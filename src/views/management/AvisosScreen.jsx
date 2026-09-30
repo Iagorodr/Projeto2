@@ -15,10 +15,13 @@ import {
   weekDiff, clientAppliesThisWeek, weekLabelPT, staffTotalHours, staffTotalPay, getAssignedClientIds,
   recomputeSharedHours,
 } from "../../models/utils.js";
+import { formatTodayLabel, T } from "../../models/i18n.js";
 import { TopBar, LangSwitcher, Field, ViewField, Sidebar } from "../shared/Layout.jsx";
 import { SectionHeader, ItemListSimple } from "../shared/AvisosWidgets.jsx";
 
 function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingItems, sentItems, setSentItems, setHorasData }) {
+  const t = T[lang].avisos;
+  const c0 = T[lang].common;
   const [formType, setFormType] = useState("reclamacao");
   const [formStaffId, setFormStaffId] = useState("");
   const [formClientId, setFormClientId] = useState("");
@@ -39,7 +42,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
 
   function handleSend() {
     if (!formStaffId || !formClientId || !formText.trim()) return;
-    setSentItems((prev) => [{ id: Date.now(), type: formType, staffId: Number(formStaffId), clientId: Number(formClientId), text: formText.trim(), date: "16/09", hasPhoto: formPhoto }, ...prev]);
+    setSentItems((prev) => [{ id: Date.now(), type: formType, staffId: Number(formStaffId), clientId: Number(formClientId), text: formText.trim(), date: isoDateStr(TODAY), hasPhoto: formPhoto }, ...prev]);
     setFormStaffId(""); setFormClientId(""); setFormText(""); setFormPhoto(false);
     setSentToast(true); setTimeout(() => setSentToast(false), 1800);
   }
@@ -58,85 +61,85 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
 
   return (
     <div style={styles.content}>
-      <TopBar lang={lang} setLang={setLang} label="Dia 16 de setembro, 2026" />
-      <h1 style={styles.title}>AVISOS</h1>
+      <TopBar lang={lang} setLang={setLang} label={formatTodayLabel(lang)} />
+      <h1 style={styles.title}>{t.title}</h1>
 
       <div style={styles.avFormCard}>
         <div style={styles.avTypeToggleRow}>
           <button style={{ ...styles.avTypeToggle, ...(formType === "reclamacao" ? styles.avTypeActiveComplaint : {}) }} onClick={() => setFormType("reclamacao")}>
-            <MessageSquare size={13} style={{ marginRight: 6 }} />Reclamação
+            <MessageSquare size={13} style={{ marginRight: 6 }} />{t.typeComplaint}
           </button>
           <button style={{ ...styles.avTypeToggle, ...(formType === "elogio" ? styles.avTypeActivePraise : {}) }} onClick={() => setFormType("elogio")}>
-            <ThumbsUp size={13} style={{ marginRight: 6 }} />Elogio
+            <ThumbsUp size={13} style={{ marginRight: 6 }} />{t.typePraise}
           </button>
           <button style={{ ...styles.avTypeToggle, ...(formType === "aviso" ? styles.avTypeActiveNotice : {}) }} onClick={() => setFormType("aviso")}>
-            <Info size={13} style={{ marginRight: 6 }} />Aviso
+            <Info size={13} style={{ marginRight: 6 }} />{t.typeNotice}
           </button>
         </div>
 
         <div style={styles.avFormRow}>
           <div style={{ flex: 1 }}>
-            <div style={styles.fieldLabel}>Funcionário</div>
+            <div style={styles.fieldLabel}>{t.formStaff}</div>
             <select style={styles.input} value={formStaffId} onChange={(e) => setFormStaffId(e.target.value)}>
-              <option value="">Escolha</option>
+              <option value="">{t.formStaffPlaceholder}</option>
               {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div style={{ flex: 1 }}>
-            <div style={styles.fieldLabel}>Cliente</div>
+            <div style={styles.fieldLabel}>{t.formClient}</div>
             <select style={styles.input} value={formClientId} onChange={(e) => setFormClientId(e.target.value)}>
-              <option value="">Escolha</option>
+              <option value="">{t.formClientPlaceholder}</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
         </div>
 
         <div style={{ marginTop: 12 }}>
-          <div style={styles.fieldLabel}>Texto</div>
-          <textarea style={styles.textarea} rows={3} placeholder="Escreva a mensagem..." value={formText} onChange={(e) => setFormText(e.target.value)} />
+          <div style={styles.fieldLabel}>{t.formText}</div>
+          <textarea style={styles.textarea} rows={3} placeholder={t.formTextPlaceholder} value={formText} onChange={(e) => setFormText(e.target.value)} />
         </div>
 
         <div style={styles.avFormFooterRow}>
           <button style={{ ...styles.avAttachButton, ...(formPhoto ? styles.avAttachActive : {}) }} onClick={() => setFormPhoto((p) => !p)}>
-            <span style={{ marginRight: 6 }}>📎</span>{formPhoto ? "Foto anexada" : "Anexar foto (opcional)"}
+            <span style={{ marginRight: 6 }}>📎</span>{formPhoto ? t.photoAttached : t.attachPhoto}
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {sentToast && <span style={styles.avSentNote}>Enviado</span>}
-            <button style={{ ...styles.saveButton, opacity: formStaffId && formClientId && formText.trim() ? 1 : 0.5 }} disabled={!formStaffId || !formClientId || !formText.trim()} onClick={handleSend}>Enviar</button>
+            {sentToast && <span style={styles.avSentNote}>{t.sent}</span>}
+            <button style={{ ...styles.saveButton, opacity: formStaffId && formClientId && formText.trim() ? 1 : 0.5 }} disabled={!formStaffId || !formClientId || !formText.trim()} onClick={handleSend}>{t.send}</button>
           </div>
         </div>
       </div>
 
-      <SectionHeader icon={PackageX} title="Solicitações" count={missingItems.filter((m) => !m.resolved).length} open={missingOpen} onToggle={() => setMissingOpen((o) => !o)} />
+      <SectionHeader icon={PackageX} title={t.sectionSolicitations} count={missingItems.filter((m) => !m.resolved).length} open={missingOpen} onToggle={() => setMissingOpen((o) => !o)} />
       {missingOpen && (
         <div style={styles.avItemsList}>
-          {missingItems.length === 0 ? <div style={styles.avNoItems}>Nada por aqui ainda.</div> : missingItems.map((m) => {
+          {missingItems.length === 0 ? <div style={styles.avNoItems}>{t.nothingHere}</div> : missingItems.map((m) => {
             const s = staffById(staff, m.staffId), c = m.clientId ? clientById(clients, m.clientId) : null;
             return (
               <div key={m.id} style={styles.avItemCard}>
                 <div style={styles.avItemTopRow}>
                   <div>
                     <div style={styles.avItemTitle}>
-                      {s ? s.name : "—"} · {m.kind === "correcao" ? "Correção de horas" : c ? c.name : "—"}
+                      {s ? s.name : "—"} · {m.kind === "correcao" ? t.correctionOfHours : c ? c.name : "—"}
                     </div>
                     <div style={styles.avItemDate}>{m.date}</div>
                   </div>
-                  <span style={{ ...styles.statusBadge, ...(m.resolved ? styles.statusActive : styles.statusInactive) }}>{m.resolved ? "Resolvido" : "Pendente"}</span>
+                  <span style={{ ...styles.statusBadge, ...(m.resolved ? styles.statusActive : styles.statusInactive) }}>{m.resolved ? c0.resolved : c0.pending}</span>
                 </div>
                 <div style={styles.avItemText}>{m.text}</div>
                 {m.response && replyingId !== m.id && (
-                  <div style={styles.avResponseBox}><div style={styles.avResponseLabel}>Sua resposta</div><div style={styles.avItemText}>{m.response}</div></div>
+                  <div style={styles.avResponseBox}><div style={styles.avResponseLabel}>{t.yourReply}</div><div style={styles.avItemText}>{m.response}</div></div>
                 )}
                 {replyingId === m.id ? (
                   <div style={styles.avResponseBox}>
-                    <textarea style={styles.textarea} rows={2} placeholder="Escreva uma resposta..." value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} />
-                    <button style={styles.avSendButtonSmall} onClick={() => sendReply(m.id)}>Enviar resposta</button>
+                    <textarea style={styles.textarea} rows={2} placeholder={t.replyPlaceholder} value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} />
+                    <button style={styles.avSendButtonSmall} onClick={() => sendReply(m.id)}>{t.sendReply}</button>
                   </div>
                 ) : (
                   <div style={styles.avItemActions}>
-                    <button style={styles.avActionOutline} onClick={() => startReply(m.id, m.response)}>Responder</button>
+                    <button style={styles.avActionOutline} onClick={() => startReply(m.id, m.response)}>{t.reply}</button>
                     <button style={styles.avActionOutline} onClick={() => toggleResolved(m.id)}>
-                      {m.resolved ? "Marcar como pendente" : m.kind === "correcao" ? "Aprovar e reabrir período" : "Marcar como resolvido"}
+                      {m.resolved ? t.markPending : m.kind === "correcao" ? t.approveAndReopen : t.markResolved}
                     </button>
                   </div>
                 )}
@@ -146,14 +149,14 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
         </div>
       )}
 
-      <SectionHeader icon={MessageSquare} title="Reclamações enviadas" count={complaints.length} open={complaintsOpen} onToggle={() => setComplaintsOpen((o) => !o)} />
-      {complaintsOpen && <ItemListSimple items={complaints} staff={staff} clients={clients} />}
+      <SectionHeader icon={MessageSquare} title={t.sectionComplaintsSent} count={complaints.length} open={complaintsOpen} onToggle={() => setComplaintsOpen((o) => !o)} />
+      {complaintsOpen && <ItemListSimple items={complaints} staff={staff} clients={clients} lang={lang} />}
 
-      <SectionHeader icon={ThumbsUp} title="Elogios" count={praises.length} open={praiseOpen} onToggle={() => setPraiseOpen((o) => !o)} />
-      {praiseOpen && <ItemListSimple items={praises} staff={staff} clients={clients} />}
+      <SectionHeader icon={ThumbsUp} title={t.sectionPraise} count={praises.length} open={praiseOpen} onToggle={() => setPraiseOpen((o) => !o)} />
+      {praiseOpen && <ItemListSimple items={praises} staff={staff} clients={clients} lang={lang} />}
 
-      <SectionHeader icon={Info} title="Avisos gerais" count={notices.length} open={noticesOpen} onToggle={() => setNoticesOpen((o) => !o)} />
-      {noticesOpen && <ItemListSimple items={notices} staff={staff} clients={clients} />}
+      <SectionHeader icon={Info} title={t.sectionNotices} count={notices.length} open={noticesOpen} onToggle={() => setNoticesOpen((o) => !o)} />
+      {noticesOpen && <ItemListSimple items={notices} staff={staff} clients={clients} lang={lang} />}
     </div>
   );
 }

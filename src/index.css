@@ -1,0 +1,25 @@
+/* Reset mínimo. O projeto estiliza tudo via objetos JS inline, mas o
+   <button> nativo tem uma cor de texto padrão própria do navegador — no
+   Safari/iOS isso aparece como um azul de "link", mesmo quando nenhuma cor
+   foi definida no botão. Sem isto, qualquer texto dentro de um <button> que
+   não define "color" explicitamente herda esse azul em vez do preto/cinza
+   do resto do app. */
+button {
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Sem isto, o navegador usa "content-box": largura declarada (ex.: 100%) +
+   padding + borda somados ficam MAIORES que o elemento pai, e isso é
+   exatamente o que causava o scroll horizontal minúsculo no mobile (ex.: o
+   cartão "phone" das telas do funcionário, ou a barra de busca com
+   width:100%). Com "border-box", padding e borda passam a ficar DENTRO da
+   largura declarada, então width:100% nunca mais estoura o pai. */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  overflow-x: hidden;
+}

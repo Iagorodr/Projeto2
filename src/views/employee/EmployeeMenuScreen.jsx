@@ -7,22 +7,31 @@ import {
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
-import { EMP_T } from "../../models/translations.js";
-import { LangSwitcher } from "../shared/Layout.jsx";
+import { T } from "../../models/i18n.js";
+import { LangSwitcher, InstallAppButton } from "../shared/Layout.jsx";
+import { LogoLockup } from "../shared/Logo.jsx";
 
-function EmployeeMenuScreen({ lang, setLang, me, onNavigate, onLogout, onSwitchToManagement, avisosBadge }) {
-  const t = EMP_T.pt;
+function EmployeeMenuScreen({ lang, setLang, me, onNavigate, onLogout, avisosBadge }) {
+  const t = T[lang].employeeMenu;
+  const isSupervisor = me.role === "supervisor";
   const items = [
-    { key: "horas", label: t.menu.horas },
-    { key: "avisos", label: t.menu.avisos, badge: avisosBadge },
-    { key: "agenda", label: t.menu.agenda },
-    { key: "clientes", label: t.menu.clientes },
-    { key: "historico", label: "HISTÓRICO" },
+    { key: "horas", label: t.registerHours },
+    { key: "avisos", label: t.notices, badge: avisosBadge },
+    { key: "agenda", label: t.agenda },
+    { key: "clientes", label: t.clients },
+    { key: "historico", label: t.history },
+    ...(isSupervisor ? [
+      { key: "monitoramento", label: t.monitoring },
+      { key: "notas", label: t.myNotes },
+    ] : []),
   ];
   return (
     <div style={mobStyles.phone}>
+      <div style={mobStyles.phoneProductRow}>
+        <LogoLockup size={18} tone="default" />
+      </div>
       <div style={mobStyles.header}>
-        <span style={mobStyles.greeting}>{t.menu.ola}, {me.name}</span>
+        <span style={mobStyles.greeting}>{t.hello}, {me.name}</span>
         <LangSwitcher lang={lang} setLang={setLang} />
       </div>
       <div style={mobStyles.menuList}>
@@ -33,9 +42,9 @@ function EmployeeMenuScreen({ lang, setLang, me, onNavigate, onLogout, onSwitchT
           </button>
         ))}
       </div>
+      <InstallAppButton lang={lang} />
       <div style={mobStyles.sairRow}>
-        <button style={mobStyles.sairLink} onClick={onLogout}>{t.menu.sair}</button>
-        <button style={mobStyles.switchLink} onClick={onSwitchToManagement}>{t.switchToMgmt}</button>
+        <button style={mobStyles.sairLink} onClick={onLogout}>{T[lang].common.logout}</button>
       </div>
     </div>
   );

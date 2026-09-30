@@ -11,13 +11,20 @@ import {
 } from "../../models/data.js";
 import {
   clientById, staffById, pad2, fmtEuro, fmtHoursNum, fmtMinutes, parseDMY, dateStrInPeriod,
-  buildClosedPeriodSnapshot, getCutoffPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr,
+  buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr,
   weekDiff, clientAppliesThisWeek, weekLabelPT, staffTotalHours, staffTotalPay, getAssignedClientIds,
   recomputeSharedHours,
 } from "../../models/utils.js";
 import { TopBar, LangSwitcher, Field, ViewField, Sidebar } from "../shared/Layout.jsx";
+import { ChevronLeftIcon, ChevronRightIcon } from "../shared/Icons.jsx";
+import { useIsMobile } from "../../hooks/useIsMobile.js";
+import { formatTodayLabel, T } from "../../models/i18n.js";
+import { exportStaffHorasPdf, exportPeriodSummaryPdf } from "../../models/pdfExport.js";
 
-function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, cutoffDay, closedPeriods, setClosedPeriods, sentItems, missingItems }) {
+function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHorasData, cutoffDay, closedPeriods, setClosedPeriods, sentItems, missingItems, setSentItems, setMissingItems }) {
+  const t = T[lang].horas;
+  const c0 = T[lang].common;
+  const pdfT = T[lang].pdf;
   const [monthOffset, setMonthOffset] = useState(0);
   const [staffSearch, setStaffSearch] = useState("");
   const [openStaffId, setOpenStaffId] = useState(null);
@@ -25,9 +32,12 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
   const [rowDraft, setRowDraft] = useState({ clientId: null, hours: "" });
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [closedToast, setClosedToast] = useState(false);
+  const isMobile = useIsMobile();
 
-  const period = getCutoffPeriod(TODAY, cutoffDay, monthOffset);
-  const periodLabel = formatPeriodLabel(period);
+  const period = monthOffset === 0
+    ? getOpenPeriod(closedPeriods, cutoffDay, TODAY)
+    : getCutoffPeriod(TODAY, cutoffDay, monthOffset);
+  const periodLabel = formatPeriodLabel(period, lang);
 
   const visibleStaff = staff.filter((s) => s.name.toLowerCase().includes(staffSearch.toLowerCase()));
   const openStaff = staff.find((s) => s.id === openStaffId);
@@ -38,8 +48,8 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
     paid: staff.filter((s) => horasData[s.id]?.paid).length,
     unpaid: staff.filter((s) => horasData[s.id]?.status === "finalizado" && !horasData[s.id]?.paid).length,
   };
-  const periodTotalHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }), 0);
-  const periodTotalEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients), 0);
+  const periodTotalHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }, period), 0);
+  const periodTotalEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, period), 0);
   const canClosePeriod = staff.length > 0 && staff.every((s) => horasData[s.id]?.paid);
 
   function closePeriod() {
@@ -47,14 +57,52 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
     setClosedPeriods((prev) => [snapshot, ...prev]);
     setHorasData((prev) => {
       const next = {};
-      staff.forEach((s) => { next[s.id] = { status: "pendente", paid: false, entries: [], lockedWeeks: {}, reopened: false }; });
+      staff.forEach((s) => {
+        const current = prev[s.id] || { status: "pendente", paid: false, entries: [], lockedWeeks: {}, noClientDays: [], reopened: false };
+        const keptEntries = current.entries.filter((e) => !dateStrInPeriod(e.date, period));
+        const keptLockedWeeks = {};
+        Object.entries(current.lockedWeeks || {}).forEach(([weekKey, val]) => {
+          if (!dateStrInPeriod(weekKey, period)) keptLockedWeeks[weekKey] = val;
+        });
+        const keptNoClientDays = (current.noClientDays || []).filter((d) => !dateStrInPeriod(d, period));
+        next[s.id] = { ...current, status: "pendente", paid: false, entries: keptEntries, lockedWeeks: keptLockedWeeks, noClientDays: keptNoClientDays, reopened: false };
+      });
       return next;
     });
+    setSentItems((prev) => prev.filter((i) => !dateStrInPeriod(i.date, period)));
+    setMissingItems((prev) => prev.filter((i) => !dateStrInPeriod(i.date, period)));
     setCloseConfirmOpen(false);
     setClosedToast(true);
     setTimeout(() => setClosedToast(false), 2200);
   }
-  function exportPeriodPdf() { window.print(); }
+  function exportPeriodPdf() {
+    const rows = staff.map((s) => {
+      const h = horasData[s.id] || { status: "pendente", paid: false, entries: [] };
+      return { name: s.name, paid: h.paid, status: h.status, hours: staffTotalHours(h, period), value: staffTotalPay(h, clients, period) };
+    });
+    exportPeriodSummaryPdf({
+      companyName: company?.name,
+      periodLabel,
+      rows,
+      totalHours: periodTotalHours,
+      totalValue: periodTotalEuros,
+      pdfT,
+      statusLabels: { paid: c0.paid, finished: t.statusFinished, pending: c0.pending },
+    });
+  }
+  function exportStaffPdf() {
+    exportStaffHorasPdf({
+      companyName: company?.name,
+      staffName: openStaff.name,
+      periodLabel,
+      entries: openHoras.entries,
+      clients,
+      totalHours: staffTotalHours(openHoras, period),
+      totalValue: staffTotalPay(openHoras, clients, period),
+      lang,
+      pdfT,
+    });
+  }
 
   function updateHoras(staffId, updater) {
     setHorasData((prev) => ({ ...prev, [staffId]: updater(prev[staffId]) }));
@@ -97,42 +145,42 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
 
       <div style={styles.horSearchKpiRow}>
         <div style={styles.horSearchWrap}>
-          <input value={staffSearch} onChange={(e) => setStaffSearch(e.target.value)} placeholder="Pesquisar Funcionario" style={styles.defTextInput} />
+          <input value={staffSearch} onChange={(e) => setStaffSearch(e.target.value)} placeholder={t.searchPlaceholder} style={styles.defTextInput} />
         </div>
         <div style={styles.horKpiBox}>
-          <div style={styles.horKpiBoxItem}><div style={styles.horKpiBoxLabel}>Pendentes</div><div style={styles.horKpiBoxValue}>{kpiCounts.pending}</div></div>
-          <div style={styles.horKpiBoxItem}><div style={styles.horKpiBoxLabel}>Pagos</div><div style={styles.horKpiBoxValue}>{kpiCounts.paid}</div></div>
-          <div style={styles.horKpiBoxItem}><div style={styles.horKpiBoxLabel}>Não pagos</div><div style={styles.horKpiBoxValue}>{kpiCounts.unpaid}</div></div>
+          <div style={styles.horKpiBoxItem}><div style={styles.horKpiBoxLabel}>{t.kpiPending}</div><div style={styles.horKpiBoxValue}>{kpiCounts.pending}</div></div>
+          <div style={styles.horKpiBoxItem}><div style={styles.horKpiBoxLabel}>{t.kpiPaid}</div><div style={styles.horKpiBoxValue}>{kpiCounts.paid}</div></div>
+          <div style={styles.horKpiBoxItem}><div style={styles.horKpiBoxLabel}>{t.kpiUnpaid}</div><div style={styles.horKpiBoxValue}>{kpiCounts.unpaid}</div></div>
         </div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={styles.horPeriodTotal}>Total do período: {fmtHoursNum(periodTotalHours)}h · {fmtEuro(periodTotalEuros)}</div>
+        <div style={styles.horPeriodTotal}>{t.periodTotal}: {fmtHoursNum(periodTotalHours)}h · {fmtEuro(periodTotalEuros)}</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button style={styles.cancelButton} onClick={exportPeriodPdf}>Exportar PDF (geral)</button>
+          <button style={styles.cancelButton} onClick={exportPeriodPdf}>{t.exportPdfGeneral}</button>
           <button
             style={{ ...styles.saveButton, opacity: canClosePeriod ? 1 : 0.5, cursor: canClosePeriod ? "pointer" : "not-allowed" }}
             disabled={!canClosePeriod}
             onClick={() => setCloseConfirmOpen(true)}
           >
-            Fechar período
+            {t.closePeriod}
           </button>
         </div>
       </div>
       {!canClosePeriod && (
         <div style={{ ...styles.defSettingHint, marginTop: -8, marginBottom: 16 }}>
-          "Fechar período" libera quando todos os funcionários estiverem marcados como Pago.
+          {t.closePeriodHint}
         </div>
       )}
-      {closedToast && <div style={{ ...styles.avSentNote, marginBottom: 12, display: "block" }}>Período fechado e enviado para o Histórico. Um novo período já começou.</div>}
+      {closedToast && <div style={{ ...styles.avSentNote, marginBottom: 12, display: "block" }}>{t.closedToast}</div>}
 
-      <div style={styles.tableWrap}>
+      <div style={isMobile ? { ...styles.tableWrap, overflowX: "auto" } : styles.tableWrap}>
         <div style={styles.tableHeaderRow}>
-          <div style={{ ...styles.th, flex: 2 }}>Funcionário</div>
-          <div style={{ ...styles.th, flex: 1 }}>Status</div>
-          <div style={{ ...styles.th, flex: 1 }}>Total de horas</div>
-          <div style={{ ...styles.th, flex: 1 }}>Total a pagar</div>
-          <div style={{ ...styles.th, flex: 1.2, textAlign: "center" }}>Pago</div>
+          <div style={{ ...styles.th, flex: 2 }}>{t.colStaff}</div>
+          <div style={{ ...styles.th, flex: 1 }}>{t.colStatus}</div>
+          <div style={{ ...styles.th, flex: 1 }}>{t.colTotalHours}</div>
+          <div style={{ ...styles.th, flex: 1 }}>{t.colTotalPay}</div>
+          <div style={{ ...styles.th, flex: 1.2, textAlign: "center" }}>{t.colPaid}</div>
         </div>
         {visibleStaff.map((s) => {
           const h = horasData[s.id] || { status: "pendente", paid: false, entries: [] };
@@ -143,12 +191,12 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
               <div style={{ ...styles.td, flex: 2, fontWeight: 600 }}>{s.name}</div>
               <div style={{ ...styles.td, flex: 1 }}>
                 <span style={{ ...styles.statusBadge, ...(h.paid ? styles.horStatusPaid : h.status === "finalizado" ? styles.horStatusDone : styles.horStatusPending) }}>
-                  {h.paid ? "Pago" : h.status === "finalizado" ? "Finalizado" : "Pendente"}
+                  {h.paid ? c0.paid : h.status === "finalizado" ? t.statusFinished : c0.pending}
                 </span>
                 {pendingExtras > 0 && <span style={styles.horPendingExtraDot} />}
               </div>
-              <div style={{ ...styles.td, flex: 1 }}>{fmtHoursNum(staffTotalHours(h))}h</div>
-              <div style={{ ...styles.td, flex: 1 }}>{fmtEuro(staffTotalPay(h, clients))}</div>
+              <div style={{ ...styles.td, flex: 1 }}>{fmtHoursNum(staffTotalHours(h, period))}h</div>
+              <div style={{ ...styles.td, flex: 1 }}>{fmtEuro(staffTotalPay(h, clients, period))}</div>
               <div style={{ ...styles.td, flex: 1.2, justifyContent: "center" }}>
                 <button
                   style={{
@@ -173,14 +221,17 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
             <div style={styles.modalHeader}>
               <div>
                 <div style={styles.modalTitle}>{openStaff.name}</div>
-                <div style={styles.modalSubtitle}>Período: {periodLabel}</div>
+                <div style={styles.modalSubtitle}>{t.periodTotal}: {periodLabel}</div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={styles.horPeriodTotal}>{fmtEuro(staffTotalPay(openHoras, clients))}</div>
-                <button style={styles.horCancelSmall} onClick={() => window.print()}>Exportar PDF</button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ ...styles.horPeriodTotal, background: COLORS.bg, color: COLORS.text }}>{t.totalHoursLabel}: {fmtHoursNum(staffTotalHours(openHoras, period))}h</div>
+                  <div style={styles.horPeriodTotal}>{t.amountToReceiveLabel}: {fmtEuro(staffTotalPay(openHoras, clients, period))}</div>
+                </div>
+                <button style={styles.horCancelSmall} onClick={exportStaffPdf}>{t.exportPdf}</button>
                 {openHoras.status === "finalizado" && !openHoras.paid && (
                   <button style={styles.horCancelSmall} onClick={() => reopenForCorrection(openStaff.id)}>
-                    Reabrir para correção
+                    {t.reopenForCorrection}
                   </button>
                 )}
                 <button
@@ -196,7 +247,7 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
                   onClick={() => togglePaid(openStaff.id)}
                 >
                   {openHoras.paid && <Check size={12} />}
-                  <span style={{ marginLeft: 6 }}>{openHoras.paid ? "Pago" : "Marcar como pago"}</span>
+                  <span style={{ marginLeft: 6 }}>{openHoras.paid ? c0.paid : t.markAsPaid}</span>
                 </button>
                 <button style={styles.modalClose} onClick={() => { setOpenStaffId(null); setEditingIndex(null); }}><X size={16} /></button>
               </div>
@@ -204,11 +255,11 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
 
             <div style={styles.horReportTable}>
               <div style={styles.horReportHeaderRow}>
-                <div style={{ ...styles.horRth, flex: 1 }}>Data</div>
-                <div style={{ ...styles.horRth, flex: 2 }}>Cliente</div>
-                <div style={{ ...styles.horRth, flex: 1 }}>Qtd Horas</div>
-                <div style={{ ...styles.horRth, flex: 1 }}>Valor Hora €</div>
-                <div style={{ ...styles.horRth, flex: 1 }}>Total €</div>
+                <div style={{ ...styles.horRth, flex: 1 }}>{t.repDate}</div>
+                <div style={{ ...styles.horRth, flex: 2 }}>{t.repClient}</div>
+                <div style={{ ...styles.horRth, flex: 1 }}>{t.repHours}</div>
+                <div style={{ ...styles.horRth, flex: 1 }}>{t.repValueHour}</div>
+                <div style={{ ...styles.horRth, flex: 1 }}>{t.repTotal}</div>
                 <div style={{ ...styles.horRth, flex: 1.8 }} />
               </div>
               {openHoras.entries.map((e, i) => {
@@ -232,8 +283,8 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
                         <div style={{ ...styles.horRtd, flex: 1 }}>{fmtEuro(valueHour)}</div>
                         <div style={{ ...styles.horRtd, flex: 1 }}>{fmtEuro((Number(rowDraft.hours) || 0) * valueHour)}</div>
                         <div style={{ flex: 1.8, display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                          <button style={styles.horCancelSmall} onClick={cancelEditRow}>Cancelar</button>
-                          <button style={styles.horApproveButton} onClick={() => saveEditRow(openStaff.id, i)}>Guardar</button>
+                          <button style={styles.horCancelSmall} onClick={cancelEditRow}>{c0.cancel}</button>
+                          <button style={styles.horApproveButton} onClick={() => saveEditRow(openStaff.id, i)}>{c0.save}</button>
                         </div>
                       </>
                     ) : (
@@ -247,17 +298,17 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
                         <div style={{ flex: 1.8, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
                           {e.voided ? (
                             <span style={styles.horVoidedTag}>
-                              Anulada
+                              {t.voided}
                               {!locked && <button style={styles.horUndoButton} onClick={() => toggleVoid(openStaff.id, i)}><RotateCcw size={11} /></button>}
                             </span>
                           ) : (
                             <>
                               {e.extra && (e.approved ? (
                                 <span style={styles.horApprovedTag}>
-                                  <Check size={11} style={{ marginRight: 3 }} />Aprovada
+                                  <Check size={11} style={{ marginRight: 3 }} />{t.approved}
                                   {!locked && <button style={styles.horUndoButton} onClick={() => revertApproval(openStaff.id, i)}><RotateCcw size={11} /></button>}
                                 </span>
-                              ) : (!locked && <button style={styles.horApproveButton} onClick={() => approveEntry(openStaff.id, i)}>Aprovar</button>))}
+                              ) : (!locked && <button style={styles.horApproveButton} onClick={() => approveEntry(openStaff.id, i)}>{t.approve}</button>))}
                               {!locked && <button style={styles.horEditRowButton} onClick={() => startEditRow(i, e)}><Pencil size={12} /></button>}
                               {!locked && <button style={styles.horVoidRowButton} onClick={() => toggleVoid(openStaff.id, i)}><X size={12} /></button>}
                             </>
@@ -276,13 +327,13 @@ function HorasScreen({ lang, setLang, clients, staff, horasData, setHorasData, c
       {closeConfirmOpen && (
         <div style={styles.modalOverlay} onClick={() => setCloseConfirmOpen(false)}>
           <div style={{ ...styles.modalCard, maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalTitle}>Fechar este período?</div>
+            <div style={styles.modalTitle}>{t.closeConfirmTitle}</div>
             <div style={{ ...styles.defSettingHint, marginBottom: 16 }}>
-              {periodLabel} vai para o Histórico com {fmtHoursNum(periodTotalHours)}h e {fmtEuro(periodTotalEuros)} registados. Um novo período em branco começa imediatamente para todos os funcionários. Isso não pode ser desfeito.
+              {t.closeConfirmBody(periodLabel, fmtHoursNum(periodTotalHours), fmtEuro(periodTotalEuros))}
             </div>
             <div style={styles.modalActions}>
-              <button style={styles.cancelButton} onClick={() => setCloseConfirmOpen(false)}>Cancelar</button>
-              <button style={styles.saveButton} onClick={closePeriod}>Sim, fechar período</button>
+              <button style={styles.cancelButton} onClick={() => setCloseConfirmOpen(false)}>{c0.cancel}</button>
+              <button style={styles.saveButton} onClick={closePeriod}>{t.confirmClose}</button>
             </div>
           </div>
         </div>

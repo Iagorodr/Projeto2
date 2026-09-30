@@ -17,15 +17,15 @@ import {
   getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk,
   buildWeekChunkSequence, weekChunksOfPayPeriod, calPeriodDays, calPeriodLabel,
 } from "../../models/utils.js";
-import { EMP_T } from "../../models/translations.js";
+import { T } from "../../models/i18n.js";
 import { LangSwitcher } from "../shared/Layout.jsx";
 
-function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assignments }) {
-  const t = EMP_T.pt.clientes;
+function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assignments, canViewAll }) {
+  const t = T[lang].employeeClientes;
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState(null);
   const myClientIds = getAssignedClientIds(assignments, staffId);
-  const myClients = clients.filter((c) => myClientIds.includes(c.id));
+  const myClients = canViewAll ? clients : clients.filter((c) => myClientIds.includes(c.id));
   const filtered = myClients.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -38,7 +38,7 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
       </div>
       <div style={mobStyles.searchWrap}>
         <Search size={16} color={COLORS.textSoft} />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.search} style={mobStyles.searchInput} />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} style={mobStyles.searchInput} />
       </div>
       {filtered.length === 0 ? (
         <div style={mobStyles.emptyState}>{t.noResults}</div>
@@ -54,7 +54,7 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
                     <div style={mobStyles.iconCircle}><Icon size={18} color={COLORS.primaryDark} /></div>
                     <div style={{ textAlign: "left", minWidth: 0 }}>
                       <div style={mobStyles.clientName}>{c.name} - {c.availability}</div>
-                      <div style={mobStyles.clientSub}>{fmtMinutes(c.duration)}/dia · {(c.days || []).length}x semana</div>
+                      <div style={mobStyles.clientSub}>{fmtMinutes(c.duration)} · {(c.days || []).length}x</div>
                     </div>
                   </div>
                   <ChevronDown size={16} color={COLORS.textSoft} style={{ transform: isExpanded ? "rotate(180deg)" : "none" }} />
@@ -65,7 +65,16 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
                       <div style={mobStyles.detailLabel}>{t.address}</div>
                       <div style={mobStyles.addressRow}>
                         <span style={mobStyles.detailText}>{c.address}</span>
-                        <span style={mobStyles.mapLink}><MapPin size={12} style={{ marginRight: 4 }} />{t.openMap}</span>
+                        {c.address && (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ ...mobStyles.mapLink, textDecoration: "none" }}
+                          >
+                            <MapPin size={12} style={{ marginRight: 4 }} />{t.openMap}
+                          </a>
+                        )}
                       </div>
                     </div>
                     {c.description && <div style={mobStyles.detailBlock}><div style={mobStyles.detailLabel}>{t.description}</div><div style={mobStyles.detailText}>{c.description}</div></div>}

@@ -14,10 +14,13 @@ import {
   getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk,
   buildWeekChunkSequence, weekChunksOfPayPeriod, calPeriodDays, calPeriodLabel,
 } from "../../models/utils.js";
-import { EMP_T } from "../../models/translations.js";
+import { T } from "../../models/i18n.js";
 import { LangSwitcher } from "../shared/Layout.jsx";
+import { exportStaffHorasPdf } from "../../models/pdfExport.js";
 
-function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, closedPeriods }) {
+function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, company, clients, closedPeriods }) {
+  const t = T[lang].employeeHistorico;
+  const pdfT = T[lang].pdf;
   const [openId, setOpenId] = useState(null);
   const mine = closedPeriods.filter((p) => p.staffSummaries.some((s) => s.staffId === staffId));
   const open = mine.find((p) => p.id === openId);
@@ -31,10 +34,10 @@ function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, closedPeriods
         </button>
         <LangSwitcher lang={lang} setLang={setLang} />
       </div>
-      <h1 style={mobStyles.title}>HISTÓRICO</h1>
+      <h1 style={mobStyles.title}>{t.title}</h1>
 
       {mine.length === 0 ? (
-        <div style={mobStyles.emptyState}>Nenhum mês fechado ainda.</div>
+        <div style={mobStyles.emptyState}>{t.noneYet}</div>
       ) : (
         <div style={mobStyles.dayList}>
           {mine.map((p) => {
@@ -59,22 +62,50 @@ function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, closedPeriods
           <div style={mobStyles.modalOverlay} onClick={() => setOpenId(null)}>
             <div style={{ ...mobStyles.modalCard, maxWidth: 340 }} onClick={(e) => e.stopPropagation()}>
               <div style={mobStyles.modalTitle}>{open.periodLabel}</div>
-              <div style={{ ...mobStyles.modalQuestion, marginBottom: 4 }}>Fechado em {open.closedAt}</div>
-              <div style={{ maxHeight: 220, overflowY: "auto", marginBottom: 12 }}>
-                {line && line.entries.map((e, i) => (
-                  <div key={i} style={mobStyles.selectedRow}>
-                    <div style={mobStyles.selectedName}>{e.date}</div>
-                    <div style={mobStyles.selectedDuration}>{fmtMinutes(Math.round(e.hours * 60))}</div>
-                  </div>
-                ))}
+              <div style={{ ...mobStyles.modalQuestion, marginBottom: 4 }}>{t.closedAt} {open.closedAt}</div>
+              <div style={{ display: "flex", gap: 8, marginTop: 6, marginBottom: 12 }}>
+                <div style={{ flex: 1, background: COLORS.bg, borderRadius: 10, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 11, color: COLORS.textSoft }}>{t.total}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>{fmtHoursNum(line ? line.hours : 0)}h</div>
+                </div>
+                <div style={{ flex: 1, background: COLORS.bg, borderRadius: 10, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 11, color: COLORS.textSoft }}>{t.receivedValue}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.primaryDark }}>{fmtEuro(line ? line.euros : 0)}</div>
+                </div>
               </div>
-              <div style={{ ...mobStyles.selectedHeader, display: "flex", justifyContent: "space-between" }}>
-                <span>Total</span>
-                <strong>{fmtHoursNum(line ? line.hours : 0)}h · {fmtEuro(line ? line.euros : 0)}</strong>
+              <div style={{ maxHeight: 220, overflowY: "auto", marginBottom: 12 }}>
+                {line && line.entries.map((e, i) => {
+                  const c = clientById(clients, e.clientId);
+                  const [, m, d] = e.date.split("-");
+                  return (
+                    <div key={i} style={{ ...mobStyles.selectedRow, alignItems: "center" }}>
+                      <div style={{ minWidth: 34, fontSize: 12, color: COLORS.textSoft, fontVariantNumeric: "tabular-nums" }}>{d}/{m}</div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={mobStyles.selectedName}>{c ? c.name : "—"}</div>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>{fmtMinutes(Math.round(e.hours * 60))}</div>
+                    </div>
+                  );
+                })}
               </div>
               <div style={mobStyles.modalActions}>
-                <button style={mobStyles.modalCancel} onClick={() => window.print()}>Exportar PDF</button>
-                <button style={mobStyles.modalConfirm} onClick={() => setOpenId(null)}>Fechar</button>
+                <button
+                  style={mobStyles.modalCancel}
+                  onClick={() => exportStaffHorasPdf({
+                    companyName: company?.name,
+                    staffName: line ? line.name : "",
+                    periodLabel: open.periodLabel,
+                    entries: line ? line.entries : [],
+                    clients,
+                    totalHours: line ? line.hours : 0,
+                    totalValue: line ? line.euros : 0,
+                    lang,
+                    pdfT,
+                  })}
+                >
+                  {t.exportPdf}
+                </button>
+                <button style={mobStyles.modalConfirm} onClick={() => setOpenId(null)}>{t.close}</button>
               </div>
             </div>
           </div>

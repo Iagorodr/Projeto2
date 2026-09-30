@@ -1,4 +1,6 @@
 // Textos da interface do lado do funcionário (mobile). Ainda só em português.
+import { WEEKDAY_FULL_PT } from "./data.js";
+import { pad2 } from "./utils.js";
 
 const EMP_T = {
   pt: {

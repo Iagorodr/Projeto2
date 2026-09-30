@@ -17,12 +17,13 @@ import {
   getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk,
   buildWeekChunkSequence, weekChunksOfPayPeriod, calPeriodDays, calPeriodLabel,
 } from "../../models/utils.js";
-import { EMP_T } from "../../models/translations.js";
+import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { LangSwitcher } from "../shared/Layout.jsx";
 import { ChevronLeftMini, ChevronRightMini, Minus2 } from "../shared/Icons.jsx";
 
 function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, clients, assignments }) {
-  const t = EMP_T.pt.agenda;
+  const t = T[lang].employeeAgenda;
+  const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
   const [weekStart, setWeekStart] = useState(() => startOfISOWeek(TODAY));
   const [expandedDay, setExpandedDay] = useState(TODAY.getDay() === 0 ? 7 : TODAY.getDay());
 
@@ -46,7 +47,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, clients, assignm
       <h1 style={mobStyles.title}>{t.title}</h1>
       <div style={mobStyles.weekNav}>
         <button style={mobStyles.periodNav} onClick={() => goWeek(-1)}><ChevronLeftMini /></button>
-        <span style={mobStyles.weekLabel}>{weekLabelPT(weekStart)}</span>
+        <span style={mobStyles.weekLabel}>{weekLabelPT(weekStart, lang)}</span>
         <button style={mobStyles.periodNav} onClick={() => goWeek(1)}><ChevronRightMini /></button>
       </div>
       <div style={mobStyles.dayList}>
@@ -59,7 +60,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, clients, assignm
             <div key={day} style={mobStyles.dayCard}>
               <button style={{ ...mobStyles.agendaDayHeader, borderBottom: isExpanded ? `1px solid ${COLORS.border}` : "none" }} onClick={() => setExpandedDay(isExpanded ? null : day)}>
                 <span style={mobStyles.dayHeaderLeft}>
-                  <span style={mobStyles.dayAbbrBold}>{DAY_LABELS_1_7[day]}</span>
+                  <span style={mobStyles.dayAbbrBold}>{dayLabels[day]}</span>
                   {isToday && <span style={mobStyles.todayDot} />}
                 </span>
                 <span style={mobStyles.dayTotalPill}>{fmtMinutes(totalMin)}</span>
@@ -78,7 +79,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, clients, assignm
                                 <div style={mobStyles.chipName}>{c.name}</div>
                                 <div style={mobStyles.chipMeta}>
                                   {fmtMinutes(c.duration)}
-                                  {c.frequency !== "weekly" && <> · {t.freq[c.frequency]}</>}
+                                  {c.frequency !== "weekly" && <> · {c.frequency === "weekly" ? t.freqWeekly : c.frequency === "biweekly" ? t.freqBiweekly : t.freqMonthly}</>}
                                   {c.availability && <> · {c.availability}</>}
                                 </div>
                               </div>

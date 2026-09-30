@@ -3,10 +3,15 @@ import {
   ChevronDown, ChevronRight, LayoutDashboard, Users, CalendarDays, Clock, Bell, UsersRound, Settings,
   Search, X, Pencil, Mail, Phone, Briefcase, Calendar, KeyRound, MapPin, Euro, RotateCcw, Check,
   Plus, Store, Building2, Home as HouseIcon, Factory, MessageSquare, ThumbsUp, PackageX, Info, Archive,
+  Download, Share,
 } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { LANG_NAMES, MENU_ITEMS } from "../../models/data.js";
+import { T } from "../../models/i18n.js";
+import { LogoLockup, LogoMark } from "./Logo.jsx";
+import { useIsMobile } from "../../hooks/useIsMobile.js";
+import { useInstallPrompt } from "../../hooks/useInstallPrompt.js";
 
 function LangSwitcher({ lang, setLang }) {
   const [open, setOpen] = useState(false);
@@ -33,33 +38,62 @@ function LangSwitcher({ lang, setLang }) {
   );
 }
 
-function Sidebar({ activeKey, onNavigate, onLogout, company }) {
+function Sidebar({ activeKey, onNavigate, onLogout, company, lang, items, labels, brandOverride }) {
+  const t = labels || T[lang].sidebar;
+  const menuItems = items || MENU_ITEMS;
+  const brandName = brandOverride ? brandOverride.name : company.name;
+  const brandSub = brandOverride ? brandOverride.sub : company.email;
+  const isMobile = useIsMobile();
+
+  // No desktop a barra mostra logo + nome da empresa + rótulo de cada
+  // item. Num ecrã estreito isso não cabe, então vira uma faixa fina só
+  // com os ícones — a navegação continua igual, só sem o texto.
+  const sidebarStyle = isMobile
+    ? { ...styles.sidebar, width: 64, padding: "14px 6px", alignItems: "center" }
+    : styles.sidebar;
+  const menuItemStyle = (active) => {
+    const base = { ...styles.menuItem, ...(active ? styles.menuItemActive : {}) };
+    return isMobile ? { ...base, justifyContent: "center", padding: "10px 0", gap: 0 } : base;
+  };
+
   return (
-    <div style={styles.sidebar}>
-      <div style={styles.brand}>
-        <div style={styles.avatar}>{!company.hasPhoto && company.name.slice(0, 1)}</div>
-        <div>
-          <div style={styles.brandName}>{company.name}</div>
-          <div style={styles.brandEmail}>{company.email}</div>
-        </div>
+    <div style={sidebarStyle}>
+      <div style={isMobile ? { ...styles.sidebarProductRow, padding: "8px", display: "flex", justifyContent: "center" } : styles.sidebarProductRow}>
+        {isMobile ? <LogoMark size={20} tone="default" /> : <LogoLockup size={20} tone="default" />}
       </div>
+      {!isMobile && (
+        <div style={styles.brand}>
+          <div style={styles.avatar}>
+            {!brandOverride && company.photoUrl ? <img src={company.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : brandName.slice(0, 1)}
+          </div>
+          <div>
+            <div style={styles.brandName}>{brandName}</div>
+            <div style={styles.brandEmail}>{brandSub}</div>
+          </div>
+        </div>
+      )}
       <div style={styles.menuList}>
-        {MENU_ITEMS.map((item) => {
+        {menuItems.map((item) => {
           const Icon = item.icon;
           const active = item.key === activeKey;
           return (
             <button
               key={item.key}
-              style={{ ...styles.menuItem, ...(active ? styles.menuItemActive : {}) }}
+              style={menuItemStyle(active)}
               onClick={() => onNavigate(item.key)}
+              title={isMobile ? t[item.key] : undefined}
             >
-              <Icon size={16} />
-              <span>{item.label}</span>
+              <span style={{ ...styles.menuIconWrap, ...(active ? styles.menuIconWrapActive : {}) }}>
+                <Icon size={15} />
+              </span>
+              {!isMobile && <span>{t[item.key]}</span>}
             </button>
           );
         })}
       </div>
-      <button style={styles.sairRow} onClick={onLogout}>Sair</button>
+      <button style={{ ...styles.sairRow, ...(isMobile ? { fontSize: 11, padding: "8px 0" } : {}) }} onClick={onLogout} title={isMobile ? T[lang].common.logout : undefined}>
+        {isMobile ? "⏻" : T[lang].common.logout}
+      </button>
     </div>
   );
 }
@@ -73,12 +107,71 @@ function TopBar({ lang, setLang, label }) {
   );
 }
 
-function Field({ label, full, children }) {
+function Field({ label, full, required, error, children }) {
   return (
     <div style={{ gridColumn: full ? "1 / -1" : "auto" }}>
-      <div style={styles.fieldLabel}>{label}</div>
+      <div style={styles.fieldLabel}>
+        {label}
+        {required && <span style={{ color: COLORS.extra }}> *</span>}
+      </div>
       {children}
+      {error && <div style={styles.fieldError}>{error}</div>}
     </div>
+  );
+}
+
+// Botão "Baixar app": no Android/Chrome dispara o diálogo nativo de
+// instalação (guardado via beforeinstallprompt). No iOS a Apple não deixa
+// disparar isso por código — lá abrimos um pop-up com o passo a passo
+// manual (Partilhar > Adicionar ao Ecrã Principal). Se a app já está
+// instalada, ou se o navegador não oferece nenhum dos dois caminhos
+// (ex.: desktop), o botão simplesmente não aparece.
+function InstallAppButton({ lang }) {
+  const t = T[lang].common;
+  const { installed, isIOS, canPromptNative, promptInstall } = useInstallPrompt();
+  const [showIOSHelp, setShowIOSHelp] = useState(false);
+
+  if (installed || (!canPromptNative && !isIOS)) return null;
+
+  function handleClick() {
+    if (canPromptNative) promptInstall();
+    else if (isIOS) setShowIOSHelp(true);
+  }
+
+  return (
+    <>
+      <button style={styles.installAppButton} onClick={handleClick}>
+        <Download size={14} style={{ marginRight: 6 }} />
+        {t.installApp}
+      </button>
+      {showIOSHelp && (
+        <div style={styles.modalOverlay} onClick={() => setShowIOSHelp(false)}>
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalTitle}>{t.installAppIOSTitle}</div>
+              <button style={styles.modalClose} onClick={() => setShowIOSHelp(false)}><X size={16} /></button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <Share size={16} color={COLORS.primaryDark} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div style={styles.defSettingHint}>{t.installAppIOSStep1}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <Plus size={16} color={COLORS.primaryDark} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div style={styles.defSettingHint}>{t.installAppIOSStep2}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <Check size={16} color={COLORS.primaryDark} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div style={styles.defSettingHint}>{t.installAppIOSStep3}</div>
+              </div>
+            </div>
+            <div style={styles.modalActions}>
+              <button style={styles.saveButton} onClick={() => setShowIOSHelp(false)}>{t.gotIt}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -94,4 +187,4 @@ function ViewField({ label, full, icon: Icon, children }) {
   );
 }
 
-export { LangSwitcher, Sidebar, TopBar, Field, ViewField };
+export { LangSwitcher, Sidebar, TopBar, Field, ViewField, InstallAppButton };

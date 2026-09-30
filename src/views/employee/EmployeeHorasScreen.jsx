@@ -3,6 +3,7 @@ import {
   ChevronDown, ChevronRight, LayoutDashboard, Users, CalendarDays, Clock, Bell, UsersRound, Settings,
   Search, X, Pencil, Mail, Phone, Briefcase, Calendar, KeyRound, MapPin, Euro, RotateCcw, Check,
   Plus, Store, Building2, Home as HouseIcon, Factory, MessageSquare, ThumbsUp, PackageX, Info, Archive,
+  AlertTriangle,
 } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
@@ -11,22 +12,32 @@ import {
   TYPE_ICONS, MONTHS_ABBR_PT, DAY_LABELS_1_7, AGENDA_DAYS, TODAY, WEEKDAY_FULL_PT, DAY_ABBR_SUN0_PT,
 } from "../../models/data.js";
 import {
-  clientById, staffById, pad2, fmtEuro, fmtHoursNum, fmtMinutes, parseDMY, dateStrInPeriod,
+  clientById, dayIsCovered, staffById, pad2, fmtEuro, fmtHoursNum, fmtMinutes, parseDMY, dateStrInPeriod,
   startOfISOWeek, addDays, isoDateStr, weekDiff, clientAppliesThisWeek, weekLabelPT,
   getAssignedClientIds, recomputeSharedHours, getCutoffPeriod, formatPeriodLabel,
-  getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk,
-  buildWeekChunkSequence, weekChunksOfPayPeriod, calPeriodDays, calPeriodLabel,
+  getWeekChunk, getWeekChunkFor, nextWeekChunk, prevWeekChunk,
+  buildWeekChunkSequence, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel,
+  getOpenPeriod,
 } from "../../models/utils.js";
-import { EMP_T } from "../../models/translations.js";
+import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG } from "../../models/i18n.js";
 import { LangSwitcher } from "../shared/Layout.jsx";
 import { ChevronLeftMini, ChevronRightMini, Minus2 } from "../shared/Icons.jsx";
 
-function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, assignments, horasData, setHorasData, cutoffDay, setMissingItems }) {
-  const t = EMP_T.pt.horas;
+function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems }) {
+  const t = T[lang].employeeHoras;
+  const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang];
+  const weekdayFull = WEEKDAY_FULL_BY_LANG[lang];
   const myClients = clients.filter((c) => getAssignedClientIds(assignments, staffId).includes(c.id));
 
+  const payPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
+  const payPeriodChunks = weekBlocksOfPayPeriod(payPeriod, cutoffDay);
+
   const [chunkIndex, setChunkIndex] = useState(null);
-  const [chunks] = useState(() => buildWeekChunkSequence(TODAY, cutoffDay, 3, 8));
+  const [chunks] = useState(() => {
+    const todayBlockIndex = payPeriodChunks.findIndex((b) => TODAY >= b.start && TODAY <= b.end);
+    const countBefore = todayBlockIndex >= 0 ? todayBlockIndex : (TODAY > payPeriod.end ? payPeriodChunks.length : 0);
+    return buildWeekChunkSequence(TODAY, cutoffDay, countBefore, 8);
+  });
   const anchorIndex = chunks.anchorIndex;
   const idx = chunkIndex === null ? anchorIndex : chunkIndex;
   const chunk = chunks.list[idx];
@@ -41,7 +52,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [missingConfirmOpen, setMissingConfirmOpen] = useState(false);
   const [missingDays, setMissingDays] = useState([]);
-  const [reviewMode, setReviewMode] = useState(null); // null | 'view'
+  const [reviewMode, setReviewMode] = useState(null);
   const [finalizeMonthConfirmOpen, setFinalizeMonthConfirmOpen] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionText, setCorrectionText] = useState("");
@@ -49,13 +60,18 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
 
   const myHoras = horasData[staffId] || { status: "pendente", paid: false, entries: [], lockedWeeks: {} };
   const chunkKey = isoDateStr(chunk.start);
-  const weekLockedFlag = !!(myHoras.lockedWeeks && myHoras.lockedWeeks[chunkKey]);
+  const weekLockedRaw = !!(myHoras.lockedWeeks && myHoras.lockedWeeks[chunkKey]);
   const monthFinalized = myHoras.status === "finalizado";
 
-  const payPeriod = getPayPeriodFor(chunk.start, cutoffDay);
-  const payPeriodChunks = weekChunksOfPayPeriod(payPeriod, cutoffDay);
-  const allWeeksFinalized = payPeriodChunks.every((c) => !!(myHoras.lockedWeeks && myHoras.lockedWeeks[isoDateStr(c.start)]));
-  const finalizedCount = payPeriodChunks.filter((c) => !!(myHoras.lockedWeeks && myHoras.lockedWeeks[isoDateStr(c.start)])).length;
+  const chunkZone = chunk.end < payPeriod.start ? "before" : chunk.start > payPeriod.end ? "after" : "within";
+  const weekLockedFlag =
+    chunkZone === "before" ? true :
+    chunkZone === "within" ? (weekLockedRaw || monthFinalized) :
+    weekLockedRaw;
+
+  const migratedLocked = migrateLockedWeeksToBlocks(myHoras.lockedWeeks, payPeriod, cutoffDay);
+  const allWeeksFinalized = payPeriodChunks.every((c) => !!migratedLocked[isoDateStr(c.start)]);
+  const finalizedCount = payPeriodChunks.filter((c) => !!migratedLocked[isoDateStr(c.start)]).length;
   const canFinalizeMonth = allWeeksFinalized && !monthFinalized;
 
   const selectedDate = days.find((d) => isoDateStr(d) === selectedDateKey) || days[0];
@@ -100,7 +116,16 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
   function saveExtra() {
     setHorasData((prev) => {
       const current = prev[staffId];
-      const updated = { ...prev, [staffId]: { ...current, entries: current.entries.map((e) => (e === extraTarget ? { ...e, extra: extraDraft > 0, extraMinutes: extraDraft } : e)) } };
+      const updated = {
+        ...prev,
+        [staffId]: {
+          ...current,
+          entries: current.entries.map((e) => {
+            if (e !== extraTarget) return e;
+            return { ...e, extra: extraDraft > 0, extraMinutes: extraDraft, approved: extraDraft > 0 ? false : e.approved };
+          }),
+        },
+      };
       return recomputeSharedHours(updated, clients, extraTarget.date, extraTarget.clientId);
     });
     setExtraTarget(null);
@@ -111,7 +136,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
     setConfirmOpen(false); setMissingConfirmOpen(false);
   }
   function handleConfirmFirst() {
-    const missing = days.filter((d) => !myHoras.entries.some((e) => e.date === isoDateStr(d)));
+    const missing = days.filter((d) => !dayIsCovered(myHoras, isoDateStr(d)));
     if (missing.length > 0) { setConfirmOpen(false); setMissingDays(missing); setMissingConfirmOpen(true); }
     else finalizeWeek();
   }
@@ -139,13 +164,16 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
         <LangSwitcher lang={lang} setLang={setLang} />
       </div>
       <div style={mobStyles.horasTop}>
+        <div style={mobStyles.subtitle}>{t.subtitle}</div>
         <div style={mobStyles.periodRow}>
           <button style={mobStyles.periodNav} onClick={() => goChunk(-1)}><ChevronLeftMini /></button>
-          <span style={mobStyles.weekLabel}>{calPeriodLabel(chunk)}</span>
+          <span style={mobStyles.weekLabel}>{calPeriodLabel(chunk, lang)}</span>
           <button style={mobStyles.periodNav} onClick={() => goChunk(1)}><ChevronRightMini /></button>
         </div>
-        <div style={mobStyles.subtitle}>{t.subtitle}</div>
-        {isBoundary && <div style={mobStyles.boundaryBadge}>{t.boundaryBadge}</div>}
+        <div style={mobStyles.periodMetaRow}>
+          {idx === anchorIndex && <span style={mobStyles.currentWeekBadge}>{t.currentWeekBadge}</span>}
+          {isBoundary && <div style={mobStyles.boundaryBadge}>{t.boundaryBadge}</div>}
+        </div>
       </div>
 
       <div style={mobStyles.dayGrid}>
@@ -153,13 +181,14 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
           const dateKey = isoDateStr(date);
           const total = dayTotalHours(dateKey);
           const filled = myHoras.entries.some((e) => e.date === dateKey);
+          const needsAttention = !filled && date < TODAY;
           const isActive = dateKey === selectedKey;
           return (
-            <button key={dateKey} onClick={() => setSelectedDateKey(dateKey)} style={{ ...mobStyles.dayChip, borderColor: isActive ? COLORS.primary : COLORS.border, borderWidth: isActive ? 2 : 1, background: filled ? COLORS.primaryTint : COLORS.surface }}>
-              <span style={{ ...mobStyles.dayIcon, background: filled ? COLORS.success : COLORS.muted || COLORS.border }}>
-                {filled ? <Check size={11} color="#fff" /> : <X size={11} color="#fff" />}
+            <button key={dateKey} onClick={() => setSelectedDateKey(dateKey)} style={{ ...mobStyles.dayChip, borderColor: isActive ? COLORS.primary : (needsAttention ? COLORS.extra : COLORS.border), borderWidth: isActive ? 2 : 1, background: filled ? COLORS.primaryTint : COLORS.surface }}>
+              <span style={{ ...mobStyles.dayIcon, background: filled ? COLORS.success : (needsAttention ? COLORS.extra : COLORS.muted || COLORS.border) }}>
+                {filled ? <Check size={11} color="#fff" /> : (needsAttention ? <AlertTriangle size={11} color="#fff" /> : <X size={11} color="#fff" />)}
               </span>
-              <span style={mobStyles.dayAbbr}>{DAY_ABBR_SUN0_PT[date.getDay()]}</span>
+              <span style={mobStyles.dayAbbr}>{dayAbbr[date.getDay()]}</span>
               <span style={mobStyles.dayDate}>{pad2(date.getDate())}/{pad2(date.getMonth() + 1)}</span>
               <span style={mobStyles.dayHours}>{total > 0 ? fmtH(total) : "-"}</span>
             </button>
@@ -168,7 +197,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
       </div>
 
       <div style={mobStyles.panel}>
-        <h2 style={mobStyles.panelTitle}>{t.which(selectedDate)}</h2>
+        <h2 style={mobStyles.panelTitle}>{t.which(weekdayFull[selectedDate.getDay()], `${pad2(selectedDate.getDate())}/${pad2(selectedDate.getMonth() + 1)}`)}</h2>
         <div style={mobStyles.searchWrap}>
           <Search size={16} color={COLORS.textSoft} />
           <input disabled={weekLockedFlag} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.search} style={mobStyles.searchInput} />
@@ -200,7 +229,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
                     <div style={mobStyles.selectedDuration}>
                       {fmtH(e.hours - (e.extraMinutes || 0) / 60)}
                       {e.extra && <span style={mobStyles.extraBadge}> + {e.extraMinutes}min {t.extraShort}*</span>}
-                      {e.sharedCount > 1 && <span style={{ color: COLORS.textSoft }}> · dividido com mais {e.sharedCount - 1}</span>}
+                      {e.sharedCount > 1 && <span style={{ color: COLORS.textSoft }}> · {t.sharedWith(e.sharedCount - 1)}</span>}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -291,7 +320,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
         <div style={mobStyles.modalOverlay} onClick={() => setMissingConfirmOpen(false)}>
           <div style={mobStyles.modalCard} onClick={(e) => e.stopPropagation()}>
             <div style={mobStyles.modalTitle}>{t.missingDaysTitle}</div>
-            <div style={mobStyles.modalQuestion}>{t.missingDaysBody(missingDays.map((d) => WEEKDAY_FULL_PT[d.getDay()]).join(", "))}</div>
+            <div style={mobStyles.modalQuestion}>{t.missingDaysBody(missingDays.map((d) => weekdayFull[d.getDay()]).join(", "))}</div>
             <div style={mobStyles.modalActions}>
               <button style={mobStyles.modalCancel} onClick={() => setMissingConfirmOpen(false)}>{t.sureNo}</button>
               <button style={mobStyles.modalConfirmDanger} onClick={finalizeWeek}>{t.sureYes}</button>
@@ -309,41 +338,51 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
         </div>
       )}
 
-      {reviewMode && (
+      {reviewMode && (() => {
+        const periodEntries = myHoras.entries.filter((e) => {
+          const d = new Date(e.date.split("-")[0], e.date.split("-")[1] - 1, e.date.split("-")[2]);
+          return d >= payPeriod.start && d <= payPeriod.end && !e.voided;
+        });
+        const totalHoursPeriod = periodEntries.reduce((s, e) => s + e.hours, 0);
+        const totalValuePeriod = periodEntries.reduce((s, e) => {
+          const c = clientById(clients, e.clientId);
+          return s + e.hours * (c ? c.valueHour : 0);
+        }, 0);
+        const shortDate = (dateStr) => {
+          const [, m, d] = dateStr.split("-");
+          return `${d}/${m}`;
+        };
+        return (
         <div style={mobStyles.modalOverlay} onClick={() => setReviewMode(null)}>
           <div style={{ ...mobStyles.modalCard, maxWidth: 360 }} onClick={(e) => e.stopPropagation()}>
             <div style={mobStyles.modalTitle}>{t.reviewTitleView}</div>
-            <div style={mobStyles.modalQuestion}>{calPeriodLabel(payPeriod)}</div>
-            <div style={{ maxHeight: 240, overflowY: "auto", marginBottom: 12 }}>
-              {myHoras.entries
-                .filter((e) => {
-                  const d = new Date(e.date.split("-")[0], e.date.split("-")[1] - 1, e.date.split("-")[2]);
-                  return d >= payPeriod.start && d <= payPeriod.end && !e.voided;
-                })
-                .map((e, i) => {
-                  const c = clientById(clients, e.clientId);
-                  return (
-                    <div key={i} style={mobStyles.selectedRow}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={mobStyles.selectedName}>{e.date} · {c ? c.name : "—"}</div>
-                        <div style={mobStyles.selectedDuration}>{fmtH(e.hours)}{e.extra && "*"}</div>
-                      </div>
-                    </div>
-                  );
-                })}
+            <div style={mobStyles.modalQuestion}>{calPeriodLabel(payPeriod, lang)}</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 12 }}>
+              <div style={{ flex: 1, background: COLORS.bg, borderRadius: 10, padding: "8px 10px" }}>
+                <div style={{ fontSize: 11, color: COLORS.textSoft }}>{t.periodTotal}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>{fmtH(totalHoursPeriod)}</div>
+              </div>
+              <div style={{ flex: 1, background: COLORS.bg, borderRadius: 10, padding: "8px 10px" }}>
+                <div style={{ fontSize: 11, color: COLORS.textSoft }}>{t.amountToReceiveNote}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.primaryDark }}>{fmtEuro(totalValuePeriod)}</div>
+              </div>
             </div>
-            <div style={{ ...mobStyles.selectedHeader, display: "flex", justifyContent: "space-between", marginTop: 0 }}>
-              <span>{t.periodTotal}</span>
-              <strong>
-                {fmtH(
-                  myHoras.entries
-                    .filter((e) => {
-                      const d = new Date(e.date.split("-")[0], e.date.split("-")[1] - 1, e.date.split("-")[2]);
-                      return d >= payPeriod.start && d <= payPeriod.end && !e.voided;
-                    })
-                    .reduce((s, e) => s + e.hours, 0)
-                )}
-              </strong>
+            <div style={{ ...mobStyles.selectedHeader, marginTop: 0 }}>{t.selected}</div>
+            <div style={{ maxHeight: 240, overflowY: "auto", marginBottom: 12 }}>
+              {periodEntries.map((e, i) => {
+                const c = clientById(clients, e.clientId);
+                return (
+                  <div key={i} style={{ ...mobStyles.selectedRow, alignItems: "center" }}>
+                    <div style={{ minWidth: 34, fontSize: 12, color: COLORS.textSoft, fontVariantNumeric: "tabular-nums" }}>{shortDate(e.date)}</div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={mobStyles.selectedName}>{c ? c.name : "—"}</div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: e.extra ? COLORS.extra : COLORS.text, whiteSpace: "nowrap" }}>
+                      {fmtH(e.hours)}{e.extra && "*"}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             {!correctionOpen ? (
               <div style={mobStyles.modalActions}>
@@ -370,8 +409,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
                           staffId,
                           clientId: null,
                           kind: "correcao",
-                          text: `Correção nas horas de ${calPeriodLabel(payPeriod)}: ${correctionText.trim()}`,
-                          date: "16/09",
+                          text: `Correção nas horas de ${calPeriodLabel(payPeriod, lang)}: ${correctionText.trim()}`,
+                          date: isoDateStr(TODAY),
                           resolved: false,
                           response: "",
                         },
@@ -391,7 +430,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, clients, staff, a
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

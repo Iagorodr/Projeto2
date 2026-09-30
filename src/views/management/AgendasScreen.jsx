@@ -15,9 +15,13 @@ import {
   weekDiff, clientAppliesThisWeek, weekLabelPT, staffTotalHours, staffTotalPay, getAssignedClientIds,
   recomputeSharedHours,
 } from "../../models/utils.js";
+import { formatTodayLabel, T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { TopBar, LangSwitcher, Field, ViewField, Sidebar } from "../shared/Layout.jsx";
+import { SupervisorTag } from "../shared/AvisosWidgets.jsx";
 
 function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignments }) {
+  const t = T[lang].agendas;
+  const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
   const [staffSearch, setStaffSearch] = useState("");
   const [openCell, setOpenCell] = useState(null);
   const [cellSearch, setCellSearch] = useState("");
@@ -45,25 +49,28 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
 
   return (
     <div style={styles.content}>
-      <TopBar lang={lang} setLang={setLang} label="Dia 16 de setembro, 2026" />
+      <TopBar lang={lang} setLang={setLang} label={formatTodayLabel(lang)} />
 
       <div style={styles.agdSearchWrap}>
-        <input value={staffSearch} onChange={(e) => setStaffSearch(e.target.value)} placeholder="Pesquisar funcionário" style={styles.defTextInput} />
+        <input value={staffSearch} onChange={(e) => setStaffSearch(e.target.value)} placeholder={t.searchPlaceholder} style={styles.defTextInput} />
       </div>
 
       <div style={styles.agdGridWrap}>
         <div style={styles.agdGridScroll}>
           <div style={{ ...styles.agdGridRow, ...styles.agdGridHeaderRow }}>
-            <div style={styles.agdStaffHeaderCell}>Funcionário</div>
-            {AGENDA_DAYS.map((d) => <div key={d} style={styles.agdDayHeaderCell}>{DAY_LABELS_1_7[d]}</div>)}
+            <div style={styles.agdStaffHeaderCell}>{T[lang].funcionarios.colName}</div>
+            {AGENDA_DAYS.map((d) => <div key={d} style={styles.agdDayHeaderCell}>{dayLabels[d]}</div>)}
           </div>
 
           {visibleStaff.length === 0 ? (
-            <div style={styles.noResults}>Nenhum funcionário encontrado</div>
+            <div style={styles.noResults}>{t.noResults}</div>
           ) : (
             visibleStaff.map((s) => (
               <div key={s.id} style={styles.agdGridRow}>
-                <div style={styles.agdStaffCell}>{s.name}</div>
+                <div style={{ ...styles.agdStaffCell, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+                  {s.name}
+                  {s.role === "supervisor" && <SupervisorTag lang={lang} />}
+                </div>
                 {AGENDA_DAYS.map((day) => {
                   const clientIds = getCellClientIds(s.id, day);
                   const key = cellKey(s.id, day);
@@ -89,7 +96,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                             autoFocus
                             value={cellSearch}
                             onChange={(e) => setCellSearch(e.target.value)}
-                            placeholder="Pesquisar cliente"
+                            placeholder={T[lang].clientes.searchPlaceholder}
                             style={styles.agdCellSearchInput}
                           />
                           <div style={styles.agdCellResults}>
@@ -113,7 +120,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
         </div>
       </div>
 
-      <div style={styles.agdFootNote}>Quando 2+ funcionários têm o mesmo cliente no mesmo dia, viram equipe automaticamente (selo com o número de pessoas).</div>
+      <div style={styles.agdFootNote}>{t.footNote}</div>
     </div>
   );
 }
