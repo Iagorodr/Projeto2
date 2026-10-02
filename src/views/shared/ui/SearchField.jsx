@@ -2,9 +2,14 @@
 // seguem a regra geral de formulários (secção 1.6): contorno forest-500 +
 // anel 3px rgba(46,133,112,.2).
 //
-// Componente NOVO, ainda não ligado a nenhum ecrã — os campos de busca que
-// já existem (`styles.searchWrap`/`styles.searchInput`) continuam como
-// estão; trocar por este componente é trabalho de Etapa 4.
+// Introduzido na Etapa 2 (componentes); já ligado em `EmployeeClientesScreen.jsx`
+// (versão PC/tablet) e, indiretamente, em `AvisosScreen.jsx`/
+// `EmployeeAvisosScreen.jsx` via `SearchSelect.jsx`, que o usa por dentro.
+// As versões mobile desses mesmos ecrãs continuam com o markup antigo
+// (`mobStyles.searchWrap`/`searchInput`), mesma decisão de "PC usa
+// componente novo, mobile fica com o markup embutido" já documentada
+// noutros componentes — comentário antigo corrigido aqui, varredura de
+// QA pós-Etapa 4, sem mudança de comportamento.
 import { useState } from "react";
 import { Search, X } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";

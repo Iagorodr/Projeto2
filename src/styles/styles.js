@@ -18,15 +18,18 @@ const styles = {
   sairRow: { fontSize: 12, color: COLORS.textSoft, textDecoration: "underline", cursor: "pointer", marginTop: 20, background: "none", border: "none", textAlign: "left" },
 
   content: { flex: 1, padding: "22px 28px", overflowY: "auto" },
-  topBar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
-  todayLabel: { fontSize: 12, fontWeight: 600, textDecoration: "underline", color: COLORS.text },
+  // `topBar`/`todayLabel` eram só do `TopBar` (views/shared/Layout.jsx),
+  // removido na limpeza pós-Etapa 4 — removidos junto por ficarem órfãos.
   langButton: { display: "flex", alignItems: "center", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 13, fontWeight: 500, color: COLORS.text, cursor: "pointer" },
   langMenu: { position: "absolute", right: 0, top: 34, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", zIndex: 20, minWidth: 120 },
   langMenuItem: { display: "block", width: "100%", textAlign: "left", padding: "9px 12px", fontSize: 13, border: "none", background: "transparent", cursor: "pointer", color: COLORS.text },
 
   toolbar: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16 },
-  searchWrap: { display: "flex", alignItems: "center", gap: 8, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "9px 12px", width: 280 },
-  searchInput: { border: "none", outline: "none", background: "transparent", fontSize: 13, width: "100%", color: COLORS.text },
+  // `searchWrap`/`searchInput` (versão PC) ficaram órfãos depois que os
+  // ecrãs da gerência passaram a usar o `SearchField`/`SearchSelect`
+  // novos — removidos aqui, varredura de QA pós-Etapa 4. A versão mobile
+  // equivalente (`mobStyles.searchWrap`/`searchInput`) continua em uso
+  // num ecrã (EmployeeClientesScreen.jsx), por isso não foi tocada.
   newButton: { padding: "10px 16px", borderRadius: 10, border: "none", background: COLORS.primary, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", letterSpacing: "0.1px", boxShadow: "0 1px 3px rgba(20,63,53,0.22)" },
   installAppButton: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px 0", background: "none", border: "none", color: COLORS.textSoft, fontSize: 12, fontWeight: 500, cursor: "pointer" },
   fieldError: { fontSize: 11, fontWeight: 600, color: COLORS.extra, marginTop: 4 },

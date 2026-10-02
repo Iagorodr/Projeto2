@@ -10,6 +10,14 @@
 // (seu único utilizador restante, já substituído pelo EmployeeInicioScreen
 // novo, ver nota em App.jsx) foram removidos do projeto na limpeza
 // pós-Etapa 4 — nenhum ecrã ao vivo usava mais nenhum dos dois.
+//
+// QA visual (Etapa 5, achado do Toni): em 375px, a fileira de ações+língua
+// não tinha `flexWrap`, então um `actions` pesado (ex.: HorasScreen, com
+// navegação de período + exportar + fechar período) empurrava o
+// `LangSwitcher` pra fora do ecrã em vez de quebrar linha — a sidebar da
+// gerência já colapsa a ícones em mobile (não era falta de espaço de
+// conteúdo, era falta de wrap aqui). Adicionado `flexWrap`+`justifyContent:
+// flex-end`, afeta só larguras onde o conteúdo não cabe numa linha.
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
@@ -65,7 +73,7 @@ function PageHeader({ title, subtitle, actions, lang, setLang, langNames }) {
         <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 26, color: COLORS.ink, lineHeight: 1.15 }}>{title}</div>
         {subtitle && <div style={{ fontSize: 13, color: COLORS.ink2, marginTop: 4 }}>{subtitle}</div>}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
         {actions}
         {lang && setLang && langNames && <LangSwitcher lang={lang} setLang={setLang} langNames={langNames} />}
       </div>

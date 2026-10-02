@@ -99,6 +99,7 @@ function AvailabilityChip({ text }) {
 function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assignments, canViewAll, desktop }) {
   const t = T[lang].employeeClientes;
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const myClientIds = getAssignedClientIds(assignments, staffId);
@@ -190,9 +191,22 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
         </button>
         <LangSwitcher lang={lang} setLang={setLang} />
       </div>
-      <div style={mobStyles.searchWrap}>
+      <div
+        style={{
+          ...mobStyles.searchWrap,
+          border: `1px solid ${searchFocused ? COLORS.forest500 : COLORS.border}`,
+          boxShadow: searchFocused ? "0 0 0 3px rgba(46,133,112,.2)" : "none",
+        }}
+      >
         <Search size={16} color={COLORS.textSoft} />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} style={mobStyles.searchInput} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          placeholder={t.searchPlaceholder}
+          style={mobStyles.searchInput}
+        />
       </div>
       {filtered.length === 0 ? (
         <div style={mobStyles.emptyState}>{t.noResults}</div>
