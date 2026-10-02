@@ -1,83 +1,374 @@
 import { useState } from "react";
-import {
-  ChevronDown, ChevronRight, LayoutDashboard, Users, CalendarDays, Clock, Bell, UsersRound, Settings,
-  Search, X, Pencil, Mail, Phone, Briefcase, Calendar, KeyRound, MapPin, Euro, RotateCcw, Check,
-  Plus, Store, Building2, Home as HouseIcon, Factory, MessageSquare, ThumbsUp, PackageX, Info, Archive,
-} from "lucide-react";
+import { Plus, MapPin, HelpCircle, PackageX, Home as HouseIcon } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
+import { RADIUS } from "../../styles/tokens.js";
+import { LANG_NAMES, TODAY } from "../../models/data.js";
+import { clientById, staffById, isoDateStr, fmtNoteDate, getAssignedClientIds } from "../../models/utils.js";
+import { T, missingItemSubjectLabel } from "../../models/i18n.js";
+import { LangSwitcher, Field } from "../shared/Layout.jsx";
 import {
-  TYPE_ICONS, MONTHS_ABBR_PT, DAY_LABELS_1_7, AGENDA_DAYS, TODAY, WEEKDAY_FULL_PT, DAY_ABBR_SUN0_PT,
-} from "../../models/data.js";
-import {
-  clientById, staffById, pad2, fmtEuro, fmtHoursNum, fmtMinutes, parseDMY, dateStrInPeriod,
-  startOfISOWeek, addDays, isoDateStr, weekDiff, clientAppliesThisWeek, weekLabelPT,
-  getAssignedClientIds, recomputeSharedHours, getCutoffPeriod, formatPeriodLabel,
-  getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk,
-  buildWeekChunkSequence, weekChunksOfPayPeriod, calPeriodDays, calPeriodLabel,
-} from "../../models/utils.js";
-import { T } from "../../models/i18n.js";
-import { LangSwitcher } from "../shared/Layout.jsx";
-import { SupervisorTag } from "../shared/AvisosWidgets.jsx";
+  PageHeader, Button, Drawer, Pill, SupervisorTag, FilterChip, SearchSelect, PhotoDropzone, Card, Toast,
+} from "../shared/ui/index.js";
+import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
 
-function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, assignments, missingItems, setMissingItems, sentItems, setSentItems, isSupervisor }) {
+// Ícone por "Assunto" do Pedido (documento, 5.6: "só há 3 opções fixas:
+// 'Falta de produto', 'Problema no local', 'Outro'"). As 3 opções
+// pertencem ao universo de "Pedido" (clay-tint, igual TYPE_META.pedido no
+// ecrã da gerência) — só o ícone muda por assunto, não a cor.
+const SUBJECT_ICONS = { produto: PackageX, local: MapPin, outro: HelpCircle };
+
+// Mesma derivação de estado do ecrã da gerência (Novo/Pendente/Resolvido a
+// partir de `resolved`/`response`, sem campo novo) — repetida aqui (não
+// extraída pra partilhado) porque é uma linha só e já está "fixada" nos
+// dois sítios onde existe (AvisosScreen.jsx da gerência tem a mesma
+// função local, com o mesmo comentário).
+function pedidoStatus(m) {
+  if (m.resolved) return "resolved";
+  if (m.response) return "pending";
+  return "new";
+}
+
+// Cartão grande selecionável do sheet "Novo aviso" (documento, 5.6:
+// "cada um com ícone e altura 64") — layout horizontal, diferente do
+// `TypeCard` vertical da gaveta da gerência (a secção 4.7 não define
+// altura pra esse). Reaproveitado também no sheet "Reportar sobre um
+// colega" pros 3 tipos (Reclamação/Elogio/Aviso).
+function BigSelectCard({ icon: Icon, iconBg, iconColor, active, onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 12, width: "100%", height: 64, padding: "0 14px",
+        borderRadius: RADIUS.control, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+        border: active ? `2px solid ${COLORS.forest500}` : `1px solid ${COLORS.line}`,
+        background: active ? COLORS.forest50 : COLORS.card, boxSizing: "border-box",
+      }}
+    >
+      <div style={{ width: 38, height: 38, borderRadius: RADIUS.chip, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon size={18} color={iconColor} />
+      </div>
+      <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{label}</span>
+    </button>
+  );
+}
+
+// `FilterChip` (Etapa 2) não tem noção de "ponto de por ler" — em vez de
+// mudar o componente partilhado (usado por vários outros ecrãs já
+// fechados), este envolve-o e desenha o ponto clay por cima, só aqui onde
+// o documento pede (5.6: "separadores em chips com contagem e ponto clay
+// se houver por ler").
+function ChipWithDot({ active, onClick, count, dot, children }) {
+  return (
+    <div style={{ position: "relative", display: "inline-flex" }}>
+      <FilterChip active={active} onClick={onClick} count={count}>{children}</FilterChip>
+      {dot && (
+        <span
+          style={{
+            position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 999,
+            background: COLORS.clay, border: `2px solid ${COLORS.bg}`,
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EmptyNote({ children }) {
+  return <div style={{ fontSize: 13.5, color: COLORS.ink3, textAlign: "center", padding: "32px 16px", border: `1px dashed ${COLORS.line}`, borderRadius: RADIUS.card }}>{children}</div>;
+}
+
+// Cartão de um item "Recebido" (reclamação/elogio/aviso enviado pela
+// gerência, ou por um supervisor — documento, 5.6: "Recebidos
+// (Reclamações, Elogios, Avisos gerais)"). Sem pílula de estado (como no
+// `SentItemCard` da gerência — estes são registos, não pedidos a tratar).
+// Toca-se no cartão pra marcar como lido (substitui o antigo "Ler
+// mais/Ler menos" por toque simples, já que o texto deixa de ser cortado).
+function ReceivedCard({ item, lang, onOpen }) {
+  const typeLabelT = T[lang].avisos;
+  const title = item.type === "reclamacao" ? typeLabelT.typeComplaint : item.type === "elogio" ? typeLabelT.typePraise : typeLabelT.typeNotice;
+  const fromSupervisor = item.sentBy === "supervisor";
+  const unread = !item.read;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(item.id)}
+      style={{
+        display: "flex", gap: 12, width: "100%", textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+        padding: 14, borderRadius: RADIUS.card, border: `1px solid ${COLORS.line}`, background: COLORS.card, boxSizing: "border-box",
+      }}
+    >
+      <TypeIconBlock type={item.type} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {unread && <span style={{ width: 8, height: 8, borderRadius: 999, background: COLORS.clay, flexShrink: 0 }} />}
+          <span style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.ink }}>{title}</span>
+          {fromSupervisor && <SupervisorTag kind="origin">{T[lang].common.sentBySupervisor}</SupervisorTag>}
+        </div>
+        <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 4 }}>{fmtNoteDate(item.date)}</div>
+        <div style={{ fontSize: 13.5, color: COLORS.ink, marginTop: 6 }}>{item.text}</div>
+      </div>
+    </button>
+  );
+}
+
+// Cartão de um item "Enviado por mim" — ou um Pedido (com pílula de
+// estado Novo/Pendente/Resolvido e a resposta da gerência, se houver), ou
+// (só supervisor) um relatório "sobre um colega" (sem estado, igual ao
+// `SentItemCard` da gerência: é um registo, não um pedido a tratar).
+function SentFeedCard({ entry, staff, clients, lang, t, c0 }) {
+  if (entry.kind === "pedido") {
+    const m = entry.data;
+    const c = m.clientId ? clientById(clients, m.clientId) : null;
+    const status = pedidoStatus(m);
+    const subject = missingItemSubjectLabel(m, lang);
+    return (
+      <Card style={{ padding: 14 }}>
+        <div style={{ display: "flex", gap: 12 }}>
+          <TypeIconBlock type="pedido" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.ink }}>{subject}</span>
+              <Pill variant={status === "resolved" ? "paid" : status === "pending" ? "pending" : "neutral"}>
+                {status === "resolved" ? c0.resolved : status === "pending" ? c0.pending : c0.newLabel}
+              </Pill>
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 4 }}>{c ? `${c.name} · ` : ""}{fmtNoteDate(m.date)}</div>
+            <div style={{ fontSize: 13.5, color: COLORS.ink, marginTop: 6 }}>{m.text}</div>
+            {m.response && (
+              <div style={{ marginTop: 10, background: COLORS.lineSoft, borderRadius: RADIUS.chip, padding: "8px 10px" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.ink2, marginBottom: 2 }}>{t.yourReplyFromManagement}</div>
+                <div style={{ fontSize: 13, color: COLORS.ink }}>{m.response}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+    );
+  }
+  const item = entry.data;
+  const s = staffById(staff, item.staffId);
+  const c = clientById(clients, item.clientId);
+  return (
+    <Card style={{ padding: 14 }}>
+      <div style={{ display: "flex", gap: 12 }}>
+        <TypeIconBlock type={item.type} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.ink }}>{s ? s.name : "—"}</span>
+            {c && <Pill variant="neutral">{c.name}</Pill>}
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 6 }}>{fmtNoteDate(item.date)}{item.hasPhoto && " · 📎"}</div>
+          <div style={{ fontSize: 13.5, color: COLORS.ink, marginTop: 4 }}>{item.text}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// Avisos (funcionário + supervisor, documento 5.6) — "regra de ouro"
+// (secção 5): mesmo ecrã nos dois papéis e em qualquer tamanho (`desktop`
+// vem de `useBreakpoint()` em App.jsx, mesmo padrão de
+// EmployeeHistoricoScreen.jsx/EmployeeClientesScreen.jsx). Abre em
+// Recebidos (a caixa de entrada), não num formulário vazio — o antigo
+// formulário fixo no topo e os 5 acordeões (Pedidos enviados,
+// Reclamações, Elogios, Avisos, e a secção do supervisor) tornam-se: botão
+// "+ Novo aviso" (abre sheet/gaveta) + 2 separadores ("Recebidos" funde
+// Reclamações/Elogios/Avisos; "Enviados por mim" funde Pedidos + relatórios
+// do supervisor).
+function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, assignments, missingItems, setMissingItems, sentItems, setSentItems, isSupervisor, desktop }) {
   const t = T[lang].employeeAvisos;
   const tr = T[lang].reportar;
+  const avT = T[lang].avisos;
   const c0 = T[lang].common;
   const myClients = clients.filter((c) => getAssignedClientIds(assignments, staffId).includes(c.id));
 
-  const [subject, setSubject] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [body, setBody] = useState("");
-  const [sentToast, setSentToast] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [noticesOpen, setNoticesOpen] = useState(false);
-  const [complaintsOpen, setComplaintsOpen] = useState(false);
-  const [sentOpen, setSentOpen] = useState(false);
-  const [expandedFeedback, setExpandedFeedback] = useState(null);
+  const [tab, setTab] = useState("recebidos");
 
-  // Secção extra, só para supervisores: reportar reclamação/elogio/aviso
-  // sobre um colega para a gerência (antiga tela "Reportar", agora fundida
-  // aqui porque tinha o mesmo formato de formulário e confundia as pessoas).
-  const [reportOpen, setReportOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [subjectKey, setSubjectKey] = useState(null);
+  const [draftClientId, setDraftClientId] = useState("");
+  const [draftText, setDraftText] = useState("");
+  const [toastMsg, setToastMsg] = useState(null);
+
+  const [reportSheetOpen, setReportSheetOpen] = useState(false);
   const [reportType, setReportType] = useState("reclamacao");
   const [reportStaffId, setReportStaffId] = useState("");
   const [reportClientId, setReportClientId] = useState("");
   const [reportText, setReportText] = useState("");
-  const [reportPhoto, setReportPhoto] = useState(false);
-  const [reportSentToast, setReportSentToast] = useState(false);
-  const [reportSentOpen, setReportSentOpen] = useState(false);
-  const reportTargets = staff.filter((s) => s.id !== staffId);
-  const mySentReports = sentItems.filter((i) => i.sentByStaffId === staffId);
+  const [reportPhoto, setReportPhoto] = useState(null);
+  const [reportToastMsg, setReportToastMsg] = useState(null);
 
   const myReceived = sentItems.filter((i) => i.staffId === staffId);
-  const complaints = myReceived.filter((i) => i.type === "reclamacao");
-  const praises = myReceived.filter((i) => i.type === "elogio");
-  const notices = myReceived.filter((i) => i.type === "aviso");
-  const mySent = missingItems.filter((m) => m.staffId === staffId);
-  const unreadPraises = praises.filter((i) => !i.read).length;
-  const unreadNotices = notices.filter((i) => !i.read).length;
-  const unreadComplaints = complaints.filter((i) => !i.read).length;
+  const receivedSorted = [...myReceived].sort((a, b) => b.date.localeCompare(a.date));
+  const unreadReceived = myReceived.filter((i) => !i.read).length;
 
+  const mySent = missingItems.filter((m) => m.staffId === staffId);
+  const reportTargets = staff.filter((s) => s.id !== staffId);
+  const mySentReports = isSupervisor ? sentItems.filter((i) => i.sentByStaffId === staffId) : [];
+  const sentFeed = [
+    ...mySent.map((m) => ({ kind: "pedido", date: m.date, data: m })),
+    ...mySentReports.map((r) => ({ kind: "report", date: r.date, data: r })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
+  const reportStaffOptions = reportTargets.map((s) => ({ id: s.id, label: s.name }));
+  const reportClientOptions = clients.map((c) => ({ id: c.id, label: c.name }));
+
+  function openSheet() { setSubjectKey(null); setDraftClientId(""); setDraftText(""); setSheetOpen(true); }
   function handleSend() {
-    if (!subject || !clientId || !body.trim()) return;
-    setMissingItems((prev) => [{ id: Date.now(), staffId, clientId: Number(clientId), kind: "produto", text: body.trim(), date: isoDateStr(TODAY), resolved: false, response: "" }, ...prev]);
-    setSentToast(true); setSubject(""); setClientId(""); setBody("");
-    setTimeout(() => setSentToast(false), 1800);
+    if (!subjectKey || !draftClientId || !draftText.trim()) return;
+    setMissingItems((prev) => [
+      { id: Date.now(), staffId, clientId: Number(draftClientId), kind: subjectKey, text: draftText.trim(), date: isoDateStr(TODAY), resolved: false, response: "" },
+      ...prev,
+    ]);
+    setSheetOpen(false);
+    setToastMsg(t.sent);
+    setTimeout(() => setToastMsg(null), 5000);
   }
-  function toggleFeedbackItem(id) {
-    setExpandedFeedback(expandedFeedback === id ? null : id);
-    setSentItems((prev) => prev.map((i) => (i.id === id ? { ...i, read: true } : i)));
+
+  function openReportSheet() {
+    setReportType("reclamacao"); setReportStaffId(""); setReportClientId(""); setReportText(""); setReportPhoto(null);
+    setReportSheetOpen(true);
   }
   function handleSendReport() {
     if (!reportStaffId || !reportClientId || !reportText.trim()) return;
     setSentItems((prev) => [
-      { id: Date.now(), type: reportType, staffId: Number(reportStaffId), clientId: Number(reportClientId), text: reportText.trim(), date: isoDateStr(TODAY), hasPhoto: reportPhoto, sentBy: "supervisor", sentByStaffId: staffId },
+      { id: Date.now(), type: reportType, staffId: Number(reportStaffId), clientId: Number(reportClientId), text: reportText.trim(), date: isoDateStr(TODAY), hasPhoto: !!reportPhoto, sentBy: "supervisor", sentByStaffId: staffId },
       ...prev,
     ]);
-    setReportStaffId(""); setReportClientId(""); setReportText(""); setReportPhoto(false);
-    setReportSentToast(true); setTimeout(() => setReportSentToast(false), 1800);
+    setReportSheetOpen(false);
+    setReportToastMsg(tr.sentToast);
+    setTimeout(() => setReportToastMsg(null), 5000);
+  }
+
+  function markRead(id) {
+    setSentItems((prev) => prev.map((i) => (i.id === id ? { ...i, read: true } : i)));
+  }
+
+  const tabsRow = (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+      <ChipWithDot active={tab === "recebidos"} onClick={() => setTab("recebidos")} count={myReceived.length} dot={unreadReceived > 0}>{t.tabReceived}</ChipWithDot>
+      <FilterChip active={tab === "enviados"} onClick={() => setTab("enviados")} count={sentFeed.length}>{t.sentSection}</FilterChip>
+    </div>
+  );
+
+  const listBody = tab === "recebidos" ? (
+    receivedSorted.length === 0 ? (
+      <EmptyNote>{t.nothingReceived}</EmptyNote>
+    ) : (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {receivedSorted.map((item) => <ReceivedCard key={item.id} item={item} lang={lang} onOpen={markRead} />)}
+      </div>
+    )
+  ) : (
+    sentFeed.length === 0 ? (
+      <EmptyNote>{t.noSent}</EmptyNote>
+    ) : (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {sentFeed.map((entry) => <SentFeedCard key={`${entry.kind}-${entry.data.id}`} entry={entry} staff={staff} clients={clients} lang={lang} t={t} c0={c0} />)}
+      </div>
+    )
+  );
+
+  const newAvisoSheet = (
+    <Drawer
+      open={sheetOpen}
+      onClose={() => setSheetOpen(false)}
+      title={t.newAviso}
+      closeLabel={c0.close}
+      footer={
+        <Button
+          size="mobile" style={{ width: "100%" }} onClick={handleSend}
+          disabled={!subjectKey || !draftClientId || !draftText.trim()}
+          disabledReason={!subjectKey ? t.chooseSubjectReason : (!draftClientId || !draftText.trim()) ? c0.requiredField : undefined} disabledReasonBelow
+        >
+          {t.send}
+        </Button>
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+        {t.subjects.map((s) => (
+          <BigSelectCard
+            key={s.key} icon={SUBJECT_ICONS[s.key]} iconBg={COLORS.clayTint} iconColor={COLORS.clayInk}
+            active={subjectKey === s.key} onClick={() => setSubjectKey(s.key)} label={s.label}
+          />
+        ))}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Field label={t.client}>
+          <select value={draftClientId} onChange={(e) => setDraftClientId(e.target.value)} style={styles.input}>
+            <option value="">{t.clientPlaceholder}</option>
+            {myClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </Field>
+        <textarea style={styles.textarea} rows={4} placeholder={t.body} value={draftText} onChange={(e) => setDraftText(e.target.value)} />
+      </div>
+    </Drawer>
+  );
+
+  // Sheet "Reportar sobre um colega" (só supervisor, documento 5.6:
+  // "ação própria, secundária... Não usa a lista de assuntos" — reaproveita
+  // os 3 cartões de TIPO (Reclamação/Elogio/Aviso, iguais aos da gaveta da
+  // gerência) em vez dos 3 de assunto do sheet acima.
+  const reportSheet = isSupervisor && (
+    <Drawer
+      open={reportSheetOpen}
+      onClose={() => setReportSheetOpen(false)}
+      title={t.reportColleagueSection}
+      closeLabel={c0.close}
+      footer={
+        <Button
+          size="mobile" style={{ width: "100%" }} onClick={handleSendReport}
+          disabled={!reportStaffId || !reportClientId || !reportText.trim()}
+          disabledReason={!reportStaffId ? avT.chooseStaffReason : (!reportClientId || !reportText.trim()) ? c0.requiredField : undefined} disabledReasonBelow
+        >
+          {tr.send}
+        </Button>
+      }
+    >
+      <div style={{ fontSize: 13, color: COLORS.ink2, marginBottom: 14 }}>{tr.subtitle}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+        <BigSelectCard icon={TYPE_META.reclamacao.icon} iconBg={TYPE_META.reclamacao.bg} iconColor={TYPE_META.reclamacao.iconColor} active={reportType === "reclamacao"} onClick={() => setReportType("reclamacao")} label={tr.typeComplaint} />
+        <BigSelectCard icon={TYPE_META.elogio.icon} iconBg={TYPE_META.elogio.bg} iconColor={TYPE_META.elogio.iconColor} active={reportType === "elogio"} onClick={() => setReportType("elogio")} label={tr.typePraise} />
+        <BigSelectCard icon={TYPE_META.aviso.icon} iconBg={TYPE_META.aviso.bg} iconColor={TYPE_META.aviso.iconColor} active={reportType === "aviso"} onClick={() => setReportType("aviso")} label={tr.typeNotice} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Field label={tr.formStaff}>
+          <SearchSelect value={reportStaffId} onChange={setReportStaffId} options={reportStaffOptions} placeholder={tr.formStaffPlaceholder} searchPlaceholder={T[lang].funcionarios.searchPlaceholder} noResultsLabel={c0.noResults} />
+        </Field>
+        <Field label={tr.formClient}>
+          <SearchSelect value={reportClientId} onChange={setReportClientId} options={reportClientOptions} placeholder={tr.formClientPlaceholder} searchPlaceholder={T[lang].clientes.searchPlaceholder} noResultsLabel={c0.noResults} />
+        </Field>
+        <Field label={tr.formText}>
+          <textarea style={styles.textarea} rows={4} placeholder={tr.formTextPlaceholder} value={reportText} onChange={(e) => setReportText(e.target.value)} />
+        </Field>
+        <PhotoDropzone file={reportPhoto} onChange={setReportPhoto} label={tr.attachPhoto} removeLabel={avT.removePhoto} />
+      </div>
+    </Drawer>
+  );
+
+  if (desktop) {
+    return (
+      <div style={styles.content}>
+        <PageHeader
+          title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES}
+          actions={
+            <>
+              {isSupervisor && <Button variant="secondary" onClick={openReportSheet}>{t.reportColleagueSection}</Button>}
+              <Button icon={Plus} onClick={openSheet}>{t.newAviso}</Button>
+            </>
+          }
+        />
+        {tabsRow}
+        {listBody}
+        {newAvisoSheet}
+        {reportSheet}
+        {toastMsg && <Toast message={toastMsg} onDismiss={() => setToastMsg(null)} closeLabel={c0.close} />}
+        {reportToastMsg && <Toast message={reportToastMsg} onDismiss={() => setReportToastMsg(null)} closeLabel={c0.close} />}
+      </div>
+    );
   }
 
   return (
@@ -90,225 +381,18 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
       </div>
       <h1 style={mobStyles.title}>{t.title}</h1>
 
-      <div style={mobStyles.avisosForm}>
-        <div style={mobStyles.avisosFieldsRow}>
-          <div style={{ flex: 1 }}>
-            <div style={mobStyles.avisosLabel}>{t.subject}</div>
-            <select value={subject} onChange={(e) => setSubject(e.target.value)} style={mobStyles.avisosSelect}>
-              <option value="">{t.subjectPlaceholder}</option>
-              {t.subjects.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={mobStyles.avisosLabel}>{t.client}</div>
-            <select value={clientId} onChange={(e) => setClientId(e.target.value)} style={mobStyles.avisosSelect}>
-              <option value="">{t.clientPlaceholder}</option>
-              {myClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-        </div>
-        <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={t.body} style={mobStyles.avisosTextarea} rows={4} />
-        <button onClick={handleSend} disabled={!subject || !clientId || !body.trim()} style={{ ...mobStyles.avisosSendButton, opacity: !subject || !clientId || !body.trim() ? 0.5 : 1 }}>{t.send}</button>
-        {sentToast && <div style={mobStyles.avisosSentNote}>{t.sent}</div>}
-      </div>
-
-      <div>
-        <button style={mobStyles.avisosSection} onClick={() => setSentOpen((o) => !o)}>
-          <span style={mobStyles.avisosSectionTitle}>
-            <ChevronDown size={14} style={{ marginRight: 6, transform: sentOpen ? "rotate(180deg)" : "none" }} />
-            {t.sentSection}
-          </span>
-          <span style={mobStyles.avisosCount}>{mySent.length}</span>
-        </button>
-        {sentOpen && (
-          <div style={mobStyles.feedbackList}>
-            {mySent.length === 0 ? <div style={mobStyles.noDetails}>{t.noSent}</div> : mySent.map((m) => {
-              const c = m.clientId ? clientById(clients, m.clientId) : null;
-              return (
-                <div key={m.id} style={mobStyles.feedbackCard}>
-                  <div style={mobStyles.feedbackClient}>{m.kind === "correcao" ? T[lang].avisos.correctionOfHours : (c ? c.name : "")}</div>
-                  <div style={mobStyles.sentDate}>{m.date} · {m.resolved ? c0.resolved : c0.pending}</div>
-                  <div style={mobStyles.feedbackText}>{m.text}</div>
-                  {m.response && <div style={{ ...mobStyles.feedbackText, marginTop: 6, fontStyle: "italic" }}>{T[lang].avisos.yourReply}: {m.response}</div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <button style={mobStyles.avisosSection} disabled={complaints.length === 0} onClick={() => setComplaintsOpen((o) => !o)}>
-        <span style={mobStyles.avisosSectionTitle}>
-          <ChevronDown size={14} style={{ marginRight: 6, transform: complaintsOpen ? "rotate(180deg)" : "none" }} />
-          {t.complaints}
-        </span>
-        <span style={mobStyles.avisosCount}>{unreadComplaints > 0 ? unreadComplaints : complaints.length}</span>
-      </button>
-      {complaintsOpen && complaints.length > 0 && (
-        <div style={mobStyles.feedbackList}>
-          {complaints.map((f) => {
-            const isExpanded = expandedFeedback === f.id;
-            const c = clientById(clients, f.clientId);
-            return (
-              <div key={f.id} style={mobStyles.feedbackCard}>
-                <div style={mobStyles.feedbackClient}>
-                  {c ? c.name : ""}
-                  {!f.read && <span style={mobStyles.unreadDot} />}
-                  {f.sentBy === "supervisor" && <SupervisorTag lang={lang} />}
-                </div>
-                <div style={mobStyles.feedbackText}>
-                  {isExpanded ? f.text : `${f.text.slice(0, 45)}...`}{" "}
-                  <button style={mobStyles.readMoreLink} onClick={() => toggleFeedbackItem(f.id)}>{isExpanded ? t.readLess : t.readMore}</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <div>
-        <button style={mobStyles.avisosSection} onClick={() => setFeedbackOpen((o) => !o)}>
-          <span style={mobStyles.avisosSectionTitle}>
-            <ChevronDown size={14} style={{ marginRight: 6, transform: feedbackOpen ? "rotate(180deg)" : "none" }} />
-            {t.praiseSection}
-          </span>
-          <span style={mobStyles.avisosCount}>{unreadPraises > 0 ? unreadPraises : praises.length}</span>
-        </button>
-        {feedbackOpen && (
-          <div style={mobStyles.feedbackList}>
-            {praises.length === 0 ? <div style={mobStyles.noDetails}>{t.noSent}</div> : praises.map((f) => {
-              const isExpanded = expandedFeedback === f.id;
-              const c = clientById(clients, f.clientId);
-              return (
-                <div key={f.id} style={mobStyles.feedbackCard}>
-                  <div style={mobStyles.feedbackClient}>
-                    {c ? c.name : ""}
-                    {!f.read && <span style={mobStyles.unreadDot} />}
-                    {f.sentBy === "supervisor" && <SupervisorTag lang={lang} />}
-                  </div>
-                  <div style={mobStyles.feedbackText}>
-                    {isExpanded ? f.text : `${f.text.slice(0, 45)}...`}{" "}
-                    <button style={mobStyles.readMoreLink} onClick={() => toggleFeedbackItem(f.id)}>{isExpanded ? t.readLess : t.readMore}</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <button style={mobStyles.avisosSection} onClick={() => setNoticesOpen((o) => !o)}>
-          <span style={mobStyles.avisosSectionTitle}>
-            <ChevronDown size={14} style={{ marginRight: 6, transform: noticesOpen ? "rotate(180deg)" : "none" }} />
-            {t.noticesSection}
-          </span>
-          <span style={mobStyles.avisosCount}>{unreadNotices > 0 ? unreadNotices : notices.length}</span>
-        </button>
-        {noticesOpen && (
-          <div style={mobStyles.feedbackList}>
-            {notices.length === 0 ? <div style={mobStyles.noDetails}>{t.noSent}</div> : notices.map((f) => {
-              const isExpanded = expandedFeedback === f.id;
-              const c = clientById(clients, f.clientId);
-              return (
-                <div key={f.id} style={mobStyles.feedbackCard}>
-                  <div style={mobStyles.feedbackClient}>
-                    {c ? c.name : ""}
-                    {!f.read && <span style={mobStyles.unreadDot} />}
-                    {f.sentBy === "supervisor" && <SupervisorTag lang={lang} />}
-                  </div>
-                  <div style={mobStyles.feedbackText}>
-                    {isExpanded ? f.text : `${f.text.slice(0, 45)}...`}{" "}
-                    <button style={mobStyles.readMoreLink} onClick={() => toggleFeedbackItem(f.id)}>{isExpanded ? t.readLess : t.readMore}</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
+      <Button size="mobile" icon={Plus} onClick={openSheet} style={{ width: "100%", marginBottom: isSupervisor ? 8 : 16 }}>{t.newAviso}</Button>
       {isSupervisor && (
-        <div style={{ marginTop: 4 }}>
-          <button style={mobStyles.avisosSection} onClick={() => setReportOpen((o) => !o)}>
-            <span style={mobStyles.avisosSectionTitle}>
-              <ChevronDown size={14} style={{ marginRight: 6, transform: reportOpen ? "rotate(180deg)" : "none" }} />
-              {t.reportColleagueSection}
-            </span>
-            <span style={mobStyles.avisosCount}>{mySentReports.length}</span>
-          </button>
-          {reportOpen && (
-            <div>
-              <div style={{ ...styles.avTypeToggleRow, marginTop: 10 }}>
-                <button style={{ ...styles.avTypeToggle, ...(reportType === "reclamacao" ? styles.avTypeActiveComplaint : {}) }} onClick={() => setReportType("reclamacao")}>
-                  <MessageSquare size={13} style={{ marginRight: 6 }} />{tr.typeComplaint}
-                </button>
-                <button style={{ ...styles.avTypeToggle, ...(reportType === "elogio" ? styles.avTypeActivePraise : {}) }} onClick={() => setReportType("elogio")}>
-                  <ThumbsUp size={13} style={{ marginRight: 6 }} />{tr.typePraise}
-                </button>
-                <button style={{ ...styles.avTypeToggle, ...(reportType === "aviso" ? styles.avTypeActiveNotice : {}) }} onClick={() => setReportType("aviso")}>
-                  <Info size={13} style={{ marginRight: 6 }} />{tr.typeNotice}
-                </button>
-              </div>
-              <div style={mobStyles.avisosForm}>
-                <div style={mobStyles.avisosFieldsRow}>
-                  <div style={{ flex: 1 }}>
-                    <div style={mobStyles.avisosLabel}>{tr.formStaff}</div>
-                    <select style={mobStyles.avisosSelect} value={reportStaffId} onChange={(e) => setReportStaffId(e.target.value)}>
-                      <option value="">{tr.formStaffPlaceholder}</option>
-                      {reportTargets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={mobStyles.avisosLabel}>{tr.formClient}</div>
-                    <select style={mobStyles.avisosSelect} value={reportClientId} onChange={(e) => setReportClientId(e.target.value)}>
-                      <option value="">{tr.formClientPlaceholder}</option>
-                      {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <div style={mobStyles.avisosLabel}>{tr.formText}</div>
-                  <textarea style={mobStyles.avisosTextarea} rows={4} placeholder={tr.formTextPlaceholder} value={reportText} onChange={(e) => setReportText(e.target.value)} />
-                </div>
-                <button style={{ ...styles.avAttachButton, ...(reportPhoto ? styles.avAttachActive : {}), width: "100%", justifyContent: "center" }} onClick={() => setReportPhoto((p) => !p)}>
-                  <span style={{ marginRight: 6 }}>📎</span>{reportPhoto ? tr.photoAttached : tr.attachPhoto}
-                </button>
-                <button
-                  onClick={handleSendReport}
-                  disabled={!reportStaffId || !reportClientId || !reportText.trim()}
-                  style={{ ...mobStyles.avisosSendButton, opacity: !reportStaffId || !reportClientId || !reportText.trim() ? 0.5 : 1 }}
-                >
-                  {tr.send}
-                </button>
-                {reportSentToast && <div style={mobStyles.avisosSentNote}>{tr.sentToast}</div>}
-              </div>
-
-              <button style={mobStyles.avisosSection} onClick={() => setReportSentOpen((o) => !o)}>
-                <span style={mobStyles.avisosSectionTitle}>
-                  <ChevronDown size={14} style={{ marginRight: 6, transform: reportSentOpen ? "rotate(180deg)" : "none" }} />
-                  {tr.sentSection}
-                </span>
-                <span style={mobStyles.avisosCount}>{mySentReports.length}</span>
-              </button>
-              {reportSentOpen && (
-                <div style={mobStyles.feedbackList}>
-                  {mySentReports.length === 0 ? <div style={mobStyles.noDetails}>{tr.noSent}</div> : mySentReports.map((it) => {
-                    const s = staffById(staff, it.staffId), c = clientById(clients, it.clientId);
-                    return (
-                      <div key={it.id} style={mobStyles.feedbackCard}>
-                        <div style={mobStyles.feedbackClient}>{s ? s.name : "—"} · {c ? c.name : "—"}</div>
-                        <div style={mobStyles.sentDate}>{it.date}</div>
-                        <div style={mobStyles.feedbackText}>{it.text}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <Button variant="secondary" onClick={openReportSheet} style={{ width: "100%", marginBottom: 16 }}>{t.reportColleagueSection}</Button>
       )}
+
+      {tabsRow}
+      {listBody}
+
+      {newAvisoSheet}
+      {reportSheet}
+      {toastMsg && <Toast message={toastMsg} onDismiss={() => setToastMsg(null)} closeLabel={c0.close} />}
+      {reportToastMsg && <Toast message={reportToastMsg} onDismiss={() => setReportToastMsg(null)} closeLabel={c0.close} />}
     </div>
   );
 }

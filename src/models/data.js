@@ -7,7 +7,7 @@ const TYPE_ICONS = { store: Store, office: Building2, house: HouseIcon, factory:
 
 const MONTHS_ABBR_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-const DAY_LABELS_1_7 = { 1: "SEG", 2: "TER", 3: "QUA", 4: "QUI", 5: "SEX", 6: "SAB", 7: "DOM" };
+const DAY_LABELS_1_7 = { 1: "SEG", 2: "TER", 3: "QUA", 4: "QUI", 5: "SEX", 6: "SÁB", 7: "DOM" };
 
 const AGENDA_DAYS = [1, 2, 3, 4, 5, 6, 7];
 
@@ -28,8 +28,12 @@ const MENU_ITEMS = [
   { key: "definicoes", icon: Settings, label: "Definições" },
 ];
 
+// Menu lateral reduzido usado quando um supervisor entra a partir de um PC
+// ou tablet (ver App.jsx) — mesmas páginas já combinadas pro supervisor no
+// mobile, só que dentro do layout de gerência (barra lateral) em vez do
+// menu em cartões do telemóvel. As chaves batem com os valores de `empScreen`.
 const SUPERVISOR_MENU_ITEMS = [
-  { key: "menu", icon: LayoutDashboard, label: "Início" },
+  { key: "menu", icon: LayoutDashboard, label: "Painel" },
   { key: "horas", icon: Clock, label: "Horas" },
   { key: "avisos", icon: Bell, label: "Avisos" },
   { key: "agenda", icon: CalendarDays, label: "Agenda" },
@@ -217,6 +221,6 @@ const EMPTY_STAFF = { name: "", email: "", contact: "", password: "", accountTyp
 
 const WEEKDAY_FULL_PT = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
-const DAY_ABBR_SUN0_PT = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
+const DAY_ABBR_SUN0_PT = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
 export { LANG_NAMES, TYPE_ICONS, MONTHS_ABBR_PT, DAY_LABELS_1_7, AGENDA_DAYS, TODAY, MENU_ITEMS, SUPERVISOR_MENU_ITEMS, INITIAL_CLIENTS, INITIAL_STAFF, INITIAL_ASSIGNMENTS, INITIAL_HORAS, INITIAL_MISSING, INITIAL_SENT, EMPTY_CLIENT, CLIENT_TYPES, FREQS, EMPTY_STAFF, WEEKDAY_FULL_PT, DAY_ABBR_SUN0_PT };

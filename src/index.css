@@ -1,3 +1,59 @@
+/* Tokens de cor do documento de design (secção 1.1) como variáveis CSS
+   globais. O projeto estiliza tudo via objetos JS inline (ver
+   src/styles/colors.js, que tem os mesmos valores em camelCase para uso
+   nesses objetos) — estas variáveis ficam disponíveis para qualquer CSS
+   "de verdade" (este ficheiro, ou <style> futuros) sem duplicar valores. */
+:root {
+  --page: #F3F6F4;
+  --card: #FFFFFF;
+  --line: #E3EAE6;
+  --line-soft: #EEF3F0;
+  --line-input: #D5E0DA;
+  --forest-900: #0F3129;
+  --forest-800: #143F35;
+  --forest-700: #185A4A;
+  --forest-600: #1F6F5C;
+  --forest-500: #2E8570;
+  --forest-200: #B5D5C9;
+  --forest-100: #D8E9E2;
+  --forest-50: #EDF4F1;
+  --clay: #E28A65;
+  --clay-ink: #9A4A26;
+  --clay-tint: #FBE9DF;
+  --alert: #B3492E;
+  --alert-tint: #FBE4DC;
+  --ok: #2F9E64;
+  --ok-ink: #14684A;
+  --ok-tint: #DDF1E6;
+  --amber-bg: #FCF3DF;
+  --amber-ink: #8A5A0B;
+  --ink: #1A2B26;
+  --ink-2: #4F635C;
+  --ink-3: #66786F;
+  --header-tint: #F6F9F7;
+  --segment-bg: #E4ECE8;
+
+  /* Forma, sombra e espaço (secção 1.3). Raios em pixels: cartão / gaveta
+     mobile (só cantos de cima) / controlo-botão gerência / controlo-botão
+     supervisor-mobile / chip / pílula. */
+  --radius-card: 20px;
+  --radius-sheet-mobile: 28px;
+  --radius-control: 12px;
+  --radius-control-mobile: 16px;
+  --radius-chip: 10px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(20, 63, 53, .06), 0 8px 20px -12px rgba(20, 63, 53, .16);
+  --shadow-2: 0 2px 4px rgba(20, 63, 53, .10), 0 22px 40px -18px rgba(20, 63, 53, .45);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --motion-fast: 120ms;
+  --motion-slow: 150ms;
+}
+
 /* Reset mínimo. O projeto estiliza tudo via objetos JS inline, mas o
    <button> nativo tem uma cor de texto padrão própria do navegador — no
    Safari/iOS isso aparece como um azul de "link", mesmo quando nenhuma cor

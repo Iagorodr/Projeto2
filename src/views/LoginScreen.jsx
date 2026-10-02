@@ -1,86 +1,11 @@
 import { useState } from "react";
-import {
-  ChevronDown, ChevronRight, LayoutDashboard, Users, CalendarDays, Clock, Bell, UsersRound, Settings,
-  Search, X, Pencil, Mail, Phone, Briefcase, Calendar, KeyRound, MapPin, Euro, RotateCcw, Check,
-  Plus, Store, Building2, Home as HouseIcon, Factory, MessageSquare, ThumbsUp, PackageX, Info, Archive,
-} from "lucide-react";
-import { styles } from "../styles/styles.js";
+import { Eye, EyeOff } from "lucide-react";
 import { COLORS } from "../styles/colors.js";
-import { TopBar, LangSwitcher, InstallAppButton } from "./shared/Layout.jsx";
-import { LogoLockup } from "./shared/Logo.jsx";
+import { RADIUS, SHADOW, FONT } from "../styles/tokens.js";
+import { LangSwitcher, InstallAppButton } from "./shared/Layout.jsx";
+import { Button } from "./shared/ui/index.js";
 import { T } from "../models/i18n.js";
 import { isSupabaseConfigured } from "../models/supabaseClient.js";
-import { useIsMobile } from "../hooks/useIsMobile.js";
-
-// Silhueta de skyline (janelas acesas em laranja/verde-menta) desenhada por
-// código — genérica o bastante para não prender a marca só a "limpeza", já
-// pensando na expansão para outros nichos de operação.
-function Skyline({ buildings, color, opacity, withWindows }) {
-  return buildings.map((b, bi) => {
-    const y = 520 - b.h;
-    const windows = [];
-    if (withWindows) {
-      const winW = 6, winH = 8, gapX = 6, gapY = 11;
-      const cols = Math.max(1, Math.floor((b.w - 10) / (winW + gapX)));
-      const rows = Math.max(1, Math.floor((b.h - 20) / (winH + gapY)));
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if ((bi * 7 + r * 3 + c * 5) % 4 !== 0) continue;
-          const wx = b.x + 8 + c * (winW + gapX);
-          const wy = y + 14 + r * (winH + gapY);
-          const isOrange = (bi + r + c) % 2 === 0;
-          windows.push(
-            <rect key={`${bi}-${r}-${c}`} x={wx} y={wy} width={winW} height={winH} rx="1"
-              fill={isOrange ? "#E28A65" : "#BFE3D3"} opacity={isOrange ? 0.65 : 0.4} />
-          );
-        }
-      }
-    }
-    return (
-      <g key={bi}>
-        <rect x={b.x} y={y} width={b.w} height={b.h} rx="2" fill={color} opacity={opacity} />
-        {windows}
-      </g>
-    );
-  });
-}
-
-function LoginScene() {
-  const backBuildings = [
-    { x: -10, w: 60, h: 170 }, { x: 46, w: 46, h: 120 }, { x: 88, w: 72, h: 200 },
-    { x: 158, w: 50, h: 140 }, { x: 206, w: 66, h: 185 }, { x: 270, w: 48, h: 130 },
-    { x: 316, w: 62, h: 165 }, { x: 380, w: 50, h: 195 },
-  ];
-  const frontBuildings = [
-    { x: -20, w: 84, h: 120 }, { x: 62, w: 58, h: 88 }, { x: 118, w: 66, h: 150 },
-    { x: 182, w: 48, h: 96 }, { x: 228, w: 72, h: 168 }, { x: 298, w: 52, h: 108 },
-    { x: 348, w: 70, h: 138 },
-  ];
-  return (
-    <svg
-      aria-hidden="true"
-      style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-      preserveAspectRatio="xMidYMax slice"
-      viewBox="0 0 400 520"
-    >
-      <defs>
-        <radialGradient id="servixGlow" cx="72%" cy="14%" r="60%">
-          <stop offset="0%" stopColor="#E28A65" stopOpacity="0.30" />
-          <stop offset="55%" stopColor="#E28A65" stopOpacity="0.06" />
-          <stop offset="100%" stopColor="#E28A65" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <rect width="400" height="520" fill="url(#servixGlow)" />
-      {/* marca d'água: o visto da marca, gigante e muito sutil */}
-      <g opacity="0.06" transform="translate(30,-30) rotate(-6)">
-        <path d="M60 230 Q100 300 150 330" fill="none" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
-        <path d="M150 330 Q230 290 340 120" fill="none" stroke="#FFFFFF" strokeWidth="26" strokeLinecap="round" />
-      </g>
-      <Skyline buildings={backBuildings} color="#FFFFFF" opacity={0.06} withWindows={false} />
-      <Skyline buildings={frontBuildings} color="#FFFFFF" opacity={0.11} withWindows />
-    </svg>
-  );
-}
 
 const ERROR_KEY_BY_CODE = {
   invalid_credentials: "errorInvalidCredentials",
@@ -88,13 +13,46 @@ const ERROR_KEY_BY_CODE = {
   generic: "errorGeneric",
 };
 
+// Logótipo do ecrã de início de sessão (documento, 4.12): "bloco 34
+// forest-600 com ✓ + 'Servi' em forest-800 e 'x' em clay" — marca nova,
+// mais simples que o `LogoLockup`/`LogoMark` já existente (Logo.jsx, duas
+// cores/dois traços, pensado pro painel escuro do desenho antigo). Fica só
+// aqui por agora; se isto virar a marca única do produto, LogoLockup pode
+// ser substituído por este bloco mais tarde.
+function LoginLogo() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ width: 34, height: 34, borderRadius: 9, background: COLORS.forest600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 13 L9.5 18.5 L20 6" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <span style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 21, color: COLORS.forest800, lineHeight: 1 }}>
+        Servi<span style={{ color: COLORS.clay }}>x</span>
+      </span>
+    </div>
+  );
+}
+
+const inputStyle = {
+  width: "100%", height: 44, borderRadius: RADIUS.control, border: `1px solid ${COLORS.lineInput}`,
+  padding: "0 14px", fontSize: 14, color: COLORS.ink, background: COLORS.card, boxSizing: "border-box",
+  fontFamily: "inherit",
+};
+
+// Início de sessão (documento de design, 4.12) — cartão centrado (420)
+// sobre fundo #E2EBE7 com brilho radial clay bem leve, logótipo novo,
+// campos com tokens/componentes da Etapa 2. "Sem mais alterações de
+// fluxo": a branch `isSupabaseConfigured` (login real) e o modo de
+// demonstração (toggle Gerência/Funcionário) continuam exatamente como
+// estavam — só a casca visual muda.
 function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLoginWithPassword, authLoading, authError, company, staff }) {
   const t = T[lang].login;
   const [mode, setMode] = useState("gerencia"); // 'gerencia' | 'funcionario' — só usado no modo de demonstração
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [showForgotHelp, setShowForgotHelp] = useState(false);
-  const isMobile = useIsMobile();
 
   function submitRealLogin(e) {
     e.preventDefault();
@@ -102,105 +60,126 @@ function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLogi
     onLoginWithPassword(email.trim(), password);
   }
 
-  const loginShellStyle = isMobile
-    ? { ...styles.loginShell, flexDirection: "column", maxWidth: 420, minHeight: 0 }
-    : styles.loginShell;
-  const loginLeftStyle = isMobile
-    ? { ...styles.loginLeft, flex: "0 0 auto", minHeight: 150, padding: "24px 24px 20px" }
-    : styles.loginLeft;
-  const loginRightStyle = isMobile
-    ? { ...styles.loginRight, padding: "24px 22px 28px" }
-    : styles.loginRight;
-
   return (
-    <div style={loginShellStyle}>
-      <div style={loginLeftStyle}>
-        <LoginScene />
-        <div style={styles.loginLeftContent}>
-          <LogoLockup size={32} tone="reversed" />
-          {!isMobile && <div style={styles.loginTagline}>{t.tagline}</div>}
-        </div>
-        {!isMobile && <div style={styles.loginLeftFoot}>Servix · {t.footNote}</div>}
+    <div
+      style={{
+        minHeight: "100vh", width: "100%", position: "relative", boxSizing: "border-box",
+        background: "#E2EBE7", display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      }}
+    >
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(circle at 50% 28%, rgba(226,138,101,.16), transparent 60%)",
+        }}
+      />
+
+      <div style={{ position: "absolute", top: 20, right: 20 }}>
+        <LangSwitcher lang={lang} setLang={setLang} />
       </div>
-      <div style={loginRightStyle}>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <LangSwitcher lang={lang} setLang={setLang} />
-        </div>
-        <div style={styles.loginFields}>
-          <div style={styles.loginCompanyName}>{company.name}</div>
 
-          {isSupabaseConfigured ? (
-            <form onSubmit={submitRealLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        style={{
+          position: "relative", width: 420, maxWidth: "100%", background: COLORS.card,
+          borderRadius: RADIUS.card, boxShadow: SHADOW.sh2, padding: "36px 32px", boxSizing: "border-box",
+        }}
+      >
+        <LoginLogo />
+        <div style={{ fontSize: 13.5, color: COLORS.ink2, marginTop: 14, marginBottom: 26 }}>{company.name}</div>
+
+        {isSupabaseConfigured ? (
+          <form onSubmit={submitRealLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <input
+              value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder={t.emailPlaceholder} style={inputStyle} type="email" autoComplete="username"
+            />
+            <div style={{ position: "relative" }}>
               <input
-                value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder={t.emailPlaceholder} style={styles.loginInput} type="email" autoComplete="username"
+                type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
+                placeholder={t.passwordPlaceholder} style={{ ...inputStyle, paddingRight: 40 }} autoComplete="current-password"
               />
-              <input
-                type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder={t.passwordPlaceholder} style={styles.loginInput} autoComplete="current-password"
-              />
-              {authError && (
-                <div style={{ background: COLORS.extraTint, color: COLORS.extra, borderRadius: 8, padding: "8px 12px", fontSize: 12.5, fontWeight: 600, marginTop: 4 }}>
-                  {t[ERROR_KEY_BY_CODE[authError]] || t.errorGeneric}
-                </div>
-              )}
-              <div style={styles.forgotRow}>
-                <button type="button" style={styles.forgotLink} onClick={() => setShowForgotHelp((v) => !v)}>
-                  {t.forgotPassword}
-                </button>
-              </div>
-              {showForgotHelp && (
-                <div style={{ ...styles.defSettingHint, background: COLORS.primaryTint, borderRadius: 8, padding: "8px 12px" }}>
-                  {t.forgotPasswordHelp}
-                </div>
-              )}
-              <button type="submit" style={{ ...styles.enterButton, opacity: authLoading ? 0.7 : 1 }} disabled={authLoading}>
-                {authLoading ? t.entering : t.enter}
+              <button
+                type="button" onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? t.hidePassword : t.showPassword}
+                style={{
+                  position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+                  width: 32, height: 32, border: "none", background: "transparent", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.ink3,
+                }}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
-            </form>
-          ) : (
-            <>
-              <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-                <button
-                  style={{ ...styles.avTypeToggle, ...(mode === "gerencia" ? styles.avTypeActiveNotice : {}) }}
-                  onClick={() => setMode("gerencia")}
-                >
-                  {t.isManagement}
-                </button>
-                <button
-                  style={{ ...styles.avTypeToggle, ...(mode === "funcionario" ? styles.avTypeActiveNotice : {}) }}
-                  onClick={() => setMode("funcionario")}
-                >
-                  {t.isEmployee}
-                </button>
-              </div>
+            </div>
 
-              {mode === "gerencia" ? (
-                <>
-                  <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.emailPlaceholder} style={styles.loginInput} />
-                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t.passwordPlaceholder} style={styles.loginInput} />
-                  <div style={styles.forgotRow}>
-                    <button style={styles.forgotLink}>{t.forgotPassword}</button>
-                  </div>
-                  <button style={styles.enterButton} onClick={onEnterManagement}>{t.enter}</button>
-                </>
-              ) : (
-                <>
-                  <div style={{ ...styles.defSettingHint, marginBottom: 4 }}>{t.chooseWho}</div>
-                  {staff.map((s) => (
-                    <button key={s.id} style={{ ...styles.cancelButton, textAlign: "left" }} onClick={() => onEnterEmployee(s.id)}>
-                      {s.name}
-                      {s.role === "supervisor" && (
-                        <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: COLORS.primaryDark }}>{t.supervisorTag}</span>
-                      )}
-                    </button>
-                  ))}
-                </>
-              )}
-            </>
-          )}
+            {authError && (
+              <div style={{ background: COLORS.alertTint, color: COLORS.alert, borderRadius: 8, padding: "8px 12px", fontSize: 12.5, fontWeight: 600 }}>
+                {t[ERROR_KEY_BY_CODE[authError]] || t.errorGeneric}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setShowForgotHelp((v) => !v)}
+                style={{ border: "none", background: "transparent", cursor: "pointer", color: COLORS.forest700, fontSize: 12.5, fontWeight: 600, padding: 0 }}
+              >
+                {t.forgotPassword}
+              </button>
+            </div>
+            {showForgotHelp && (
+              <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: COLORS.ink2, lineHeight: 1.5 }}>
+                {t.forgotPasswordHelp}
+              </div>
+            )}
+
+            <Button type="submit" variant="primary" disabled={authLoading} style={{ height: 52, width: "100%", marginTop: 4, fontSize: 14 }}>
+              {authLoading ? t.entering : t.enter}
+            </Button>
+          </form>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button variant={mode === "gerencia" ? "primary" : "secondary"} style={{ flex: 1, height: 40 }} onClick={() => setMode("gerencia")}>
+                {t.isManagement}
+              </Button>
+              <Button variant={mode === "funcionario" ? "primary" : "secondary"} style={{ flex: 1, height: 40 }} onClick={() => setMode("funcionario")}>
+                {t.isEmployee}
+              </Button>
+            </div>
+
+            {mode === "gerencia" ? (
+              <>
+                <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.emailPlaceholder} style={inputStyle} />
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t.passwordPlaceholder} style={inputStyle} />
+                <Button variant="primary" onClick={onEnterManagement} style={{ height: 52, width: "100%", marginTop: 4 }}>{t.enter}</Button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, color: COLORS.ink3, marginBottom: 2 }}>{t.chooseWho}</div>
+                {staff.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => onEnterEmployee(s.id)}
+                    style={{
+                      textAlign: "left", border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control,
+                      background: COLORS.card, padding: "10px 14px", fontSize: 13.5, color: COLORS.ink, cursor: "pointer",
+                    }}
+                  >
+                    {s.name}
+                    {s.role === "supervisor" && (
+                      <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: COLORS.forest700 }}>{t.supervisorTag}</span>
+                    )}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        <div style={{ marginTop: 22, display: "flex", justifyContent: "center" }}>
+          <InstallAppButton lang={lang} />
         </div>
-        <InstallAppButton lang={lang} />
       </div>
     </div>
   );

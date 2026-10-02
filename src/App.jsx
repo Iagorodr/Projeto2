@@ -1,10 +1,15 @@
 // Camada "View" raiz: lê o estado do controller e decide qual tela mostrar.
 // Não guarda estado do negócio — só consome useAppController().
+import { useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 import { useAppController } from "./controllers/useAppController.js";
 import { styles } from "./styles/styles.js";
 import { Sidebar } from "./views/shared/Layout.jsx";
+import { AppSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.js";
 import { useIsMobile } from "./hooks/useIsMobile.js";
-import { SUPERVISOR_MENU_ITEMS } from "./models/data.js";
+import { useBreakpoint } from "./hooks/useBreakpoint.js";
+import { SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
+import { getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
 import LoginScreen from "./views/LoginScreen.jsx";
@@ -20,17 +25,29 @@ import HistoricoScreen from "./views/management/HistoricoScreen.jsx";
 import DefinicoesScreen from "./views/management/DefinicoesScreen.jsx";
 import NotasScreen from "./views/shared/NotasScreen.jsx";
 
-import EmployeeMenuScreen from "./views/employee/EmployeeMenuScreen.jsx";
+// EmployeeMenuScreen.jsx (a lista de botões sem casca nenhuma) ficou
+// substituído pelo EmployeeInicioScreen novo + a casca da Etapa 3 abaixo
+// — ficheiro removido do projeto na limpeza pós-Etapa 4 (estava órfão,
+// sem nenhum import).
 import EmployeeHorasScreen from "./views/employee/EmployeeHorasScreen.jsx";
 import EmployeeAvisosScreen from "./views/employee/EmployeeAvisosScreen.jsx";
 import EmployeeAgendaScreen from "./views/employee/EmployeeAgendaScreen.jsx";
 import EmployeeClientesScreen from "./views/employee/EmployeeClientesScreen.jsx";
 import EmployeeHistoricoScreen from "./views/employee/EmployeeHistoricoScreen.jsx";
-import SupervisorDashboardScreen from "./views/employee/SupervisorDashboardScreen.jsx";
+import EmployeeInicioScreen from "./views/employee/EmployeeInicioScreen.jsx";
+// SupervisorDashboardScreen.jsx (o antigo "Início" do supervisor em
+// PC/tablet, só notas/lembretes) ficou substituído pelo EmployeeInicioScreen
+// novo (Etapa 4b, secção 5.1) — ficheiro removido do projeto na limpeza
+// pós-Etapa 4 (estava órfão, sem nenhum import).
 
 export default function App() {
   const c = useAppController();
   const isMobile = useIsMobile();
+  // Casca nova da Etapa 3 (sidebar/rail/barra inferior), só pro lado
+  // funcionário/supervisor por agora — a gerência continua com `Sidebar`
+  // antiga e `useIsMobile`, troca dela é trabalho fora desta etapa.
+  const empTier = useBreakpoint();
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   // styles.page tem minHeight fixo de 700px, pensado para desktop. Em telemóveis
   // (ex.: iPhone SE tem só 667px de altura) isso força o corpo a ficar mais alto
   // que o próprio ecrã, criando um pequeno scroll vertical sempre presente.
@@ -49,12 +66,12 @@ export default function App() {
 
       {c.perspective === "management" && (
         <div style={styles.shell}>
-          <Sidebar activeKey={c.screen} onNavigate={c.setScreen} onLogout={c.logout} company={c.company} lang={c.lang} />
+          <Sidebar activeKey={c.screen} onNavigate={c.setScreen} onLogout={c.logout} company={c.company} lang={c.lang} collapsed={c.screen === "agendas"} />
           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
             {c.screen === "dashboard" && (
               <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} onNavigate={c.setScreen} />
             )}
-            {c.screen === "clientes" && <ClientesScreen lang={c.lang} setLang={c.setLang} clients={c.clients} setClients={c.setClients} onDeleteClient={c.deleteClient} />}
+            {c.screen === "clientes" && <ClientesScreen lang={c.lang} setLang={c.setLang} clients={c.clients} setClients={c.setClients} onDeleteClient={c.deleteClient} staff={c.staff} assignments={c.assignments} horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} contractAlertDays={c.contractAlertDays} onNavigate={c.setScreen} />}
             {c.screen === "agendas" && <AgendasScreen lang={c.lang} setLang={c.setLang} clients={c.clients} staff={c.staff} assignments={c.assignments} setAssignments={c.setAssignments} />}
             {c.screen === "horas" && <HorasScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setClosedPeriods={c.setClosedPeriods} sentItems={c.sentItems} missingItems={c.missingItems} setSentItems={c.setSentItems} setMissingItems={c.setMissingItems} />}
             {c.screen === "monitoramento" && <MonitoramentoScreen lang={c.lang} setLang={c.setLang} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} />}
@@ -67,7 +84,7 @@ export default function App() {
             {c.screen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />
             )}
-            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} />}
+            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} />}
             {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} />}
             {c.screen === "definicoes" && (
               <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
@@ -76,79 +93,131 @@ export default function App() {
         </div>
       )}
 
-      {c.perspective === "employee" && c.me && c.me.role === "supervisor" && !isMobile && (
-        // Supervisor entrando de PC/tablet: mesmo layout de barra lateral da
-        // gerência, só que com o menu restrito às páginas já combinadas pro
-        // supervisor, e um "dashboard" próprio (notas/lembretes) no lugar do
-        // painel completo de gerência, que não faz sentido aqui.
-        <div style={styles.shell}>
-          <Sidebar
-            activeKey={c.empScreen} onNavigate={c.setEmpScreen} onLogout={c.logout}
-            company={c.company} lang={c.lang}
-            items={SUPERVISOR_MENU_ITEMS} labels={T[c.lang].supervisorSidebar}
-            brandOverride={{ name: c.me.name, sub: T[c.lang].acessos.roleSupervisor }}
-          />
-          <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+      {c.perspective === "employee" && c.me && (() => {
+        // Casca nova da Etapa 3 pro funcionário/supervisor (documento,
+        // 3.1-3.3): PC sidebar completa, tablet vira "rail" (108px,
+        // variante que não existia pra este lado antes), telemóvel vira
+        // barra inferior + folha "Mais". "Regra de ouro" (documento, 5):
+        // os dois papéis usam os MESMOS ecrãs — a única diferença é
+        // Monitoramento (só supervisor) e o selo de papel.
+        const isSupervisor = c.me.role === "supervisor";
+        const tSidebar = T[c.lang].supervisorSidebar;
+        // SUPERVISOR_MENU_ITEMS já tem a ordem certa do documento
+        // (Início, Horas, Avisos, Agenda, Clientes, Histórico,
+        // Monitoramento, Notas) com o ícone certo por chave — só falta
+        // traduzir o rótulo e tirar Monitoramento pra quem não é
+        // supervisor. O funcionário ganha aqui o acesso a "Notas" que só
+        // tinha por rota direta até agora (o botão no menu antigo não
+        // oferecia isso, mas a rota em si já funcionava).
+        const roleItems = SUPERVISOR_MENU_ITEMS.filter((it) => isSupervisor || it.key !== "monitoramento");
+        const sidebarItems = roleItems.map((it) => ({
+          key: it.key, icon: it.icon, label: tSidebar[it.key],
+          badge: it.key === "avisos" ? c.myUnreadBadge : undefined,
+        }));
+
+        const body = (
+          <>
             {c.empScreen === "menu" && (
-              <SupervisorDashboardScreen lang={c.lang} setLang={c.setLang} me={c.me} personalNotes={c.personalNotes} onNavigate={c.setEmpScreen} />
+              <EmployeeInicioScreen
+                lang={c.lang} setLang={c.setLang} me={c.me} onNavigate={c.setEmpScreen}
+                avisosBadge={c.myUnreadBadge} clients={c.clients} staff={c.staff} assignments={c.assignments}
+                horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes}
+              />
+            )}
+            {c.empScreen === "horas" && (
+              <EmployeeHorasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setMissingItems={c.setMissingItems} />
+            )}
+            {c.empScreen === "avisos" && (
+              <EmployeeAvisosScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} isSupervisor={isSupervisor} desktop={empTier !== "mobile"} />
+            )}
+            {c.empScreen === "agenda" && (
+              <EmployeeAgendaScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} staff={c.staff} clients={c.clients} assignments={c.assignments} desktop={empTier !== "mobile"} />
+            )}
+            {c.empScreen === "clientes" && (
+              <EmployeeClientesScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} assignments={c.assignments} canViewAll={!!c.me.canViewAllClients} desktop={empTier !== "mobile"} />
+            )}
+            {c.empScreen === "historico" && (
+              <EmployeeHistoricoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} closedPeriods={c.closedPeriods} desktop={empTier !== "mobile"} />
+            )}
+            {c.empScreen === "monitoramento" && (
+              <MonitoramentoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} />
             )}
             {c.empScreen === "notas" && (
-              <NotasScreen lang={c.lang} setLang={c.setLang} ownerId={c.me.id} personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />
+              <NotasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} ownerId={c.me.id} personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop={empTier !== "mobile"} />
             )}
-            {["horas", "avisos", "agenda", "clientes", "historico", "monitoramento"].includes(c.empScreen) && (
-              <div style={{ flex: 1, overflowY: "auto", display: "flex", justifyContent: "center", padding: "24px 24px 40px" }}>
-                {c.empScreen === "horas" && (
-                  <EmployeeHorasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setMissingItems={c.setMissingItems} />
-                )}
-                {c.empScreen === "avisos" && (
-                  <EmployeeAvisosScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} isSupervisor />
-                )}
-                {c.empScreen === "agenda" && (
-                  <EmployeeAgendaScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} assignments={c.assignments} />
-                )}
-                {c.empScreen === "clientes" && (
-                  <EmployeeClientesScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} assignments={c.assignments} canViewAll={!!c.me.canViewAllClients} />
-                )}
-                {c.empScreen === "historico" && (
-                  <EmployeeHistoricoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} closedPeriods={c.closedPeriods} />
-                )}
-                {c.empScreen === "monitoramento" && (
-                  <MonitoramentoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} />
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          </>
+        );
 
-      {c.perspective === "employee" && c.me && !(c.me.role === "supervisor" && !isMobile) && (
-        <>
-          {c.empScreen === "menu" && (
-            <EmployeeMenuScreen lang={c.lang} setLang={c.setLang} me={c.me} onNavigate={c.setEmpScreen} onLogout={c.logout} avisosBadge={c.myUnreadBadge} />
-          )}
-          {c.empScreen === "horas" && (
-            <EmployeeHorasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setMissingItems={c.setMissingItems} />
-          )}
-          {c.empScreen === "avisos" && (
-            <EmployeeAvisosScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} isSupervisor={c.me.role === "supervisor"} />
-          )}
-          {c.empScreen === "agenda" && (
-            <EmployeeAgendaScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} assignments={c.assignments} />
-          )}
-          {c.empScreen === "clientes" && (
-            <EmployeeClientesScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} assignments={c.assignments} canViewAll={!!c.me.canViewAllClients} />
-          )}
-          {c.empScreen === "historico" && (
-            <EmployeeHistoricoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} closedPeriods={c.closedPeriods} />
-          )}
-          {c.empScreen === "monitoramento" && (
-            <MonitoramentoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} />
-          )}
-          {c.empScreen === "notas" && (
-            <NotasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} ownerId={c.me.id} personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} />
-          )}
-        </>
-      )}
+        if (empTier === "mobile") {
+          // Telemóvel (<640): barra inferior fixa (Início·Horas·Agenda·
+          // Avisos·Mais) substitui por completo o antigo EmployeeMenuScreen
+          // (lista de botões sem casca nenhuma) — em Horas ela já dá lugar
+          // à BottomActionBar do próprio ecrã (5.2.6), como sempre foi.
+          const iconByKey = Object.fromEntries(SUPERVISOR_MENU_ITEMS.map((it) => [it.key, it.icon]));
+          const bottomItems = [
+            { key: "menu", icon: iconByKey.menu, label: tSidebar.menu },
+            { key: "horas", icon: iconByKey.horas, label: tSidebar.horas },
+            { key: "agenda", icon: iconByKey.agenda, label: tSidebar.agenda },
+            { key: "avisos", icon: iconByKey.avisos, label: tSidebar.avisos, badge: c.myUnreadBadge },
+            { key: "mais", icon: MoreHorizontal, label: T[c.lang].common.more },
+          ];
+          const moreItems = [
+            { key: "clientes", icon: iconByKey.clientes, label: tSidebar.clientes, onSelect: () => c.setEmpScreen("clientes") },
+            { key: "historico", icon: iconByKey.historico, label: tSidebar.historico, onSelect: () => c.setEmpScreen("historico") },
+            { key: "notas", icon: iconByKey.notas, label: tSidebar.notas, onSelect: () => c.setEmpScreen("notas") },
+            ...(isSupervisor ? [{
+              key: "monitoramento", icon: iconByKey.monitoramento, label: tSidebar.monitoramento,
+              // Selo do nº de funcionários com dias em falta — só aqui na
+              // folha "Mais" (comentário do próprio MoreSheet.jsx), não na
+              // sidebar/rail principal, que o documento (3.1) só dá selo a
+              // Avisos.
+              badge: staffWithGapsCount(
+                c.staff, c.horasData, c.clients, c.assignments,
+                getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY),
+                weekBlocksOfPayPeriod(getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY), c.cutoffDay),
+                c.cutoffDay, TODAY
+              ) || undefined,
+              onSelect: () => c.setEmpScreen("monitoramento"),
+            }] : []),
+          ];
+          const hideBottomBar = c.empScreen === "horas";
+          // Sem padding aqui: a `pageStyle` do topo do App já dá os 14px de
+          // margem em telemóvel (igual já dava a todos estes ecrãs antes
+          // desta casca existir) — só acrescento espaço por baixo pra não
+          // ficar tapado pela barra inferior fixa.
+          return (
+            <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+              <div style={{ flex: 1, paddingBottom: hideBottomBar ? 0 : 8 }}>
+                {body}
+              </div>
+              {!hideBottomBar && (
+                <MobileBottomBar
+                  activeKey={c.empScreen === "mais" ? "" : c.empScreen}
+                  onNavigate={(key) => (key === "mais" ? setMoreSheetOpen(true) : c.setEmpScreen(key))}
+                  items={bottomItems}
+                />
+              )}
+              <MoreSheet open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} items={moreItems} />
+            </div>
+          );
+        }
+
+        // Tablet (640-1023, "rail" de 108px — variante nova, nunca usada
+        // antes pra este lado) e PC (≥1024, sidebar completa de 236px).
+        return (
+          <div style={styles.shell}>
+            <AppSidebar
+              items={sidebarItems} activeKey={c.empScreen} onNavigate={c.setEmpScreen}
+              density="supervisor" collapsed={empTier === "tablet" ? "rail" : false}
+              user={{ name: c.me.name, subtitle: isSupervisor ? T[c.lang].acessos.roleSupervisor : undefined }}
+              onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
+            />
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", justifyContent: "center", padding: "24px 24px 40px" }}>
+              {body}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

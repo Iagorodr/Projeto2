@@ -1,45 +1,96 @@
 import { useState } from "react";
-import {
-  ChevronDown, ChevronRight, LayoutDashboard, Users, CalendarDays, Clock, Bell, UsersRound, Settings,
-  Search, X, Pencil, Mail, Phone, Briefcase, Calendar, KeyRound, MapPin, Euro, RotateCcw, Check,
-  Plus, Store, Building2, Home as HouseIcon, Factory, MessageSquare, ThumbsUp, PackageX, Info, Archive,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Pencil, X, RotateCcw } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
+import { RADIUS, FONT } from "../../styles/tokens.js";
+import { TODAY } from "../../models/data.js";
 import {
-  TYPE_ICONS, MONTHS_ABBR_PT, DAY_LABELS_1_7, AGENDA_DAYS, TODAY, MENU_ITEMS,
-} from "../../models/data.js";
-import {
-  clientById, staffById, pad2, fmtEuro, fmtHoursNum, fmtMinutes, parseDMY, dateStrInPeriod,
-  buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr,
-  weekDiff, clientAppliesThisWeek, weekLabelPT, staffTotalHours, staffTotalPay, getAssignedClientIds,
-  recomputeSharedHours,
+  clientById, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
+  buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
+  startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
+  weekBlocksOfPayPeriod, calPeriodLabel, isStaffActive,
 } from "../../models/utils.js";
-import { TopBar, LangSwitcher, Field, ViewField, Sidebar } from "../shared/Layout.jsx";
-import { ChevronLeftIcon, ChevronRightIcon } from "../shared/Icons.jsx";
-import { useIsMobile } from "../../hooks/useIsMobile.js";
-import { formatTodayLabel, T } from "../../models/i18n.js";
+import { formatTodayLabel, T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf, exportPeriodSummaryPdf } from "../../models/pdfExport.js";
+import {
+  PageHeader, Card, SegmentedBar, FilterChip, SearchField, Button, Pill,
+  Avatar, DataTable, Drawer, ConfirmDialog, Toast,
+} from "../shared/ui/index.js";
+import { LANG_NAMES } from "../../models/data.js";
 
+// "2026-09-20" -> Date local (meia-noite), igual ao resto do app faz com
+// datas ISO vindas de `horasData`.
+function parseISODate(str) {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Agrupa os lançamentos de um funcionário pelos blocos do período aberto
+// (documento, 6.1 — "28 set – 4 out", etc.), mantendo o índice ORIGINAL de
+// cada entrada em `_idx` (as funções de aprovar/editar/anular operam por
+// índice no array `entries` tal como já estava). Uma entrada que caia fora
+// de todos os blocos do período (ex.: adiantada bem para a frente) cai num
+// grupo à parte pela sua própria semana civil, para nunca desaparecer da
+// gaveta.
+function groupEntriesByBlock(entries, payPeriodChunks, lang) {
+  const blocks = payPeriodChunks.map((chunk) => ({ chunk, items: [] }));
+  const leftovers = new Map();
+  entries.forEach((entry, idx) => {
+    const d = parseISODate(entry.date);
+    const block = blocks.find((b) => d >= b.chunk.start && d <= b.chunk.end);
+    if (block) {
+      block.items.push({ ...entry, _idx: idx });
+    } else {
+      const weekStart = startOfISOWeek(d);
+      const key = isoDateStr(weekStart);
+      if (!leftovers.has(key)) leftovers.set(key, { weekStart, items: [] });
+      leftovers.get(key).items.push({ ...entry, _idx: idx });
+    }
+  });
+  const groups = [
+    ...blocks.filter((b) => b.items.length > 0).map((b) => ({ label: calPeriodLabel(b.chunk, lang), start: b.chunk.start, items: b.items })),
+    ...Array.from(leftovers.values()).map((g) => ({ label: weekLabelPT(g.weekStart, lang), start: g.weekStart, items: g.items })),
+  ];
+  groups.forEach((g) => g.items.sort((a, b) => a.date.localeCompare(b.date)));
+  groups.sort((a, b) => a.start - b.start);
+  return groups;
+}
+
+// Horas (pagamentos) — documento de design, secção 4.4, "o ecrã mais
+// importante da gerência". A lógica de negócio (status/paid derivados,
+// fecho parcial, aprovação de extras) já vinha pronta da Etapa 0 — aqui só
+// muda a apresentação: cartão herói com barra segmentada, chips de
+// filtro, `DataTable`, gaveta de 640 (em vez do modal centrado) com os
+// lançamentos agrupados por bloco do período, e confirmação escrita para
+// "Reabrir" (que antes agia direto, sem perguntar nada).
 function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHorasData, cutoffDay, closedPeriods, setClosedPeriods, sentItems, missingItems, setSentItems, setMissingItems }) {
   const t = T[lang].horas;
   const c0 = T[lang].common;
   const pdfT = T[lang].pdf;
+  const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang];
   const [monthOffset, setMonthOffset] = useState(0);
   const [staffSearch, setStaffSearch] = useState("");
+  const [activeChip, setActiveChip] = useState("todos");
   const [openStaffId, setOpenStaffId] = useState(null);
   const [editingIndex, setEditingIndex] = useState(null);
   const [rowDraft, setRowDraft] = useState({ clientId: null, hours: "" });
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [closedToast, setClosedToast] = useState(false);
-  const isMobile = useIsMobile();
 
+  // monthOffset=0 é "o período aberto agora" — derivado do histórico real de
+  // fechamentos (getOpenPeriod), não de TODAY puro, pra não ficar errado
+  // depois de um fecho tardio. Offsets != 0 (navegação pra outros períodos,
+  // hoje sem UI que os acione) continuam por cálculo direto.
   const period = monthOffset === 0
     ? getOpenPeriod(closedPeriods, cutoffDay, TODAY)
     : getCutoffPeriod(TODAY, cutoffDay, monthOffset);
   const periodLabel = formatPeriodLabel(period, lang);
+  const payPeriodChunks = weekBlocksOfPayPeriod(period, cutoffDay);
+  // Fecho atrasado (documento, 4.4 + 6.2): o período aberto já devia ter
+  // terminado e ainda não foi fechado — mostra a faixa de aviso.
+  const isLateClosing = monthOffset === 0 && TODAY > period.end;
 
-  const visibleStaff = staff.filter((s) => s.name.toLowerCase().includes(staffSearch.toLowerCase()));
   const openStaff = staff.find((s) => s.id === openStaffId);
   const openHoras = openStaffId ? horasData[openStaffId] : null;
 
@@ -50,7 +101,30 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   };
   const periodTotalHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }, period), 0);
   const periodTotalEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, period), 0);
-  const canClosePeriod = staff.length > 0 && staff.every((s) => horasData[s.id]?.paid);
+  const unpaidForClose = staff.filter((s) => !horasData[s.id]?.paid).length;
+  const canClosePeriod = staff.length > 0 && unpaidForClose === 0;
+
+  const CHIP_FILTERS = {
+    todos: () => true,
+    pendentes: (h) => h.status === "pendente",
+    porPagar: (h) => h.status === "finalizado" && !h.paid,
+    pagos: (h) => h.paid,
+  };
+  // Etapa 4j (4.9): uma conta inativa (incluindo Replacement já fora da
+  // validade) só continua no quadro do período ABERTO se tiver pelo menos
+  // um lançamento não anulado dentro desse período — "tem de ser paga pelo
+  // que trabalhou". Sem lançamentos, já não há nada a pagar/corrigir e sai
+  // do quadro; uma vez o período fechado, isto já não se aplica (o
+  // histórico é só da gerência ler, não deste ecrã). Staff ativo continua
+  // a aparecer sempre, como já era.
+  function hasEntriesInOpenPeriod(s) {
+    const h = horasData[s.id];
+    return !!h && (h.entries || []).some((e) => !e.voided && dateStrInPeriod(e.date, period));
+  }
+  const visibleStaff = staff
+    .filter((s) => isStaffActive(s, TODAY) || hasEntriesInOpenPeriod(s))
+    .filter((s) => s.name.toLowerCase().includes(staffSearch.toLowerCase()))
+    .filter((s) => CHIP_FILTERS[activeChip](horasData[s.id] || { status: "pendente", paid: false }));
 
   function closePeriod() {
     const snapshot = buildClosedPeriodSnapshot(period, clients, staff, horasData, sentItems, missingItems);
@@ -59,6 +133,12 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       const next = {};
       staff.forEach((s) => {
         const current = prev[s.id] || { status: "pendente", paid: false, entries: [], lockedWeeks: {}, noClientDays: [], reopened: false };
+        // Fecho PARCIAL: só arquiva o que é do período que está fechando (já
+        // está no snapshot acima). Entries lançadas adiantado (já no período
+        // seguinte), semanas já em curso e dias "sem clientes" já marcados
+        // pro período seguinte continuam vivos — é o que evita perder o
+        // trabalho de quem adiantou o mês antes de a gerência fechar com
+        // atraso.
         const keptEntries = current.entries.filter((e) => !dateStrInPeriod(e.date, period));
         const keptLockedWeeks = {};
         Object.entries(current.lockedWeeks || {}).forEach(([weekKey, val]) => {
@@ -69,11 +149,15 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       });
       return next;
     });
+    // Mesma lógica dos Horas: só arquiva avisos/reclamações/elogios/
+    // solicitações do período que está fechando (já estão no snapshot acima).
+    // O que já tiver sido lançado pro período seguinte continua na lista ao
+    // vivo — antes isto zerava tudo, incluindo itens já do próximo período.
     setSentItems((prev) => prev.filter((i) => !dateStrInPeriod(i.date, period)));
     setMissingItems((prev) => prev.filter((i) => !dateStrInPeriod(i.date, period)));
     setCloseConfirmOpen(false);
     setClosedToast(true);
-    setTimeout(() => setClosedToast(false), 2200);
+    setTimeout(() => setClosedToast(false), 5000);
   }
   function exportPeriodPdf() {
     const rows = staff.map((s) => {
@@ -112,6 +196,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   }
   function reopenForCorrection(staffId) {
     updateHoras(staffId, (h) => ({ ...h, status: "pendente", lockedWeeks: {}, reopened: true }));
+    setReopenConfirmOpen(false);
   }
   function approveEntry(staffId, i) {
     updateHoras(staffId, (h) => ({ ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, approved: true } : e)) }));
@@ -132,212 +217,278 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     setEditingIndex(null);
   }
 
+  const columns = [
+    {
+      key: "staff", label: t.colStaff, width: 2,
+      render: (s) => {
+        const h = horasData[s.id] || { status: "pendente", paid: false, reopened: false };
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
+            <Avatar name={s.name} size={32} />
+            <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+            {h.reopened && <Pill variant="reopened">{t.reopenedTag}</Pill>}
+          </div>
+        );
+      },
+    },
+    {
+      key: "status", label: t.colStatus, width: 1,
+      render: (s) => {
+        const h = horasData[s.id] || { status: "pendente", paid: false };
+        if (h.paid) return <Pill variant="paid">{c0.paid}</Pill>;
+        if (h.status === "finalizado") return <Pill variant="owed">{t.kpiUnpaid}</Pill>;
+        return <Pill variant="pending">{c0.pending}</Pill>;
+      },
+    },
+    { key: "hours", label: t.colTotalHours, width: 1, render: (s) => fmtHoursScreen(staffTotalHours(horasData[s.id] || { entries: [] }, period)) },
+    {
+      key: "extras", label: t.miniExtrasLabel, width: 1,
+      render: (s) => {
+        const h = horasData[s.id] || { entries: [] };
+        const n = h.entries.filter((e) => e.extra && !e.approved && !e.voided).length;
+        return n > 0 ? <Pill variant="pending">{n}</Pill> : <span style={{ color: COLORS.ink3 }}>–</span>;
+      },
+    },
+    { key: "pay", label: t.colTotalPay, width: 1, numeric: true, render: (s) => fmtEuro(staffTotalPay(horasData[s.id] || { entries: [] }, clients, period)) },
+    {
+      key: "paid", label: t.colPaid, width: 1,
+      render: (s) => {
+        const h = horasData[s.id] || { status: "pendente", paid: false };
+        const togglable = h.status === "finalizado";
+        return (
+          <button
+            type="button"
+            title={togglable ? t.markAsPaid : t.waitingFinalize(s.name)}
+            disabled={!togglable}
+            onClick={(ev) => { ev.stopPropagation(); togglePaid(s.id); }}
+            style={{
+              width: 34, height: 34, borderRadius: RADIUS.control,
+              border: `1.5px solid ${h.paid ? COLORS.ok : COLORS.lineInput}`,
+              background: h.paid ? COLORS.ok : "transparent",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: togglable ? "pointer" : "not-allowed", opacity: togglable ? 1 : 0.45,
+            }}
+          >
+            {h.paid && <Check size={16} color="#fff" strokeWidth={2.5} />}
+          </button>
+        );
+      },
+    },
+  ];
+
   return (
     <div style={styles.content}>
-      <div style={styles.horTop}>
-        <div style={styles.periodNav}>
-          <button style={styles.navButton} onClick={() => setMonthOffset((m) => m - 1)}><ChevronLeftIcon /></button>
-          <span style={styles.periodLabel}>{periodLabel}</span>
-          <button style={styles.navButton} onClick={() => setMonthOffset((m) => m + 1)}><ChevronRightIcon /></button>
-        </div>
-        <LangSwitcher lang={lang} setLang={setLang} />
-      </div>
+      <PageHeader
+        title={t.title} subtitle={formatTodayLabel(lang)}
+        lang={lang} setLang={setLang} langNames={LANG_NAMES}
+        actions={(
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 2, background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.pill, padding: 3 }}>
+              <button
+                type="button" onClick={() => setMonthOffset((m) => m - 1)} aria-label={t.previousPeriod}
+                style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, padding: "0 4px", whiteSpace: "nowrap" }}>{periodLabel}</span>
+              <button
+                type="button" onClick={() => setMonthOffset((m) => m + 1)} aria-label={t.nextPeriod}
+                style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <Button variant="secondary" onClick={exportPeriodPdf}>{t.exportPdfGeneral}</Button>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <Button variant="primary" disabled={!canClosePeriod} onClick={() => setCloseConfirmOpen(true)}>{t.closePeriod}</Button>
+              {!canClosePeriod && <Pill variant="pending">{t.missingPaymentsHint(unpaidForClose)}</Pill>}
+            </div>
+          </div>
+        )}
+      />
 
-      <div style={styles.horSearchKpiRow}>
-        <div style={styles.horSearchWrap}>
-          <input value={staffSearch} onChange={(e) => setStaffSearch(e.target.value)} placeholder={t.searchPlaceholder} style={styles.defTextInput} />
-        </div>
-        <div style={styles.horKpiBox}>
-          <div style={styles.horKpiBoxItem}><div style={styles.horKpiBoxLabel}>{t.kpiPending}</div><div style={styles.horKpiBoxValue}>{kpiCounts.pending}</div></div>
-          <div style={styles.horKpiBoxItem}><div style={styles.horKpiBoxLabel}>{t.kpiPaid}</div><div style={styles.horKpiBoxValue}>{kpiCounts.paid}</div></div>
-          <div style={styles.horKpiBoxItem}><div style={styles.horKpiBoxLabel}>{t.kpiUnpaid}</div><div style={styles.horKpiBoxValue}>{kpiCounts.unpaid}</div></div>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={styles.horPeriodTotal}>{t.periodTotal}: {fmtHoursNum(periodTotalHours)}h · {fmtEuro(periodTotalEuros)}</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={styles.cancelButton} onClick={exportPeriodPdf}>{t.exportPdfGeneral}</button>
-          <button
-            style={{ ...styles.saveButton, opacity: canClosePeriod ? 1 : 0.5, cursor: canClosePeriod ? "pointer" : "not-allowed" }}
-            disabled={!canClosePeriod}
-            onClick={() => setCloseConfirmOpen(true)}
-          >
-            {t.closePeriod}
-          </button>
-        </div>
-      </div>
-      {!canClosePeriod && (
-        <div style={{ ...styles.defSettingHint, marginTop: -8, marginBottom: 16 }}>
-          {t.closePeriodHint}
-        </div>
+      {isLateClosing && (
+        <Card variant="alert" style={{ marginBottom: 16 }}>
+          {t.lateClosingBanner(periodLabel)}
+        </Card>
       )}
-      {closedToast && <div style={{ ...styles.avSentNote, marginBottom: 12, display: "block" }}>{t.closedToast}</div>}
 
-      <div style={isMobile ? { ...styles.tableWrap, overflowX: "auto" } : styles.tableWrap}>
-        <div style={styles.tableHeaderRow}>
-          <div style={{ ...styles.th, flex: 2 }}>{t.colStaff}</div>
-          <div style={{ ...styles.th, flex: 1 }}>{t.colStatus}</div>
-          <div style={{ ...styles.th, flex: 1 }}>{t.colTotalHours}</div>
-          <div style={{ ...styles.th, flex: 1 }}>{t.colTotalPay}</div>
-          <div style={{ ...styles.th, flex: 1.2, textAlign: "center" }}>{t.colPaid}</div>
+      <Card variant="hero" style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>{t.heroTitle}</div>
+        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 32, marginBottom: 2 }}>{fmtEuro(periodTotalEuros)}</div>
+        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 16 }}>{fmtHoursScreen(periodTotalHours)} · {periodLabel}</div>
+        <SegmentedBar
+          onHero
+          segments={[
+            { value: kpiCounts.paid, color: "#fff" },
+            { value: kpiCounts.unpaid, color: COLORS.clay },
+            { value: kpiCounts.pending, color: "rgba(255,255,255,.28)" },
+          ]}
+        />
+        <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 8 }}>
+          {t.heroLegend(kpiCounts.paid, kpiCounts.unpaid, kpiCounts.pending)}
         </div>
-        {visibleStaff.map((s) => {
-          const h = horasData[s.id] || { status: "pendente", paid: false, entries: [] };
-          const pendingExtras = h.entries.filter((e) => e.extra && !e.approved && !e.voided).length;
-          const paidTogglable = h.status === "finalizado";
-          return (
-            <div key={s.id} style={styles.tableRow} onClick={() => setOpenStaffId(s.id)}>
-              <div style={{ ...styles.td, flex: 2, fontWeight: 600 }}>{s.name}</div>
-              <div style={{ ...styles.td, flex: 1 }}>
-                <span style={{ ...styles.statusBadge, ...(h.paid ? styles.horStatusPaid : h.status === "finalizado" ? styles.horStatusDone : styles.horStatusPending) }}>
-                  {h.paid ? c0.paid : h.status === "finalizado" ? t.statusFinished : c0.pending}
-                </span>
-                {pendingExtras > 0 && <span style={styles.horPendingExtraDot} />}
-              </div>
-              <div style={{ ...styles.td, flex: 1 }}>{fmtHoursNum(staffTotalHours(h, period))}h</div>
-              <div style={{ ...styles.td, flex: 1 }}>{fmtEuro(staffTotalPay(h, clients, period))}</div>
-              <div style={{ ...styles.td, flex: 1.2, justifyContent: "center" }}>
-                <button
-                  style={{
-                    ...styles.horPaidToggle,
-                    background: h.paid ? COLORS.primaryDark : "transparent",
-                    borderColor: paidTogglable ? COLORS.primaryDark : COLORS.border,
-                    cursor: paidTogglable ? "pointer" : "not-allowed",
-                    opacity: paidTogglable ? 1 : 0.4,
-                  }}
-                  disabled={!paidTogglable}
-                  onClick={(ev) => { ev.stopPropagation(); togglePaid(s.id); }}
-                />
-              </div>
-            </div>
-          );
-        })}
+      </Card>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <FilterChip active={activeChip === "todos"} onClick={() => setActiveChip("todos")} count={staff.length}>{t.filterAll}</FilterChip>
+          <FilterChip active={activeChip === "pendentes"} onClick={() => setActiveChip("pendentes")} count={kpiCounts.pending}>{t.kpiPending}</FilterChip>
+          <FilterChip active={activeChip === "porPagar"} onClick={() => setActiveChip("porPagar")} count={kpiCounts.unpaid}>{t.kpiUnpaid}</FilterChip>
+          <FilterChip active={activeChip === "pagos"} onClick={() => setActiveChip("pagos")} count={kpiCounts.paid}>{t.kpiPaid}</FilterChip>
+        </div>
+        <SearchField value={staffSearch} onChange={setStaffSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
       </div>
 
-      {openStaff && openHoras && (
-        <div style={styles.modalOverlay} onClick={() => { setOpenStaffId(null); setEditingIndex(null); }}>
-          <div style={{ ...styles.modalCard, maxWidth: 780 }} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div>
-                <div style={styles.modalTitle}>{openStaff.name}</div>
-                <div style={styles.modalSubtitle}>{t.periodTotal}: {periodLabel}</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <div style={{ ...styles.horPeriodTotal, background: COLORS.bg, color: COLORS.text }}>{t.totalHoursLabel}: {fmtHoursNum(staffTotalHours(openHoras, period))}h</div>
-                  <div style={styles.horPeriodTotal}>{t.amountToReceiveLabel}: {fmtEuro(staffTotalPay(openHoras, clients, period))}</div>
-                </div>
-                <button style={styles.horCancelSmall} onClick={exportStaffPdf}>{t.exportPdf}</button>
-                {openHoras.status === "finalizado" && !openHoras.paid && (
-                  <button style={styles.horCancelSmall} onClick={() => reopenForCorrection(openStaff.id)}>
-                    {t.reopenForCorrection}
-                  </button>
-                )}
-                <button
-                  style={{
-                    ...styles.horModalPaidToggle,
-                    background: openHoras.paid ? COLORS.primaryDark : "transparent",
-                    borderColor: openHoras.status === "finalizado" ? COLORS.primaryDark : COLORS.border,
-                    color: openHoras.paid ? "#fff" : COLORS.primaryDark,
-                    cursor: openHoras.status === "finalizado" ? "pointer" : "not-allowed",
-                    opacity: openHoras.status === "finalizado" ? 1 : 0.4,
-                  }}
-                  disabled={openHoras.status !== "finalizado"}
-                  onClick={() => togglePaid(openStaff.id)}
-                >
-                  {openHoras.paid && <Check size={12} />}
-                  <span style={{ marginLeft: 6 }}>{openHoras.paid ? c0.paid : t.markAsPaid}</span>
-                </button>
-                <button style={styles.modalClose} onClick={() => { setOpenStaffId(null); setEditingIndex(null); }}><X size={16} /></button>
-              </div>
-            </div>
+      <DataTable columns={columns} rows={visibleStaff} onRowClick={(s) => setOpenStaffId(s.id)} />
 
-            <div style={styles.horReportTable}>
-              <div style={styles.horReportHeaderRow}>
-                <div style={{ ...styles.horRth, flex: 1 }}>{t.repDate}</div>
-                <div style={{ ...styles.horRth, flex: 2 }}>{t.repClient}</div>
-                <div style={{ ...styles.horRth, flex: 1 }}>{t.repHours}</div>
-                <div style={{ ...styles.horRth, flex: 1 }}>{t.repValueHour}</div>
-                <div style={{ ...styles.horRth, flex: 1 }}>{t.repTotal}</div>
-                <div style={{ ...styles.horRth, flex: 1.8 }} />
+      <Drawer
+        open={!!(openStaff && openHoras)}
+        onClose={() => { setOpenStaffId(null); setEditingIndex(null); }}
+        width={640}
+        avatar={openStaff && <Avatar name={openStaff.name} size={36} />}
+        title={openStaff?.name}
+        pill={openHoras && (openHoras.paid ? <Pill variant="paid">{c0.paid}</Pill> : openHoras.status === "finalizado" ? <Pill variant="owed">{t.kpiUnpaid}</Pill> : <Pill variant="pending">{c0.pending}</Pill>)}
+        footer={openHoras && (
+          <>
+            <Button variant="secondary" onClick={exportStaffPdf}>{t.exportPdf}</Button>
+            {openHoras.status === "finalizado" && !openHoras.paid && (
+              <Button variant="secondary" onClick={() => setReopenConfirmOpen(true)}>{t.reopenForCorrection}</Button>
+            )}
+            <Button
+              variant="primary" disabled={openHoras.status !== "finalizado"}
+              icon={openHoras.paid ? Check : undefined}
+              onClick={() => togglePaid(openStaff.id)}
+            >
+              {openHoras.paid ? c0.paid : t.markAsPaid}
+            </Button>
+          </>
+        )}
+      >
+        {openStaff && openHoras && (() => {
+          const locked = openHoras.paid;
+          const pendingExtras = openHoras.entries.filter((e) => e.extra && !e.approved && !e.voided).length;
+          const groups = groupEntriesByBlock(openHoras.entries, payPeriodChunks, lang);
+          return (
+            <>
+              <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+                <Card style={{ flex: 1, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 11.5, color: COLORS.ink2, marginBottom: 4 }}>{t.miniHoursLabel}</div>
+                  <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 18 }}>{fmtHoursScreen(staffTotalHours(openHoras, period))}</div>
+                </Card>
+                <Card style={{ flex: 1, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 11.5, color: COLORS.ink2, marginBottom: 4 }}>{t.miniReceiveLabel}</div>
+                  <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 18 }}>{fmtEuro(staffTotalPay(openHoras, clients, period))}</div>
+                </Card>
+                <Card style={{ flex: 1, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 11.5, color: COLORS.ink2, marginBottom: 4 }}>{t.miniExtrasLabel}</div>
+                  <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 18 }}>{pendingExtras || "–"}</div>
+                </Card>
               </div>
-              {openHoras.entries.map((e, i) => {
-                const isEditing = editingIndex === i;
-                const locked = openHoras.paid;
-                const client = clientById(clients, e.clientId);
-                const valueHour = client ? client.valueHour : 0;
+
+              {locked && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, background: COLORS.lineSoft, color: COLORS.ink2, borderRadius: RADIUS.control, padding: "10px 14px", marginBottom: 18, fontSize: 13 }}>
+                  🔒 {t.lockedBanner}
+                </div>
+              )}
+
+              {groups.map((group) => {
+                const subtotal = group.items.filter((e) => !e.voided).reduce((s, e) => s + e.hours, 0);
                 return (
-                  <div key={i} style={{ ...styles.horReportRow, background: e.voided ? COLORS.bg : e.extra ? COLORS.extraTint : COLORS.surface, opacity: e.voided ? 0.55 : 1 }}>
-                    <div style={{ ...styles.horRtd, flex: 1, textDecoration: e.voided ? "line-through" : "none" }}>{e.date}</div>
-                    {isEditing ? (
-                      <>
-                        <div style={{ flex: 2, paddingRight: 8 }}>
-                          <select style={styles.horRowEditInput} value={rowDraft.clientId || ""} onChange={(ev) => setRowDraft((d) => ({ ...d, clientId: Number(ev.target.value) }))}>
-                            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                        </div>
-                        <div style={{ flex: 1, paddingRight: 8 }}>
-                          <input type="number" step="0.5" style={styles.horRowEditInput} value={rowDraft.hours} onChange={(ev) => setRowDraft((d) => ({ ...d, hours: ev.target.value }))} />
-                        </div>
-                        <div style={{ ...styles.horRtd, flex: 1 }}>{fmtEuro(valueHour)}</div>
-                        <div style={{ ...styles.horRtd, flex: 1 }}>{fmtEuro((Number(rowDraft.hours) || 0) * valueHour)}</div>
-                        <div style={{ flex: 1.8, display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                          <button style={styles.horCancelSmall} onClick={cancelEditRow}>{c0.cancel}</button>
-                          <button style={styles.horApproveButton} onClick={() => saveEditRow(openStaff.id, i)}>{c0.save}</button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ ...styles.horRtd, flex: 2, textDecoration: e.voided ? "line-through" : "none" }}>{client ? client.name : "—"}</div>
-                        <div style={{ ...styles.horRtd, flex: 1, textDecoration: e.voided ? "line-through" : "none", color: e.extra ? COLORS.extra : COLORS.text, fontWeight: e.extra ? 700 : 400 }}>
-                          {fmtHoursNum(e.hours)}{e.extra && "*"}
-                        </div>
-                        <div style={{ ...styles.horRtd, flex: 1, textDecoration: e.voided ? "line-through" : "none" }}>{fmtEuro(valueHour)}</div>
-                        <div style={{ ...styles.horRtd, flex: 1, textDecoration: e.voided ? "line-through" : "none" }}>{fmtEuro(e.hours * valueHour)}</div>
-                        <div style={{ flex: 1.8, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
-                          {e.voided ? (
-                            <span style={styles.horVoidedTag}>
-                              {t.voided}
-                              {!locked && <button style={styles.horUndoButton} onClick={() => toggleVoid(openStaff.id, i)}><RotateCcw size={11} /></button>}
-                            </span>
-                          ) : (
-                            <>
-                              {e.extra && (e.approved ? (
-                                <span style={styles.horApprovedTag}>
-                                  <Check size={11} style={{ marginRight: 3 }} />{t.approved}
-                                  {!locked && <button style={styles.horUndoButton} onClick={() => revertApproval(openStaff.id, i)}><RotateCcw size={11} /></button>}
-                                </span>
-                              ) : (!locked && <button style={styles.horApproveButton} onClick={() => approveEntry(openStaff.id, i)}>{t.approve}</button>))}
-                              {!locked && <button style={styles.horEditRowButton} onClick={() => startEditRow(i, e)}><Pencil size={12} /></button>}
-                              {!locked && <button style={styles.horVoidRowButton} onClick={() => toggleVoid(openStaff.id, i)}><X size={12} /></button>}
-                            </>
-                          )}
-                        </div>
-                      </>
-                    )}
+                  <div key={group.label} style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink2, marginBottom: 8 }}>
+                      {group.label} · {fmtHoursScreen(subtotal)}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {group.items.map((e) => {
+                        const i = e._idx;
+                        const isEditing = editingIndex === i;
+                        const client = clientById(clients, e.clientId);
+                        const valueHour = client ? client.valueHour : 0;
+                        const d = parseISODate(e.date);
+                        const dateLabel = `${dayAbbr[d.getDay()].toLowerCase()} ${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              borderRadius: RADIUS.chip, border: `1px solid ${COLORS.line}`, padding: "10px 12px",
+                              background: e.voided ? COLORS.lineSoft : (e.extra && !e.approved) ? COLORS.amberBg : COLORS.card,
+                              opacity: e.voided ? 0.6 : 1,
+                            }}
+                          >
+                            {isEditing ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                <select value={rowDraft.clientId || ""} onChange={(ev) => setRowDraft((dft) => ({ ...dft, clientId: Number(ev.target.value) }))} style={{ flex: 1, minWidth: 140, height: 36, borderRadius: RADIUS.control, border: `1px solid ${COLORS.lineInput}`, padding: "0 8px", fontFamily: "inherit" }}>
+                                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                                <input type="number" step="0.5" value={rowDraft.hours} onChange={(ev) => setRowDraft((dft) => ({ ...dft, hours: ev.target.value }))} style={{ width: 70, height: 36, borderRadius: RADIUS.control, border: `1px solid ${COLORS.lineInput}`, padding: "0 8px", fontFamily: "inherit" }} />
+                                <Button variant="secondary" onClick={cancelEditRow}>{c0.cancel}</Button>
+                                <Button variant="primary" onClick={() => saveEditRow(openStaff.id, i)}>{c0.save}</Button>
+                              </div>
+                            ) : (
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                                <div style={{ fontSize: 13.5, color: COLORS.ink, textDecoration: e.voided ? "line-through" : "none" }}>
+                                  {dateLabel} · {client ? client.name : "—"} · {fmtHoursScreen(e.hours)} · {fmtEuro(valueHour)}/h · {fmtEuro(e.hours * valueHour)}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  {e.voided ? (
+                                    <>
+                                      <Pill variant="missing">{t.voided}</Pill>
+                                      {!locked && <Button variant="ghost" icon={RotateCcw} onClick={() => toggleVoid(openStaff.id, i)} />}
+                                    </>
+                                  ) : (
+                                    <>
+                                      {e.extra && (e.approved ? (
+                                        <>
+                                          <Pill variant="paid"><Check size={11} /> {t.approved}</Pill>
+                                          {!locked && <Button variant="ghost" icon={RotateCcw} onClick={() => revertApproval(openStaff.id, i)} />}
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Pill variant="pending">{t.extraPendingTag}</Pill>
+                                          {!locked && <Button variant="secondary" onClick={() => approveEntry(openStaff.id, i)}>{t.approve}</Button>}
+                                        </>
+                                      ))}
+                                      {!locked && <Button variant="ghost" icon={Pencil} onClick={() => startEditRow(i, e)} />}
+                                      {!locked && <Button variant="ghost" icon={X} onClick={() => toggleVoid(openStaff.id, i)} />}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}
-            </div>
-          </div>
-        </div>
-      )}
+            </>
+          );
+        })()}
+      </Drawer>
 
-      {closeConfirmOpen && (
-        <div style={styles.modalOverlay} onClick={() => setCloseConfirmOpen(false)}>
-          <div style={{ ...styles.modalCard, maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalTitle}>{t.closeConfirmTitle}</div>
-            <div style={{ ...styles.defSettingHint, marginBottom: 16 }}>
-              {t.closeConfirmBody(periodLabel, fmtHoursNum(periodTotalHours), fmtEuro(periodTotalEuros))}
-            </div>
-            <div style={styles.modalActions}>
-              <button style={styles.cancelButton} onClick={() => setCloseConfirmOpen(false)}>{c0.cancel}</button>
-              <button style={styles.saveButton} onClick={closePeriod}>{t.confirmClose}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={closeConfirmOpen}
+        title={t.closeConfirmTitle}
+        body={t.closeConfirmBody(periodLabel, fmtHoursScreen(periodTotalHours), fmtEuro(periodTotalEuros))}
+        cancelLabel={c0.cancel}
+        confirmLabel={t.confirmClose}
+        onCancel={() => setCloseConfirmOpen(false)}
+        onConfirm={closePeriod}
+      />
+
+      <ConfirmDialog
+        open={reopenConfirmOpen}
+        title={t.reopenConfirmTitle}
+        body={openStaff ? t.reopenConfirmBody(openStaff.name) : ""}
+        cancelLabel={c0.cancel}
+        confirmLabel={t.reopenConfirmConfirm}
+        onCancel={() => setReopenConfirmOpen(false)}
+        onConfirm={() => reopenForCorrection(openStaff.id)}
+      />
+
+      {closedToast && <Toast message={t.closedToast} onDismiss={() => setClosedToast(false)} closeLabel={c0.close} />}
     </div>
   );
 }

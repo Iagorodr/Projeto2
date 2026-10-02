@@ -1,40 +1,138 @@
-import { useState } from "react";
-import {
-  ChevronDown, ChevronRight, LayoutDashboard, Users, CalendarDays, Clock, Bell, UsersRound, Settings,
-  Search, X, Pencil, Mail, Phone, Briefcase, Calendar, KeyRound, MapPin, Euro, RotateCcw, Check,
-  Plus, Store, Building2, Home as HouseIcon, Factory, MessageSquare, ThumbsUp, PackageX, Info, Archive,
-} from "lucide-react";
+import { Users, Building2, RotateCcw, Clock, Undo2, Bell, Calendar, Check } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
+import { RADIUS, FONT } from "../../styles/tokens.js";
+import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
-  TYPE_ICONS, MONTHS_ABBR_PT, DAY_LABELS_1_7, AGENDA_DAYS, TODAY, MENU_ITEMS,
-} from "../../models/data.js";
-import {
-  clientById, staffById, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtMinutes, parseDMY, dateStrInPeriod,
-  buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr,
-  weekDiff, clientAppliesThisWeek, weekLabelPT, staffTotalHours, staffTotalPay, getAssignedClientIds,
-  recomputeSharedHours, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner,
+  clientById, parseDMY, getOpenPeriod, formatPeriodLabel, staffTotalHours, staffTotalPay,
+  recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
+  monthAbbr, isStaffActive,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
-import { TopBar, LangSwitcher, Field, ViewField, Sidebar } from "../shared/Layout.jsx";
-import { KpiCard, PendingRow, ComplaintsGauge, BarChart, LineChart } from "../shared/DashboardWidgets.jsx";
-import { NotesWidget, NotesTeaser } from "../shared/NotesWidget.jsx";
-import { useIsMobile } from "../../hooks/useIsMobile.js";
+import {
+  PageHeader, Card, KpiCard, SegmentedBar, Avatar, ReclamacoesCard, PeriodBarChart, PeriodLineChart,
+} from "../shared/ui/index.js";
 
+// Pequeno "tile" de data (documento, 4.1 — cartão de Notas): 46×46, dia
+// grande + mês em maiúsculas, clay-ink. Nenhum dos formatadores que já
+// existiam (`fmtNoteDate`, que devolve "DD/MM" numa única linha) desenha
+// isto — por isso um componente novo, só para este cartão.
+function NoteDateTile({ iso, lang }) {
+  const [, m, d] = iso.split("-");
+  return (
+    <div
+      style={{
+        width: 46, height: 46, borderRadius: RADIUS.chip, background: COLORS.clayTint,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0,
+      }}
+    >
+      <div style={{ fontFamily: FONT.heading, fontWeight: 700, fontSize: 17, lineHeight: 1, color: COLORS.clayInk }}>
+        {Number(d)}
+      </div>
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.clayInk, marginTop: 3 }}>
+        {monthAbbr(lang, Number(m) - 1)}
+      </div>
+    </div>
+  );
+}
+
+// Linha de "Pendências" (documento, 4.1): bloco de ícone 38, texto,
+// contagem em quadrado 34 — ou, quando a contagem é 0, a linha inteira
+// esbatida com "✓ Em dia" no lugar do quadrado. A cor âmbar (documento:
+// só a linha "Horas extra por aprovar") só aparece quando há mesmo
+// alguma coisa pendente — com contagem 0 fica neutra como as outras,
+// pela mesma regra de QA geral do documento ("nenhuma cor de alerta em
+// elementos que não sejam erro ou falta").
+function PendingRow({ icon: Icon, label, count, amber, onClick, okLabel, last }) {
+  const isZero = count === 0;
+  const useAmber = amber && !isZero;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 2px",
+        border: "none", borderBottom: last ? "none" : `1px solid ${COLORS.line}`, background: "transparent",
+        cursor: "pointer", textAlign: "left", fontFamily: "inherit", opacity: isZero ? 0.55 : 1,
+      }}
+    >
+      <div
+        style={{
+          width: 38, height: 38, borderRadius: RADIUS.chip, flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: useAmber ? COLORS.amberBg : COLORS.forest50,
+          color: useAmber ? COLORS.amberInk : COLORS.forest600,
+        }}
+      >
+        <Icon size={18} strokeWidth={1.8} />
+      </div>
+      <div style={{ flex: 1, fontSize: 13.5, color: COLORS.ink }}>{label}</div>
+      {isZero ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 700, color: COLORS.ok, flexShrink: 0 }}>
+          <Check size={14} /> {okLabel}
+        </div>
+      ) : (
+        <div
+          style={{
+            width: 34, height: 34, borderRadius: RADIUS.chip, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: useAmber ? COLORS.amberBg : COLORS.lineSoft,
+            color: useAmber ? COLORS.amberInk : COLORS.ink,
+            fontWeight: 700, fontSize: 14,
+          }}
+        >
+          {count}
+        </div>
+      )}
+    </button>
+  );
+}
+
+// Dashboard (documento de design, secção 4.1) — "dizer em 5 segundos
+// quanto há a pagar, o que precisa de atenção e como vai o mês". A lógica
+// de negócio por trás de cada número já estava correta (Etapas 0/4b) —
+// aqui só muda a apresentação: cartão herói + 3 KPIs na mesma linha,
+// Pendências com o novo comportamento "contagem 0 = em dia", o
+// componente de Reclamações (2.13) no lugar do velocímetro, um único
+// cartão de Notas (o documento pede explicitamente que o duplicado
+// desapareça) e os dois gráficos de 6 períodos (2.14) no lugar dos SVGs
+// antigos.
 function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, onNavigate }) {
   const t = T[lang].dashboard;
-  const isMobile = useIsMobile();
-  const activeStaff = staff.filter((s) => s.status === "ativo");
+  const th = T[lang].horas;
+  const tn = T[lang].notas;
+  // Etapa 4j (4.9): usa o mesmo auxiliar isStaffActive de todo o app, em
+  // vez de só `s.status === "ativo"` — uma conta Replacement cuja validade
+  // já passou deixa de contar aqui também, coerente com a pílula "Inativo"
+  // que já mostra em Funcionários e com o facto de já não aparecer em
+  // Agendas/Monitoramento. Antes desta etapa não havia essa distinção.
+  const activeStaff = staff.filter((s) => isStaffActive(s, TODAY));
   const currentPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
-  const isLastDayOfPeriod = isoDateStr(TODAY) === isoDateStr(currentPeriod.end);
+  const currentPeriodLabel = formatPeriodLabel(currentPeriod, lang);
 
-  let overtimePending = 0, unfinishedMonth = 0, reopenedCount = 0;
-  Object.entries(horasData).forEach(([staffId, data]) => {
-    if (data.status !== "finalizado") unfinishedMonth += 1;
+  // Mesma fórmula do cartão herói de Horas (4.4) — os dois ecrãs mostram
+  // literalmente os mesmos números (total a receber, horas, pagos/por
+  // pagar/pendentes), por isso o cálculo tem de bater certo nos dois.
+  const currentPeriodHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }, currentPeriod), 0);
+  const currentPeriodEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, currentPeriod), 0);
+  const kpiCounts = {
+    pending: staff.filter((s) => horasData[s.id]?.status === "pendente").length,
+    paid: staff.filter((s) => horasData[s.id]?.paid).length,
+    unpaid: staff.filter((s) => horasData[s.id]?.status === "finalizado" && !horasData[s.id]?.paid).length,
+  };
+
+  let overtimePending = 0, reopenedCount = 0;
+  Object.values(horasData).forEach((data) => {
     if (data.reopened) reopenedCount += 1;
     data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; });
   });
-  const unreadNotices = missingItems.filter((m) => !m.resolved).length;
+  // "Avisos e pedidos por ler" (documento, 4.1): não existe, em lado
+  // nenhum do modelo de dados, um sinal de "a gerência ainda não viu esta
+  // solicitação nova" — `.read` em `sentItems` é só do lado do
+  // funcionário (se ele já viu a RESPOSTA da gerência). O próprio ecrã de
+  // Avisos (gerência) já usa esta mesma contagem para o selo de
+  // "Solicitações" — reaproveitada aqui tal e qual.
+  const pendingRequests = missingItems.filter((m) => !m.resolved).length;
 
   const contractsNearExpiry = clients.filter((c) => {
     const end = parseDMY(c.contractEnd);
@@ -48,68 +146,166 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     return new Date(c.clientValidUntil) >= TODAY;
   }).length;
 
-  const recentPeriods = recentClosedPeriodsChronological(closedPeriods, 6);
-  const HISTORY_LABELS = recentPeriods.map((p) => shortMonthFromIso(p.periodEnd, lang));
-  const HISTORY_TOOLTIPS = recentPeriods.map((p) => p.periodLabel);
-  const VALUE_HISTORY = recentPeriods.map((p) => p.totalEuros);
-  const HOURS_HISTORY = recentPeriods.map((p) => p.totalHours);
-  const hasHistory = recentPeriods.length > 0;
   const complaintsCurrent = sentItems.filter((i) => i.type === "reclamacao").length;
   // Limites escalam com o tamanho da carteira de clientes (configurado em
   // Definições como "reclamações a cada N clientes"), em vez de um valor fixo.
   const excelenteThreshold = Math.max(0, Math.round((clients.length / (reclamacaoBaseClients || 10)) * (reclamacaoExcelenteCount ?? 1)));
   const razoavelThreshold = Math.max(excelenteThreshold + 1, Math.round((clients.length / (reclamacaoBaseClients || 10)) * (reclamacaoRazoavelCount ?? 3)));
-  const gaugeT = { excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico };
+  // `sentItems[].date` nem sempre é ISO: dados-exemplo antigos usam
+  // "DD/MM", lançamentos novos (AvisosScreen.jsx) usam isoDateStr (ex.:
+  // "2026-09-26") — o resto do app já mostra este campo em bruto, sem
+  // formatar (AvisosWidgets.jsx, `{it.date}`); reaproveitado aqui do
+  // mesmo jeito, em vez de `fmtNoteDate` (que pressupõe ISO e quebra nos
+  // dados-exemplo em "DD/MM", mostrando "undefined/undefined").
+  const recentComplaints = sentItems
+    .filter((i) => i.type === "reclamacao")
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 2)
+    .map((i) => ({ client: clientById(clients, i.clientId)?.name || "—", date: i.date }));
+
+  const myNotes = notesForOwner(personalNotes, "management");
+
+  // Gráficos de 6 períodos (documento, 2.14): os 5 períodos FECHADOS mais
+  // recentes (ordem cronológica) + o período ABERTO agora como 6º/último
+  // item — é esse último item que os componentes de gráfico tratam como
+  // "o período atual" (destacado, gradiente/ponto). Com menos de 5
+  // fechados, o gráfico simplesmente mostra menos barras/pontos — nunca
+  // inventa períodos vazios.
+  const recentClosed = recentClosedPeriodsChronological(closedPeriods, 5);
+  const currentLabel = monthAbbr(lang, currentPeriod.end.getMonth());
+  const valueChartData = [
+    ...recentClosed.map((p) => ({ label: shortMonthFromIso(p.periodEnd, lang), value: p.totalEuros, dateRangeLabel: p.periodLabel })),
+    { label: currentLabel, value: currentPeriodEuros, dateRangeLabel: currentPeriodLabel },
+  ];
+  const hoursChartData = [
+    ...recentClosed.map((p) => ({ label: shortMonthFromIso(p.periodEnd, lang), value: p.totalHours, dateRangeLabel: p.periodLabel })),
+    { label: currentLabel, value: currentPeriodHours, dateRangeLabel: currentPeriodLabel },
+  ];
+
+  const row = { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 20 };
 
   return (
     <div style={styles.content}>
-      <TopBar lang={lang} setLang={setLang} label={formatTodayLabel(lang)} />
+      <PageHeader title={t.title} subtitle={formatTodayLabel(lang)} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
-      <div style={isMobile ? { ...styles.kpiRow, flexDirection: "column" } : styles.kpiRow}>
-        <KpiCard label={t.kpiStaffActive} value={activeStaff.length} icon={Users} tint={COLORS.primaryTint} iconColor={COLORS.primary} />
-        <KpiCard label={t.kpiClients} value={clients.length} icon={Building2} tint={COLORS.successTint} iconColor={COLORS.success} />
-        <KpiCard label={t.kpiReplacementClients} value={replacementClientsActive} icon={RotateCcw} tint={COLORS.extraTint} iconColor={COLORS.extra} />
-        <NotesTeaser notes={notesForOwner(personalNotes, "management")} todayIso={isoDateStr(TODAY)} lang={lang} onSeeAll={() => onNavigate("notas")} />
+      {/* Linha 1 — 4 KPIs (herói + 3), documento 4.1 */}
+      <div style={row}>
+        <Card variant="hero" style={{ flex: "1 1 240px", minWidth: 220 }}>
+          <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>{th.heroTitle}</div>
+          <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 28, marginBottom: 2 }}>{fmtEuro(currentPeriodEuros)}</div>
+          <div style={{ fontSize: 12.5, opacity: 0.85, marginBottom: 14 }}>{fmtHoursScreen(currentPeriodHours)} · {currentPeriodLabel}</div>
+          <SegmentedBar
+            onHero
+            segments={[
+              { value: kpiCounts.paid, color: "#fff" },
+              { value: kpiCounts.unpaid, color: COLORS.clay },
+              { value: kpiCounts.pending, color: "rgba(255,255,255,.28)" },
+            ]}
+          />
+          <div style={{ fontSize: 11.5, opacity: 0.85, marginTop: 8 }}>
+            {th.heroLegend(kpiCounts.paid, kpiCounts.unpaid, kpiCounts.pending)}
+          </div>
+        </Card>
+
+        <KpiCard icon={Users} label={t.kpiStaffActive} value={activeStaff.length} style={{ flex: "1 1 220px", minWidth: 200 }}>
+          <div style={{ display: "flex", alignItems: "center", marginTop: 14 }}>
+            {activeStaff.slice(0, 5).map((s, i) => (
+              <div key={s.id} style={{ marginLeft: i === 0 ? 0 : -10, borderRadius: "50%", border: "2px solid #fff", boxShadow: `0 0 0 1px ${COLORS.line}` }}>
+                <Avatar name={s.name} size={28} />
+              </div>
+            ))}
+            {activeStaff.length > 5 && (
+              <div
+                style={{
+                  marginLeft: -10, width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+                  background: COLORS.forest700, color: "#fff", border: "2px solid #fff",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700,
+                }}
+              >
+                +{activeStaff.length - 5}
+              </div>
+            )}
+          </div>
+        </KpiCard>
+
+        <KpiCard icon={Building2} label={t.kpiClients} value={clients.length} style={{ flex: "1 1 220px", minWidth: 200 }} />
+
+        <KpiCard
+          icon={RotateCcw} label={t.kpiReplacementClients} value={replacementClientsActive}
+          iconBg={COLORS.clayTint} iconColor={COLORS.clayInk}
+          style={{ flex: "1 1 220px", minWidth: 200 }}
+        />
       </div>
 
-      <div style={isMobile ? { ...styles.midRow, flexDirection: "column" } : styles.midRow}>
-        <div style={styles.dashPendingCard}>
-          <div style={styles.sectionTitle}>{t.pendingTitle}</div>
-          <PendingRow label={t.pendingOvertime} count={overtimePending} onClick={() => onNavigate("horas")} />
-          {isLastDayOfPeriod && (
-            <PendingRow label={t.pendingUnfinishedMonth} count={unfinishedMonth} onClick={() => onNavigate("horas")} />
-          )}
-          <PendingRow label={t.pendingReopened} count={reopenedCount} onClick={() => onNavigate("horas")} />
-          <PendingRow label={t.pendingUnread} count={unreadNotices} onClick={() => onNavigate("avisos")} />
-          <PendingRow label={t.pendingContracts} count={contractsNearExpiry} onClick={() => onNavigate("clientes")} last />
+      {/* Linha 2 — Pendências, Reclamações, Notas (documento 4.1) */}
+      <div style={row}>
+        <Card style={{ flex: "1 1 420px", minWidth: 320 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>{t.pendingTitle}</div>
+          <PendingRow icon={Clock} label={t.pendingOvertime} count={overtimePending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
+          <PendingRow icon={Undo2} label={t.pendingReopened} count={reopenedCount} onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
+          <PendingRow icon={Bell} label={t.pendingUnread} count={pendingRequests} onClick={() => onNavigate("avisos")} okLabel={t.pendingAllOk} />
+          {/* "Contratos a vencer -> Clientes (filtro)": a navegação ainda não
+              sabe levar um filtro pré-aplicado (Clientes em si só é
+              redesenhado na 4f) — por agora só abre a tela, como o
+              Dashboard antigo já fazia. */}
+          <PendingRow icon={Calendar} label={t.pendingContracts} count={contractsNearExpiry} onClick={() => onNavigate("clientes")} okLabel={t.pendingAllOk} last />
+        </Card>
+
+        <div style={{ flex: "1 1 260px", minWidth: 240 }}>
+          <ReclamacoesCard
+            current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
+            recent={recentComplaints}
+            title={t.complaintsTitle} subtitle={t.complaintsSubtitle}
+            labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
+          />
         </div>
-        <div style={styles.gaugeCard}>
-          <div style={styles.sectionTitle}>{t.complaintsTitle}</div>
-          <ComplaintsGauge current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold} t={gaugeT} complaintsThisMonthLabel={t.complaintsThisMonth} />
-        </div>
-      </div>
 
-      <div style={{ marginBottom: 20 }}>
-        <NotesWidget notes={notesForOwner(personalNotes, "management")} todayIso={isoDateStr(TODAY)} lang={lang} onSeeAll={() => onNavigate("notas")} limit={5} />
-      </div>
-
-      <div style={isMobile ? { ...styles.historyRow, flexDirection: "column" } : styles.historyRow}>
-        <div style={styles.historyCard}>
-          <div style={styles.chartTitle}>{t.historyValueTitle}</div>
-          {hasHistory ? (
-            <BarChart data={VALUE_HISTORY} labels={HISTORY_LABELS} tooltipLabels={HISTORY_TOOLTIPS} valueFormatter={(v) => compactEuro(v)} tooltipValueFormatter={(v) => fmtEuro(v)} />
+        <Card variant="warm" style={{ flex: "1 1 320px", minWidth: 260 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: myNotes.length === 0 ? 0 : 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{tn.widgetTitle}</div>
+            <button
+              type="button" onClick={() => onNavigate("notas")}
+              style={{ border: "none", background: "transparent", color: COLORS.clayInk, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              {tn.seeAll} →
+            </button>
+          </div>
+          {myNotes.length === 0 ? (
+            <div style={{ fontSize: 13, color: COLORS.ink2 }}>{tn.noNotes}</div>
           ) : (
-            <div style={styles.noResults}>{t.historyEmpty}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {myNotes.slice(0, 3).map((n) => (
+                <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <NoteDateTile iso={n.date} lang={lang} />
+                  <div style={{ fontSize: 13, color: COLORS.ink, lineHeight: 1.35 }}>{n.text}</div>
+                </div>
+              ))}
+            </div>
           )}
-        </div>
-        <div style={styles.historyCard}>
-          <div style={styles.chartTitle}>{t.historyHoursTitle}</div>
-          {hasHistory ? (
-            <LineChart data={HOURS_HISTORY} labels={HISTORY_LABELS} tooltipLabels={HISTORY_TOOLTIPS} valueFormatter={(v) => fmtHoursNum(v)} />
-          ) : (
-            <div style={styles.noResults}>{t.historyEmpty}</div>
-          )}
-        </div>
+        </Card>
+      </div>
+
+      {/* Linha 3 — gráficos de 6 períodos (documento 2.14) */}
+      <div style={row}>
+        <Card style={{ flex: "1 1 380px", minWidth: 300 }}>
+          <PeriodBarChart
+            data={valueChartData}
+            valueFormatter={compactEuro}
+            currentValueLabel={fmtEuro(valueChartData[valueChartData.length - 1].value)}
+            title={t.historyValueTitle}
+            comparisonLabel={t.vsPreviousPeriod}
+          />
+        </Card>
+        <Card style={{ flex: "1 1 380px", minWidth: 300 }}>
+          <PeriodLineChart
+            data={hoursChartData}
+            valueFormatter={fmtHoursScreen}
+            averageLabel={t.averageHoursLabel}
+            title={t.historyHoursTitle}
+            comparisonLabel={t.vsPreviousPeriod}
+          />
+        </Card>
       </div>
     </div>
   );

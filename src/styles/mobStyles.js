@@ -6,7 +6,9 @@ const mobStyles = {
   phone: { width: "100%", maxWidth: 400, background: COLORS.surface, borderRadius: 20, border: `1px solid ${COLORS.border}`, padding: "18px 18px 22px", position: "relative" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   phoneProductRow: { display: "flex", justifyContent: "center", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${COLORS.border}` },
-  homeIcon: { width: 36, height: 36, borderRadius: "50%", background: COLORS.bg, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  // Varredura de QA pós-Etapa 4: 36px ficava abaixo do alvo de toque mínimo
+  // em mobile (secção 9 do documento) — acordado com o Toni em 40px.
+  homeIcon: { width: 40, height: 40, borderRadius: "50%", background: COLORS.bg, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   switchLink: { fontSize: 11, color: COLORS.textSoft, textDecoration: "underline", background: "none", border: "none", cursor: "pointer", display: "block", marginTop: 6 },
   greeting: { fontSize: 15, fontWeight: 600 },
   menuList: { display: "flex", flexDirection: "column", gap: 12, marginTop: 24 },

@@ -61,24 +61,30 @@ function buildTotalsBox(doc, startY, totals) {
 
 // Relatório detalhado por funcionário: Data, Cliente, Horas, Valor/hora, Total
 // — igual às colunas já usadas na tela (Data/Cliente/Horas/Valor/Total).
-function exportStaffHorasPdf({ companyName, staffName, periodLabel, entries, clients, totalHours, totalValue, lang, pdfT }) {
+function exportStaffHorasPdf({ companyName, staffName, periodLabel, entries, clients, totalHours, totalValue, lang, pdfT, provisional }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const startY = buildHeader(doc, {
     companyName,
-    reportTitle: pdfT.reportTitleStaff,
+    reportTitle: provisional ? `${pdfT.reportTitleStaff} — ${pdfT.provisionalStamp}` : pdfT.reportTitleStaff,
     subtitle: `${staffName} — ${periodLabel}`,
     pdfT,
   });
 
+  // Spec 6.4: distinguir hora extra já aprovada (soma normal, sem marca) de
+  // hora extra ainda por aprovar (marcada com "*" e explicada na legenda) —
+  // antes toda hora extra levava "*", aprovada ou não, o que confundia quem
+  // lia o PDF já depois de a gerência ter aprovado.
+  const hasPendingExtra = entries.some((e) => !e.voided && e.extra && !e.approved);
   const rows = entries
     .filter((e) => !e.voided)
     .map((e) => {
       const c = clientById(clients, e.clientId);
       const valueHour = c ? c.valueHour : 0;
+      const pendingMark = e.extra && !e.approved ? "*" : "";
       return [
         shortDate(e.date),
         c ? c.name : "—",
-        `${fmtHoursNum(e.hours)}${e.extra ? "*" : ""}`,
+        `${fmtHoursNum(e.hours)}${pendingMark}`,
         fmtEuro(valueHour),
         fmtEuro(e.hours * valueHour),
       ];
@@ -95,13 +101,33 @@ function exportStaffHorasPdf({ companyName, staffName, periodLabel, entries, cli
     margin: { left: 40, right: 40 },
   });
 
-  const afterTableY = doc.lastAutoTable.finalY;
+  let afterTableY = doc.lastAutoTable.finalY;
+  if (hasPendingExtra) {
+    doc.setFontSize(8.5);
+    doc.setTextColor(...TEXT_SOFT);
+    doc.text(pdfT.extraPendingLegend, 40, afterTableY + 14);
+    afterTableY += 14;
+  }
   buildTotalsBox(doc, afterTableY, [
     { label: pdfT.totalHoursLabel, value: `${fmtHoursNum(totalHours)}h` },
     { label: pdfT.totalValueLabel, value: fmtEuro(totalValue) },
   ]);
 
-  doc.save(`horas-${staffName.replace(/\s+/g, "_")}-${periodLabel.replace(/\s+/g, "_")}.pdf`);
+  if (provisional) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.saveGraphicsState();
+    doc.setFontSize(52);
+    doc.setTextColor(179, 73, 46); // COLORS.alert — mesmo tom de "atenção", nunca confundir com o relatório final
+    if (typeof doc.setGState === "function" && doc.GState) {
+      doc.setGState(new doc.GState({ opacity: 0.16 }));
+    }
+    doc.text(pdfT.provisionalStamp, pageWidth / 2, pageHeight / 2, { align: "center", angle: 35 });
+    doc.restoreGraphicsState();
+  }
+
+  const fileSuffix = provisional ? "-provisorio" : "";
+  doc.save(`horas-${staffName.replace(/\s+/g, "_")}-${periodLabel.replace(/\s+/g, "_")}${fileSuffix}.pdf`);
 }
 
 // Resumo do período inteiro (todos os funcionários): Funcionário, Status,

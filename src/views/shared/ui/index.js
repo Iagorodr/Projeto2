@@ -1,0 +1,31 @@
+// Barril dos componentes novos da Etapa 2 (documento de design, secção 2).
+// Facilita o import nos ecrãs quando chegar a Etapa 4: `import { Card, Pill, ... } from ".../ui"`.
+export { Avatar, getInitials, colorsForName } from "./Avatar.jsx";
+export { Pill, SupervisorTag } from "./Pill.jsx";
+export { Button, IconButton } from "./Button.jsx";
+export { Card } from "./Card.jsx";
+export { KpiCard } from "./KpiCard.jsx";
+export { SegmentedControl, FilterChip } from "./SegmentedControl.jsx";
+export { SearchField } from "./SearchField.jsx";
+export { SearchSelect } from "./SearchSelect.jsx";
+export { PhotoDropzone } from "./PhotoDropzone.jsx";
+export { ProgressBar } from "./ProgressBar.jsx";
+export { SegmentedBar } from "./SegmentedBar.jsx";
+export { ToastProvider, useToast, Toast } from "./Toast.jsx";
+export { ConfirmDialog } from "./ConfirmDialog.jsx";
+export { Drawer } from "./Drawer.jsx";
+export { DataTable } from "./DataTable.jsx";
+export { ReclamacoesCard } from "./ReclamacoesCard.jsx";
+export { ChartHeader } from "./charts/ChartHeader.jsx";
+export { PeriodBarChart } from "./charts/PeriodBarChart.jsx";
+export { PeriodLineChart } from "./charts/PeriodLineChart.jsx";
+export { AppSidebar } from "./shell/AppSidebar.jsx";
+export { MobileBottomBar } from "./shell/MobileBottomBar.jsx";
+export { MoreSheet } from "./shell/MoreSheet.jsx";
+export { MobileHeader } from "./shell/MobileHeader.jsx";
+export { PageHeader } from "./shell/PageHeader.jsx";
+export { WeekStrip } from "./mobile/WeekStrip.jsx";
+export { ClientCheckCard } from "./mobile/ClientCheckCard.jsx";
+export { DayPanel } from "./mobile/DayPanel.jsx";
+export { BottomActionBar } from "./mobile/BottomActionBar.jsx";
+export { PeriodCalendar } from "./mobile/PeriodCalendar.jsx";

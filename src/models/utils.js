@@ -9,11 +9,39 @@ function monthAbbr(lang, monthIndex) {
 
 function clientById(clients, id) { return clients.find((c) => c.id === id); }
 
+// Um dia conta como "coberto" (fechado, não em falta) se tiver pelo menos um
+// lançamento válido OU se o funcionário tiver marcado "Hoje não tive
+// clientes" (horasData[staffId].noClientDays, spec 6.3) OU se o cliente
+// desse dia já tiver sido feito mais cedo, noutro dia da mesma semana
+// ("adiantar" — ver `replacesDate` logo abaixo): nesse caso existe um
+// lançamento datado de OUTRO dia com `replacesDate === dateKey`, não um
+// lançamento datado deste dia. Sem este terceiro caso, o dia original
+// ficava por sempre como "em falta" em todo o lado que usa esta função —
+// Horas da gerência (`HorasScreen.jsx`), Monitoramento
+// (`MonitoramentoScreen.jsx`), Histórico (`HistoricoScreen.jsx`,
+// `EmployeeHistoricoScreen.jsx`) e o próprio ecrã de Horas do funcionário
+// — mesmo já estando coberto (apontado pelo Toni ao rever a Etapa 4a).
+// Corrigir aqui, na função partilhada, corrige todos esses ecrãs de uma
+// vez, sem os tocar individualmente; como `replacesDate` só passou a
+// existir com o ecrã novo de Horas, isto não muda nada em dados já
+// existentes (nenhum lançamento antigo tem esse campo).
 function dayIsCovered(horasEntry, dateKey) {
   const hasEntry = (horasEntry.entries || []).some((e) => e.date === dateKey && !e.voided);
   const markedNoClient = (horasEntry.noClientDays || []).includes(dateKey);
-  return hasEntry || markedNoClient;
+  const coveredByAdvance = (horasEntry.entries || []).some((e) => e.replacesDate === dateKey && !e.voided);
+  return hasEntry || markedNoClient || coveredByAdvance;
 }
+
+// "Adiantar" (spec 6.3): uma entry pode ter `replacesDate` (ISO) — a data
+// originalmente agendada que ela substitui, feita mais cedo. No dia
+// original, o cliente deve aparecer como "já feito" (a UI que implementa
+// isto lê `replacesDate` das entries do funcionário — Etapa 4a,
+// `EmployeeHorasScreen.jsx`) e o dia original conta como coberto, não em
+// falta (`dayIsCovered`, acima). Regra: nunca duas entries não-anuladas
+// do mesmo cliente na mesma semana. `recomputeSharedHours` (abaixo) não
+// precisa de mudar: continua a operar por (date, clientId) normalmente,
+// porque a entry adiantada guarda a SUA PRÓPRIA data — só passa a levar
+// `replacesDate` como metadado extra.
 
 function recomputeSharedHours(horasDataObj, clients, date, clientId) {
   const client = clientById(clients, clientId);
@@ -42,9 +70,47 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId) {
 
 function staffById(staff, id) { return staff.find((s) => s.id === id); }
 
+// Etapa 4j (documento, 4.9) — único auxiliar que decide se um funcionário
+// está "ativo" em todo o app: `estado Ativo && !(tipo Replacement &&
+// validade < data)`. A validade é INCLUSIVA (no próprio dia da validade
+// ainda está ativo — por isso a comparação é "<", nunca "<="). Calculado
+// na hora, nunca gravado: se a gerência prolongar a validade, a pessoa
+// volta a estar ativa imediatamente, sem precisar de nenhuma tarefa
+// agendada. `date` aceita qualquer data de referência (não só "hoje") —
+// chamado com um dia específico, responde "estaria ativo nesse dia?",
+// o que é exatamente o que a agenda do funcionário (4.9, "Aplicação do
+// funcionário: os dias a seguir à validade ficam sem clientes") precisa.
+// `validUntil` vem como "YYYY-MM-DD" (input type="date") — compara-se com
+// a mesma convenção de data local usada em todo o resto do projeto (nunca
+// `Date.parse` direto numa string ISO, que é UTC e pode desviar um dia).
+function isStaffActive(staff, date) {
+  if (!staff) return false;
+  if (staff.status !== "ativo") return false;
+  if (staff.accountType === "replacement" && staff.validUntil) {
+    const [y, m, d] = staff.validUntil.split("-").map(Number);
+    const validUntilDate = new Date(y, m - 1, d);
+    if (validUntilDate < date) return false;
+  }
+  return true;
+}
+
 function pad2(n) { return String(n).padStart(2, "0"); }
 
-function fmtEuro(v) { return `€ ${v.toFixed(2).replace(".", ",")}`; }
+// Formatador único de dinheiro pra app inteira (documento de design, 1.5):
+// símbolo à frente, espaço, milhar separado, vírgula decimal — "€ 9 266,00".
+// O separador de milhar usa espaço-sem-quebra (NBSP,  ) em vez do
+// "espaço fino" tipográfico ( ) sugerido no documento: os PDFs
+// (pdfExport.js) usam as fontes padrão do jsPDF, que só cobrem
+// WinAnsiEncoding —   não existe nesse conjunto e sairia como um
+// caractere em branco/errado no PDF, enquanto   faz parte do
+// Windows-1252 e sai corretamente tanto no ecrã como no PDF. Visualmente o
+// resultado é o mesmo (um espaço que não quebra linha no meio do número).
+function fmtEuro(v) {
+  const neg = v < 0;
+  const [intPart, decPart] = Math.abs(v).toFixed(2).split(".");
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return `€ ${neg ? "-" : ""}${grouped},${decPart}`;
+}
 
 // Versão compacta pro rótulo direto na barra do gráfico (o slot tem uns
 // 40-50px, "€ 9914,50" não cabe sem colidir com o vizinho). O tooltip
@@ -55,6 +121,20 @@ function compactEuro(v) {
 }
 
 function fmtHoursNum(h) { return h.toFixed(2).replace(".", ","); }
+
+// Formatador de horas PARA O ECRÃ (documento de design, 1.5): "2h30",
+// "1h", "41h", "38h30", "45min" — nunca decimais como "2,50" ou "41,00h"
+// (isso é só pra PDF/exportações, que continuam usando fmtHoursNum).
+// Recebe horas em decimal (ex.: 38.5) pra bater com o resto do app, que
+// guarda totais de horas assim. Reaproveita a mesma lógica de fmtMinutes.
+// Introduzido na Etapa 1 (fundação/formatadores); já ligado a todos os
+// ecrãs redesenhados na Etapa 4 (gerência e funcionário/supervisor) —
+// comentário antigo (dizia "ainda não ligado a nenhum ecrã") corrigido
+// aqui, varredura de QA pós-Etapa 4, sem mudança de comportamento.
+function fmtHoursScreen(hoursDecimal) {
+  if (!hoursDecimal || hoursDecimal <= 0) return "0h";
+  return fmtMinutes(Math.round(hoursDecimal * 60));
+}
 
 function fmtMinutes(min) {
   if (!min || min <= 0) return "-";
@@ -100,6 +180,10 @@ function buildClosedPeriodSnapshot(period, clients, staff, horasData, sentItems,
     reclamacoesItems, elogiosItems, avisosItems,
     solicitacoes: solicitacoesItems.length, solicitacoesResolvidas: solicitacoesItems.filter((i) => i.resolved).length,
     solicitacoesItems,
+    // Nº de clientes NO MOMENTO do fecho — sem isto, a faixa histórica de
+    // Reclamações (Histórico) recalculava contra a lista de clientes de
+    // HOJE, e um período fechado há meses ia "andando" toda vez que um
+    // cliente era criado/removido depois. Fica congelado aqui.
     clientCount: clients.length,
   };
 }
@@ -111,6 +195,14 @@ function getCutoffPeriod(baseDate, cutoffDay, offset) {
   return { start: new Date(year, month, cutoffDay), end: new Date(year, month + 1, cutoffDay - 1) };
 }
 
+// O período "aberto" (o próximo a fechar) devia ser sempre "o dia seguinte ao
+// fim do último período fechado", NÃO "onde TODAY cai" por matemática pura —
+// senão um fecho tardio (gerência fecha com atraso) faz a UI já mostrar
+// "hoje" dentro do período seguinte enquanto o período anterior ainda nem foi
+// fechado, e horasData ainda contém a mistura das duas fases. Deriva do
+// HISTÓRICO real (closedPeriods, sempre com o mais recente em [0] — ver
+// recentClosedPeriodsChronological) em vez de TODAY. Sem histórico nenhum
+// (empresa nova, ainda não fechou nada), cai de volta ao cálculo por TODAY.
 function getOpenPeriod(closedPeriods, cutoffDay, today) {
   if (!closedPeriods || closedPeriods.length === 0) {
     return getCutoffPeriod(today, cutoffDay, 0);
@@ -193,6 +285,13 @@ function weekChunksOfPayPeriod(payPeriod, cutoffDay) {
 }
 
 // --- Blocos do período, "opção B" (spec 6.1) --------------------------
+// O período de pagamento vai de dia 20 a dia 19 e a semana civil é
+// segunda-domingo; como o período raramente começa numa segunda ou acaba
+// num domingo, `weekChunksOfPayPeriod` às vezes devolve um bloco de só 1
+// dia numa ponta (ex.: período 20 set–19 out 2026, em que 20 set cai num
+// domingo — só esse dia sobra da semana anterior — e 19 out numa segunda —
+// só esse dia sobra da semana seguinte). Um bloco de 1 dia sozinho não faz
+// sentido pra navegação/finalização, então junta-se ao bloco vizinho.
 function isOneDayChunk(chunk) { return isoDateStr(chunk.start) === isoDateStr(chunk.end); }
 
 function mergeEdgeBlocks(chunks) {
@@ -208,10 +307,21 @@ function mergeEdgeBlocks(chunks) {
   return merged;
 }
 
+// Devolve os blocos "visíveis" do período (o que a UI mostra: normalmente 4,
+// dois deles com 8 dias quando há fusão nas pontas). A chave de cada bloco
+// (pra `lockedWeeks`) é `isoDateStr(block.start)`.
 function weekBlocksOfPayPeriod(payPeriod, cutoffDay) {
   return mergeEdgeBlocks(weekChunksOfPayPeriod(payPeriod, cutoffDay));
 }
 
+// Migração de `lockedWeeks`: dados antigos foram gravados com uma chave por
+// semana civil "crua" (incluindo blocos de 1 dia nas pontas). Com os blocos
+// fundidos, um bloco da ponta passa a responder por mais de uma chave antiga
+// — a chave do bloco novo é a data de início do PRIMEIRO sub-bloco (a mesma
+// de antes para o bloco da esquerda; nova para o da direita, que absorve o
+// que era um bloco de 1 dia isolado) e o valor é o **E lógico** dos valores
+// antigos (só fica trancado se TODOS os sub-blocos estavam). Migração feita
+// À LEITURA — não apaga nem reescreve `lockedWeeks` guardado, só interpreta.
 function migrateLockedWeeksToBlocks(lockedWeeks, payPeriod, cutoffDay) {
   const rawChunks = weekChunksOfPayPeriod(payPeriod, cutoffDay);
   const blocks = mergeEdgeBlocks(rawChunks);
@@ -237,6 +347,12 @@ function calPeriodLabel(period, lang) {
   return `${pad2(period.start.getDate())} ${monthAbbr(lang, period.start.getMonth())} - ${pad2(period.end.getDate())} ${monthAbbr(lang, period.end.getMonth())}`;
 }
 
+// `period` é opcional (compatível com todas as chamadas existentes, que
+// continuam a somar TODAS as entries não anuladas). Quando passado (formato
+// {start, end} em Date, igual ao que getCutoffPeriod/getWeekChunk devolvem),
+// só soma entries cuja data cai dentro do período — é o que impede que horas
+// lançadas já no período seguinte (antes de um fecho tardio) poluam o total
+// do período que está a ser fechado/mostrado.
 function staffTotalHours(horasEntry, period) {
   return horasEntry.entries
     .filter((e) => !e.voided && (!period || dateStrInPeriod(e.date, period)))
@@ -272,16 +388,188 @@ function getAssignedClientIds(assignments, staffId) {
   return [...ids];
 }
 
+// Clientes da agenda (semana tipo) de `staffId` numa DATA concreta (spec
+// 5.2.4: o painel do dia mostra um cartão por cliente da agenda, já
+// marcável — antes só existia por dia-da-semana genérico, em
+// `EmployeeAgendaScreen.getDayOccurrences`; esta função faz o mesmo cálculo
+// mas para uma data específica, reutilizável em Horas e Agenda. `assignments`
+// guarda `staffId-diaDaSemana(1-7)` -> ids de cliente; `clientAppliesThisWeek`
+// filtra quinzenal/mensal pela semana da data dada.
+function dayScheduledClients(clients, assignments, staffId, date) {
+  const dow = date.getDay() === 0 ? 7 : date.getDay();
+  const weekStart = startOfISOWeek(date);
+  const clientIds = assignments[`${staffId}-${dow}`] || [];
+  return clientIds
+    .map((id) => clientById(clients, id))
+    .filter((c) => c && clientAppliesThisWeek(c, weekStart));
+}
+
+// Etapa 4b (secção 5.1, "Esta semana") — resumo da semana CIVIL corrente
+// (segunda a domingo que contém `today`), independente dos blocos do
+// período de pagamento (que podem ter 8 dias nas pontas — "opção B"). Soma
+// horas registadas (só no dia do próprio lançamento, nunca no dia de
+// origem de um "adiantamento" — mesma regra de `hoursLabel` em
+// `EmployeeHorasScreen.buildCalDay`, pra não contar a mesma hora duas
+// vezes) e horas previstas pela agenda, dia a dia, mais o estado de cada
+// um dos 7 pontos do cartão (verde registado · contorno alert em falta ·
+// vazio futuro · tracejado sem clientes).
+function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staffMember) {
+  const weekStart = startOfISOWeek(today);
+  const days = [];
+  let registeredHours = 0;
+  let scheduledHours = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(weekStart, i);
+    const dateKey = isoDateStr(d);
+    // `staffMember` é opcional (Etapa 4j, 4.9) — quando passado, um dia já
+    // para lá da validade de uma conta Replacement conta como "sem
+    // clientes", mesmo que a agenda/atribuição ainda exista (as
+    // atribuições não se apagam — só deixam de se aplicar nesses dias).
+    const activeOnDay = !staffMember || isStaffActive(staffMember, d);
+    const scheduled = activeOnDay ? dayScheduledClients(clients, assignments, staffId, d) : [];
+    const hasAgenda = scheduled.length > 0;
+    scheduledHours += scheduled.reduce((s, c) => s + (c.duration || 0) / 60, 0);
+    const covered = dayIsCovered(horasEntry, dateKey);
+    if (covered) {
+      registeredHours += (horasEntry.entries || [])
+        .filter((e) => e.date === dateKey && !e.voided)
+        .reduce((s, e) => s + e.hours, 0);
+    }
+    let state;
+    if (covered) state = "registered";
+    else if (!hasAgenda) state = "noClients";
+    else if (d > today) state = "future";
+    else state = "missing";
+    days.push({ dateKey, state, isToday: dateKey === isoDateStr(today) });
+  }
+  return { registeredHours, scheduledHours, days };
+}
+
+// Etapa 4b (5.1, "Precisa da sua atenção" — "Dias por registar") — dias em
+// falta no período aberto INTEIRO (todos os blocos, não só o atual — mesma
+// regra do `periodMissingCount` já calculado em `EmployeeHorasScreen.jsx`,
+// só que devolvendo as datas em vez da contagem, pra dar pra mostrar a
+// primeira em falta ("Segunda-feira, 28/09"). Ordenadas da mais antiga pra
+// mais recente.
+function periodMissingDays(clients, assignments, staffId, horasEntry, payPeriodChunks, today, staffMember) {
+  const missing = [];
+  payPeriodChunks.forEach((chunk) => {
+    calPeriodDays(chunk).forEach((d) => {
+      // `staffMember` opcional (Etapa 4j, 4.9): dia já fora da validade de
+      // uma conta Replacement nunca conta como "em falta" (não há mais
+      // agenda real nesse dia, só a atribuição antiga que fica guardada).
+      const activeOnDay = !staffMember || isStaffActive(staffMember, d);
+      if (d <= today && activeOnDay && dayScheduledClients(clients, assignments, staffId, d).length > 0 && !dayIsCovered(horasEntry, isoDateStr(d))) {
+        missing.push(d);
+      }
+    });
+  });
+  return missing.sort((a, b) => a - b);
+}
+
+// Etapa 4b (5.1, "Precisa da sua atenção" — "Dias em falta na equipa",
+// só supervisor) — quantos funcionários (ativos, fixos) têm pelo menos um
+// dia em falta no período aberto. Mesma regra/filtros do `totalWithGaps`
+// de `MonitoramentoScreen.jsx` (semana trancada ou ainda não começada não
+// conta), reescrita aqui como função independente pra não obrigar a
+// montar a tela inteira de Monitoramento só pra ler este número — os dois
+// continuam a bater porque partilham as mesmas peças do Model
+// (`dayIsCovered`, `clientAppliesThisWeek`, `migrateLockedWeeksToBlocks`).
+function staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, today) {
+  function isoWeekday(d) { const wd = d.getDay(); return wd === 0 ? 7 : wd; }
+  function hasAgendaOnDay(staffId, d) {
+    const clientIds = assignments[`${staffId}-${isoWeekday(d)}`] || [];
+    const weekStart = startOfISOWeek(d);
+    return clientIds.some((id) => { const c = clientById(clients, id); return c && clientAppliesThisWeek(c, weekStart); });
+  }
+  return staff
+    .filter((s) => isStaffActive(s, today) && s.accountType === "fixo")
+    .filter((s) => {
+      const h = horasData[s.id] || { entries: [], lockedWeeks: {}, noClientDays: [] };
+      const migratedLocked = migrateLockedWeeksToBlocks(h.lockedWeeks, payPeriod, cutoffDay);
+      return payPeriodChunks.some((chunk) => {
+        const locked = !!migratedLocked[isoDateStr(chunk.start)];
+        const notStarted = chunk.start > today;
+        if (locked || notStarted) return false;
+        return calPeriodDays(chunk).some((d) => d <= today && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d)));
+      });
+    }).length;
+}
+
+// Bloco de notas/lembretes pessoais (dashboard do supervisor e, opcionalmente,
+// da gerência). `ownerId` é o id do funcionário dono da nota, ou a string
+// "management" para notas partilhadas por todos os logins de gerência.
 function notesForOwner(personalNotes, ownerId) {
   return (personalNotes || [])
     .filter((n) => n.ownerId === ownerId)
     .slice()
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+// "YYYY-MM-DD" (formato do <input type="date">) -> "DD/MM" pra exibição.
 function fmtNoteDate(isoStr) {
   const [, m, d] = isoStr.split("-");
   return `${d}/${m}`;
 }
 
-export { clientById, dayIsCovered, recomputeSharedHours, staffById, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate };
+// --- Etapa 4f (Clientes, documento 4.2/5.4) ---
+
+// Soma as horas lançadas por TODOS os funcionários para UM cliente, num
+// período (documento, 4.2: "Horas no período" = horas feitas ÷ meta mensal
+// do cliente). Espelha `staffTotalHours`, só que soma por `horasData`
+// inteiro (todos os donos de registo) filtrando por `e.clientId`, em vez de
+// somar as entries de UM funcionário já escolhido.
+function clientTotalHours(horasData, clientId, period) {
+  return Object.values(horasData).reduce((sum, horasEntry) => {
+    return sum + (horasEntry.entries || [])
+      .filter((e) => !e.voided && e.clientId === clientId && (!period || dateStrInPeriod(e.date, period)))
+      .reduce((s, e) => s + e.hours, 0);
+  }, 0);
+}
+
+// Equipa atribuída a um cliente (documento, 4.2: "Equipa" = avatares de
+// quem faz este cliente). `assignments` é a semana-tipo plana, chave
+// "staffId-day" (ver `cellKey` em AgendasScreen.jsx) — percorre todas as
+// células e junta os IDs de funcionário que têm este cliente em QUALQUER
+// dia da semana-tipo, sem distinguir dias (mesmo modelo já usado em
+// Agendas; ver nota em AgendasScreen.jsx sobre `assignments` não ter
+// relação com `client.days`/`frequency`).
+function clientTeamStaffIds(assignments, clientId) {
+  const ids = new Set();
+  Object.entries(assignments).forEach(([key, cids]) => {
+    if ((cids || []).includes(clientId)) {
+      const staffId = Number(key.slice(0, key.lastIndexOf("-")));
+      ids.add(staffId);
+    }
+  });
+  return Array.from(ids);
+}
+
+// Sugestão de "Horas por mês (meta)" calculada a partir da própria agenda
+// do cliente (documento, 4.2: "Pela agenda: 32h30 (2h30 × 3 dias × 4,33)")
+// — duração da visita × nº de dias por semana × 4,33 (semanas médias por
+// mês, mesma constante usada em calendários de RH). Devolve horas em
+// decimal, pronta para `fmtHoursScreen`.
+function agendaHoursSuggestion(client) {
+  const weeklyHours = ((client.duration || 0) / 60) * (client.days || []).length;
+  return weeklyHours * 4.33;
+}
+
+// --- Etapa 4g (Histórico, documento 4.6/5.5) ---
+
+// Variação percentual entre dois valores (documento, 4.6: pílula "+6 %" na
+// lista e nos KPIs do detalhe, sempre "face ao período anterior"). Devolve
+// `null` quando não há período anterior ou ele é 0 (nada pra comparar —
+// quem usa isto mostra "Sem período anterior" nesse caso, não "0%" nem
+// Infinity). Pura função de número pra número, sem noção de cor/UI — a
+// decisão de cor (nunca vermelho-alerta pra "desceu", só a regra de QA
+// geral do documento, 1.5: "nenhuma cor de alerta em elementos que não
+// sejam erro ou falta" — uma descida de horas/valor face ao mês passado
+// não é um erro) fica no componente que desenha a pílula, em
+// HistoricoScreen.jsx.
+function pctChange(current, previous) {
+  if (!previous || previous <= 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
+export { clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };

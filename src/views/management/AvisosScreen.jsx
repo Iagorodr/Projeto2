@@ -1,50 +1,202 @@
 import { useState } from "react";
-import {
-  ChevronDown, ChevronRight, LayoutDashboard, Users, CalendarDays, Clock, Bell, UsersRound, Settings,
-  Search, X, Pencil, Mail, Phone, Briefcase, Calendar, KeyRound, MapPin, Euro, RotateCcw, Check,
-  Plus, Store, Building2, Home as HouseIcon, Factory, MessageSquare, ThumbsUp, PackageX, Info, Archive,
-} from "lucide-react";
+import { Plus } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
+import { RADIUS } from "../../styles/tokens.js";
+import { LANG_NAMES, TODAY } from "../../models/data.js";
+import { clientById, staffById, isoDateStr, fmtNoteDate } from "../../models/utils.js";
+import { T, missingItemSubjectLabel } from "../../models/i18n.js";
+import { Field } from "../shared/Layout.jsx";
 import {
-  TYPE_ICONS, MONTHS_ABBR_PT, DAY_LABELS_1_7, AGENDA_DAYS, TODAY, MENU_ITEMS,
-} from "../../models/data.js";
-import {
-  clientById, staffById, pad2, fmtEuro, fmtHoursNum, fmtMinutes, parseDMY, dateStrInPeriod,
-  buildClosedPeriodSnapshot, getCutoffPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr,
-  weekDiff, clientAppliesThisWeek, weekLabelPT, staffTotalHours, staffTotalPay, getAssignedClientIds,
-  recomputeSharedHours,
-} from "../../models/utils.js";
-import { formatTodayLabel, T } from "../../models/i18n.js";
-import { TopBar, LangSwitcher, Field, ViewField, Sidebar } from "../shared/Layout.jsx";
-import { SectionHeader, ItemListSimple } from "../shared/AvisosWidgets.jsx";
+  PageHeader, Button, Drawer, Pill, SupervisorTag, Avatar, FilterChip, SearchSelect, PhotoDropzone, Card, Toast,
+} from "../shared/ui/index.js";
+import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
 
+// Um dos 3 "cartões grandes selecionáveis" da gaveta "Novo aviso"
+// (documento, 4.7: "tipo em 3 cartões grandes selecionáveis (Reclamação,
+// Elogio, Aviso; com o ícone e a cor do tipo)").
+function TypeCard({ type, active, onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "14px 8px",
+        borderRadius: RADIUS.control, cursor: "pointer", fontFamily: "inherit",
+        border: active ? `2px solid ${COLORS.forest500}` : `1px solid ${COLORS.line}`,
+        background: active ? COLORS.forest50 : COLORS.card,
+      }}
+    >
+      <TypeIconBlock type={type} size={38} />
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink }}>{label}</span>
+    </button>
+  );
+}
+
+// Pedido (missingItems): "Novo" quando ainda não foi tocado, "Pendente"
+// quando já tem resposta mas não foi marcado como resolvido, "Resolvido"
+// quando marcado — 3 estados derivados dos 2 campos que já existem
+// (`resolved`/`response`), sem precisar de nenhum campo novo. O documento
+// pede literalmente "pílula de estado (Novo / Pendente / Resolvido)" pros
+// itens do Pedidos; antes só havia 2 estados (Pendente/Resolvido).
+function pedidoStatus(m) {
+  if (m.resolved) return "resolved";
+  if (m.response) return "pending";
+  return "new";
+}
+
+// Cartão de um Pedido — bloco de ícone, avatar+nome, assunto+cliente+data,
+// texto, pílula de estado, bloco "A sua resposta" e as 3 ações (Responder /
+// Marcar como pendente / Marcar como resolvido), como o documento pede.
+function PedidoCard({ m, staff, clients, lang, t, c0, replying, replyDraft, setReplyDraft, onStartReply, onSendReply, onToggleResolved }) {
+  const s = staffById(staff, m.staffId);
+  const c = m.clientId ? clientById(clients, m.clientId) : null;
+  const status = pedidoStatus(m);
+  const subject = missingItemSubjectLabel(m, lang);
+  return (
+    <Card style={{ padding: 14 }}>
+      <div style={{ display: "flex", gap: 12 }}>
+        <TypeIconBlock type="pedido" />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+              <Avatar name={s ? s.name : "—"} size={24} />
+              <span style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.ink }}>{s ? s.name : "—"}</span>
+            </div>
+            <Pill variant={status === "resolved" ? "paid" : status === "pending" ? "pending" : "neutral"}>
+              {status === "resolved" ? c0.resolved : status === "pending" ? c0.pending : c0.newLabel}
+            </Pill>
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 4 }}>
+            {subject}{c ? ` · ${c.name}` : ""} · {fmtNoteDate(m.date)}
+          </div>
+          <div style={{ fontSize: 13.5, color: COLORS.ink, marginTop: 6 }}>{m.text}</div>
+
+          {m.response && replying !== m.id && (
+            <div style={{ marginTop: 10, background: COLORS.lineSoft, borderRadius: RADIUS.chip, padding: "8px 10px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.ink2, marginBottom: 2 }}>{t.yourReply}</div>
+              <div style={{ fontSize: 13, color: COLORS.ink }}>{m.response}</div>
+            </div>
+          )}
+
+          {replying === m.id ? (
+            <div style={{ marginTop: 10 }}>
+              <textarea
+                style={styles.textarea} rows={2} placeholder={t.replyPlaceholder}
+                value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)}
+              />
+              <Button onClick={() => onSendReply(m.id)} style={{ marginTop: 8 }}>{t.sendReply}</Button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <Button variant="secondary" onClick={() => onStartReply(m.id, m.response)}>{t.reply}</Button>
+              <Button variant="secondary" onClick={() => onToggleResolved(m.id)}>
+                {m.resolved ? t.markPending : m.kind === "correcao" ? t.approveAndReopen : t.markResolved}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// Cartão de um item enviado pela gerência (reclamação/elogio/aviso) — sem
+// estado de resolução (isto é um registo do que foi enviado, não um pedido
+// a tratar), por isso sem pílula de estado, exatamente como o próprio
+// documento só pede "pílula de estado" para os itens que de facto têm um
+// estado (Pedidos).
+function SentItemCard({ item, type, staff, clients, c0 }) {
+  const s = staffById(staff, item.staffId);
+  const c = clientById(clients, item.clientId);
+  const fromSupervisor = item.sentBy === "supervisor";
+  return (
+    <Card style={{ padding: 14 }}>
+      <div style={{ display: "flex", gap: 12 }}>
+        <TypeIconBlock type={type} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <Avatar name={s ? s.name : "—"} size={24} />
+            <span style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.ink }}>{s ? s.name : "—"}</span>
+            {c && <Pill variant="neutral">{c.name}</Pill>}
+            {fromSupervisor && <SupervisorTag kind="origin">{c0.sentBySupervisor}</SupervisorTag>}
+          </div>
+          <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 6 }}>
+            {fmtNoteDate(item.date)}{item.hasPhoto && ` · 📎`}
+          </div>
+          <div style={{ fontSize: 13.5, color: COLORS.ink, marginTop: 4 }}>{item.text}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function EmptyNote({ children }) {
+  return <div style={{ fontSize: 13.5, color: COLORS.ink3, textAlign: "center", padding: "32px 16px", border: `1px dashed ${COLORS.line}`, borderRadius: RADIUS.card }}>{children}</div>;
+}
+
+// Avisos (gerência, documento 4.7) — "tratar pedidos dos funcionários e
+// enviar reclamações, elogios e avisos". Muda, pelo documento: formulário
+// deixa de ocupar o topo (agora é uma gaveta, "+ Novo aviso"), a caixa de
+// entrada passa a ser o primeiro que se vê (abre em Pedidos), e os
+// acordeões viram separadores (chips).
 function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingItems, sentItems, setSentItems, setHorasData }) {
   const t = T[lang].avisos;
   const c0 = T[lang].common;
-  const [formType, setFormType] = useState("reclamacao");
-  const [formStaffId, setFormStaffId] = useState("");
-  const [formClientId, setFormClientId] = useState("");
-  const [formText, setFormText] = useState("");
-  const [formPhoto, setFormPhoto] = useState(false);
-  const [sentToast, setSentToast] = useState(false);
-
-  const [missingOpen, setMissingOpen] = useState(true);
-  const [complaintsOpen, setComplaintsOpen] = useState(false);
-  const [praiseOpen, setPraiseOpen] = useState(false);
-  const [noticesOpen, setNoticesOpen] = useState(false);
+  const [tab, setTab] = useState("pedidos");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [draftType, setDraftType] = useState("reclamacao");
+  const [draftStaffId, setDraftStaffId] = useState("");
+  const [draftClientId, setDraftClientId] = useState("");
+  const [draftText, setDraftText] = useState("");
+  const [draftPhoto, setDraftPhoto] = useState(null);
+  const [toastMsg, setToastMsg] = useState(null);
   const [replyingId, setReplyingId] = useState(null);
   const [replyDraft, setReplyDraft] = useState("");
 
   const complaints = sentItems.filter((i) => i.type === "reclamacao");
   const praises = sentItems.filter((i) => i.type === "elogio");
   const notices = sentItems.filter((i) => i.type === "aviso");
+  const pendingSolicitations = missingItems.filter((m) => !m.resolved).length;
 
+  // Documento, 4.7, literal: "Funcionário (seletor com pesquisa; em
+  // 'Aviso' pode ser 'Todos')" — a opção "Todos" só faz sentido pro tipo
+  // Aviso (um aviso geral costuma ser pra equipa toda; reclamação/elogio
+  // são sempre sobre uma pessoa). Em vez de inventar um valor "broadcast"
+  // no modelo de dados (que obrigaria a mudar todo o código que já lê
+  // `sentItems[].staffId]`, incluindo o ecrã do funcionário), "Todos" cria
+  // um item igual por cada funcionário — cada um fica indistinguível de um
+  // aviso enviado individualmente, sem precisar de nenhuma outra mudança.
+  const staffOptions = draftType === "aviso"
+    ? [{ id: "all", label: t.allStaff }, ...staff.map((s) => ({ id: s.id, label: s.name }))]
+    : staff.map((s) => ({ id: s.id, label: s.name }));
+  const clientOptions = clients.map((c) => ({ id: c.id, label: c.name }));
+
+  function openDrawer() {
+    setDraftType("reclamacao"); setDraftStaffId(""); setDraftClientId(""); setDraftText(""); setDraftPhoto(null);
+    setDrawerOpen(true);
+  }
+  // Muda o tipo e limpa o funcionário escolhido: "Todos" só existe pro
+  // tipo Aviso, por isso uma seleção de "Todos" não pode sobreviver a uma
+  // troca pra Reclamação/Elogio (ficaria um valor inválido escondido).
+  function changeDraftType(type) { setDraftType(type); setDraftStaffId(""); }
   function handleSend() {
-    if (!formStaffId || !formClientId || !formText.trim()) return;
-    setSentItems((prev) => [{ id: Date.now(), type: formType, staffId: Number(formStaffId), clientId: Number(formClientId), text: formText.trim(), date: isoDateStr(TODAY), hasPhoto: formPhoto }, ...prev]);
-    setFormStaffId(""); setFormClientId(""); setFormText(""); setFormPhoto(false);
-    setSentToast(true); setTimeout(() => setSentToast(false), 1800);
+    if (!draftStaffId || !draftClientId || !draftText.trim()) return;
+    if (draftStaffId === "all") {
+      const now = Date.now();
+      setSentItems((prev) => [
+        ...staff.map((s, i) => ({ id: now + i, type: draftType, staffId: s.id, clientId: Number(draftClientId), text: draftText.trim(), date: isoDateStr(TODAY), hasPhoto: !!draftPhoto })),
+        ...prev,
+      ]);
+    } else {
+      setSentItems((prev) => [
+        { id: Date.now(), type: draftType, staffId: Number(draftStaffId), clientId: Number(draftClientId), text: draftText.trim(), date: isoDateStr(TODAY), hasPhoto: !!draftPhoto },
+        ...prev,
+      ]);
+    }
+    setDrawerOpen(false);
+    setToastMsg(t.sent);
+    setTimeout(() => setToastMsg(null), 5000);
   }
   function toggleResolved(id) {
     const item = missingItems.find((m) => m.id === id);
@@ -59,104 +211,87 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   function startReply(id, current) { setReplyingId(id); setReplyDraft(current || ""); }
   function sendReply(id) { setMissingItems((prev) => prev.map((m) => (m.id === id ? { ...m, response: replyDraft.trim() } : m))); setReplyingId(null); }
 
+  const tabContent = {
+    reclamacoes: { items: complaints, type: "reclamacao" },
+    elogios: { items: praises, type: "elogio" },
+    avisos: { items: notices, type: "aviso" },
+  }[tab];
+
   return (
     <div style={styles.content}>
-      <TopBar lang={lang} setLang={setLang} label={formatTodayLabel(lang)} />
-      <h1 style={styles.title}>{t.title}</h1>
+      <PageHeader title={t.title} actions={<Button icon={Plus} onClick={openDrawer}>{t.newAviso}</Button>} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
-      <div style={styles.avFormCard}>
-        <div style={styles.avTypeToggleRow}>
-          <button style={{ ...styles.avTypeToggle, ...(formType === "reclamacao" ? styles.avTypeActiveComplaint : {}) }} onClick={() => setFormType("reclamacao")}>
-            <MessageSquare size={13} style={{ marginRight: 6 }} />{t.typeComplaint}
-          </button>
-          <button style={{ ...styles.avTypeToggle, ...(formType === "elogio" ? styles.avTypeActivePraise : {}) }} onClick={() => setFormType("elogio")}>
-            <ThumbsUp size={13} style={{ marginRight: 6 }} />{t.typePraise}
-          </button>
-          <button style={{ ...styles.avTypeToggle, ...(formType === "aviso" ? styles.avTypeActiveNotice : {}) }} onClick={() => setFormType("aviso")}>
-            <Info size={13} style={{ marginRight: 6 }} />{t.typeNotice}
-          </button>
-        </div>
-
-        <div style={styles.avFormRow}>
-          <div style={{ flex: 1 }}>
-            <div style={styles.fieldLabel}>{t.formStaff}</div>
-            <select style={styles.input} value={formStaffId} onChange={(e) => setFormStaffId(e.target.value)}>
-              <option value="">{t.formStaffPlaceholder}</option>
-              {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={styles.fieldLabel}>{t.formClient}</div>
-            <select style={styles.input} value={formClientId} onChange={(e) => setFormClientId(e.target.value)}>
-              <option value="">{t.formClientPlaceholder}</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <div style={styles.fieldLabel}>{t.formText}</div>
-          <textarea style={styles.textarea} rows={3} placeholder={t.formTextPlaceholder} value={formText} onChange={(e) => setFormText(e.target.value)} />
-        </div>
-
-        <div style={styles.avFormFooterRow}>
-          <button style={{ ...styles.avAttachButton, ...(formPhoto ? styles.avAttachActive : {}) }} onClick={() => setFormPhoto((p) => !p)}>
-            <span style={{ marginRight: 6 }}>📎</span>{formPhoto ? t.photoAttached : t.attachPhoto}
-          </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {sentToast && <span style={styles.avSentNote}>{t.sent}</span>}
-            <button style={{ ...styles.saveButton, opacity: formStaffId && formClientId && formText.trim() ? 1 : 0.5 }} disabled={!formStaffId || !formClientId || !formText.trim()} onClick={handleSend}>{t.send}</button>
-          </div>
-        </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+        <FilterChip active={tab === "pedidos"} onClick={() => setTab("pedidos")} count={pendingSolicitations}>{t.sectionSolicitations}</FilterChip>
+        <FilterChip active={tab === "reclamacoes"} onClick={() => setTab("reclamacoes")} count={complaints.length}>{t.tabComplaints}</FilterChip>
+        <FilterChip active={tab === "elogios"} onClick={() => setTab("elogios")} count={praises.length}>{t.sectionPraise}</FilterChip>
+        <FilterChip active={tab === "avisos"} onClick={() => setTab("avisos")} count={notices.length}>{t.sectionNotices}</FilterChip>
       </div>
 
-      <SectionHeader icon={PackageX} title={t.sectionSolicitations} count={missingItems.filter((m) => !m.resolved).length} open={missingOpen} onToggle={() => setMissingOpen((o) => !o)} />
-      {missingOpen && (
-        <div style={styles.avItemsList}>
-          {missingItems.length === 0 ? <div style={styles.avNoItems}>{t.nothingHere}</div> : missingItems.map((m) => {
-            const s = staffById(staff, m.staffId), c = m.clientId ? clientById(clients, m.clientId) : null;
-            return (
-              <div key={m.id} style={styles.avItemCard}>
-                <div style={styles.avItemTopRow}>
-                  <div>
-                    <div style={styles.avItemTitle}>
-                      {s ? s.name : "—"} · {m.kind === "correcao" ? t.correctionOfHours : c ? c.name : "—"}
-                    </div>
-                    <div style={styles.avItemDate}>{m.date}</div>
-                  </div>
-                  <span style={{ ...styles.statusBadge, ...(m.resolved ? styles.statusActive : styles.statusInactive) }}>{m.resolved ? c0.resolved : c0.pending}</span>
-                </div>
-                <div style={styles.avItemText}>{m.text}</div>
-                {m.response && replyingId !== m.id && (
-                  <div style={styles.avResponseBox}><div style={styles.avResponseLabel}>{t.yourReply}</div><div style={styles.avItemText}>{m.response}</div></div>
-                )}
-                {replyingId === m.id ? (
-                  <div style={styles.avResponseBox}>
-                    <textarea style={styles.textarea} rows={2} placeholder={t.replyPlaceholder} value={replyDraft} onChange={(e) => setReplyDraft(e.target.value)} />
-                    <button style={styles.avSendButtonSmall} onClick={() => sendReply(m.id)}>{t.sendReply}</button>
-                  </div>
-                ) : (
-                  <div style={styles.avItemActions}>
-                    <button style={styles.avActionOutline} onClick={() => startReply(m.id, m.response)}>{t.reply}</button>
-                    <button style={styles.avActionOutline} onClick={() => toggleResolved(m.id)}>
-                      {m.resolved ? t.markPending : m.kind === "correcao" ? t.approveAndReopen : t.markResolved}
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      {tab === "pedidos" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {missingItems.length === 0 ? <EmptyNote>{t.nothingHere}</EmptyNote> : missingItems.map((m) => (
+            <PedidoCard
+              key={m.id} m={m} staff={staff} clients={clients} lang={lang} t={t} c0={c0}
+              replying={replyingId} replyDraft={replyDraft} setReplyDraft={setReplyDraft}
+              onStartReply={startReply} onSendReply={sendReply} onToggleResolved={toggleResolved}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {tabContent.items.length === 0 ? <EmptyNote>{t.nothingHere}</EmptyNote> : tabContent.items.map((item) => (
+            <SentItemCard key={item.id} item={item} type={tabContent.type} staff={staff} clients={clients} c0={c0} />
+          ))}
         </div>
       )}
 
-      <SectionHeader icon={MessageSquare} title={t.sectionComplaintsSent} count={complaints.length} open={complaintsOpen} onToggle={() => setComplaintsOpen((o) => !o)} />
-      {complaintsOpen && <ItemListSimple items={complaints} staff={staff} clients={clients} lang={lang} />}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        width={480}
+        title={t.drawerNewTitle}
+        closeLabel={c0.close}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDrawerOpen(false)}>{c0.cancel}</Button>
+            <Button
+              onClick={handleSend}
+              disabled={!draftStaffId || !draftClientId || !draftText.trim()}
+              disabledReason={!draftStaffId ? t.chooseStaffReason : (!draftClientId || !draftText.trim()) ? c0.requiredField : undefined}
+            >
+              {t.send}
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          <TypeCard type="reclamacao" active={draftType === "reclamacao"} onClick={() => changeDraftType("reclamacao")} label={t.typeComplaint} />
+          <TypeCard type="elogio" active={draftType === "elogio"} onClick={() => changeDraftType("elogio")} label={t.typePraise} />
+          <TypeCard type="aviso" active={draftType === "aviso"} onClick={() => changeDraftType("aviso")} label={t.typeNotice} />
+        </div>
 
-      <SectionHeader icon={ThumbsUp} title={t.sectionPraise} count={praises.length} open={praiseOpen} onToggle={() => setPraiseOpen((o) => !o)} />
-      {praiseOpen && <ItemListSimple items={praises} staff={staff} clients={clients} lang={lang} />}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Field label={t.formStaff}>
+            <SearchSelect
+              value={draftStaffId} onChange={setDraftStaffId} options={staffOptions}
+              placeholder={t.formStaffPlaceholder} searchPlaceholder={T[lang].funcionarios.searchPlaceholder} noResultsLabel={c0.noResults}
+            />
+          </Field>
+          <Field label={t.formClient}>
+            <SearchSelect
+              value={draftClientId} onChange={setDraftClientId} options={clientOptions}
+              placeholder={t.formClientPlaceholder} searchPlaceholder={T[lang].clientes.searchPlaceholder} noResultsLabel={c0.noResults}
+            />
+          </Field>
+          <Field label={t.formText}>
+            <textarea style={styles.textarea} rows={4} placeholder={t.formTextPlaceholder} value={draftText} onChange={(e) => setDraftText(e.target.value)} />
+          </Field>
+          <PhotoDropzone file={draftPhoto} onChange={setDraftPhoto} label={t.attachPhoto} removeLabel={t.removePhoto} />
+        </div>
+      </Drawer>
 
-      <SectionHeader icon={Info} title={t.sectionNotices} count={notices.length} open={noticesOpen} onToggle={() => setNoticesOpen((o) => !o)} />
-      {noticesOpen && <ItemListSimple items={notices} staff={staff} clients={clients} lang={lang} />}
+      {toastMsg && <Toast message={toastMsg} onDismiss={() => setToastMsg(null)} closeLabel={c0.close} />}
     </div>
   );
 }

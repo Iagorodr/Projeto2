@@ -38,30 +38,42 @@ function LangSwitcher({ lang, setLang }) {
   );
 }
 
-function Sidebar({ activeKey, onNavigate, onLogout, company, lang, items, labels, brandOverride }) {
+// `items`/`labels` deixam a barra lateral reutilizável fora da gerência —
+// ver o modo desktop do supervisor em App.jsx, que passa SUPERVISOR_MENU_ITEMS
+// e um dicionário de rótulos próprio em vez do menu completo da gerência.
+// `brandOverride` troca o nome/subtítulo da empresa pelo do próprio supervisor.
+// `collapsed` (documento, 3.2: "Na agenda da gerência a sidebar recolhe a
+// ícones (76 px) para dar espaço à grelha") força o mesmo visual "só
+// ícones" que já existe pra ecrãs estreitos (`isMobile`), só que a
+// pedido de UM ecrã específico, independente da largura real da janela
+// — por isso 76px aqui (não os 64px do colapso por largura, que é outro
+// caso já existente e não mexido). Prop nova, opcional, sem efeito em
+// nenhum outro ecrã que não a passe.
+function Sidebar({ activeKey, onNavigate, onLogout, company, lang, items, labels, brandOverride, collapsed }) {
   const t = labels || T[lang].sidebar;
   const menuItems = items || MENU_ITEMS;
   const brandName = brandOverride ? brandOverride.name : company.name;
   const brandSub = brandOverride ? brandOverride.sub : company.email;
   const isMobile = useIsMobile();
+  const iconOnly = collapsed || isMobile;
 
   // No desktop a barra mostra logo + nome da empresa + rótulo de cada
   // item. Num ecrã estreito isso não cabe, então vira uma faixa fina só
   // com os ícones — a navegação continua igual, só sem o texto.
-  const sidebarStyle = isMobile
-    ? { ...styles.sidebar, width: 64, padding: "14px 6px", alignItems: "center" }
+  const sidebarStyle = iconOnly
+    ? { ...styles.sidebar, width: collapsed ? 76 : 64, padding: "14px 6px", alignItems: "center" }
     : styles.sidebar;
   const menuItemStyle = (active) => {
     const base = { ...styles.menuItem, ...(active ? styles.menuItemActive : {}) };
-    return isMobile ? { ...base, justifyContent: "center", padding: "10px 0", gap: 0 } : base;
+    return iconOnly ? { ...base, justifyContent: "center", padding: "10px 0", gap: 0 } : base;
   };
 
   return (
     <div style={sidebarStyle}>
-      <div style={isMobile ? { ...styles.sidebarProductRow, padding: "8px", display: "flex", justifyContent: "center" } : styles.sidebarProductRow}>
-        {isMobile ? <LogoMark size={20} tone="default" /> : <LogoLockup size={20} tone="default" />}
+      <div style={iconOnly ? { ...styles.sidebarProductRow, padding: "8px", display: "flex", justifyContent: "center" } : styles.sidebarProductRow}>
+        {iconOnly ? <LogoMark size={20} tone="default" /> : <LogoLockup size={20} tone="default" />}
       </div>
-      {!isMobile && (
+      {!iconOnly && (
         <div style={styles.brand}>
           <div style={styles.avatar}>
             {!brandOverride && company.photoUrl ? <img src={company.photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : brandName.slice(0, 1)}
@@ -81,28 +93,19 @@ function Sidebar({ activeKey, onNavigate, onLogout, company, lang, items, labels
               key={item.key}
               style={menuItemStyle(active)}
               onClick={() => onNavigate(item.key)}
-              title={isMobile ? t[item.key] : undefined}
+              title={iconOnly ? t[item.key] : undefined}
             >
               <span style={{ ...styles.menuIconWrap, ...(active ? styles.menuIconWrapActive : {}) }}>
                 <Icon size={15} />
               </span>
-              {!isMobile && <span>{t[item.key]}</span>}
+              {!iconOnly && <span>{t[item.key]}</span>}
             </button>
           );
         })}
       </div>
-      <button style={{ ...styles.sairRow, ...(isMobile ? { fontSize: 11, padding: "8px 0" } : {}) }} onClick={onLogout} title={isMobile ? T[lang].common.logout : undefined}>
-        {isMobile ? "⏻" : T[lang].common.logout}
+      <button style={{ ...styles.sairRow, ...(iconOnly ? { fontSize: 11, padding: "8px 0" } : {}) }} onClick={onLogout} title={iconOnly ? T[lang].common.logout : undefined}>
+        {iconOnly ? "⏻" : T[lang].common.logout}
       </button>
-    </div>
-  );
-}
-
-function TopBar({ lang, setLang, label }) {
-  return (
-    <div style={styles.topBar}>
-      <div style={styles.todayLabel}>{label}</div>
-      <LangSwitcher lang={lang} setLang={setLang} />
     </div>
   );
 }
@@ -187,4 +190,4 @@ function ViewField({ label, full, icon: Icon, children }) {
   );
 }
 
-export { LangSwitcher, Sidebar, TopBar, Field, ViewField, InstallAppButton };
+export { LangSwitcher, Sidebar, Field, ViewField, InstallAppButton };
