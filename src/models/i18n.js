@@ -158,6 +158,13 @@ const T = {
       inactiveGroup: (n) => `Inativos (${n})`,
       noPersonWarning: (name, dm) => `Sem pessoa: ${name} expirou a ${dm}`,
       inactiveExpiredOn: (dm) => `Expirou a ${dm}`,
+      // QA (achado do Iago): navegação de semana — os mesmos clientes da
+      // "semana tipo" (`subtitle` acima já avisa: repete-se todas as
+      // semanas), só muda QUAL semana (datas) está em exibição. O botão de
+      // calendário serve pra saltar meses à frente sem clicar em "semana
+      // seguinte" dezenas de vezes.
+      previousWeek: "Semana anterior", nextWeek: "Semana seguinte",
+      pickWeek: "Escolher semana", backToToday: "Hoje",
     },
     horas: {
       title: "Horas",
@@ -712,6 +719,8 @@ const T = {
       inactiveGroup: (n) => `Inactive (${n})`,
       noPersonWarning: (name, dm) => `No one assigned: ${name} expired on ${dm}`,
       inactiveExpiredOn: (dm) => `Expired on ${dm}`,
+      previousWeek: "Previous week", nextWeek: "Next week",
+      pickWeek: "Choose week", backToToday: "Today",
     },
     horas: {
       title: "Hours",
@@ -1224,6 +1233,8 @@ const T = {
       inactiveGroup: (n) => `Inactifs (${n})`,
       noPersonWarning: (name, dm) => `Personne assignée : ${name} a expiré le ${dm}`,
       inactiveExpiredOn: (dm) => `Expiré le ${dm}`,
+      previousWeek: "Semaine précédente", nextWeek: "Semaine suivante",
+      pickWeek: "Choisir une semaine", backToToday: "Aujourd'hui",
     },
     horas: {
       title: "Heures",

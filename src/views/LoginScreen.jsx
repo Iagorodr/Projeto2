@@ -47,17 +47,20 @@ const inputStyle = {
 // demonstração (toggle Gerência/Funcionário) continuam exatamente como
 // estavam — só a casca visual muda.
 //
-// QA (achado do Iago): os dois "gradientes" desta tela não apareciam de
-// verdade. (1) O fundo era uma cor lisa (`#E2EBE7`, sem transição
-// nenhuma) — só o nome da variável/comentário chamava de "fundo", nunca
-// foi de facto um gradiente. (2) O brilho radial clay estava centrado em
-// "50% 28%" — exatamente onde o cartão (também centrado, 420px) fica
-// por cima dele — então o próprio brilho nascia escondido debaixo do
-// cartão opaco, sobrando só uma sombra quase impercetível nas bordas.
-// Fundo trocado por um `linear-gradient` real (tons forest/verde claro,
-// mesma "teoria" de paleta do `AppSidebar.jsx`, só que em claro em vez
-// de escuro) e o brilho clay subido pro topo ("50% 0%"), onde fica
-// visível por cima e ao lado do cartão em vez de atrás dele.
+// QA (achado do Iago, 2ª volta): a 1ª correção (ver histórico) trocou a
+// cor lisa por um `linear-gradient`, mas os tons escolhidos (#EDF4F1 ->
+// #CBDDD3) eram perto demais uns dos outros — na prática continuava
+// parecendo uma cor quase lisa, "muito opaco sem as cores". Também
+// faltava o `body { margin: 0 }` global (ver index.css) — o
+// user-agent stylesheet do browser dá 8px de margem ao `body` por
+// padrão, então o fundo (mesmo cobrindo `100vh`) nunca chegava às
+// bordas reais da janela, sobrando uma faixa branca à volta. Esta volta:
+// gradiente com tons bem mais afastados entre si (de um verde-menta
+// quase branco até um forest-500 saturado, mesma família do
+// `AppSidebar.jsx`) pra ter profundidade/cor de verdade, e dois brilhos
+// radiais (clay no topo, forest escuro no canto oposto) em vez de um só
+// — eco dos dois tons da marca (verde + clay) em vez de só um ponto de
+// luz.
 function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLoginWithPassword, authLoading, authError, company, staff }) {
   const t = T[lang].login;
   const [mode, setMode] = useState("gerencia"); // 'gerencia' | 'funcionario' — só usado no modo de demonstração
@@ -76,7 +79,7 @@ function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLogi
     <div
       style={{
         minHeight: "100vh", width: "100%", position: "relative", boxSizing: "border-box",
-        background: "linear-gradient(160deg, #EDF4F1 0%, #DCE8E2 55%, #CBDDD3 100%)",
+        background: "linear-gradient(155deg, #E3F2EA 0%, #A9D9C2 45%, #4D9D7E 85%, #2E8570 100%)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       }}
     >
@@ -84,7 +87,9 @@ function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLogi
         aria-hidden="true"
         style={{
           position: "absolute", inset: 0,
-          background: "radial-gradient(circle at 50% 0%, rgba(226,138,101,.22), transparent 55%)",
+          background:
+            "radial-gradient(circle at 50% 0%, rgba(226,138,101,.35), transparent 50%), " +
+            "radial-gradient(circle at 100% 100%, rgba(15,49,41,.35), transparent 55%)",
         }}
       />
 

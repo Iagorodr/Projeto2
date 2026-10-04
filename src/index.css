@@ -76,6 +76,17 @@ button {
   box-sizing: border-box;
 }
 
+/* QA (achado do Iago): faltava isto desde sempre — o user-agent stylesheet
+   do browser dá `margin: 8px` ao `body` por padrão. Qualquer tela cujo
+   fundo seja uma cor/gradiente a cobrir `100vh`/`100dvh` (ex.:
+   `LoginScreen.jsx`) nunca chegava mesmo às bordas da janela por causa
+   desses 8px — sobrava uma faixa branca (fundo da própria página, atrás do
+   `body`) à volta inteira. Não mexia nos ecrãs internos porque ali o fundo
+   visível é `COLORS.page`, quase branco, e a faixa ficava imperceptível. */
+body {
+  margin: 0;
+}
+
 /* Lote 4, 4.1 (achado da Marta): "html, body" fazia o `body` virar a sua
    própria área de rolagem — e um elemento com `position: sticky; bottom: 0`
    dentro dele passa a colar no fundo DESSA área (o scrollport do body), não

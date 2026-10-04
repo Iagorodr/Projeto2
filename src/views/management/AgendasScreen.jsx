@@ -1,10 +1,14 @@
 import { useState, useEffect, useId } from "react";
-import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
+import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CalendarDays, AlertTriangle } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
+import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
-import { clientById, staffById, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen, isStaffActive } from "../../models/utils.js";
+import {
+  clientById, staffById, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
+  isStaffActive, formatPeriodLabel,
+} from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import {
   PageHeader, SegmentedControl, SearchField, FilterChip, Avatar, Pill, SupervisorTag, DataTable, Toast, InfoTip,
@@ -99,6 +103,116 @@ function AgendaModal({ title, titleId, onClose, closeLabel, width = 340, childre
         </div>
       </div>
     </div>
+  );
+}
+
+// QA (achado do Iago — "Agendas"): a grade "Por funcionário" só mostrava
+// a semana corrente (`startOfISOWeek(TODAY)`, fixo) — sem jeito de ver
+// outra semana, mesmo sendo a MESMA semana-tipo em todas elas (ver
+// `subtitle` do ecrã: "repete-se todas as semanas"). Isto não muda os
+// clientes mostrados (continuam vindo de `assignments`, que não varia
+// por semana) — só QUAL semana (datas, "hoje") está em exibição; serve
+// pra planear à frente (ex.: em que dia cai cada cliente daqui a 2
+// meses). `WeekPickerCalendar` é a grelha de mês pra saltar direto a
+// qualquer semana, em vez de clicar "seguinte" dezenas de vezes.
+function WeekPickerCalendar({ weekStart, lang, t, c0, onSelectWeek, onClose }) {
+  const [viewMonth, setViewMonth] = useState(() => new Date(weekStart.getFullYear(), weekStart.getMonth(), 1));
+  const titleId = useId();
+  const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
+  const todayIso = isoDateStr(TODAY);
+  const weekEndIso = isoDateStr(addDays(weekStart, 6));
+  const weekStartIso = isoDateStr(weekStart);
+
+  // Grelha de 6 semanas (42 dias) a partir da segunda-feira da semana que
+  // contém o dia 1 do mês em exibição — cobre o mês inteiro mesmo quando
+  // ele começa perto do fim de uma semana (ex.: mês a começar num
+  // domingo), com dias de meses vizinhos esmaecidos mas clicáveis (saltar
+  // pra "semana de 30 set" a partir da grelha de outubro, por exemplo).
+  const gridStart = startOfISOWeek(new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1));
+  const weeks = [];
+  for (let w = 0; w < 6; w++) {
+    weeks.push(AGENDA_DAYS.map((_, d) => addDays(gridStart, w * 7 + d)));
+  }
+
+  const monthLabel = `${T[lang].months[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`;
+
+  return (
+    <AgendaModal
+      titleId={titleId} title={t.pickWeek} closeLabel={c0.close}
+      onClose={onClose} width={320}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <button
+          type="button" onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+          aria-label={t.previousWeek}
+          style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
+        >
+          <ChevronLeft size={15} />
+        </button>
+        <span style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.ink, textTransform: "capitalize" }}>{monthLabel}</span>
+        <button
+          type="button" onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+          aria-label={t.nextWeek}
+          style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
+        >
+          <ChevronRight size={15} />
+        </button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+        {AGENDA_DAYS.map((day) => (
+          <div key={day} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: COLORS.ink3, letterSpacing: "0.03em" }}>
+            {dayLabels[day][0]}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {weeks.map((week, wi) => {
+          const inSelectedWeek = isoDateStr(week[0]) === weekStartIso;
+          return (
+            <div
+              key={wi}
+              style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, borderRadius: RADIUS.chip, background: inSelectedWeek ? COLORS.clayTint : "transparent" }}
+            >
+              {week.map((day) => {
+                const iso = isoDateStr(day);
+                const outsideMonth = day.getMonth() !== viewMonth.getMonth();
+                const isToday = iso === todayIso;
+                return (
+                  <button
+                    key={iso}
+                    type="button"
+                    onClick={() => onSelectWeek(day)}
+                    style={{
+                      height: 32, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit",
+                      borderRadius: RADIUS.chip, fontSize: 12.5, fontWeight: isToday ? 800 : 500,
+                      color: outsideMonth ? COLORS.ink3 : inSelectedWeek ? COLORS.clayInk : COLORS.ink,
+                      opacity: outsideMonth ? 0.45 : 1, position: "relative",
+                    }}
+                  >
+                    {day.getDate()}
+                    {isToday && (
+                      <span style={{ position: "absolute", bottom: 2, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: COLORS.clay }} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      {!(weekStartIso <= todayIso && todayIso <= weekEndIso) && (
+        <button
+          type="button" onClick={() => onSelectWeek(TODAY)}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: 10,
+            border: `1.5px dashed ${COLORS.lineInput}`, background: "transparent", color: COLORS.forest700,
+            cursor: "pointer", borderRadius: RADIUS.chip, padding: "8px 0", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
+          }}
+        >
+          <CalendarDays size={13} /> {t.backToToday}
+        </button>
+      )}
+    </AgendaModal>
   );
 }
 
@@ -212,12 +326,29 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   // `day-${day}-${clientId}`, sem staffId porque ali o botão não pertence
   // a uma linha de funcionário) — null quando nenhum está aberto.
   const [openTeam, setOpenTeam] = useState(null);
-
-  const weekStart = startOfISOWeek(TODAY);
+  const { height: ctrlHeight, radius: ctrlRadius } = useControlSize();
+  // QA (achado do Iago — "Agendas"): antes era `const weekStart =
+  // startOfISOWeek(TODAY)`, fixo — só dava pra ver a semana corrente.
+  // Vira estado pra poder navegar; os CLIENTES mostrados não mudam (é a
+  // mesma semana-tipo sempre, ver `t.subtitle`), só as datas/"hoje" em
+  // exibição — ver `WeekPickerCalendar` mais acima.
+  const [weekStart, setWeekStart] = useState(() => startOfISOWeek(TODAY));
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const weekDates = AGENDA_DAYS.map((_, i) => addDays(weekStart, i));
   const todayIso = isoDateStr(TODAY);
-  const todayAgendaDay = AGENDA_DAYS[weekDates.findIndex((d) => isoDateStr(d) === todayIso)] ?? AGENDA_DAYS[0];
+  // Token 1 (segunda) a 7 (domingo) do dia de hoje de verdade — não depende
+  // de `weekDates`/`weekStart` (que agora navegam) porque a vista "Por
+  // dia" seleciona por DIA DA SEMANA (mesma semana-tipo em qualquer
+  // semana em exibição, ver comentário acima de `weekStart`), não por
+  // data; `getDay()` do JS devolve 0 (domingo) a 6 (sábado), daí o ajuste.
+  const todayDow = TODAY.getDay();
+  const todayAgendaDay = todayDow === 0 ? 7 : todayDow;
   const [selectedDay, setSelectedDay] = useState(todayAgendaDay);
+
+  function goToWeek(anyDateInWeek) {
+    setWeekStart(startOfISOWeek(anyDateInWeek));
+    setWeekPickerOpen(false);
+  }
 
   function showToast(message, opts) {
     setToast({ message, ...opts });
@@ -609,6 +740,57 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
     },
   ];
 
+  // Navegação de semana (ver comentário em `weekStart`, mais acima): mesmo
+  // padrão visual/estrutural já usado em Horas (`HorasScreen.jsx`, seta
+  // esquerda + rótulo + seta direita dentro de uma pílula) — reaproveita a
+  // linguagem de navegação de período já estabelecida no app em vez de
+  // inventar uma nova, só troca "mês" por "semana". O botão de calendário
+  // (ícone já é o mesmo usado pra "Agendas" na sidebar, ver `tokens.js`)
+  // abre `WeekPickerCalendar` pra saltar direto a qualquer semana; "Hoje"
+  // só aparece quando a semana em exibição não é a corrente.
+  const isCurrentWeek = isoDateStr(weekStart) === isoDateStr(startOfISOWeek(TODAY));
+  const weekRangeLabel = formatPeriodLabel({ start: weekStart, end: addDays(weekStart, 6) }, lang);
+  const weekNavControl = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 2, background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.pill, padding: 3 }}>
+        <button
+          type="button" onClick={() => setWeekStart((d) => addDays(d, -7))} aria-label={t.previousWeek}
+          style={{ width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, padding: "0 4px", whiteSpace: "nowrap" }}>{weekRangeLabel}</span>
+        <button
+          type="button" onClick={() => setWeekStart((d) => addDays(d, 7))} aria-label={t.nextWeek}
+          style={{ width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      <button
+        type="button" onClick={() => setWeekPickerOpen(true)} aria-label={t.pickWeek} title={t.pickWeek}
+        style={{
+          width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: `1px solid ${COLORS.line}`,
+          background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink,
+        }}
+      >
+        <CalendarDays size={16} />
+      </button>
+      {!isCurrentWeek && (
+        <button
+          type="button" onClick={() => setWeekStart(startOfISOWeek(TODAY))}
+          style={{
+            height: ctrlHeight, padding: "0 12px", borderRadius: ctrlRadius, border: "none",
+            background: COLORS.forest50, color: COLORS.forest700, fontSize: 12.5, fontWeight: 700,
+            cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+          }}
+        >
+          {t.backToToday}
+        </button>
+      )}
+    </div>
+  );
+
   return (
     // QA (achado do Iago — "Agendas"): `styles.content` (partilhado com
     // as outras telas de gerência) tem `overflowY: "auto"` — mas como
@@ -623,7 +805,14 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
     // aqui (só nesta tela — `styles.content` continua igual nas outras)
     // devolve o sticky pra janela real.
     <div style={{ ...styles.content, overflowY: "visible" }}>
-      <PageHeader title={t.title} subtitle={t.subtitle} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      <PageHeader title={t.title} subtitle={t.subtitle} actions={weekNavControl} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      {weekPickerOpen && (
+        <WeekPickerCalendar
+          weekStart={weekStart} lang={lang} t={t} c0={c0}
+          onSelectWeek={goToWeek}
+          onClose={() => setWeekPickerOpen(false)}
+        />
+      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <SegmentedControl
