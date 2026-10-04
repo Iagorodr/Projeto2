@@ -15,14 +15,11 @@ import {
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 
 // Documento gera "41 clientes ativos" (4.2) a partir dos 41 clientes do seed
-// em data.js — aqui a conta é literal: contrato ainda não terminado (ou sem
-// data de fim) conta como ativo. QA pós-auditoria (Lote 3, "'Ativo' com uma
-// definição só"): esta conta passou para `activeClientsCount` (utils.js),
-// partilhada com o KPI "Clientes" do Dashboard — antes cada tela tinha a
-// sua própria conta (esta já estava certa; o Dashboard mostrava
-// `clients.length` puro, sem excluir os contratos já vencidos) e os
-// números não batiam (37 aqui vs. 41 lá). Decisão do Iago: "ativo" para
-// valer, não o total de clientes cadastrados.
+// em data.js. QA pós-auditoria (Lote 3, item 4 do briefing — "'Ativo' com
+// uma definição só"): esta conta usa `activeClientsCount` (utils.js),
+// partilhada com o KPI "Clientes" do Dashboard, pra nunca divergirem.
+// Reconfirmado pelo Iago em 04/10: "ativo" = todo cliente cadastrado (41),
+// contrato vencido ou não — vira pendência à parte, não some da contagem.
 const EMPTY_CLIENT_FORM = { ...EMPTY_CLIENT, documents: [null, null, null, null] };
 
 function splitClientName(name) {

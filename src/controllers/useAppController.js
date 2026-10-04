@@ -126,7 +126,16 @@ export function useAppController() {
       // Um segundo (ou terceiro...) login de gerência é só um "funcionário"
       // com role "gerencia" — mesma tabela/tela de Acessos, mas cai direto
       // na perspectiva de gerência completa, igual ao login principal.
+      // Lote 4, 4.3 (achado da Marta — "bloco de usuário com nome e papel
+      // de quem entrou, não 'Empresa'"): sem isto `loggedInStaffId` ficava
+      // null em qualquer login de gerência (igual ao login da conta-mãe da
+      // empresa), e o `AppSidebar` não tinha como saber o nome de quem
+      // entrou — só dava pra mostrar o nome da empresa. Guardando o id
+      // aqui, `me` (perto do fim deste ficheiro) resolve para o próprio
+      // funcionário de gerência, igual já acontece do lado funcionário/
+      // supervisor.
       if (matchedStaff.role === "gerencia") {
+        setLoggedInStaffId(matchedStaff.id);
         enterManagement();
       } else {
         enterEmployee(matchedStaff.id);

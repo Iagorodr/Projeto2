@@ -4,11 +4,10 @@ import { useState } from "react";
 import { MoreHorizontal, LogOut } from "lucide-react";
 import { useAppController } from "./controllers/useAppController.js";
 import { styles } from "./styles/styles.js";
-import { Sidebar } from "./views/shared/Layout.jsx";
 import { AppSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.js";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useBreakpoint } from "./hooks/useBreakpoint.js";
-import { SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
+import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
 import { getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
@@ -43,9 +42,10 @@ import EmployeeInicioScreen from "./views/employee/EmployeeInicioScreen.jsx";
 export default function App() {
   const c = useAppController();
   const isMobile = useIsMobile();
-  // Casca nova da Etapa 3 (sidebar/rail/barra inferior), só pro lado
-  // funcionário/supervisor por agora — a gerência continua com `Sidebar`
-  // antiga e `useIsMobile`, troca dela é trabalho fora desta etapa.
+  // Casca nova da Etapa 3 (sidebar/rail/barra inferior); a gerência
+  // também usa `empTier` pro `AppSidebar` desde o Lote 4, 4.3 — o
+  // CONTEÚDO de cada tela de gerência continua em `useIsMobile` (isso não
+  // mudou, só a sidebar em volta).
   const empTier = useBreakpoint();
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   // styles.page tem minHeight fixo de 700px, pensado para desktop. Em telemóveis
@@ -81,9 +81,48 @@ export default function App() {
         />
       )}
 
-      {c.perspective === "management" && (
+      {c.perspective === "management" && (() => {
+        // Lote 4, 4.3 (achado da Marta — "Menu verde da gerência"): troca
+        // do `Sidebar` antigo (views/shared/Layout.jsx — fundo sólido, sem
+        // o verde gradiente nem o "Sair" de verdade) pelo `AppSidebar` já
+        // usado do lado funcionário/supervisor desde a Etapa 4, igual ao
+        // documento pede: 236px sempre aberto no desktop (inclusive em
+        // Agendas agora — a própria grade de 170px já rola na horizontal
+        // dentro do cartão, ver AgendasScreen.jsx linha 587, então não
+        // precisa mais forçar o menu a ícones só nessa tela), só ícones
+        // (76px) no tablet, e o mesmo modo de ícones no celular ("o mínimo
+        // que funcione", como o Iago aprovou — sem rail próprio pra
+        // gerência, que é trabalho de Etapa 4 fora de escopo).
+        const tSidebar = T[c.lang].sidebar;
+        let overtimePending = 0;
+        Object.values(c.horasData).forEach((data) => {
+          data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; });
+        });
+        const pendingRequests = c.missingItems.filter((m) => !m.resolved).length;
+        const managementItems = MENU_ITEMS.map((item) => ({
+          key: item.key, icon: item.icon, label: tSidebar[item.key],
+          badge: item.key === "horas" ? (overtimePending || undefined)
+            : item.key === "avisos" ? (pendingRequests || undefined)
+            : undefined,
+        }));
+        const managementCollapsed = empTier === "desktop" ? false : "icons";
+        // Nome de quem entrou, não da empresa (achado da Marta) — `staff`
+        // não tem campo de foto (igual já era do lado supervisor/
+        // funcionário, ver o `user` passado ao AppSidebar logo abaixo
+        // nesta mesma tela, perto de "empTier === 'tablet'"), só a
+        // `company` tem; por isso só o login direto da conta-mãe (sem
+        // `loggedInStaffId`, ver resolveSessionAndRoute) ganha foto aqui.
+        const managementUser = c.me
+          ? { name: c.me.name, subtitle: T[c.lang].acessos.roleGerencia }
+          : { name: c.company.name, photoUrl: c.company.photoUrl, subtitle: T[c.lang].acessos.roleGerencia };
+
+        return (
         <div style={styles.shell}>
-          <Sidebar activeKey={c.screen} onNavigate={c.setScreen} onLogout={c.logout} company={c.company} lang={c.lang} collapsed={c.screen === "agendas"} />
+          <AppSidebar
+            items={managementItems} activeKey={c.screen} onNavigate={c.setScreen}
+            density="gerencia" collapsed={managementCollapsed}
+            user={managementUser} onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
+          />
           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
             {c.screen === "dashboard" && (
               <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} onNavigate={c.setScreen} />
@@ -108,7 +147,8 @@ export default function App() {
             )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {c.perspective === "employee" && c.me && (() => {
         // Casca nova da Etapa 3 pro funcionário/supervisor (documento,

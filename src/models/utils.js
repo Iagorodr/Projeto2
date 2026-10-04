@@ -111,17 +111,16 @@ function boardStaff(staffList, horasData, period, today) {
   return staffList.filter((s) => isStaffActive(s, today) || hasEntriesInOpenPeriod(s));
 }
 
-// QA pós-auditoria (Lote 3, "'Ativo' com uma definição só"): cliente ativo
-// = contrato sem data de fim OU ainda não vencido ("ainda não vencido" =
-// `>=` hoje, não `>` — um contrato que termina HOJE ainda conta). Antes
-// desta etapa só existia no subtítulo de ClientesScreen.jsx (ali já
-// computava certo: 37/41 com os 4 contratos vencidos de hoje); o KPI
-// "Clientes" do Dashboard mostrava `clients.length` puro (41, sem filtrar
-// os vencidos) — os dois números não batiam. Decisão do Iago (não a
-// sugestão "41" da Marta): "ativo" significa ativo de verdade hoje, logo
-// o Dashboard passa a excluir os vencidos, não o contrário.
+// QA pós-auditoria (Lote 3, item 4 do briefing — "'Ativo' com uma
+// definição só"): o Dashboard mostrava `clients.length` puro (41) e
+// ClientesScreen.jsx excluía quem já tinha contrato vencido (37) — os
+// dois números não batiam. Uma versão anterior deste helper tinha optado
+// por excluir os vencidos (37); o Iago reconfirmou em 04/10 que quer os
+// 41 — todo cliente cadastrado conta como "ativo", um contrato vencido
+// vira só uma pendência à parte (cartão de Pendências), não tira o
+// cliente da contagem.
 function activeClientsCount(clients, today) {
-  return clients.filter((c) => !c.contractEnd || parseDMY(c.contractEnd) >= today).length;
+  return clients.length;
 }
 
 function pad2(n) { return String(n).padStart(2, "0"); }

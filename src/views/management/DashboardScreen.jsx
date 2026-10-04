@@ -268,10 +268,10 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           </div>
         </KpiCard>
 
-        {/* QA pós-auditoria (Lote 3, "'Ativo' com uma definição só"): era
-            `clients.length` puro (41, sem excluir os 4 contratos já
-            vencidos) — agora usa a mesma `activeClientsCount` do subtítulo
-            de ClientesScreen.jsx (decisão do Iago: "ativo" de verdade). */}
+        {/* QA pós-auditoria (Lote 3, item 4 do briefing — "'Ativo' com uma
+            definição só"): usa a mesma `activeClientsCount` do subtítulo
+            de ClientesScreen.jsx, pra nunca divergir. Reconfirmado pelo
+            Iago em 04/10: conta todo cliente cadastrado (41). */}
         <KpiCard icon={Building2} label={t.kpiClients} value={activeClientsCount(clients, TODAY)} />
 
         <KpiCard
