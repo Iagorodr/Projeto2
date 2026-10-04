@@ -8,7 +8,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { isoDateStr, addDays, startOfISOWeek, notesForOwner, monthAbbr } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { LangSwitcher, Field } from "./Layout.jsx";
-import { PageHeader, Button, IconButton, Drawer, Pill, Card, Toast } from "./ui/index.js";
+import { PageHeader, Button, IconButton, Drawer, Pill, Card, Toast, InfoTip } from "./ui/index.js";
 import { usePushNotifications } from "../../hooks/usePushNotifications.js";
 
 // "YYYY-MM-DD" -> Date local (meia-noite local, não UTC) — mesmo padrão já
@@ -101,14 +101,21 @@ function EmptyNotes({ text }) {
 // botão "Ativar notificações" quando não; 5.7 telemóvel: cartão
 // empilhado — texto + botão a toda a largura — que se reduz a uma
 // pílula quando ativa).
-function PushStatus({ push, t, desktop }) {
+function PushStatus({ push, t, c0, desktop }) {
   if (!push.supported) return null;
   const gap = desktop ? 18 : 14;
   if (push.subscribed) {
     return <div style={{ marginBottom: gap }}><Pill variant="paid">{desktop ? t.pushEnabled : t.pushEnabledShort}</Pill></div>;
   }
   if (push.permission === "denied") {
-    return <div style={{ fontSize: 12.5, color: COLORS.ink3, marginBottom: gap }}>{t.pushDenied}</div>;
+    // Lote 4, 4.5 (achado da Marta): fica, mas mais curto — é um estado
+    // que impede a função; o "como liberar" vai pro InfoTip.
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 2, marginBottom: gap }}>
+        <span style={{ fontSize: 12.5, color: COLORS.ink3 }}>{t.pushDenied}</span>
+        <InfoTip text={t.pushDeniedHelp} label={c0.moreInfoLabel} />
+      </div>
+    );
   }
   if (desktop) {
     return <div style={{ marginBottom: gap }}><Button variant="secondary" onClick={() => push.subscribe()} disabled={push.busy}>{t.pushEnable}</Button></div>;
@@ -196,9 +203,15 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
   if (desktop) {
     return (
       <div style={styles.content}>
-        <PageHeader title={t.title} subtitle={t.subtitle} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+        {/* Lote 4, 4.5 (achado da Marta): o subtítulo ("Guarde lembretes
+            pessoais...") vira (i) ao lado do título, em vez de ficar
+            sempre visível abaixo dele. */}
+        <PageHeader
+          title={t.title} titleInfo={<InfoTip text={t.subtitle} label={c0.moreInfoLabel} />}
+          lang={lang} setLang={setLang} langNames={LANG_NAMES}
+        />
 
-        <PushStatus push={push} t={t} desktop />
+        <PushStatus push={push} t={t} c0={c0} desktop />
 
         <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div style={{ flex: 7, minWidth: 280 }}>{list}</div>
@@ -223,15 +236,17 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
   return (
     <div style={{ ...mobStyles.phone, maxWidth: 460 }}>
       <div style={mobStyles.header}>
-        <button style={mobStyles.homeIcon} onClick={onHome} aria-label="menu">
+        <button style={mobStyles.homeIcon} onClick={onHome} aria-label={t.backLabel}>
           <HouseIcon size={18} color={COLORS.textSoft} />
         </button>
         <LangSwitcher lang={lang} setLang={setLang} />
       </div>
-      <h1 style={mobStyles.title}>{t.title}</h1>
-      <div style={{ fontSize: 12.5, color: COLORS.ink3, marginBottom: 14, textAlign: "center" }}>{t.subtitle}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginBottom: 14 }}>
+        <h1 style={{ ...mobStyles.title, marginBottom: 0 }}>{t.title}</h1>
+        <InfoTip text={t.subtitle} label={c0.moreInfoLabel} />
+      </div>
 
-      <PushStatus push={push} t={t} desktop={false} />
+      <PushStatus push={push} t={t} c0={c0} desktop={false} />
 
       <Button size="mobile" icon={Plus} onClick={openSheet} style={{ width: "100%", marginBottom: 18 }}>{t.newNote}</Button>
 

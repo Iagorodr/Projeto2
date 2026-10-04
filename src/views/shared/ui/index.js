@@ -2,6 +2,7 @@
 // Facilita o import nos ecrãs quando chegar a Etapa 4: `import { Card, Pill, ... } from ".../ui"`.
 export { Avatar, getInitials, colorsForName } from "./Avatar.jsx";
 export { Pill, SupervisorTag } from "./Pill.jsx";
+export { InfoTip } from "./InfoTip.jsx";
 export { Button, IconButton } from "./Button.jsx";
 export { Card } from "./Card.jsx";
 export { KpiCard } from "./KpiCard.jsx";

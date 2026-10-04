@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useId } from "react";
 import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -7,7 +7,7 @@ import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import { clientById, staffById, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen, isStaffActive } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import {
-  PageHeader, SegmentedControl, SearchField, FilterChip, Avatar, Pill, SupervisorTag, DataTable, Toast,
+  PageHeader, SegmentedControl, SearchField, FilterChip, Avatar, Pill, SupervisorTag, DataTable, Toast, InfoTip,
 } from "../shared/ui/index.js";
 
 // Coluna de "hoje" (documento, 4.3): fundo #F5FAF7 — valor literal do
@@ -18,6 +18,115 @@ import {
 // mesma cor a descer pela coluna inteira dá mais coerência visual, sem
 // mudar o que o cabeçalho já faz).
 const TODAY_COLUMN_BG = "#F5FAF7";
+
+// Lote 4, 4.6 (achado da Marta): "quem está no cliente" — o bloco
+// compartilhado (chip na vista "Por funcionário", avatares na coluna
+// "Quem" da vista "Por dia") vira um botão focável; isto é o popover que
+// abre, com nomes+mini-avatares+duração de cada um, "Remover" sempre
+// visível (sem precisar de hover) e "Adicionar" pra juntar outro
+// funcionário a este cliente neste dia. Esc e clique fora fecham —
+// mesmo padrão do `InfoTip.jsx` (useEffect com listeners em `document`
+// só enquanto aberto), adaptado de tooltip pra popover/diálogo: aqui
+// abre só por clique/Enter (não por hover/focus), e usa `role="dialog"`
+// em vez de `role="tooltip"` porque o conteúdo já não é só texto.
+function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, onAdd, onClose }) {
+  const [adding, setAdding] = useState(false);
+  const [addSearch, setAddSearch] = useState("");
+  const rootRef = useRef(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    function onKeyDown(e) { if (e.key === "Escape") onClose(); }
+    function onPointerDown(e) {
+      if (rootRef.current && !rootRef.current.contains(e.target)) onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [onClose]);
+
+  const availableStaff = staff
+    .filter((s) => !team.some((m) => m.id === s.id))
+    .filter((s) => s.name.toLowerCase().includes(addSearch.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <div
+      ref={rootRef} role="dialog" aria-labelledby={titleId}
+      style={{
+        position: "absolute", top: "100%", left: 0, marginTop: 4, width: 240, zIndex: 20,
+        background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control,
+        boxShadow: SHADOW.sh2, padding: 10,
+      }}
+    >
+      <div id={titleId} style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>
+        {client.name} · {t.peopleLabel(team.length)}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {team.map((member) => (
+          <div key={member.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Avatar name={member.name} size={22} />
+            <span style={{ flex: 1, fontSize: 12.5, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {member.name}
+            </span>
+            <span style={{ flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: COLORS.ink2 }}>
+              {fmtMinutes(perPerson)}
+            </span>
+            <button
+              type="button" onClick={() => onRemove(member.id)} aria-label={t.remove}
+              style={{ flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, padding: 2, display: "flex" }}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+      {adding ? (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <SearchField value={addSearch} onChange={setAddSearch} placeholder={t.addStaffPlaceholder} style={{ flex: 1 }} />
+            <button
+              type="button" onClick={() => { setAdding(false); setAddSearch(""); }} aria-label={c0.cancel}
+              style={{ border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, flexShrink: 0, display: "flex" }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div style={{ maxHeight: 160, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+            {availableStaff.length === 0 ? (
+              <div style={{ fontSize: 12, color: COLORS.ink2, padding: "6px 4px" }}>{t.noStaffAvailable}</div>
+            ) : availableStaff.map((s) => (
+              <button
+                key={s.id} type="button" onClick={() => { onAdd(s.id); setAdding(false); setAddSearch(""); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6, textAlign: "left", border: "none", background: "transparent",
+                  cursor: "pointer", padding: "6px 4px", borderRadius: RADIUS.chip, fontSize: 12.5, fontFamily: "inherit", color: COLORS.ink,
+                }}
+              >
+                <Avatar name={s.name} size={20} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button" onClick={() => setAdding(true)}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, width: "100%", border: `1.5px dashed ${COLORS.lineInput}`,
+            background: "transparent", color: COLORS.ink3, cursor: "pointer", borderRadius: RADIUS.chip, padding: "6px 8px",
+            fontSize: 12.5, fontFamily: "inherit", marginTop: 8,
+          }}
+        >
+          <Plus size={13} /> {t.addPerson}
+        </button>
+      )}
+    </div>
+  );
+}
 
 // Agendas (documento de design, secção 4.3) — "ver e mudar quem faz que
 // cliente em cada dia da semana". `assignments` é uma semana-tipo (repete
@@ -35,6 +144,11 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   const [hoverCell, setHoverCell] = useState(null);
   const [toast, setToast] = useState(null);
   const [inactiveOpen, setInactiveOpen] = useState(false);
+  // Lote 4, 4.6: chave do popover "quem está no cliente" aberto (vista
+  // "Por funcionário": `${staffId}-${day}-${clientId}`; vista "Por dia":
+  // `day-${day}-${clientId}`, sem staffId porque ali o botão não pertence
+  // a uma linha de funcionário) — null quando nenhum está aberto.
+  const [openTeam, setOpenTeam] = useState(null);
 
   const weekStart = startOfISOWeek(TODAY);
   const weekDates = AGENDA_DAYS.map((_, i) => addDays(weekStart, i));
@@ -50,6 +164,11 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   function cellKey(staffId, day) { return `${staffId}-${day}`; }
   function getCellClientIds(staffId, day) { return assignments[cellKey(staffId, day)] || []; }
   function teamSizeFor(day, clientId) { return staff.filter((s) => getCellClientIds(s.id, day).includes(clientId)).length; }
+  // Lote 4, 4.6: mesma lista que `teamSizeFor` conta, mas devolvendo quem
+  // são (não só quantos) — pro popover "quem está no cliente".
+  function staffOnClient(day, clientId) { return staff.filter((s) => getCellClientIds(s.id, day).includes(clientId)); }
+  function teamKey(staffId, day, clientId) { return `${staffId}-${day}-${clientId}`; }
+  function dayTeamKey(day, clientId) { return `day-${day}-${clientId}`; }
 
   function mergeAdd(key, clientId) {
     setAssignments((prev) => {
@@ -178,7 +297,8 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
               {clientIds.map((cid) => {
                 const client = clientById(clients, cid);
                 if (!client) return null;
-                const teamSize = teamSizeFor(day, cid);
+                const team = staffOnClient(day, cid);
+                const teamSize = team.length;
                 const shared = teamSize > 1;
                 const perPerson = Math.round(client.duration / teamSize);
                 const recurring = client.frequency === "biweekly" || client.frequency === "monthly";
@@ -186,26 +306,69 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                 const tooltip = `${client.name} · ${fmtMinutes(client.duration)}`
                   + (recurring ? ` · ${freqLabel}` : "")
                   + (shared ? ` · ${t.peopleLabel(teamSize)}, ${fmtMinutes(perPerson)} ${t.each}` : "");
+
+                // Lote 4, 4.6 (achado da Marta): o bloco partilhado vira um
+                // botão focável que abre o popover "quem está no cliente"
+                // (nomes+mini-avatares+duração, "Remover"/"Adicionar"
+                // sempre visíveis ali dentro); o `title` fica só como
+                // reforço, já não é a única forma de ver quem são (não
+                // funcionava ao toque). O chip sem partilha não muda —
+                // continua `div` simples, remover só ao `isHovered`.
+                if (shared) {
+                  const thisTeamKey = teamKey(s.id, day, cid);
+                  const isTeamOpen = openTeam === thisTeamKey;
+                  return (
+                    <div key={cid} style={{ position: "relative" }}>
+                      <button
+                        type="button" title={tooltip}
+                        aria-haspopup="dialog" aria-expanded={isTeamOpen}
+                        onClick={() => setOpenTeam((k) => (k === thisTeamKey ? null : thisTeamKey))}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 4, height: 30, width: "100%", borderRadius: RADIUS.chip,
+                          padding: "0 8px", background: COLORS.clayTint, fontSize: 12.5, border: "none", cursor: "pointer",
+                          fontFamily: "inherit", textAlign: "left",
+                        }}
+                      >
+                        <UsersRound size={12} style={{ flexShrink: 0, color: COLORS.clayInk }} />
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500, color: COLORS.clayInk }}>
+                          {client.name}
+                        </span>
+                        <span style={{ flexShrink: 0, fontWeight: 600, color: COLORS.clayInk }}>
+                          {fmtMinutes(perPerson)}
+                        </span>
+                        {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: COLORS.clayInk }} />}
+                      </button>
+                      {isTeamOpen && (
+                        <ClientTeamPopover
+                          client={client} team={team} perPerson={perPerson} t={t} c0={c0} staff={staff}
+                          onRemove={(staffId) => removeClient(staffId, day, cid)}
+                          onAdd={(staffId) => mergeAdd(cellKey(staffId, day), cid)}
+                          onClose={() => setOpenTeam(null)}
+                        />
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={cid} title={tooltip}
                     style={{
                       display: "flex", alignItems: "center", gap: 4, height: 30, borderRadius: RADIUS.chip, padding: "0 8px",
-                      background: shared ? COLORS.clayTint : COLORS.lineSoft, fontSize: 12.5,
+                      background: COLORS.lineSoft, fontSize: 12.5,
                     }}
                   >
-                    {shared && <UsersRound size={12} style={{ flexShrink: 0, color: COLORS.clayInk }} />}
-                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500, color: shared ? COLORS.clayInk : COLORS.ink }}>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500, color: COLORS.ink }}>
                       {client.name}
                     </span>
-                    <span style={{ flexShrink: 0, fontWeight: 600, color: shared ? COLORS.clayInk : COLORS.ink2 }}>
+                    <span style={{ flexShrink: 0, fontWeight: 600, color: COLORS.ink2 }}>
                       {fmtMinutes(perPerson)}
                     </span>
-                    {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: shared ? COLORS.clayInk : COLORS.ink3 }} />}
+                    {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: COLORS.ink3 }} />}
                     {isHovered && (
                       <button
                         type="button" onClick={() => removeClient(s.id, day, cid)} aria-label={t.remove}
-                        style={{ flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", color: shared ? COLORS.clayInk : COLORS.ink3, padding: 0, display: "flex" }}
+                        style={{ flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, padding: 0, display: "flex" }}
                       >
                         <X size={12} />
                       </button>
@@ -312,7 +475,10 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
       },
     },
     {
-      key: "who", label: t.colWho, width: 2.2,
+      // Lote 4, 4.6 (achado da Marta): `allowOverflow` deixa o popover
+      // "quem está no cliente" sair da célula sem ser cortado pelo
+      // `overflow:hidden` padrão da DataTable (ver DataTable.jsx).
+      key: "who", label: t.colWho, width: 2.2, allowOverflow: true,
       render: (r) => {
         if (r.peopleCount === 0) return <Pill variant="missing">{t.noneAssigned}</Pill>;
         // Etapa 4j (4.9): a atribuição em si não se apaga quando a pessoa
@@ -330,14 +496,38 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
             </span>
           );
         }
+        // Lote 4, 4.6: mesmo tratamento da vista "Por funcionário" — a
+        // lista de avatares vira um botão focável que abre o popover
+        // "quem está no cliente" (Remover/Adicionar sempre visíveis,
+        // Esc/clique fora fecham), em vez de ser só leitura.
+        const key = dayTeamKey(selectedDay, r.client.id);
+        const isOpen = openTeam === key;
+        const perPerson = Math.round(r.client.duration / r.peopleCount);
         return (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {r.staffList.map((s) => (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 4, opacity: isStaffActive(s, TODAY) ? 1 : 0.5 }}>
-                <Avatar name={s.name} size={22} />
-                <span style={{ fontSize: 12.5, color: COLORS.ink }}>{s.name.split(" ")[0]}</span>
-              </div>
-            ))}
+          <div style={{ position: "relative" }}>
+            <button
+              type="button" aria-haspopup="dialog" aria-expanded={isOpen}
+              onClick={() => setOpenTeam((k) => (k === key ? null : key))}
+              style={{
+                display: "flex", flexWrap: "wrap", gap: 8, border: "none", background: "transparent",
+                cursor: "pointer", padding: 0, fontFamily: "inherit", textAlign: "left",
+              }}
+            >
+              {r.staffList.map((s) => (
+                <span key={s.id} style={{ display: "flex", alignItems: "center", gap: 4, opacity: isStaffActive(s, TODAY) ? 1 : 0.5 }}>
+                  <Avatar name={s.name} size={22} />
+                  <span style={{ fontSize: 12.5, color: COLORS.ink }}>{s.name.split(" ")[0]}</span>
+                </span>
+              ))}
+            </button>
+            {isOpen && (
+              <ClientTeamPopover
+                client={r.client} team={r.staffList} perPerson={perPerson} t={t} c0={c0} staff={staff}
+                onRemove={(staffId) => removeClient(staffId, selectedDay, r.client.id)}
+                onAdd={(staffId) => mergeAdd(cellKey(staffId, selectedDay), r.client.id)}
+                onClose={() => setOpenTeam(null)}
+              />
+            )}
           </div>
         );
       },
@@ -376,7 +566,13 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 22, borderRadius: 8, padding: "0 8px", background: COLORS.clayTint, fontSize: 11.5, fontWeight: 600, color: COLORS.clayInk }}>
             <UsersRound size={11} /> {t.legendSampleName} <b>1h</b>
           </span>
-          <span>{t.legendShared}</span>
+          {/* Lote 4, 4.5 (achado da Marta): legenda compacta (bolinha
+              laranja + "Compartilhado"); o texto inteiro vai pro InfoTip. */}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.clay, flexShrink: 0 }} />
+            {t.legendSharedCompact}
+          </span>
+          <InfoTip text={t.legendShared} label={c0.moreInfoLabel} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 22, borderRadius: 8, padding: "0 8px", background: COLORS.lineSoft, fontSize: 11.5, fontWeight: 600, color: COLORS.ink }}>

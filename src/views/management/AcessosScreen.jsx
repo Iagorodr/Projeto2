@@ -213,7 +213,9 @@ function AcessosScreen({ lang, setLang, staff, setStaff }) {
 
   return (
     <div style={styles.content}>
-      <PageHeader title={t.title} subtitle={t.subtitle} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      {/* Lote 4, 4.5 (achado da Marta): subtítulo sai — o título e a
+          lista já dizem isso. */}
+      <PageHeader title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
       <div style={{ marginBottom: 18, maxWidth: 420 }}>
         <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} clearLabel={c0.close} mobile={isMobile} />

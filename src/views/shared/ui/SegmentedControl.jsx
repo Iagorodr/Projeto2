@@ -6,6 +6,7 @@
 // de comportamento.
 import { COLORS } from "../../../styles/colors.js";
 import { RADIUS, MOTION } from "../../../styles/tokens.js";
+import { useControlSize } from "../../../hooks/useBreakpoint.js";
 
 // options: [{ value, label }]
 function SegmentedControl({ options, value, onChange }) {
@@ -42,14 +43,18 @@ function SegmentedControl({ options, value, onChange }) {
 }
 
 // `count`: número opcional, mostrado numa mini-pílula depois do texto.
+// Lote 4, 4.4 (achado da Marta): era 36 fixo, abaixo do mínimo de toque
+// em qualquer dispositivo — agora 40/48 por `useControlSize` (o raio
+// continua pílula, isso não muda por dispositivo).
 function FilterChip({ active, onClick, count, children }) {
+  const { height } = useControlSize();
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
         display: "inline-flex", alignItems: "center", gap: 6,
-        height: 36, padding: "0 14px", borderRadius: RADIUS.pill,
+        height, padding: "0 14px", borderRadius: RADIUS.pill,
         border: active ? "1px solid transparent" : `1px solid ${COLORS.line}`,
         background: active ? COLORS.forest800 : COLORS.card,
         color: active ? "#fff" : COLORS.ink,

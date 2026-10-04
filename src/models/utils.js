@@ -94,6 +94,36 @@ function isStaffActive(staff, date) {
   return true;
 }
 
+// QA pós-auditoria (Lote 1, "Fechar período" e as contagens): staff que
+// conta nos números de pagamento de Horas e do Dashboard — ativo HOJE OU
+// com pelo menos um lançamento não anulado no período aberto (ex.: alguém
+// desativado a meio do período que ainda tem horas por pagar). Sem busca
+// nem chip — isso é só do `visibleStaff` da tabela de Horas, que filtra
+// esta lista por cima. Partilhado entre HorasScreen e DashboardScreen para
+// os dois nunca divergirem (antes cada tela fazia a sua própria conta:
+// HorasScreen com este mesmo filtro, Dashboard com `staff` inteiro — os
+// números não batiam).
+function boardStaff(staffList, horasData, period, today) {
+  function hasEntriesInOpenPeriod(s) {
+    const h = horasData[s.id];
+    return !!h && (h.entries || []).some((e) => !e.voided && dateStrInPeriod(e.date, period));
+  }
+  return staffList.filter((s) => isStaffActive(s, today) || hasEntriesInOpenPeriod(s));
+}
+
+// QA pós-auditoria (Lote 3, "'Ativo' com uma definição só"): cliente ativo
+// = contrato sem data de fim OU ainda não vencido ("ainda não vencido" =
+// `>=` hoje, não `>` — um contrato que termina HOJE ainda conta). Antes
+// desta etapa só existia no subtítulo de ClientesScreen.jsx (ali já
+// computava certo: 37/41 com os 4 contratos vencidos de hoje); o KPI
+// "Clientes" do Dashboard mostrava `clients.length` puro (41, sem filtrar
+// os vencidos) — os dois números não batiam. Decisão do Iago (não a
+// sugestão "41" da Marta): "ativo" significa ativo de verdade hoje, logo
+// o Dashboard passa a excluir os vencidos, não o contrário.
+function activeClientsCount(clients, today) {
+  return clients.filter((c) => !c.contractEnd || parseDMY(c.contractEnd) >= today).length;
+}
+
 function pad2(n) { return String(n).padStart(2, "0"); }
 
 // Formatador único de dinheiro pra app inteira (documento de design, 1.5):
@@ -188,11 +218,18 @@ function buildClosedPeriodSnapshot(period, clients, staff, horasData, sentItems,
   };
 }
 
+// Lote 4, 4.8 (achado da Marta, confirmado pelo Iago): o período vai até o
+// dia exato do corte, incluindo-o — com corte 20, "21 Set a 20 Out", não
+// "20 Set a 19 Out" (como era antes: o dia do corte abria o período
+// seguinte, nunca fechava o atual). Por isso o limiar de mês também sobe de
+// `<` pra `<=` (o próprio dia do corte já pertence ao período que está a
+// fechar, não ao que começa) e `start`/`end` passam a `cutoffDay + 1` /
+// `cutoffDay`, não `cutoffDay` / `cutoffDay - 1`.
 function getCutoffPeriod(baseDate, cutoffDay, offset) {
   let year = baseDate.getFullYear(), month = baseDate.getMonth();
-  if (baseDate.getDate() < cutoffDay) month -= 1;
+  if (baseDate.getDate() <= cutoffDay) month -= 1;
   month += offset;
-  return { start: new Date(year, month, cutoffDay), end: new Date(year, month + 1, cutoffDay - 1) };
+  return { start: new Date(year, month, cutoffDay + 1), end: new Date(year, month + 1, cutoffDay) };
 }
 
 // O período "aberto" (o próximo a fechar) devia ser sempre "o dia seguinte ao
@@ -211,7 +248,16 @@ function getOpenPeriod(closedPeriods, cutoffDay, today) {
   const [y, m, d] = lastClosed.periodEnd.split("-").map(Number);
   const lastEnd = new Date(y, m - 1, d);
   const start = addDays(lastEnd, 1);
-  const end = new Date(start.getFullYear(), start.getMonth() + 1, cutoffDay - 1);
+  // Lote 4, 4.8: idem `getCutoffPeriod` (fecha NO dia do corte, não no dia
+  // antes) — mas `start` fica como já estava, derivado do histórico real
+  // (dia seguinte ao fim do último período fechado), não recalculado por
+  // `cutoffDay`. É exatamente isso que faz a virada ser "de uma vez só": no
+  // primeiro período aberto depois da mudança, `start` ainda reflete a
+  // convenção antiga de quem fechou por último (dia 20) e só `end` já usa a
+  // nova (dia do corte, não dia-1) — o período fica um dia mais longo essa
+  // única vez (ex.: 20 Ago a 20 Set), e dali em diante os dois lados já
+  // nascem na convenção nova (21 a 20).
+  const end = new Date(start.getFullYear(), start.getMonth() + 1, cutoffDay);
   return { start, end };
 }
 
@@ -285,11 +331,11 @@ function weekChunksOfPayPeriod(payPeriod, cutoffDay) {
 }
 
 // --- Blocos do período, "opção B" (spec 6.1) --------------------------
-// O período de pagamento vai de dia 20 a dia 19 e a semana civil é
-// segunda-domingo; como o período raramente começa numa segunda ou acaba
-// num domingo, `weekChunksOfPayPeriod` às vezes devolve um bloco de só 1
-// dia numa ponta (ex.: período 20 set–19 out 2026, em que 20 set cai num
-// domingo — só esse dia sobra da semana anterior — e 19 out numa segunda —
+// O período de pagamento vai de dia 21 a dia 20 (Lote 4, 4.8) e a semana
+// civil é segunda-domingo; como o período raramente começa numa segunda ou
+// acaba num domingo, `weekChunksOfPayPeriod` às vezes devolve um bloco de só
+// 1 dia numa ponta (ex.: período 21 jun–20 jul 2026, em que 21 jun cai num
+// domingo — só esse dia sobra da semana anterior — e 20 jul numa segunda —
 // só esse dia sobra da semana seguinte). Um bloco de 1 dia sozinho não faz
 // sentido pra navegação/finalização, então junta-se ao bloco vizinho.
 function isOneDayChunk(chunk) { return isoDateStr(chunk.start) === isoDateStr(chunk.end); }
@@ -469,12 +515,23 @@ function periodMissingDays(clients, assignments, staffId, horasEntry, payPeriodC
 
 // Etapa 4b (5.1, "Precisa da sua atenção" — "Dias em falta na equipa",
 // só supervisor) — quantos funcionários (ativos, fixos) têm pelo menos um
-// dia em falta no período aberto. Mesma regra/filtros do `totalWithGaps`
-// de `MonitoramentoScreen.jsx` (semana trancada ou ainda não começada não
-// conta), reescrita aqui como função independente pra não obrigar a
-// montar a tela inteira de Monitoramento só pra ler este número — os dois
-// continuam a bater porque partilham as mesmas peças do Model
-// (`dayIsCovered`, `clientAppliesThisWeek`, `migrateLockedWeeksToBlocks`).
+// dia em falta no período aberto, E quantos DIAS em falta há no total.
+// Mesma regra/filtros/classificação de dia-a-dia do `weeksInfoFor`/
+// `monitored`/`totalGapsSum` de `MonitoramentoScreen.jsx` (semana trancada
+// ou ainda não começada não conta como "em falta"), reescrita aqui como
+// função independente pra não obrigar a montar a tela inteira de
+// Monitoramento só pra ler este número — os dois continuam a bater porque
+// partilham as mesmas peças do Model (`dayIsCovered`, `clientAppliesThisWeek`,
+// `migrateLockedWeeksToBlocks`).
+//
+// QA pós-auditoria (Lote 2, "dias em falta na equipa" contando dias): antes
+// devolvia só a contagem de FUNCIONÁRIOS (um booleano "tem algum furo" por
+// pessoa), mas o cartão "Precisa da sua atenção" do Início mostra isto como
+// número de DIAS — e o "Como conferir" do documento exige que esse total
+// bata com o total do Monitoramento (soma de `totalGaps`, não a contagem de
+// linhas). Devolve os dois números: quem só precisava do selo de
+// funcionários (badge da folha "Mais", App.jsx) lê `.staffCount`; quem
+// precisa do total de dias (Início) lê `.totalDays`.
 function staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, today) {
   function isoWeekday(d) { const wd = d.getDay(); return wd === 0 ? 7 : wd; }
   function hasAgendaOnDay(staffId, d) {
@@ -482,18 +539,28 @@ function staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, p
     const weekStart = startOfISOWeek(d);
     return clientIds.some((id) => { const c = clientById(clients, id); return c && clientAppliesThisWeek(c, weekStart); });
   }
-  return staff
+  let staffCount = 0;
+  let totalDays = 0;
+  staff
     .filter((s) => isStaffActive(s, today) && s.accountType === "fixo")
-    .filter((s) => {
+    .forEach((s) => {
       const h = horasData[s.id] || { entries: [], lockedWeeks: {}, noClientDays: [] };
       const migratedLocked = migrateLockedWeeksToBlocks(h.lockedWeeks, payPeriod, cutoffDay);
-      return payPeriodChunks.some((chunk) => {
+      const gaps = payPeriodChunks.reduce((sum, chunk) => {
         const locked = !!migratedLocked[isoDateStr(chunk.start)];
         const notStarted = chunk.start > today;
-        if (locked || notStarted) return false;
-        return calPeriodDays(chunk).some((d) => d <= today && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d)));
-      });
-    }).length;
+        if (locked || notStarted) return sum;
+        const missed = calPeriodDays(chunk).filter(
+          (d) => d <= today && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d))
+        ).length;
+        return sum + missed;
+      }, 0);
+      if (gaps > 0) {
+        staffCount += 1;
+        totalDays += gaps;
+      }
+    });
+  return { staffCount, totalDays };
 }
 
 // Bloco de notas/lembretes pessoais (dashboard do supervisor e, opcionalmente,
@@ -507,8 +574,14 @@ function notesForOwner(personalNotes, ownerId) {
 }
 
 // "YYYY-MM-DD" (formato do <input type="date">) -> "DD/MM" pra exibição.
-function fmtNoteDate(isoStr) {
-  const [, m, d] = isoStr.split("-");
+// QA pós-auditoria: alguns dados de demonstração antigos (INITIAL_MISSING,
+// data.js) já guardam a data como "DD/MM" em vez de ISO — sem "-", o
+// destructuring abaixo dava `undefined/undefined`. Devolve a própria
+// string nesse caso; a migração desses dados-exemplo para ISO fica para
+// depois (fora do risco aceitável desta leva).
+function fmtNoteDate(dateStr) {
+  if (!dateStr.includes("-")) return dateStr;
+  const [, m, d] = dateStr.split("-");
   return `${d}/${m}`;
 }
 
@@ -572,4 +645,4 @@ function pctChange(current, previous) {
   return ((current - previous) / previous) * 100;
 }
 
-export { clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };
+export { clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };

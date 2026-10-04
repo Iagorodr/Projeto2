@@ -3,12 +3,13 @@ import { ChevronLeft, ChevronRight, Check, Pencil, X, RotateCcw } from "lucide-r
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
+import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { TODAY } from "../../models/data.js";
 import {
   clientById, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
-  weekBlocksOfPayPeriod, calPeriodLabel, isStaffActive,
+  weekBlocksOfPayPeriod, calPeriodLabel, boardStaff,
 } from "../../models/utils.js";
 import { formatTodayLabel, T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf, exportPeriodSummaryPdf } from "../../models/pdfExport.js";
@@ -77,6 +78,14 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [closedToast, setClosedToast] = useState(false);
+  // Lote 4, 4.4 (achado da Marta: "Como conferir" pede setas, Exportar PDF,
+  // Fechar período, idioma e Pago com a MESMA altura e raio 12 a 1366px).
+  // As setas do navegador de período eram círculos (raio "50%") de 40×40
+  // fixo, e o botão "Pago" era 34×34 com `RADIUS.control` mas altura
+  // própria — nenhum dos dois seguia `useControlSize` como o resto. Agora
+  // os três (setas, Pago, e por herança os botões/idioma já ajustados) saem
+  // da mesma fonte.
+  const { height: ctrlHeight, radius: ctrlRadius } = useControlSize();
 
   // monthOffset=0 é "o período aberto agora" — derivado do histórico real de
   // fechamentos (getOpenPeriod), não de TODAY puro, pra não ficar errado
@@ -94,15 +103,34 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const openStaff = staff.find((s) => s.id === openStaffId);
   const openHoras = openStaffId ? horasData[openStaffId] : null;
 
-  const kpiCounts = {
-    pending: staff.filter((s) => horasData[s.id]?.status === "pendente").length,
-    paid: staff.filter((s) => horasData[s.id]?.paid).length,
-    unpaid: staff.filter((s) => horasData[s.id]?.status === "finalizado" && !horasData[s.id]?.paid).length,
-  };
+  // QA pós-auditoria (Lote 1, "Fechar período" e as contagens): `board` é
+  // quem conta nos números desta tela (kpis, chip "Todos", "Faltam N
+  // pagamentos") — ver `boardStaff` em utils.js (Etapa 4j, 4.9: uma conta
+  // inativa só continua no quadro do período ABERTO se tiver pelo menos um
+  // lançamento não anulado dentro desse período — "tem de ser paga pelo
+  // que trabalhou"; sem lançamentos, sai do quadro — uma vez o período
+  // fechado isto já não se aplica, o histórico é só da gerência ler, não
+  // deste ecrã). Staff ativo continua a aparecer sempre. Antes, estes
+  // números vinham de `staff` inteiro (18 contas, incluindo 2 inativas e 4
+  // de teste com 0h), por isso "Faltam 14 pagamentos" nunca batia com as
+  // 12 linhas realmente por pagar.
+  const board = boardStaff(staff, horasData, period, TODAY);
+  // Quem não tem horasData nenhum conta como pendente, igual ao que
+  // CHIP_FILTERS.pendentes já faz com o objeto por omissão logo abaixo.
+  const kpiCounts = board.reduce((acc, s) => {
+    const h = horasData[s.id] || { status: "pendente", paid: false };
+    if (h.status === "pendente") acc.pending += 1;
+    if (h.paid) acc.paid += 1;
+    if (h.status === "finalizado" && !h.paid) acc.unpaid += 1;
+    return acc;
+  }, { pending: 0, paid: 0, unpaid: 0 });
   const periodTotalHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }, period), 0);
   const periodTotalEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, period), 0);
-  const unpaidForClose = staff.filter((s) => !horasData[s.id]?.paid).length;
-  const canClosePeriod = staff.length > 0 && unpaidForClose === 0;
+  // "Faltam N pagamentos": só quem está no quadro, tem horas lançadas no
+  // período (staffTotalHours > 0) e ainda não foi marcado como pago — uma
+  // conta de teste com 0h no período não trava mais o fecho.
+  const unpaidForClose = board.filter((s) => staffTotalHours(horasData[s.id] || { entries: [] }, period) > 0 && !horasData[s.id]?.paid).length;
+  const canClosePeriod = board.length > 0 && unpaidForClose === 0;
 
   const CHIP_FILTERS = {
     todos: () => true,
@@ -110,19 +138,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     porPagar: (h) => h.status === "finalizado" && !h.paid,
     pagos: (h) => h.paid,
   };
-  // Etapa 4j (4.9): uma conta inativa (incluindo Replacement já fora da
-  // validade) só continua no quadro do período ABERTO se tiver pelo menos
-  // um lançamento não anulado dentro desse período — "tem de ser paga pelo
-  // que trabalhou". Sem lançamentos, já não há nada a pagar/corrigir e sai
-  // do quadro; uma vez o período fechado, isto já não se aplica (o
-  // histórico é só da gerência ler, não deste ecrã). Staff ativo continua
-  // a aparecer sempre, como já era.
-  function hasEntriesInOpenPeriod(s) {
-    const h = horasData[s.id];
-    return !!h && (h.entries || []).some((e) => !e.voided && dateStrInPeriod(e.date, period));
-  }
-  const visibleStaff = staff
-    .filter((s) => isStaffActive(s, TODAY) || hasEntriesInOpenPeriod(s))
+  const visibleStaff = board
     .filter((s) => s.name.toLowerCase().includes(staffSearch.toLowerCase()))
     .filter((s) => CHIP_FILTERS[activeChip](horasData[s.id] || { status: "pendente", paid: false }));
 
@@ -262,7 +278,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
             disabled={!togglable}
             onClick={(ev) => { ev.stopPropagation(); togglePaid(s.id); }}
             style={{
-              width: 34, height: 34, borderRadius: RADIUS.control,
+              width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius,
               border: `1.5px solid ${h.paid ? COLORS.ok : COLORS.lineInput}`,
               background: h.paid ? COLORS.ok : "transparent",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -286,14 +302,14 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
             <div style={{ display: "flex", alignItems: "center", gap: 2, background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.pill, padding: 3 }}>
               <button
                 type="button" onClick={() => setMonthOffset((m) => m - 1)} aria-label={t.previousPeriod}
-                style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
+                style={{ width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
               >
                 <ChevronLeft size={16} />
               </button>
               <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, padding: "0 4px", whiteSpace: "nowrap" }}>{periodLabel}</span>
               <button
                 type="button" onClick={() => setMonthOffset((m) => m + 1)} aria-label={t.nextPeriod}
-                style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
+                style={{ width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
               >
                 <ChevronRight size={16} />
               </button>
@@ -332,7 +348,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <FilterChip active={activeChip === "todos"} onClick={() => setActiveChip("todos")} count={staff.length}>{t.filterAll}</FilterChip>
+          <FilterChip active={activeChip === "todos"} onClick={() => setActiveChip("todos")} count={board.length}>{t.filterAll}</FilterChip>
           <FilterChip active={activeChip === "pendentes"} onClick={() => setActiveChip("pendentes")} count={kpiCounts.pending}>{t.kpiPending}</FilterChip>
           <FilterChip active={activeChip === "porPagar"} onClick={() => setActiveChip("porPagar")} count={kpiCounts.unpaid}>{t.kpiUnpaid}</FilterChip>
           <FilterChip active={activeChip === "pagos"} onClick={() => setActiveChip("pagos")} count={kpiCounts.paid}>{t.kpiPaid}</FilterChip>

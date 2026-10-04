@@ -42,13 +42,32 @@ export function useAppController() {
   const [personalNotes, setPersonalNotes] = useState([]);
 
   const [hydrated, setHydrated] = useState(!isSupabaseConfigured);
+  // QA pós-auditoria (Lote 1, "Gravar só depois de ler"): só true quando
+  // `loadAllData` terminou SEM erro de leitura. Enquanto isto for false,
+  // os efeitos de gravação abaixo não rodam — antes, `hydrated` virava
+  // true no `finally` do `init()` mesmo com erro de leitura (ou sessão sem
+  // leitura nenhuma), e cada fatia do estado era regravada por cima com os
+  // dados de demonstração que ainda estavam em memória.
+  const [readOk, setReadOk] = useState(!isSupabaseConfigured);
+  // QA pós-auditoria (Lote 1, item 2 — aviso de leitura falhada): true
+  // quando a ÚLTIMA tentativa de `loadAllData()` terminou com `ok = false`.
+  // Zerado no início de cada tentativa nova (`loadAllData`/`logout`) pra
+  // nunca mostrar um aviso de uma tentativa antiga já superada.
+  const [loadError, setLoadError] = useState(false);
 
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
+  // QA pós-auditoria: devolve `ok` (false se qualquer uma das 4 leituras
+  // falhou, incluindo exceção) além de `companyEmail`/`staffList` — antes
+  // só fazia `console.error`, sem contar isso a quem chamou, então
+  // `hydrated`/as gravações não tinham como saber que a leitura falhou.
   async function loadAllData() {
+    setReadOk(false);
+    setLoadError(false);
     let companyEmail = company.email;
     let staffList = staff;
+    let ok = true;
     try {
       const [clientsRes, staffRes, settingsRes, appDataRes] = await Promise.all([
         supabase.from("clients").select("*"),
@@ -57,16 +76,16 @@ export function useAppController() {
         supabase.from("app_data").select("*").eq("id", 1).maybeSingle(),
       ]);
 
-      if (clientsRes.error) console.error("Erro ao carregar clientes:", clientsRes.error);
+      if (clientsRes.error) { console.error("Erro ao carregar clientes:", clientsRes.error); ok = false; }
       else if (clientsRes.data && clientsRes.data.length > 0) setClients(clientsRes.data.map(fromDbClient));
 
-      if (staffRes.error) console.error("Erro ao carregar funcionários:", staffRes.error);
+      if (staffRes.error) { console.error("Erro ao carregar funcionários:", staffRes.error); ok = false; }
       else if (staffRes.data && staffRes.data.length > 0) {
         staffList = staffRes.data.map(fromDbStaff);
         setStaff(staffList);
       }
 
-      if (settingsRes.error) console.error("Erro ao carregar definições:", settingsRes.error);
+      if (settingsRes.error) { console.error("Erro ao carregar definições:", settingsRes.error); ok = false; }
       else if (settingsRes.data) {
         const mapped = fromDbCompanySettings(settingsRes.data);
         companyEmail = mapped.company.email;
@@ -78,7 +97,7 @@ export function useAppController() {
         setReclamacaoRazoavelCount(mapped.reclamacaoRazoavelCount);
       }
 
-      if (appDataRes.error) console.error("Erro ao carregar dados do app:", appDataRes.error);
+      if (appDataRes.error) { console.error("Erro ao carregar dados do app:", appDataRes.error); ok = false; }
       else if (appDataRes.data) {
         const row = appDataRes.data;
         if (row.assignments && Object.keys(row.assignments).length > 0) setAssignments(row.assignments);
@@ -90,8 +109,10 @@ export function useAppController() {
       }
     } catch (err) {
       console.error("Erro ao carregar dados do Supabase:", err);
+      ok = false;
     }
-    return { companyEmail, staffList };
+    if (!ok) setLoadError(true);
+    return { companyEmail, staffList, ok };
   }
 
   async function resolveSessionAndRoute(sessionEmail, companyEmail, staffList) {
@@ -124,8 +145,9 @@ export function useAppController() {
         const { data: { session } } = await supabase.auth.getSession();
         if (cancelled) return;
         if (session) {
-          const { companyEmail, staffList } = await loadAllData();
+          const { companyEmail, staffList, ok } = await loadAllData();
           if (cancelled) return;
+          if (ok) setReadOk(true);
           const routed = await resolveSessionAndRoute(session.user.email, companyEmail, staffList);
           if (!routed) {
             console.error("Sessão sem correspondência em funcionários/empresa — a terminar sessão.");
@@ -151,7 +173,8 @@ export function useAppController() {
         setAuthError(error.message === "Invalid login credentials" ? "invalid_credentials" : "generic");
         return;
       }
-      const { companyEmail, staffList } = await loadAllData();
+      const { companyEmail, staffList, ok } = await loadAllData();
+      if (ok) setReadOk(true);
       const routed = await resolveSessionAndRoute(data.user.email, companyEmail, staffList);
       if (!routed) {
         setAuthError("no_account");
@@ -169,24 +192,35 @@ export function useAppController() {
     setLoggedInStaffId(null);
     setAuthError(null);
     setPerspective("login");
+    setReadOk(false);
+    setLoadError(false);
   }
 
+  // QA pós-auditoria ("Gravar só depois de ler"): `clients`, `staff` e
+  // `company_settings` só são gravados na sessão de GERÊNCIA — nenhuma
+  // tela de supervisor ou funcionário tem setter para estes três (só
+  // `AcessosScreen`/`FuncionariosScreen`/`ClientesScreen`/
+  // `DefinicoesScreen`, todas de gerência, chamam `setStaff`/`setClients`/
+  // `setCompany`/etc. — conferido em toda a árvore de `views/`). Antes,
+  // mesmo uma sessão de supervisor/funcionário regravava `staff` a cada
+  // render (o mesmo array que acabou de ler, sem mudança nenhuma), e era
+  // esse upsert redundante que o gatilho do banco recusava com P0001.
   useEffect(() => {
-    if (!hydrated || !isSupabaseConfigured) return;
+    if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
     supabase.from("clients").upsert(clients.map(toDbClient)).then(({ error }) => {
       if (error) console.error("Erro ao gravar clientes:", error);
     });
-  }, [hydrated, clients]);
+  }, [hydrated, readOk, perspective, clients]);
 
   useEffect(() => {
-    if (!hydrated || !isSupabaseConfigured) return;
+    if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
     supabase.from("staff").upsert(staff.map(toDbStaff)).then(({ error }) => {
       if (error) console.error("Erro ao gravar funcionários:", error);
     });
-  }, [hydrated, staff]);
+  }, [hydrated, readOk, perspective, staff]);
 
   useEffect(() => {
-    if (!hydrated || !isSupabaseConfigured) return;
+    if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
     const payload = toDbCompanySettings({
       company, cutoffDay, contractAlertDays,
       reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount,
@@ -194,49 +228,52 @@ export function useAppController() {
     supabase.from("company_settings").update(payload).eq("id", 1).then(({ error }) => {
       if (error) console.error("Erro ao gravar definições:", error);
     });
-  }, [hydrated, company, cutoffDay, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount]);
+  }, [hydrated, readOk, perspective, company, cutoffDay, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount]);
 
+  // `app_data` continua gravado por todas as sessões (gerência, supervisor
+  // e funcionário escrevem horas/avisos/notas aqui) — só ganha o novo
+  // guard de `readOk`.
   useEffect(() => {
-    if (!hydrated || !isSupabaseConfigured) return;
+    if (!hydrated || !isSupabaseConfigured || !readOk) return;
     supabase.from("app_data").update({ assignments }).eq("id", 1).then(({ error }) => {
       if (error) console.error("Erro ao gravar atribuições:", error);
     });
-  }, [hydrated, assignments]);
+  }, [hydrated, readOk, assignments]);
 
   useEffect(() => {
-    if (!hydrated || !isSupabaseConfigured) return;
+    if (!hydrated || !isSupabaseConfigured || !readOk) return;
     supabase.from("app_data").update({ horas_data: horasData }).eq("id", 1).then(({ error }) => {
       if (error) console.error("Erro ao gravar horas:", error);
     });
-  }, [hydrated, horasData]);
+  }, [hydrated, readOk, horasData]);
 
   useEffect(() => {
-    if (!hydrated || !isSupabaseConfigured) return;
+    if (!hydrated || !isSupabaseConfigured || !readOk) return;
     supabase.from("app_data").update({ missing_items: missingItems }).eq("id", 1).then(({ error }) => {
       if (error) console.error("Erro ao gravar solicitações:", error);
     });
-  }, [hydrated, missingItems]);
+  }, [hydrated, readOk, missingItems]);
 
   useEffect(() => {
-    if (!hydrated || !isSupabaseConfigured) return;
+    if (!hydrated || !isSupabaseConfigured || !readOk) return;
     supabase.from("app_data").update({ sent_items: sentItems }).eq("id", 1).then(({ error }) => {
       if (error) console.error("Erro ao gravar avisos:", error);
     });
-  }, [hydrated, sentItems]);
+  }, [hydrated, readOk, sentItems]);
 
   useEffect(() => {
-    if (!hydrated || !isSupabaseConfigured) return;
+    if (!hydrated || !isSupabaseConfigured || !readOk) return;
     supabase.from("app_data").update({ closed_periods: closedPeriods }).eq("id", 1).then(({ error }) => {
       if (error) console.error("Erro ao gravar histórico:", error);
     });
-  }, [hydrated, closedPeriods]);
+  }, [hydrated, readOk, closedPeriods]);
 
   useEffect(() => {
-    if (!hydrated || !isSupabaseConfigured) return;
+    if (!hydrated || !isSupabaseConfigured || !readOk) return;
     supabase.from("app_data").update({ personal_notes: personalNotes }).eq("id", 1).then(({ error }) => {
       if (error) console.error("Erro ao gravar notas:", error);
     });
-  }, [hydrated, personalNotes]);
+  }, [hydrated, readOk, personalNotes]);
 
   function enterManagement() { setPerspective("management"); setScreen("dashboard"); }
   function enterEmployee(staffId) { setLoggedInStaffId(staffId); setPerspective("employee"); setEmpScreen("menu"); }
@@ -324,6 +361,6 @@ export function useAppController() {
     enterManagement, enterEmployee, deleteClient, deleteStaff,
     formatAllData, verifyPassword,
     authLoading, authError, loginWithPassword, logout,
-    me, myUnreadBadge,
+    me, myUnreadBadge, loadError,
   };
 }

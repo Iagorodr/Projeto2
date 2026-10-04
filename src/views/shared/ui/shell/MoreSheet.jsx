@@ -7,12 +7,19 @@
 // (comentário antigo corrigido aqui, varredura de QA, sem mudança de
 // comportamento). Esc e clique fora fecham (mesma regra de acessibilidade
 // das gavetas/diálogos, secção 1.7).
+//
+// Lote 4, 4.2 (achado da Marta): no celular o "Sair" não existia em
+// lugar nenhum. Prop `user` nova (opcional, retrocompatível — nada muda
+// para quem não a passa): mostra o nome de quem entrou acima da lista.
+// O item com `logout: true` (sempre o último, ver App.jsx `moreItems`)
+// não mostra a seta — é uma ação que encerra a sessão, não uma navegação.
 import { useEffect } from "react";
 import { ChevronRight } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../../../styles/tokens.js";
+import { Avatar } from "../Avatar.jsx";
 
-function MoreSheet({ open, onClose, items }) {
+function MoreSheet({ open, onClose, items, user }) {
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e) { if (e.key === "Escape") onClose?.(); }
@@ -34,9 +41,16 @@ function MoreSheet({ open, onClose, items }) {
         <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
           <div style={{ width: 44, height: 5, borderRadius: 3, background: COLORS.line }} />
         </div>
+        {user && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px 14px" }}>
+            <Avatar name={user.name} photoUrl={user.photoUrl} size={40} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{user.name}</div>
+          </div>
+        )}
         <div style={{ display: "flex", flexDirection: "column" }}>
           {items.map((item, i) => {
             const Icon = item.icon;
+            const isLogout = !!item.logout;
             return (
               <button
                 key={item.key}
@@ -44,7 +58,7 @@ function MoreSheet({ open, onClose, items }) {
                 onClick={() => { item.onSelect?.(); onClose?.(); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 14, height: 70, padding: "0 18px",
-                  border: "none", borderTop: i === 0 ? "none" : `1px solid ${COLORS.lineSoft}`,
+                  border: "none", borderTop: i === 0 && !user ? "none" : `1px solid ${COLORS.lineSoft}`,
                   background: "transparent", cursor: "pointer", fontFamily: "inherit", width: "100%",
                 }}
               >
@@ -63,7 +77,9 @@ function MoreSheet({ open, onClose, items }) {
                   )}
                 </span>
                 <span style={{ flex: 1, textAlign: "left", fontSize: 17, fontWeight: 600, color: COLORS.ink }}>{item.label}</span>
-                <ChevronRight size={18} color={COLORS.ink3} />
+                {/* "Sair" encerra a sessão em vez de navegar — sem seta,
+                    pra não parecer mais uma tela dentro da folha. */}
+                {!isLogout && <ChevronRight size={18} color={COLORS.ink3} />}
               </button>
             );
           })}

@@ -8,9 +8,34 @@
 // Puramente apresentacional. `weeks`: matriz de semanas, cada uma com 7
 // células SEG→DOM: [{ key, dayNumber, state, hoursLabel, isToday }].
 // `state` ∈ "registered" | "noAttendance" | "missing" | "noSchedule" | "outside"
+//
+// `muted` (QA pós-auditoria, Lote 2 — "mês finalizado cinza"): este mesmo
+// componente é usado tanto na vista normal/editável (cores do documento,
+// 2.15) quanto dentro do bloco "Mês finalizado" de EmployeeHorasScreen.jsx,
+// que o briefing exige em tons de cinza ("tela toda em tons de cinza").
+// Em vez de cinzentar o componente para todo mundo (quebraria a vista
+// normal), `muted` troca só a paleta das células por tons de
+// cinza/ink — mantendo contraste AA (spec 1.7) — sem mudar `onSelectDay`
+// nem a estrutura. Default `false`: comportamento/cores inalterados onde
+// já era usado.
 import { COLORS } from "../../../../styles/colors.js";
 
-function cellStyle(state) {
+function cellStyle(state, muted) {
+  if (muted) {
+    switch (state) {
+      case "registered":
+        return { background: COLORS.line, color: COLORS.ink2, border: "none" };
+      case "noAttendance":
+        return { background: COLORS.lineSoft, color: COLORS.ink3, border: "none", textDecoration: "line-through" };
+      case "missing":
+        return { background: COLORS.lineSoft, color: COLORS.ink2, border: `1px dashed ${COLORS.ink3}` };
+      case "noSchedule":
+        return { background: "transparent", color: COLORS.ink3, border: `1px dashed ${COLORS.line}` };
+      case "outside":
+      default:
+        return { background: "transparent", color: "transparent", border: "none", pointerEvents: "none" };
+    }
+  }
   switch (state) {
     case "registered":
       return { background: COLORS.okTint, color: COLORS.okInk, border: "none" };
@@ -26,7 +51,7 @@ function cellStyle(state) {
   }
 }
 
-function PeriodCalendar({ weeks, dayHeaderLabels = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"], onSelectDay }) {
+function PeriodCalendar({ weeks, dayHeaderLabels = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"], onSelectDay, muted = false }) {
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
@@ -40,7 +65,7 @@ function PeriodCalendar({ weeks, dayHeaderLabels = ["SEG", "TER", "QUA", "QUI", 
         {weeks.map((week, wi) => (
           <div key={wi} style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
             {week.map((day) => {
-              const style = cellStyle(day.state);
+              const style = cellStyle(day.state, muted);
               const clickable = day.state !== "outside" && !!onSelectDay;
               return (
                 <button
@@ -61,7 +86,7 @@ function PeriodCalendar({ weeks, dayHeaderLabels = ["SEG", "TER", "QUA", "QUI", 
                     <span style={{ fontSize: 9, fontWeight: 700 }}>{day.hoursLabel}</span>
                   )}
                   {day.isToday && (
-                    <span style={{ position: "absolute", bottom: 3, width: 5, height: 5, borderRadius: "50%", background: COLORS.clay }} />
+                    <span style={{ position: "absolute", bottom: 3, width: 5, height: 5, borderRadius: "50%", background: muted ? COLORS.ink3 : COLORS.clay }} />
                   )}
                 </button>
               );

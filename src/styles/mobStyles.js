@@ -8,7 +8,10 @@ const mobStyles = {
   phoneProductRow: { display: "flex", justifyContent: "center", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${COLORS.border}` },
   // Varredura de QA pós-Etapa 4: 36px ficava abaixo do alvo de toque mínimo
   // em mobile (secção 9 do documento) — acordado com o Toni em 40px.
-  homeIcon: { width: 40, height: 40, borderRadius: "50%", background: COLORS.bg, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
+  // Lote 4, 4.4 (achado da Marta): "unificar" com o botão Início de
+  // Horas (44×44, MobileHeader.jsx) — os dois passam a usar o alvo de
+  // toque mobile do padrão novo por dispositivo (48×48).
+  homeIcon: { width: 48, height: 48, borderRadius: "50%", background: COLORS.bg, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" },
   switchLink: { fontSize: 11, color: COLORS.textSoft, textDecoration: "underline", background: "none", border: "none", cursor: "pointer", display: "block", marginTop: 6 },
   greeting: { fontSize: 15, fontWeight: 600 },
   menuList: { display: "flex", flexDirection: "column", gap: 12, marginTop: 24 },

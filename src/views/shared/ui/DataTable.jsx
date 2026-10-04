@@ -19,6 +19,7 @@ import { useState } from "react";
 import { ChevronUp, ChevronDown, Inbox } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../../styles/tokens.js";
+import { useControlSize } from "../../../hooks/useBreakpoint.js";
 
 function SkeletonRows({ columns, count, rowHeight }) {
   return Array.from({ length: count }).map((_, i) => (
@@ -42,6 +43,16 @@ function DataTable({
   const rowHeight = dense ? 48 : 56;
   const selectable = !!batchActions;
   const selectedCount = selectedIds ? selectedIds.size : 0;
+  // Lote 4, 4.4 (achado da Marta: "ordenação das tabelas, 15 de altura" e
+  // "caixas de seleção, 13×13"): nenhum dos dois tinha uma área de clique
+  // real — o botão de ordenação só tinha o tamanho do texto+ícone (~15px)
+  // e as caixas de seleção eram o tamanho nativo do navegador. O desenho
+  // continua pequeno (documento: "a área clicável pode ser invisível"); o
+  // que muda é a área que responde ao toque. `minTap` por `useControlSize`
+  // (40 no desktop, 48 em tablet/celular ou ponteiro grosso); o cabeçalho
+  // (antes 44 fixo) sobe para caber esse alvo quando ele exceder 44.
+  const { minTap } = useControlSize();
+  const headerHeight = Math.max(44, minTap);
 
   return (
     <div style={{ position: "relative", border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, overflow: "hidden", background: COLORS.card }}>
@@ -50,18 +61,26 @@ function DataTable({
           {/* Cabeçalho — pegajoso no topo. */}
           <div
             style={{
-              display: "flex", alignItems: "center", height: 44, background: COLORS.headerTint,
+              display: "flex", alignItems: "center", height: headerHeight, background: COLORS.headerTint,
               position: "sticky", top: 0, zIndex: 2, padding: "0 16px", gap: 16,
               borderBottom: `1px solid ${COLORS.line}`,
             }}
           >
             {selectable && (
-              <input
-                type="checkbox"
-                checked={rows.length > 0 && selectedCount === rows.length}
-                onChange={onToggleSelectAll}
-                style={{ flexShrink: 0 }}
-              />
+              <label
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: minTap, height: minTap, flexShrink: 0, cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={rows.length > 0 && selectedCount === rows.length}
+                  onChange={onToggleSelectAll}
+                  style={{ cursor: "pointer" }}
+                />
+              </label>
             )}
             {columns.map((col, i) => (
               <button
@@ -70,7 +89,7 @@ function DataTable({
                 onClick={col.sortable ? () => onSortChange?.(col.key) : undefined}
                 style={{
                   flex: col.width || 1, minWidth: col.minWidth, display: "flex", alignItems: "center",
-                  justifyContent: col.numeric ? "flex-end" : "flex-start", gap: 4,
+                  justifyContent: col.numeric ? "flex-end" : "flex-start", gap: 4, height: "100%",
                   fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
                   color: COLORS.ink2, background: "transparent", border: "none",
                   cursor: col.sortable ? "pointer" : "default", padding: 0, fontFamily: "inherit",
@@ -118,13 +137,20 @@ function DataTable({
                   }}
                 >
                   {selectable && (
-                    <input
-                      type="checkbox"
-                      checked={!!selected}
+                    <label
                       onClick={(e) => e.stopPropagation()}
-                      onChange={() => onToggleSelect?.(id)}
-                      style={{ flexShrink: 0 }}
-                    />
+                      style={{
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        width: minTap, height: minTap, flexShrink: 0, cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!selected}
+                        onChange={() => onToggleSelect?.(id)}
+                        style={{ cursor: "pointer" }}
+                      />
+                    </label>
                   )}
                   {columns.map((col, i) => (
                     <div
@@ -133,7 +159,15 @@ function DataTable({
                         flex: col.width || 1, minWidth: col.minWidth,
                         textAlign: col.numeric ? "right" : "left",
                         fontVariantNumeric: col.numeric ? "tabular-nums" : undefined,
-                        fontSize: 13.5, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        fontSize: 13.5, color: COLORS.ink,
+                        // Lote 4, 4.6 (achado da Marta): a coluna "Quem" da
+                        // Agendas ("Por dia") agora abre um popover a partir
+                        // desta célula — `overflow:hidden` cortava-o. Opt-in
+                        // por coluna (`allowOverflow`), nunca muda nenhuma
+                        // outra coluna/ecrã que já usa esta tabela.
+                        overflow: col.allowOverflow ? "visible" : "hidden",
+                        textOverflow: col.allowOverflow ? undefined : "ellipsis",
+                        whiteSpace: col.allowOverflow ? undefined : "nowrap",
                         position: i === 0 && !selectable ? "sticky" : "static", left: i === 0 ? 0 : undefined,
                         background: i === 0 && !selectable ? "inherit" : undefined,
                       }}

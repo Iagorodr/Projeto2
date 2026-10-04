@@ -76,6 +76,16 @@ button {
   box-sizing: border-box;
 }
 
-html, body {
+/* Lote 4, 4.1 (achado da Marta): "html, body" fazia o `body` virar a sua
+   própria área de rolagem — e um elemento com `position: sticky; bottom: 0`
+   dentro dele passa a colar no fundo DESSA área (o scrollport do body), não
+   necessariamente no fundo da janela visível. Era exatamente isso que
+   impedia a barra de baixo do celular (MobileBottomBar/BottomActionBar) de
+   ficar fixa. O overflow-x escondido fica só no `html` (que é, de fato, o
+   scrollport real da janela) — o `body` volta a `overflow: visible` (não
+   declara nada aqui, que é o default). O estouro de largura de 320px (fixo)
+   que isso escondia, nos cartões da Linha 2 do Dashboard, foi corrigido na
+   origem (DashboardScreen.jsx) — ver comentário lá. */
+html {
   overflow-x: hidden;
 }

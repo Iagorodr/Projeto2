@@ -16,6 +16,7 @@
 // é a mesma decisão documentada nos dois ficheiros. Comentário antigo
 // corrigido aqui, varredura de QA pós-Etapa 4, sem mudança de
 // comportamento.
+import { LogOut } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
 import { FONT } from "../../../../styles/tokens.js";
 import { Avatar } from "../Avatar.jsx";
@@ -33,7 +34,16 @@ function AppSidebar({
   return (
     <div
       style={{
-        width, flexShrink: 0, minHeight: "100%", display: "flex", flexDirection: "column",
+        // Lote 4, 4.2 (achado da Marta): era `minHeight: "100%"`, que só
+        // estica junto com o `shell` (flex) — numa tela longa o shell
+        // cresce junto com o conteúdo e o "Sair" do rodapé passa a exigir
+        // rolar a página inteira para aparecer. `position: sticky` +
+        // `height: 100dvh` prendem a barra à janela (o `shell`, em
+        // styles.js, usa `overflow: "clip"` em vez de `"hidden"` — do
+        // contrário o próprio shell virava a referência de rolagem do
+        // sticky, e ele nunca prenderia à janela de verdade).
+        width, flexShrink: 0, display: "flex", flexDirection: "column",
+        position: "sticky", top: 0, height: "100dvh", alignSelf: "flex-start",
         padding: iconsOnly || rail ? "20px 8px" : "20px 16px",
         background:
           "radial-gradient(circle at 10% 8%, rgba(226,138,101,.18), transparent 45%), " +
@@ -103,18 +113,28 @@ function AppSidebar({
         })}
       </div>
 
+      {/* Lote 4, 4.2: trocado o caractere "⏻" por um botão com o ícone
+          `LogOut` de verdade — altura igual à dos itens de navegação
+          (42/48, `itemHeight`), ícone+rótulo no modo completo, só o
+          ícone (com aria-label e tooltip) nos modos recolhidos. */}
       <button
         type="button"
         onClick={onLogout}
+        aria-label={logoutLabel}
         title={iconsOnly ? logoutLabel : undefined}
         style={{
-          marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.12)",
+          display: "flex", alignItems: "center", gap: 10, flexShrink: 0, boxSizing: "border-box",
+          height: rail ? "auto" : itemHeight,
+          padding: rail ? "10px 4px" : iconsOnly ? "10px 0" : "10px 10px 0",
+          marginTop: 10, borderTop: "1px solid rgba(255,255,255,.12)",
           borderLeft: "none", borderRight: "none", borderBottom: "none",
           background: "transparent", color: "rgba(255,255,255,.7)", fontSize: 12.5, cursor: "pointer",
+          justifyContent: iconsOnly || rail ? "center" : "flex-start", flexDirection: rail ? "column" : "row",
           textAlign: iconsOnly || rail ? "center" : "left", fontFamily: "inherit",
         }}
       >
-        {iconsOnly || rail ? "⏻" : logoutLabel}
+        <LogOut size={rail ? 22 : 16} />
+        {!iconsOnly && <span style={{ fontSize: rail ? 12 : 12.5 }}>{logoutLabel}</span>}
       </button>
     </div>
   );

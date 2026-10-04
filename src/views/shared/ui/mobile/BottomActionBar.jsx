@@ -23,8 +23,11 @@ function BottomActionBar({
         boxShadow: "0 -4px 16px rgba(20,63,53,.08)",
       }}
     >
+      {/* Lote 4, 4.4 (achado da Marta): "56 só no botão principal da
+          barra de ação fixa" — o secundário volta ao tamanho automático
+          (48 numa tela mobile), só o primário usa os 56 fixos. */}
       {secondaryLabel && (
-        <Button variant="secondary" size="mobile" onClick={onSecondary} style={{ width: "100%" }}>
+        <Button variant="secondary" onClick={onSecondary} style={{ width: "100%" }}>
           {secondaryLabel}
         </Button>
       )}
@@ -33,7 +36,7 @@ function BottomActionBar({
           {totalLabel}
         </div>
         <Button
-          variant="primary" size="mobile" onClick={onPrimary}
+          variant="primary" size="actionBarPrimary" onClick={onPrimary}
           disabled={primaryDisabled} disabledReason={primaryDisabledReason} disabledReasonBelow
         >
           {primaryLabel}

@@ -2,11 +2,12 @@ import { Users, Building2, RotateCcw, Clock, Undo2, Bell, Calendar, Check } from
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
+import { useBreakpoint, useControlSize } from "../../hooks/useBreakpoint.js";
 import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, parseDMY, getOpenPeriod, formatPeriodLabel, staffTotalHours, staffTotalPay,
   recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
-  monthAbbr, isStaffActive,
+  monthAbbr, isStaffActive, boardStaff, activeClientsCount,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
 import {
@@ -101,6 +102,14 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   const t = T[lang].dashboard;
   const th = T[lang].horas;
   const tn = T[lang].notas;
+  // Lote 4, 4.4 (achado da Marta, item "Ver todas →" 87×19): usado abaixo
+  // no link "Ver todas" do cartão de Notas — mesma régua do resto.
+  const { height: seeAllHeight } = useControlSize();
+  // Lote 4, 4.7 (achado da Marta): a Linha 1 (herói + 3 KPIs) usava
+  // `flex-wrap`, e a 922px o Replacement quebrava pra uma 2ª linha sozinho
+  // e esticava (922×172 — 172 é o `minHeight` do próprio KpiCard). Grade
+  // fixa por `tier` em vez disso: nunca quebra dentro de um nível.
+  const tier = useBreakpoint();
   // Etapa 4j (4.9): usa o mesmo auxiliar isStaffActive de todo o app, em
   // vez de só `s.status === "ativo"` — uma conta Replacement cuja validade
   // já passou deixa de contar aqui também, coerente com a pílula "Inativo"
@@ -115,11 +124,19 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   // pagar/pendentes), por isso o cálculo tem de bater certo nos dois.
   const currentPeriodHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }, currentPeriod), 0);
   const currentPeriodEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, currentPeriod), 0);
-  const kpiCounts = {
-    pending: staff.filter((s) => horasData[s.id]?.status === "pendente").length,
-    paid: staff.filter((s) => horasData[s.id]?.paid).length,
-    unpaid: staff.filter((s) => horasData[s.id]?.status === "finalizado" && !horasData[s.id]?.paid).length,
-  };
+  // QA pós-auditoria (Lote 1): mesmo `board` do cartão herói de Horas (ver
+  // `boardStaff` em utils.js) — antes este cartão contava `staff` inteiro
+  // (incluindo inativos e contas de teste), por isso pagos+por
+  // pagar+pendentes não batia com "Funcionários ativos" nem com o mesmo
+  // cartão em Horas.
+  const board = boardStaff(staff, horasData, currentPeriod, TODAY);
+  const kpiCounts = board.reduce((acc, s) => {
+    const h = horasData[s.id] || { status: "pendente", paid: false };
+    if (h.status === "pendente") acc.pending += 1;
+    if (h.paid) acc.paid += 1;
+    if (h.status === "finalizado" && !h.paid) acc.unpaid += 1;
+    return acc;
+  }, { pending: 0, paid: 0, unpaid: 0 });
 
   let overtimePending = 0, reopenedCount = 0;
   Object.values(horasData).forEach((data) => {
@@ -139,6 +156,17 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     const diffDays = (end - TODAY) / (24 * 60 * 60 * 1000);
     return diffDays >= 0 && diffDays <= contractAlertDays;
   }).length;
+  // QA pós-auditoria (Lote 3, "Contratos a vencer"): a conta acima
+  // (`diffDays >= 0`) sempre ignorou os contratos JÁ vencidos — por isso o
+  // cartão de Pendências dizia "Em dia" mesmo havendo vencidos (hoje 4).
+  // Conta nova, à parte (mesma regra de `kind: "expired"` de
+  // `contractStatus`, ClientesScreen.jsx), com a sua própria linha —
+  // somar às "a vencer" escondia de volta a urgência maior dos vencidos.
+  const contractsExpired = clients.filter((c) => {
+    const end = parseDMY(c.contractEnd);
+    const diffDays = (end - TODAY) / (24 * 60 * 60 * 1000);
+    return diffDays < 0;
+  }).length;
 
   const replacementClientsActive = clients.filter((c) => {
     if (c.clientType !== "replacement") return false;
@@ -154,9 +182,10 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   // `sentItems[].date` nem sempre é ISO: dados-exemplo antigos usam
   // "DD/MM", lançamentos novos (AvisosScreen.jsx) usam isoDateStr (ex.:
   // "2026-09-26") — o resto do app já mostra este campo em bruto, sem
-  // formatar (AvisosWidgets.jsx, `{it.date}`); reaproveitado aqui do
-  // mesmo jeito, em vez de `fmtNoteDate` (que pressupõe ISO e quebra nos
-  // dados-exemplo em "DD/MM", mostrando "undefined/undefined").
+  // formatar (AvisosWidgets.jsx, `{it.date}`); reaproveitado aqui do mesmo
+  // jeito. (QA pós-auditoria: `fmtNoteDate` já entende os dois formatos —
+  // deixou de ser o motivo de não o usar aqui; manter em bruto continua
+  // sendo o comportamento certo, só não é mais por causa do bug antigo.)
   const recentComplaints = sentItems
     .filter((i) => i.type === "reclamacao")
     .slice()
@@ -184,14 +213,24 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   ];
 
   const row = { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 20 };
+  // Lote 4, 4.7: herói com 1,5 parte e os três KPIs com 1 parte cada, na
+  // mesma linha no desktop; 2 por 2 no tablet; 1 coluna no celular. Grid
+  // (não flex) porque não deve quebrar dentro de um nível — é exatamente
+  // isso que fazia o Replacement esticar sozinho a 922px.
+  const kpiRow = {
+    display: "grid",
+    gridTemplateColumns: tier === "desktop" ? "1.5fr 1fr 1fr 1fr" : tier === "tablet" ? "1fr 1fr" : "1fr",
+    gap: 20,
+    marginBottom: 20,
+  };
 
   return (
     <div style={styles.content}>
       <PageHeader title={t.title} subtitle={formatTodayLabel(lang)} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
       {/* Linha 1 — 4 KPIs (herói + 3), documento 4.1 */}
-      <div style={row}>
-        <Card variant="hero" style={{ flex: "1 1 240px", minWidth: 220 }}>
+      <div style={kpiRow}>
+        <Card variant="hero">
           <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>{th.heroTitle}</div>
           <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 28, marginBottom: 2 }}>{fmtEuro(currentPeriodEuros)}</div>
           <div style={{ fontSize: 12.5, opacity: 0.85, marginBottom: 14 }}>{fmtHoursScreen(currentPeriodHours)} · {currentPeriodLabel}</div>
@@ -208,7 +247,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           </div>
         </Card>
 
-        <KpiCard icon={Users} label={t.kpiStaffActive} value={activeStaff.length} style={{ flex: "1 1 220px", minWidth: 200 }}>
+        <KpiCard icon={Users} label={t.kpiStaffActive} value={activeStaff.length}>
           <div style={{ display: "flex", alignItems: "center", marginTop: 14 }}>
             {activeStaff.slice(0, 5).map((s, i) => (
               <div key={s.id} style={{ marginLeft: i === 0 ? 0 : -10, borderRadius: "50%", border: "2px solid #fff", boxShadow: `0 0 0 1px ${COLORS.line}` }}>
@@ -229,18 +268,28 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           </div>
         </KpiCard>
 
-        <KpiCard icon={Building2} label={t.kpiClients} value={clients.length} style={{ flex: "1 1 220px", minWidth: 200 }} />
+        {/* QA pós-auditoria (Lote 3, "'Ativo' com uma definição só"): era
+            `clients.length` puro (41, sem excluir os 4 contratos já
+            vencidos) — agora usa a mesma `activeClientsCount` do subtítulo
+            de ClientesScreen.jsx (decisão do Iago: "ativo" de verdade). */}
+        <KpiCard icon={Building2} label={t.kpiClients} value={activeClientsCount(clients, TODAY)} />
 
         <KpiCard
           icon={RotateCcw} label={t.kpiReplacementClients} value={replacementClientsActive}
           iconBg={COLORS.clayTint} iconColor={COLORS.clayInk}
-          style={{ flex: "1 1 220px", minWidth: 200 }}
         />
       </div>
 
       {/* Linha 2 — Pendências, Reclamações, Notas (documento 4.1) */}
       <div style={row}>
-        <Card style={{ flex: "1 1 420px", minWidth: 320 }}>
+        {/* Lote 4, 4.1 (achado da Marta): `minWidth: 320` não cabia no
+            conteúdo disponível em 375px com a sidebar já recolhida a
+            ícones (os outros dois cartões desta linha, 240/260, cabiam —
+            só este estourava, até uns 413px de ponta direita). Descia
+            para 260 — o mesmo piso já usado no cartão de Notas ao lado,
+            que nunca deu problema — sem mudar a largura preferida (420)
+            que já era usada em telas largas. */}
+        <Card style={{ flex: "1 1 420px", minWidth: 260 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>{t.pendingTitle}</div>
           <PendingRow icon={Clock} label={t.pendingOvertime} count={overtimePending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
           <PendingRow icon={Undo2} label={t.pendingReopened} count={reopenedCount} onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
@@ -249,7 +298,10 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
               sabe levar um filtro pré-aplicado (Clientes em si só é
               redesenhado na 4f) — por agora só abre a tela, como o
               Dashboard antigo já fazia. */}
-          <PendingRow icon={Calendar} label={t.pendingContracts} count={contractsNearExpiry} onClick={() => onNavigate("clientes")} okLabel={t.pendingAllOk} last />
+          <PendingRow icon={Calendar} label={t.pendingContracts} count={contractsNearExpiry} onClick={() => onNavigate("clientes")} okLabel={t.pendingAllOk} />
+          {/* QA pós-auditoria (Lote 3): linha própria para os já vencidos —
+              "Em dia" só aparece quando NEM esta nem a de cima têm contagem. */}
+          <PendingRow icon={Calendar} label={t.pendingContractsExpired} count={contractsExpired} amber onClick={() => onNavigate("clientes")} okLabel={t.pendingAllOk} last />
         </Card>
 
         <div style={{ flex: "1 1 260px", minWidth: 240 }}>
@@ -266,7 +318,10 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
             <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{tn.widgetTitle}</div>
             <button
               type="button" onClick={() => onNavigate("notas")}
-              style={{ border: "none", background: "transparent", color: COLORS.clayInk, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+              style={{
+                border: "none", background: "transparent", color: COLORS.clayInk, fontSize: 12.5, fontWeight: 700,
+                cursor: "pointer", fontFamily: "inherit", height: seeAllHeight, padding: "0 4px", display: "inline-flex", alignItems: "center",
+              }}
             >
               {tn.seeAll} →
             </button>

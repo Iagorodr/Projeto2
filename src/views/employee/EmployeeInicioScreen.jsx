@@ -2,7 +2,7 @@ import { AlertTriangle, Bell, Eye, Clock, CalendarDays, UsersRound, ChevronRight
 import { COLORS } from "../../styles/colors.js";
 import { FONT, RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
-import { useBreakpoint } from "../../hooks/useBreakpoint.js";
+import { useBreakpoint, useControlSize } from "../../hooks/useBreakpoint.js";
 import {
   dayScheduledClients, thisWeekSummary, periodMissingDays, staffWithGapsCount, isStaffActive,
   fmtHoursScreen, pad2, isoDateStr, notesForOwner, fmtNoteDate,
@@ -48,6 +48,9 @@ function EmployeeInicioScreen({
   const dayAbbrSun0 = DAY_ABBR_SUN0_BY_LANG[lang];
   const dayLabels17 = DAY_LABELS_1_7_BY_LANG[lang];
   const tier = useBreakpoint();
+  // Lote 4, 4.4 (achado da Marta, item "Ver todas →" 87×19): usado no link
+  // "Ver todas" do cartão de Notas, mesma régua do resto.
+  const { height: seeAllHeight } = useControlSize();
   const isSupervisor = me.role === "supervisor";
   const horasEntry = horasData[me.id] || { entries: [], noClientDays: [] };
   const todayKey = isoDateStr(TODAY);
@@ -70,9 +73,13 @@ function EmployeeInicioScreen({
   const payPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
   const payPeriodChunks = weekBlocksOfPayPeriod(payPeriod, cutoffDay);
   const missingDays = periodMissingDays(clients, assignments, me.id, horasEntry, payPeriodChunks, TODAY, me);
-  const teamGapsCount = isSupervisor
+  // QA pós-auditoria (Lote 2, "dias em falta na equipa" contando dias):
+  // `staffWithGapsCount` passou a devolver { staffCount, totalDays } — o
+  // cartão mostra `totalDays` (bate com o total do Monitoramento) e usa
+  // `staffCount` só na legenda de apoio ("X funcionários").
+  const teamGaps = isSupervisor
     ? staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, TODAY)
-    : 0;
+    : { staffCount: 0, totalDays: 0 };
 
   const attentionItems = [];
   if (missingDays.length > 0) {
@@ -89,9 +96,10 @@ function EmployeeInicioScreen({
       onClick: () => onNavigate("avisos"),
     });
   }
-  if (isSupervisor && teamGapsCount > 0) {
+  if (isSupervisor && teamGaps.totalDays > 0) {
     attentionItems.push({
-      key: "team", icon: Eye, count: teamGapsCount, label: t.attentionTeamGapsLabel,
+      key: "team", icon: Eye, count: teamGaps.totalDays, label: t.attentionTeamGapsLabel,
+      subtitle: t.attentionTeamGapsSubtitle(teamGaps.staffCount),
       onClick: () => onNavigate("monitoramento"),
     });
   }
@@ -203,7 +211,10 @@ function EmployeeInicioScreen({
         <div style={cardTitleStyle}>{tNotas.widgetTitle}</div>
         <button
           type="button" onClick={() => onNavigate("notas")}
-          style={{ border: "none", background: "transparent", color: COLORS.forest700, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+          style={{
+            border: "none", background: "transparent", color: COLORS.forest700, fontSize: 12.5, fontWeight: 600,
+            cursor: "pointer", fontFamily: "inherit", height: seeAllHeight, padding: "0 4px", display: "inline-flex", alignItems: "center",
+          }}
         >
           {tNotas.seeAll}
         </button>

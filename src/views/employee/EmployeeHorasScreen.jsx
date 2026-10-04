@@ -6,8 +6,8 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   clientById, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
-  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, getOpenPeriod,
-  buildWeekChunkSequence, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
+  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, getOpenPeriod, getCutoffPeriod,
+  weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -64,10 +64,28 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const payPeriodChunks = weekBlocksOfPayPeriod(payPeriod, cutoffDay);
 
   const [chunkIndex, setChunkIndex] = useState(null);
+  // QA pós-auditoria (Lote 3, "período aberto em Horas do funcionário"):
+  // antes a sequência navegável vinha de `buildWeekChunkSequence(TODAY,
+  // cutoffDay, countBefore, 8)`, que re-deriva as semanas uma a uma (civil,
+  // seg-dom) a partir de hoje, SEM a fusão de blocos de 1 dia da "opção B"
+  // (6.1) — resultado: um bloco solto de 1 dia na borda do período aberto
+  // (ex.: "20–20 Set") e a navegação entrando no período seguinte sem
+  // terminar certo no fim do período aberto. Troca por uma sequência
+  // montada a partir dos MESMOS blocos fundidos de `weekBlocksOfPayPeriod`
+  // usados pelo Monitoramento: primeiro os do período aberto
+  // (`payPeriodChunks`, já calculado acima), depois os dos períodos
+  // seguintes (um `getCutoffPeriod` por mês), até ter pelo menos 8 blocos
+  // de margem depois de hoje.
   const [chunks] = useState(() => {
-    const todayBlockIndex = payPeriodChunks.findIndex((b) => TODAY >= b.start && TODAY <= b.end);
-    const countBefore = todayBlockIndex >= 0 ? todayBlockIndex : (TODAY > payPeriod.end ? payPeriodChunks.length : 0);
-    return buildWeekChunkSequence(TODAY, cutoffDay, countBefore, 8);
+    const list = [...payPeriodChunks];
+    let periodOffset = 1;
+    while (list.length - payPeriodChunks.length < 8) {
+      const nextPeriod = getCutoffPeriod(payPeriod.start, cutoffDay, periodOffset);
+      list.push(...weekBlocksOfPayPeriod(nextPeriod, cutoffDay));
+      periodOffset += 1;
+    }
+    const todayIndex = list.findIndex((b) => TODAY >= b.start && TODAY <= b.end);
+    return { list, anchorIndex: todayIndex >= 0 ? todayIndex : 0 };
   });
   const anchorIndex = chunks.anchorIndex;
   const idx = chunkIndex === null ? anchorIndex : chunkIndex;
@@ -397,7 +415,14 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           </button>
         </div>
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 6 }}>
-          {idx === anchorIndex && <Pill variant="paid">{t.currentWeekBadge}</Pill>}
+          {/* QA pós-auditoria (Lote 2, "mês finalizado cinza"): este selo
+              verde ("paid") era o item colorido que sobrava na vista — ele
+              aparece sempre que a semana vista é a atual, o que é o caso
+              mais comum logo depois de finalizar o próprio mês (a semana
+              atual cai dentro do período que acabou de ser finalizado). O
+              selo "neutral" de bloco parcial já é cinza, por isso não
+              precisa do mesmo tratamento. */}
+          {idx === anchorIndex && !monthFinalized && <Pill variant="paid">{t.currentWeekBadge}</Pill>}
           {isBoundary && <Pill variant="neutral">{t.boundaryBadge}</Pill>}
         </div>
         {!monthFinalized && chunkZone !== "before" && (
@@ -426,17 +451,32 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               </div>
               <div style={{ fontSize: 13, color: COLORS.ink2 }}>{t.monthDoneNote}</div>
             </Card>
-            <Card variant="default">
+            {/* QA pós-auditoria (Lote 2, "mês finalizado cinza"): cartão
+                esbatido (fundo lineSoft + contorno line, igual ao banner
+                acima) em vez do branco puro do `Card variant="default"` —
+                o "Como conferir" do briefing pede a tela toda em tons de
+                cinza, não só o banner do topo. */}
+            <Card variant="default" style={{ background: COLORS.lineSoft, border: `1px solid ${COLORS.line}` }}>
               <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                <div style={{ flex: 1, background: COLORS.bg, borderRadius: RADIUS.control, padding: "10px 12px" }}>
+                <div style={{ flex: 1, background: COLORS.card, borderRadius: RADIUS.control, padding: "10px 12px" }}>
                   <div style={{ fontSize: 11, color: COLORS.ink3 }}>{t.periodTotal}</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.ink }}>{fmtHoursScreen(periodHours)}</div>
                 </div>
               </div>
-              <PeriodCalendar weeks={buildPeriodWeeks()} dayHeaderLabels={[1, 2, 3, 4, 5, 6, 7].map((d) => dayLabels17[d])} />
+              {/* `muted`: mesmas células do calendário normal, em tons de
+                  cinza/ink em vez do verde `okTint` de "registado" — ver
+                  comentário de `PeriodCalendar.jsx`. */}
+              <PeriodCalendar weeks={buildPeriodWeeks()} dayHeaderLabels={[1, 2, 3, 4, 5, 6, 7].map((d) => dayLabels17[d])} muted />
               <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-                <Button variant="secondary" onClick={() => downloadPdf(false)}>{t.downloadPdf}</Button>
-                {!correctionOpen && <Button variant="ghost" onClick={() => setCorrectionOpen(true)}>{t.requestCorrection}</Button>}
+                {/* Texto/contorno recolorido de verde (`forest700`/`#9FB8AE`,
+                    estilo normal de `variantStyle("secondary")`) para tons de
+                    cinza — mesma razão do cartão acima. Só estes dois botões
+                    "ambiente" do bloco finalizado; o mini-formulário de
+                    "Pedir correção" abaixo (quando aberto) fica com as cores
+                    normais dos botões — é uma ação em curso, não parte do
+                    pano de fundo cinza que o briefing descreve. */}
+                <Button variant="secondary" onClick={() => downloadPdf(false)} style={{ color: COLORS.ink2, border: `1.5px solid ${COLORS.line}` }}>{t.downloadPdf}</Button>
+                {!correctionOpen && <Button variant="ghost" onClick={() => setCorrectionOpen(true)} style={{ color: COLORS.ink2 }}>{t.requestCorrection}</Button>}
               </div>
               {correctionOpen && (
                 <div style={{ marginTop: 12 }}>

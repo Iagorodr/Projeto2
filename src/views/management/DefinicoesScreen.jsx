@@ -5,7 +5,7 @@ import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { T } from "../../models/i18n.js";
-import { PageHeader, Card, Button, ConfirmDialog, SegmentedBar } from "../shared/ui/index.js";
+import { PageHeader, Card, Button, ConfirmDialog, SegmentedBar, InfoTip } from "../shared/ui/index.js";
 import { supabase } from "../../models/supabaseClient.js";
 
 // Diálogo simples de "feito" (um botão só) — reaproveitado pelo sucesso de
@@ -185,9 +185,13 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                     <input style={styles.defTextInput} value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} />
                   </div>
                   <div>
-                    <div style={styles.defSettingLabel}>{t.newPassword}</div>
+                    {/* Lote 4, 4.5 (achado da Marta): hint fixo (11.5px)
+                        vira (i) ao lado do rótulo. */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <div style={styles.defSettingLabel}>{t.newPassword}</div>
+                      <InfoTip text={t.changePasswordHint} label={c0.moreInfoLabel} />
+                    </div>
                     <Button variant="secondary" onClick={openPwModal}>{t.changePasswordButton}</Button>
-                    <div style={styles.defSettingHint}>{t.changePasswordHint}</div>
                   </div>
                 </div>
               </div>
@@ -199,8 +203,11 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
               <div style={styles.sectionTitle}>{t.payment}</div>
               <div style={styles.defSettingRow}>
                 <div style={{ flex: 1 }}>
-                  <div style={styles.defSettingLabel}>{t.cutoffLabel}</div>
-                  <div style={styles.defSettingHint}>{t.cutoffHint}</div>
+                  {/* Lote 4, 4.5 (achado da Marta, cutoffHint): idem. */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <div style={styles.defSettingLabel}>{t.cutoffLabel}</div>
+                    <InfoTip text={t.cutoffHint} label={c0.moreInfoLabel} />
+                  </div>
                 </div>
                 <input
                   type="number" min={1} max={28} style={styles.defNumberInput}
@@ -223,8 +230,11 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
               </div>
               <div style={styles.defSettingRow}>
                 <div style={{ flex: 1 }}>
-                  <div style={styles.defSettingLabel}>{t.gaugeBaseLabel}</div>
-                  <div style={styles.defSettingHint}>{t.gaugeBaseHint}</div>
+                  {/* Lote 4, 4.5 (achado da Marta, gaugeBaseHint): idem. */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <div style={styles.defSettingLabel}>{t.gaugeBaseLabel}</div>
+                    <InfoTip text={t.gaugeBaseHint} label={c0.moreInfoLabel} />
+                  </div>
                 </div>
                 <input type="number" min={1} style={styles.defNumberInput} value={reclamacaoBaseClients} onChange={(e) => setReclamacaoBaseClients(Number(e.target.value))} />
               </div>

@@ -21,6 +21,12 @@ const T = {
       installAppIOSStep2: "Escolha \"Adicionar ao Ecrã Principal\".",
       installAppIOSStep3: "Pronto — o app aparece como qualquer outro, com ícone próprio e ecrã inteiro.",
       gotIt: "Entendi",
+      // Lote 4, 4.5 (InfoTip): rótulo genérico do botão (i) — o conteúdo
+      // real vem de cada chave ...Hint já existente, este é só o aria-label.
+      moreInfoLabel: "Mais informações",
+      // QA pós-auditoria (Lote 1, "Gravar só depois de ler"): texto do aviso
+      // quando a leitura inicial falha (ver `loadError` no App.jsx).
+      loadErrorBanner: "Não foi possível carregar os dados. Tente novamente.",
     },
     pdf: {
       colDate: "Data", colClient: "Cliente", colHours: "Horas", colValueHour: "Valor/hora", colTotal: "Total",
@@ -56,6 +62,10 @@ const T = {
       pendingReopened: "Reabertos para correção",
       pendingUnread: "Avisos e pedidos por ler",
       pendingContracts: "Contratos a vencer",
+      // QA pós-auditoria (Lote 3): linha nova, separada de "Contratos a
+      // vencer" — contratos JÁ vencidos, que antes não apareciam em lugar
+      // nenhum do Dashboard.
+      pendingContractsExpired: "Contratos vencidos",
       pendingAllOk: "Em dia",
       complaintsTitle: "Reclamações", complaintsThisMonth: "Reclamações este mês", complaintsSubtitle: "este mês",
       gaugeExcelente: "Excelente", gaugeRazoavel: "Razoável", gaugeCritico: "Crítico",
@@ -125,9 +135,18 @@ const T = {
       legendSampleName: "Cliente 12",
       legendDuration: "Duração da visita",
       legendShared: "Laranja = 2 ou mais pessoas no cliente (duração dividida)",
+      // Lote 4, 4.5 (achado da Marta): a legenda vira compacta (bolinha
+      // laranja + esta palavra), o texto inteiro (legendShared) passa pro
+      // InfoTip.
+      legendSharedCompact: "Compartilhado",
       legendRecurring: "Ícone de setas = quinzenal ou mensal",
       addClientPlaceholder: "Pesquisar cliente",
       noClientsAvailable: "Todos os clientes já estão nesta célula.",
+      // Lote 4, 4.6 (achado da Marta): popover "quem está no cliente" —
+      // adicionar ou remover um funcionário desse cliente nesse dia.
+      addPerson: "Adicionar",
+      addStaffPlaceholder: "Pesquisar funcionário",
+      noStaffAvailable: "Todos os funcionários já estão neste cliente.",
       alreadyWith: (n) => (n === 1 ? "já com 1 pessoa" : `já com ${n} pessoas`),
       peopleLabel: (n) => (n === 1 ? "1 pessoa" : `${n} pessoas`),
       each: "cada", remove: "Remover",
@@ -242,7 +261,8 @@ const T = {
     },
     acessos: {
       title: "Acessos",
-      subtitle: "Central de logins de todos os funcionários e supervisores.",
+      // Lote 4, 4.5 (achado da Marta): subtítulo removido (saiu da tela —
+      // o título e a lista já bastam).
       searchPlaceholder: "Pesquisar por nome ou email",
       colName: "Nome", colEmail: "Email", colRole: "Papel",
       roleFuncionario: "Funcionário", roleSupervisor: "Supervisor", roleGerencia: "Gerência",
@@ -366,6 +386,11 @@ const T = {
       attentionMissingDaysSubtitle: (weekday, dm) => `${weekday}, ${dm}`,
       attentionUnreadLabel: "Avisos por ler",
       attentionTeamGapsLabel: "Dias em falta na equipa",
+      // Lote 2 (briefing do Toni): o número agora é de DIAS (soma de
+      // `staffWithGapsCount(...).totalDays`, bate com o total do
+      // Monitoramento), não mais de funcionários — esta subtitle devolve o
+      // nº de funcionários à parte, pra não perder essa informação.
+      attentionTeamGapsSubtitle: (n) => n === 1 ? "1 funcionário com dias em falta" : `${n} funcionários com dias em falta`,
       shortcutsTitle: "Atalhos",
     },
     notas: {
@@ -378,7 +403,10 @@ const T = {
       pushEnable: "Ativar notificações",
       pushEnabled: "🔔 Notificações ativas neste dispositivo",
       pushEnabledShort: "Notificações ativas",
-      pushDenied: "Notificação bloqueada nas permissões do navegador — não dá para ativar por aqui.",
+      pushDenied: "Notificação bloqueada nas permissões do navegador.",
+      // Lote 4, 4.5 (achado da Marta): o "como liberar" sai do texto fixo
+      // e vai pro InfoTip ao lado.
+      pushDeniedHelp: "Para ativar, abra as definições deste site no navegador e mude as notificações para \"Permitir\".",
       newNote: "+ Nova nota",
       groupToday: "Hoje", groupOverdue: "Em atraso", groupThisWeek: "Esta semana", groupLater: "Mais tarde",
       daysAgo: (n) => `há ${n} dia${n === 1 ? "" : "s"}`,
@@ -386,6 +414,10 @@ const T = {
       chooseDateReason: "Escolha uma data",
       noteDeletedToast: "Nota eliminada.",
       undo: "Desfazer",
+      // QA pós-auditoria (Lote 2, nome acessível do botão Início): o botão só
+      // tinha aria-label="menu" fixo em pt, sem tradução. Mesmo padrão de
+      // `monitoramento.backLabel` / `employeeHoras.backLabel`.
+      backLabel: "Início",
     },
     supervisorSidebar: {
       menu: "Início", horas: "Horas", avisos: "Avisos", agenda: "Agenda",
@@ -492,6 +524,7 @@ const T = {
       // fixo em pt, nunca traduzido) — corrigido aqui, secção 1.7 do
       // documento exige aria-label em ícones sozinhos.
       previousWeek: "Semana anterior", nextWeek: "Semana seguinte",
+      backLabel: "Início",
     },
     employeeClientes: {
       title: "Clientes",
@@ -500,6 +533,7 @@ const T = {
       openMap: "Abrir no mapa", noDetails: "Sem informações adicionais.",
       timesPerWeek: (n) => `${n}×/semana`,
       selectPrompt: "Selecione um cliente para ver os detalhes.",
+      backLabel: "Início",
     },
     employeeAvisos: {
       title: "Avisos", subject: "Assunto", subjectPlaceholder: "Escolha",
@@ -524,10 +558,12 @@ const T = {
         { key: "outro", label: "Outro" },
       ],
       reportColleagueSection: "Reportar sobre um colega",
+      backLabel: "Início",
     },
     employeeHistorico: {
       title: "Histórico", noneYet: "Nenhum mês fechado ainda.",
       closedAt: "Fechado em", total: "Total", receivedValue: "Valor recebido", exportPdf: "Exportar PDF", close: "Fechar",
+      backLabel: "Início",
     },
   },
 
@@ -548,6 +584,8 @@ const T = {
       installAppIOSStep2: "Choose \"Add to Home Screen\".",
       installAppIOSStep3: "Done — the app now appears like any other, with its own icon, full screen.",
       gotIt: "Got it",
+      moreInfoLabel: "More information",
+      loadErrorBanner: "Couldn't load the data. Please try again.",
     },
     pdf: {
       colDate: "Date", colClient: "Client", colHours: "Hours", colValueHour: "Value/hour", colTotal: "Total",
@@ -583,6 +621,7 @@ const T = {
       pendingReopened: "Reopened for correction",
       pendingUnread: "Unread notices and requests",
       pendingContracts: "Contracts expiring soon",
+      pendingContractsExpired: "Expired contracts",
       pendingAllOk: "Up to date",
       complaintsTitle: "Complaints", complaintsThisMonth: "Complaints this month", complaintsSubtitle: "this month",
       gaugeExcelente: "Excellent", gaugeRazoavel: "Reasonable", gaugeCritico: "Critical",
@@ -652,9 +691,13 @@ const T = {
       legendSampleName: "Client 12",
       legendDuration: "Visit duration",
       legendShared: "Orange = 2 or more people on the client (duration split)",
+      legendSharedCompact: "Shared",
       legendRecurring: "Arrows icon = biweekly or monthly",
       addClientPlaceholder: "Search client",
       noClientsAvailable: "All clients are already in this cell.",
+      addPerson: "Add",
+      addStaffPlaceholder: "Search staff",
+      noStaffAvailable: "All staff are already on this client.",
       alreadyWith: (n) => (n === 1 ? "already with 1 person" : `already with ${n} people`),
       peopleLabel: (n) => (n === 1 ? "1 person" : `${n} people`),
       each: "each", remove: "Remove",
@@ -761,7 +804,6 @@ const T = {
     },
     acessos: {
       title: "Access",
-      subtitle: "Central login hub for all staff and supervisors.",
       searchPlaceholder: "Search by name or email",
       colName: "Name", colEmail: "Email", colRole: "Role",
       roleFuncionario: "Staff", roleSupervisor: "Supervisor", roleGerencia: "Management",
@@ -884,6 +926,7 @@ const T = {
       attentionMissingDaysSubtitle: (weekday, dm) => `${weekday}, ${dm}`,
       attentionUnreadLabel: "Unread notices",
       attentionTeamGapsLabel: "Team days missing",
+      attentionTeamGapsSubtitle: (n) => n === 1 ? "1 staff member with missing days" : `${n} staff members with missing days`,
       shortcutsTitle: "Shortcuts",
     },
     notas: {
@@ -896,7 +939,8 @@ const T = {
       pushEnable: "Enable notifications",
       pushEnabled: "🔔 Notifications active on this device",
       pushEnabledShort: "Notifications active",
-      pushDenied: "Notifications are blocked in the browser's permissions — can't enable them from here.",
+      pushDenied: "Notifications are blocked in the browser's permissions.",
+      pushDeniedHelp: "To enable them, open this site's settings in your browser and set notifications to \"Allow\".",
       newNote: "+ New note",
       groupToday: "Today", groupOverdue: "Overdue", groupThisWeek: "This week", groupLater: "Later",
       daysAgo: (n) => `${n} day${n === 1 ? "" : "s"} ago`,
@@ -904,6 +948,7 @@ const T = {
       chooseDateReason: "Choose a date",
       noteDeletedToast: "Note deleted.",
       undo: "Undo",
+      backLabel: "Home",
     },
     supervisorSidebar: {
       menu: "Home", horas: "Hours", avisos: "Notices", agenda: "Schedule",
@@ -995,6 +1040,7 @@ const T = {
       legendSampleName: "Client", legendDuration: "is your share of the visit",
       legendShared: "shared client", legendRecurring: "biweekly or monthly",
       previousWeek: "Previous week", nextWeek: "Next week",
+      backLabel: "Home",
     },
     employeeClientes: {
       title: "Clients",
@@ -1003,6 +1049,7 @@ const T = {
       openMap: "Open in maps", noDetails: "No additional information.",
       timesPerWeek: (n) => `${n}×/week`,
       selectPrompt: "Select a client to see the details.",
+      backLabel: "Home",
     },
     employeeAvisos: {
       title: "Notices", subject: "Subject", subjectPlaceholder: "Choose",
@@ -1020,10 +1067,12 @@ const T = {
         { key: "outro", label: "Other" },
       ],
       reportColleagueSection: "Report about a colleague",
+      backLabel: "Home",
     },
     employeeHistorico: {
       title: "History", noneYet: "No month closed yet.",
       closedAt: "Closed on", total: "Total", receivedValue: "Amount received", exportPdf: "Export PDF", close: "Close",
+      backLabel: "Home",
     },
   },
 
@@ -1044,6 +1093,8 @@ const T = {
       installAppIOSStep2: "Choisissez « Sur l'écran d'accueil ».",
       installAppIOSStep3: "Terminé — l'app apparaît comme les autres, avec sa propre icône, en plein écran.",
       gotIt: "Compris",
+      moreInfoLabel: "Plus d'informations",
+      loadErrorBanner: "Impossible de charger les données. Veuillez réessayer.",
     },
     pdf: {
       colDate: "Date", colClient: "Client", colHours: "Heures", colValueHour: "Valeur/heure", colTotal: "Total",
@@ -1079,6 +1130,7 @@ const T = {
       pendingReopened: "Rouverts pour correction",
       pendingUnread: "Avis et demandes non lus",
       pendingContracts: "Contrats bientôt échus",
+      pendingContractsExpired: "Contrats expirés",
       pendingAllOk: "À jour",
       complaintsTitle: "Réclamations", complaintsThisMonth: "Réclamations ce mois-ci", complaintsSubtitle: "ce mois-ci",
       gaugeExcelente: "Excellent", gaugeRazoavel: "Raisonnable", gaugeCritico: "Critique",
@@ -1148,9 +1200,13 @@ const T = {
       legendSampleName: "Client 12",
       legendDuration: "Durée de la visite",
       legendShared: "Orange = 2 personnes ou plus chez le client (durée partagée)",
+      legendSharedCompact: "Partagé",
       legendRecurring: "Icône de flèches = bimensuel ou mensuel",
       addClientPlaceholder: "Rechercher un client",
       noClientsAvailable: "Tous les clients sont déjà dans cette cellule.",
+      addPerson: "Ajouter",
+      addStaffPlaceholder: "Rechercher un employé",
+      noStaffAvailable: "Tous les employés sont déjà chez ce client.",
       alreadyWith: (n) => (n === 1 ? "déjà avec 1 personne" : `déjà avec ${n} personnes`),
       peopleLabel: (n) => (n === 1 ? "1 personne" : `${n} personnes`),
       each: "chacun", remove: "Retirer",
@@ -1257,7 +1313,6 @@ const T = {
     },
     acessos: {
       title: "Accès",
-      subtitle: "Centre des identifiants pour tous les employés et superviseurs.",
       searchPlaceholder: "Rechercher par nom ou email",
       colName: "Nom", colEmail: "Email", colRole: "Rôle",
       roleFuncionario: "Employé", roleSupervisor: "Superviseur", roleGerencia: "Gérance",
@@ -1380,6 +1435,7 @@ const T = {
       attentionMissingDaysSubtitle: (weekday, dm) => `${weekday} ${dm}`,
       attentionUnreadLabel: "Avis non lus",
       attentionTeamGapsLabel: "Jours manquants de l'équipe",
+      attentionTeamGapsSubtitle: (n) => n === 1 ? "1 employé avec des jours manquants" : `${n} employés avec des jours manquants`,
       shortcutsTitle: "Raccourcis",
     },
     notas: {
@@ -1392,7 +1448,8 @@ const T = {
       pushEnable: "Activer les notifications",
       pushEnabled: "🔔 Notifications actives sur cet appareil",
       pushEnabledShort: "Notifications actives",
-      pushDenied: "Notifications bloquées dans les permissions du navigateur — impossible de les activer ici.",
+      pushDenied: "Notifications bloquées dans les permissions du navigateur.",
+      pushDeniedHelp: "Pour les activer, ouvrez les paramètres de ce site dans votre navigateur et réglez les notifications sur « Autoriser ».",
       newNote: "+ Nouvelle note",
       groupToday: "Aujourd'hui", groupOverdue: "En retard", groupThisWeek: "Cette semaine", groupLater: "Plus tard",
       daysAgo: (n) => `il y a ${n} jour${n > 1 ? "s" : ""}`,
@@ -1400,6 +1457,7 @@ const T = {
       chooseDateReason: "Choisissez une date",
       noteDeletedToast: "Note supprimée.",
       undo: "Annuler",
+      backLabel: "Accueil",
     },
     supervisorSidebar: {
       menu: "Accueil", horas: "Heures", avisos: "Avis", agenda: "Planning",
@@ -1491,6 +1549,7 @@ const T = {
       legendSampleName: "Client", legendDuration: "est votre part de la visite",
       legendShared: "client partagé", legendRecurring: "bimensuel ou mensuel",
       previousWeek: "Semaine précédente", nextWeek: "Semaine suivante",
+      backLabel: "Accueil",
     },
     employeeClientes: {
       title: "Clients",
@@ -1499,6 +1558,7 @@ const T = {
       openMap: "Ouvrir dans les cartes", noDetails: "Aucune information supplémentaire.",
       timesPerWeek: (n) => `${n}×/semaine`,
       selectPrompt: "Sélectionnez un client pour voir les détails.",
+      backLabel: "Accueil",
     },
     employeeAvisos: {
       title: "Avis", subject: "Sujet", subjectPlaceholder: "Choisir",
@@ -1516,10 +1576,12 @@ const T = {
         { key: "outro", label: "Autre" },
       ],
       reportColleagueSection: "Signaler un collègue",
+      backLabel: "Accueil",
     },
     employeeHistorico: {
       title: "Historique", noneYet: "Aucun mois clôturé pour l'instant.",
       closedAt: "Clôturé le", total: "Total", receivedValue: "Montant reçu", exportPdf: "Exporter en PDF", close: "Fermer",
+      backLabel: "Accueil",
     },
   },
 };

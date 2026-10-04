@@ -5,7 +5,7 @@ import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { TYPE_ICONS, AGENDA_DAYS, TODAY, LANG_NAMES, EMPTY_CLIENT } from "../../models/data.js";
 import {
-  parseDMY, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById,
+  parseDMY, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
@@ -16,8 +16,13 @@ import { useIsMobile } from "../../hooks/useIsMobile.js";
 
 // Documento gera "41 clientes ativos" (4.2) a partir dos 41 clientes do seed
 // em data.js — aqui a conta é literal: contrato ainda não terminado (ou sem
-// data de fim) conta como ativo, igual à lógica já usada pela Dashboard
-// (`contractsNearExpiry`, DashboardScreen.jsx) para "a acabar"/"expirado".
+// data de fim) conta como ativo. QA pós-auditoria (Lote 3, "'Ativo' com uma
+// definição só"): esta conta passou para `activeClientsCount` (utils.js),
+// partilhada com o KPI "Clientes" do Dashboard — antes cada tela tinha a
+// sua própria conta (esta já estava certa; o Dashboard mostrava
+// `clients.length` puro, sem excluir os contratos já vencidos) e os
+// números não batiam (37 aqui vs. 41 lá). Decisão do Iago: "ativo" para
+// valer, não o total de clientes cadastrados.
 const EMPTY_CLIENT_FORM = { ...EMPTY_CLIENT, documents: [null, null, null, null] };
 
 function splitClientName(name) {
@@ -104,7 +109,7 @@ function ClientesScreen({
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
 
   const period = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
-  const activeCount = clients.filter((c) => !c.contractEnd || parseDMY(c.contractEnd) >= TODAY).length;
+  const activeCount = activeClientsCount(clients, TODAY);
   const cities = Array.from(new Set(clients.map((c) => c.city).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
   const filtered = clients.filter((c) => {

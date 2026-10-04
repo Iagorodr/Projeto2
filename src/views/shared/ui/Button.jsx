@@ -6,11 +6,22 @@
 // de comportamento.
 import { useState } from "react";
 import { COLORS } from "../../../styles/colors.js";
-import { RADIUS, MOTION } from "../../../styles/tokens.js";
+import { MOTION } from "../../../styles/tokens.js";
+import { useControlSize } from "../../../hooks/useBreakpoint.js";
 
-// size: "gerencia" (44, por defeito) · "mobile" (56, dentro do intervalo
-// 52-58 do documento; supervisor/mobile usam a mesma).
-const HEIGHTS = { gerencia: 44, mobile: 56 };
+// Lote 4, 4.4 (achado da Marta): altura/raio deixam de ser fixos por
+// `size` e passam a vir de `useControlSize` — 40 no desktop (mouse), 48
+// no tablet e no celular (ou no desktop com ponteiro grosso, ex.: iPad
+// na horizontal); raio 12 no desktop/tablet, 16 só no celular. Era
+// `HEIGHTS = { gerencia: 44, mobile: 56 }` fixo — "gerencia" virava 44
+// sempre (mesmo num celular), e "mobile" forçava 56 em QUALQUER botão
+// mobile, não só no principal da barra de ação fixa (documento: "56 só
+// no botão principal"). `size="mobile"` continua aceito nos chamadores
+// existentes (histórico, em telas só-celular) mas agora é só um sinônimo
+// do tamanho automático — na prática já dava 48/56 ali por estar sempre
+// dentro de uma tela mobile; o 56 fixo sai, exceto para quem passar
+// `size="actionBarPrimary"` (só o botão principal da BottomActionBar).
+const FIXED_HEIGHTS = { actionBarPrimary: 56 };
 
 const BASE = {
   border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13,
@@ -29,6 +40,11 @@ function variantStyle(variant, hover) {
         color: COLORS.forest700, border: `1.5px solid #9FB8AE`,
       };
     case "ghost":
+      // Lote 4, 4.4 (achado da Marta, itens "Redefinir" 88×16 e "Tive um
+      // cliente mesmo assim" 198×16): sem fundo nem contorno, então a
+      // altura mínima de toque fica "invisível" — o texto continua do
+      // mesmo tamanho, só a área clicável (centrada por `alignItems:
+      // center` do BASE) cresce para 40/48.
       return {
         background: "transparent", color: COLORS.forest700, padding: "0 6px",
         textDecoration: hover ? "underline" : "none",
@@ -56,8 +72,9 @@ function Button({
   disabledReasonBelow, onClick, type = "button", children, style,
 }) {
   const [hover, setHover] = useState(false);
-  const height = HEIGHTS[size] || HEIGHTS.gerencia;
-  const radius = size === "mobile" ? RADIUS.controlMobile : RADIUS.control;
+  const { height: autoHeight, radius: autoRadius } = useControlSize();
+  const height = FIXED_HEIGHTS[size] || autoHeight;
+  const radius = autoRadius;
   const btn = (
     <button
       type={type}
@@ -68,7 +85,7 @@ function Button({
       style={{
         ...BASE,
         ...variantStyle(variant, hover && !disabled),
-        height: variant === "ghost" ? "auto" : height,
+        height,
         borderRadius: variant === "ghost" ? 0 : radius,
         opacity: disabled ? 0.45 : 1,
         cursor: disabled ? "not-allowed" : "pointer",
@@ -90,11 +107,15 @@ function Button({
   );
 }
 
-// Botão de ícone isolado: 40×40 (48 no mobile), raio 12, contorno line.
-// O documento exige `aria-label` em ícones sozinhos (secção 1.7).
+// Botão de ícone isolado: 40×40 no desktop, 48×48 no tablet/celular (ou
+// no desktop com ponteiro grosso), raio 12/12/16 — mesma régua de
+// `useControlSize` usada pelo `Button` (Lote 4, 4.4). `size="mobile"`
+// continua aceito (sinônimo do automático, já dava 48 por estar sempre
+// numa tela mobile). O documento exige `aria-label` em ícones sozinhos
+// (secção 1.7).
 function IconButton({ icon: Icon, size = "gerencia", onClick, ariaLabel, disabled, style }) {
   const [hover, setHover] = useState(false);
-  const dim = size === "mobile" ? 48 : 40;
+  const { minTap: dim, radius } = useControlSize();
   return (
     <button
       type="button"
@@ -104,7 +125,7 @@ function IconButton({ icon: Icon, size = "gerencia", onClick, ariaLabel, disable
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width: dim, height: dim, borderRadius: RADIUS.control,
+        width: dim, height: dim, borderRadius: radius,
         border: `1px solid ${COLORS.line}`, background: hover && !disabled ? COLORS.forest50 : COLORS.card,
         display: "flex", alignItems: "center", justifyContent: "center",
         cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1,

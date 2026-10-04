@@ -13,16 +13,21 @@
 import { useState } from "react";
 import { Search, X } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";
-import { RADIUS, MOTION } from "../../../styles/tokens.js";
+import { MOTION } from "../../../styles/tokens.js";
+import { useControlSize } from "../../../hooks/useBreakpoint.js";
 
+// Lote 4, 4.4 (achado da Marta): era `mobile ? 44 : 42` (prop manual,
+// cada chamador decidia, sem tablet) — agora 40/48 por `useControlSize`,
+// raio 12/12/16 idem. A prop `mobile` fica aceita (compatibilidade com
+// quem ainda a passa) mas não é mais usada pro tamanho.
 function SearchField({ value, onChange, placeholder, mobile, clearLabel = "Limpar", style }) {
   const [focused, setFocused] = useState(false);
-  const height = mobile ? 44 : 42;
+  const { height, radius } = useControlSize();
   return (
     <div
       style={{
         display: "flex", alignItems: "center", gap: 8, height,
-        borderRadius: RADIUS.control, background: COLORS.card,
+        borderRadius: radius, background: COLORS.card,
         border: `1px solid ${focused ? COLORS.forest500 : COLORS.lineInput}`,
         boxShadow: focused ? "0 0 0 3px rgba(46,133,112,.2)" : "none",
         padding: "0 12px", transition: `border-color ${MOTION.fast} ease, box-shadow ${MOTION.fast} ease`,

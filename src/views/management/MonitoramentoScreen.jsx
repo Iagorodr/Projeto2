@@ -11,7 +11,7 @@ import {
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
-  PageHeader, MobileHeader, Card, Pill, Avatar, FilterChip, SearchField, Button, Drawer, DataTable,
+  PageHeader, MobileHeader, Card, Pill, Avatar, FilterChip, SearchField, Button, Drawer, DataTable, InfoTip,
 } from "../shared/ui/index.js";
 
 // Monitoramento — documento de design, secções 4.4/4.5 (mesmo ficheiro; o
@@ -29,6 +29,7 @@ import {
 function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignments, cutoffDay, closedPeriods, onHome }) {
   const t = T[lang].monitoramento;
   const th = T[lang].horas;
+  const c0 = T[lang].common;
   const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang];
   const [search, setSearch] = useState("");
   const [onlyGaps, setOnlyGaps] = useState(true);
@@ -251,9 +252,13 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <FilterChip active={onlyGaps} onClick={() => setOnlyGaps(true)} count={totalWithGaps}>{t.chipOnlyGaps}</FilterChip>
             <FilterChip active={!onlyGaps} onClick={() => setOnlyGaps(false)} count={monitored.length}>{t.chipAllStaff}</FilterChip>
+            {/* Lote 4, 4.5 (achado da Marta): a nota sobre inativos/
+                replacement vira (i) ao lado do filtro "Todos", em vez de
+                ficar sempre visível abaixo da tabela. */}
+            <InfoTip text={t.inactiveNote} label={c0.moreInfoLabel} />
           </div>
           <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
         </div>
@@ -265,8 +270,6 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
           onRowClick={(row) => setOpenStaffId(row.staffMember.id)}
           emptyMessage={t.noResults}
         />
-
-        <div style={{ ...styles.defSettingHint, marginTop: 12 }}>{t.inactiveNote}</div>
 
         {extractDrawer}
       </div>
@@ -291,7 +294,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
 
       <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} mobile style={{ marginBottom: 14 }} />
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: RADIUS.control, background: totalWithGaps > 0 ? COLORS.alertTint : COLORS.okTint, color: totalWithGaps > 0 ? COLORS.alert : COLORS.okInk, fontSize: 13, fontWeight: 700 }}>
           {totalWithGaps > 0 ? <AlertTriangle size={15} /> : <Check size={15} />}
           {t.summaryWithGapsCount(totalWithGaps)}
@@ -300,6 +303,9 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
           <Check size={15} />
           {t.summaryOkCount(totalOk)}
         </div>
+        {/* Lote 4, 4.5: mesma nota de 4.4 (ramo gerência), sem filtro
+            "Todos" aqui pra ancorar — fica junto do resumo. */}
+        <InfoTip text={t.inactiveNote} label={c0.moreInfoLabel} />
       </div>
 
       {monitored.length === 0 ? (
@@ -328,8 +334,6 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
           ))}
         </div>
       )}
-
-      <div style={{ ...styles.defSettingHint, marginTop: 14 }}>{t.inactiveNote}</div>
 
       {extractDrawer}
     </div>

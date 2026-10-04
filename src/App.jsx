@@ -1,7 +1,7 @@
 // Camada "View" raiz: lê o estado do controller e decide qual tela mostrar.
 // Não guarda estado do negócio — só consome useAppController().
 import { useState } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, LogOut } from "lucide-react";
 import { useAppController } from "./controllers/useAppController.js";
 import { styles } from "./styles/styles.js";
 import { Sidebar } from "./views/shared/Layout.jsx";
@@ -55,6 +55,23 @@ export default function App() {
 
   return (
     <div style={pageStyle}>
+      {c.loadError && (
+        // QA pós-auditoria (Lote 1, item 2 — "Gravar só depois de ler"):
+        // avisa quando a última leitura do Supabase falhou (`loadError`,
+        // ver useAppController.js) — sem isto, um erro de leitura passava
+        // em silêncio e os dados de demonstração em memória podiam acabar
+        // gravados por cima dos reais.
+        <div
+          role="alert"
+          style={{
+            background: "#fff3cd", color: "#664d03", border: "1px solid #ffe69c",
+            borderRadius: 8, padding: "10px 14px", marginBottom: 12,
+            fontSize: 14, fontWeight: 500,
+          }}
+        >
+          {T[c.lang].common.loadErrorBanner}
+        </div>
+      )}
       {c.perspective === "login" && (
         <LoginScreen
           lang={c.lang} setLang={c.setLang}
@@ -171,14 +188,23 @@ export default function App() {
               // folha "Mais" (comentário do próprio MoreSheet.jsx), não na
               // sidebar/rail principal, que o documento (3.1) só dá selo a
               // Avisos.
+              // QA pós-auditoria (Lote 2): `staffWithGapsCount` passou a devolver
+              // { staffCount, totalDays } — este selo continua a ser a
+              // contagem de FUNCIONÁRIOS, não de dias.
               badge: staffWithGapsCount(
                 c.staff, c.horasData, c.clients, c.assignments,
                 getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY),
                 weekBlocksOfPayPeriod(getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY), c.cutoffDay),
                 c.cutoffDay, TODAY
-              ) || undefined,
+              ).staffCount || undefined,
               onSelect: () => c.setEmpScreen("monitoramento"),
             }] : []),
+            // Lote 4, 4.2 (achado da Marta): no celular o "Sair" não existia
+            // em lugar nenhum — último item da folha, sempre (o nome de
+            // quem entrou vai no cabeçalho da folha, via prop `user` do
+            // MoreSheet, não aqui). `logout: true` tira a seta (não é
+            // navegação) no MoreSheet.jsx.
+            { key: "logout", icon: LogOut, label: T[c.lang].common.logout, logout: true, onSelect: () => c.logout() },
           ];
           const hideBottomBar = c.empScreen === "horas";
           // Sem padding aqui: a `pageStyle` do topo do App já dá os 14px de
@@ -197,7 +223,7 @@ export default function App() {
                   items={bottomItems}
                 />
               )}
-              <MoreSheet open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} items={moreItems} />
+              <MoreSheet open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} items={moreItems} user={{ name: c.me.name }} />
             </div>
           );
         }

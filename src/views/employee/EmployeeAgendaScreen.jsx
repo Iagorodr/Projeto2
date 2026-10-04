@@ -238,7 +238,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   return (
     <div style={mobStyles.phone}>
       <div style={mobStyles.header}>
-        <button style={mobStyles.homeIcon} onClick={onHome} aria-label="menu">
+        <button style={mobStyles.homeIcon} onClick={onHome} aria-label={t.backLabel}>
           <HouseIcon size={18} color={COLORS.textSoft} />
         </button>
         <LangSwitcher lang={lang} setLang={setLang} />
