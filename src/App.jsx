@@ -51,7 +51,7 @@ export default function App() {
   // styles.page tem minHeight fixo de 700px, pensado para desktop. Em telemóveis
   // (ex.: iPhone SE tem só 667px de altura) isso força o corpo a ficar mais alto
   // que o próprio ecrã, criando um pequeno scroll vertical sempre presente.
-  const pageStyle = isMobile ? { ...styles.page, minHeight: "100vh", padding: "14px" } : styles.page;
+  const pageStyle = isMobile ? { ...styles.page, minHeight: "100dvh", padding: "14px" } : styles.page;
 
   return (
     <div style={pageStyle}>
@@ -271,7 +271,7 @@ export default function App() {
           // desta casca existir) — só acrescento espaço por baixo pra não
           // ficar tapado pela barra inferior fixa.
           return (
-            <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
               <div style={{ flex: 1, paddingBottom: 8 }}>
                 {body}
               </div>

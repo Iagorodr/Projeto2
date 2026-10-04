@@ -1,48 +1,54 @@
 // Barra inferior mobile (documento de design, 3.3): 5 posições fixas —
-// Início · Horas · Agenda · Avisos · Mais. Bloco de 58×32 com ícone 24
-// (fundo forest-100 quando ativo) e etiqueta 12px (peso 600 + forest-700
-// quando ativa; ink-3 quando não). Fundo branco, contorno superior line,
-// padding inferior 16 (área segura). Selo numérico no ícone de Avisos.
+// Início · Horas · Agenda · Avisos · Mais. Selo numérico no ícone de Avisos.
 //
 // No ecrã Horas esta barra é SUBSTITUÍDA pela BottomActionBar (2.15/5.2.6)
 // — decisão de qual mostrar é de quem monta o ecrã (Etapa 4), não deste
 // componente.
 //
-// Introduzido na Etapa 3 (casca); já ligado a App.jsx desde a Etapa 4
-// (comentário antigo corrigido aqui, varredura de QA, sem mudança de
-// comportamento).
+// Introduzido na Etapa 3 (casca); já ligado a App.jsx desde a Etapa 4.
+//
+// QA (achado do Iago): recolorida pra seguir a mesma "teoria" do menu de
+// PC/tablet (AppSidebar.jsx) — fundo verde-escuro (forest900, o tom mais
+// escuro do gradiente da sidebar), ícone/rótulo brancos translúcidos por
+// omissão e clay (laranja) no item selecionado, em vez de pílula clara
+// sobre fundo branco. Faixa também ficou mais alta (ícone 24→26, blocos e
+// paddings maiores) a pedido dele. `paddingBottom` trocado de 16 fixo para
+// `env(safe-area-inset-bottom, 16px)` — mesma convenção já usada no
+// MoreSheet.jsx, cobre o entalhe/gesture-bar do iPhone sem empurrar demais
+// em aparelhos sem área segura.
 import { COLORS } from "../../../../styles/colors.js";
 
 function MobileBottomBar({ items, activeKey, onNavigate }) {
   return (
     <div
       style={{
-        position: "sticky", bottom: 0, left: 0, right: 0, background: COLORS.card,
-        borderTop: `1px solid ${COLORS.line}`, display: "flex", justifyContent: "space-around",
-        paddingTop: 8, paddingBottom: 16, zIndex: 30,
+        position: "sticky", bottom: 0, left: 0, right: 0, background: COLORS.forest900,
+        display: "flex", justifyContent: "space-around",
+        paddingTop: 12, paddingBottom: "env(safe-area-inset-bottom, 16px)", zIndex: 30,
       }}
     >
       {items.map((item) => {
         const active = item.key === activeKey;
         const Icon = item.icon;
+        const color = active ? COLORS.clay : "rgba(255,255,255,.78)";
         return (
           <button
             key={item.key}
             type="button"
             onClick={() => onNavigate(item.key)}
             style={{
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
-              width: 58, height: 32, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
+              width: 64, height: 40, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit",
               position: "relative",
             }}
           >
             <span
               style={{
-                width: 40, height: 26, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
-                background: active ? COLORS.forest100 : "transparent", position: "relative",
+                width: 46, height: 30, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+                background: active ? "rgba(255,255,255,.13)" : "transparent", position: "relative",
               }}
             >
-              <Icon size={24} strokeWidth={1.8} color={active ? COLORS.forest700 : COLORS.ink3} />
+              <Icon size={26} strokeWidth={1.8} color={color} />
               {item.badge != null && item.badge > 0 && (
                 <span
                   style={{
@@ -55,7 +61,7 @@ function MobileBottomBar({ items, activeKey, onNavigate }) {
                 </span>
               )}
             </span>
-            <span style={{ fontSize: 12, fontWeight: active ? 600 : 500, color: active ? COLORS.forest700 : COLORS.ink3 }}>
+            <span style={{ fontSize: 12, fontWeight: active ? 700 : 500, color }}>
               {item.label}
             </span>
           </button>
