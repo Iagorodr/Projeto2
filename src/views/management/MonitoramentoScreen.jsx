@@ -290,14 +290,46 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   // padrão já usado em `EmployeeHorasScreen.jsx` (Etapa 4a): o ecrã ganha
   // uma largura máxima maior em tablet/PC em vez de ficar sempre
   // encaixotado num "telemóvel" de 460px independentemente do ecrã real.
+  //
+  // QA (achado do Iago, 2ª rodada — "continua sem ser responsivo, em
+  // desktop e em tablet"): a 1ª correção só deu sombra/cantos, mas o
+  // layout em si continuava igual ao do celular — uma única coluna
+  // estreita (720 no máximo) centrada numa tela que pode ter o triplo
+  // disso de largura, com cabeçalho `MobileHeader` (de seta "Voltar", que
+  // não faz sentido ao lado da barra lateral já visível em tablet/PC).
+  // Corrigido pro mesmo padrão que `EmployeeInicioScreen.jsx` já usa:
+  // `PageHeader` (sem seta — a barra lateral já é a navegação) a partir do
+  // tablet, container bem mais largo, e a lista de funcionários em
+  // `flexWrap` (mesma receita de `flex: "1 1 <base>px"` que o resto do
+  // app redesenhado usa pra reflow — não é grid CSS à parte) pra ocupar
+  // várias colunas em vez de uma única coluna esticada.
   // ---------------------------------------------------------------------
-  const containerMaxWidth = tier === "desktop" ? 720 : tier === "tablet" ? 640 : 460;
+  const isMobileTier = tier === "mobile";
+  const containerMaxWidth = tier === "desktop" ? 1100 : tier === "tablet" ? 800 : 460;
   return (
-    <div style={{ padding: "16px 16px 32px", maxWidth: containerMaxWidth, margin: "0 auto" }}>
-      <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+    <div
+      style={
+        isMobileTier
+          ? { padding: "16px 16px 32px", maxWidth: containerMaxWidth, margin: "0 auto" }
+          // Tablet/PC: sem padding/margin-auto próprios — a mesma receita
+          // de EmployeeInicioScreen.jsx ("Tablet/PC"), que já conta com o
+          // wrapper de App.jsx (`padding: "24px 24px 40px"` +
+          // `justifyContent: "center"`) pra dar o respiro e centrar.
+          : { width: "100%", maxWidth: containerMaxWidth }
+      }
+    >
+      {isMobileTier ? (
+        <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      ) : (
+        <PageHeader title={t.title} subtitle={t.subtitlePeriodOnly(periodLabel)} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      )}
 
-      <div style={{ fontSize: 13, color: COLORS.ink2, marginBottom: 4 }}>{t.subtitlePeriodOnly(periodLabel)}</div>
-      <div style={{ fontSize: 14, color: COLORS.ink2, marginBottom: 16 }}>{t.tapToSeeDetail}</div>
+      {isMobileTier && (
+        <>
+          <div style={{ fontSize: 13, color: COLORS.ink2, marginBottom: 4 }}>{t.subtitlePeriodOnly(periodLabel)}</div>
+          <div style={{ fontSize: 14, color: COLORS.ink2, marginBottom: 16 }}>{t.tapToSeeDetail}</div>
+        </>
+      )}
 
       <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} mobile style={{ marginBottom: 14 }} />
 
@@ -327,14 +359,23 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       {monitored.length === 0 ? (
         <div style={styles.noResults}>{t.noResults}</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        // QA (2ª rodada): era `flexDirection: "column"` sempre — uma
+        // coluna só de botões de 64px esticados, por mais larga que a
+        // tela fosse (o oposto de "responsivo"). Em `flexWrap` com
+        // `flex: "1 1 300px"` cada cartão fica com no mínimo 300px e
+        // reflui pra 2-3 colunas sozinho conforme o espaço disponível,
+        // igual à receita já usada em EmployeeInicioScreen.jsx — no
+        // celular (containerMaxWidth 460) só cabe 1 por linha mesmo, então
+        // o visual aí não muda.
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           {monitored.map(({ staffMember: s, totalGaps }) => (
             <button
               key={s.id}
               onClick={() => setOpenStaffId(s.id)}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, height: 64, padding: "0 16px",
-                borderRadius: RADIUS.card, border: `1px solid ${COLORS.line}`, background: COLORS.card, boxShadow: SHADOW.sh1, cursor: "pointer", textAlign: "left", width: "100%", boxSizing: "border-box",
+                borderRadius: RADIUS.card, border: `1px solid ${COLORS.line}`, background: COLORS.card, boxShadow: SHADOW.sh1, cursor: "pointer", textAlign: "left",
+                flex: isMobileTier ? "1 1 100%" : "1 1 300px", minWidth: 0, boxSizing: "border-box",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>

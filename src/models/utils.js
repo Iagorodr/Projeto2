@@ -260,6 +260,24 @@ function getOpenPeriod(closedPeriods, cutoffDay, today) {
   return { start, end };
 }
 
+// QA (achado do Iago, Avisos — "esses pedidos são de um mês já fechado"):
+// um Pedido (missingItems) não tem ligação nenhuma com o período de
+// pagamento — só uma `date` solta (string). Quando essa `date` é ISO
+// (`"YYYY-MM-DD"`, como todo Pedido criado em tempo real já grava — ver
+// `sendCorrectionRequest` em EmployeeHorasScreen.jsx) e cai ANTES do
+// início do período aberto (`openPeriod.start`, de `getOpenPeriod`), o
+// pedido é de um período que já fechou. Dados de demonstração antigos
+// (data.js) guardam `date` como "DD/MM" sem ano (ver comentário em
+// `fmtNoteDate`) — sem ano não dá pra comparar com segurança, por isso
+// esses sempre devolvem `false` aqui (nunca marcados como "fechado",
+// nunca escondidos) em vez de arriscar um ano errado.
+function isSolicitationStale(m, openPeriod) {
+  if (!m.date || !m.date.includes("-")) return false;
+  const [y, mo, d] = m.date.split("-").map(Number);
+  const itemDate = new Date(y, mo - 1, d);
+  return itemDate < openPeriod.start;
+}
+
 function formatPeriodLabel(period, lang) {
   return `${pad2(period.start.getDate())} ${monthAbbr(lang, period.start.getMonth())} - ${pad2(period.end.getDate())} ${monthAbbr(lang, period.end.getMonth())}`;
 }
@@ -644,4 +662,4 @@ function pctChange(current, previous) {
   return ((current - previous) / previous) * 100;
 }
 
-export { clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };
+export { clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };

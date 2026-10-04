@@ -234,6 +234,11 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
   }
   function handleSendReport() {
     if (!reportStaffId || !reportClientId || !reportText.trim()) return;
+    // QA (achado do Iago, Avisos da gerência — "só deve aparecer o
+    // número de coisas novas"): sem `seenByManagement` aqui (ao contrário
+    // do que a própria gerência cria em AvisosScreen.jsx, que já nasce
+    // visto) — isto é exatamente o tipo de item que deve contar como
+    // "novo" pra gerência até ela abrir aquela aba.
     setSentItems((prev) => [
       { id: Date.now(), type: reportType, staffId: Number(reportStaffId), clientId: Number(reportClientId), text: reportText.trim(), date: isoDateStr(TODAY), hasPhoto: !!reportPhoto, sentBy: "supervisor", sentByStaffId: staffId },
       ...prev,

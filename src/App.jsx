@@ -8,7 +8,7 @@ import { AppSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useBreakpoint } from "./hooks/useBreakpoint.js";
 import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
-import { getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount } from "./models/utils.js";
+import { getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, isSolicitationStale } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
 import LoginScreen from "./views/LoginScreen.jsx";
@@ -98,7 +98,13 @@ export default function App() {
         Object.values(c.horasData).forEach((data) => {
           data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; });
         });
-        const pendingRequests = c.missingItems.filter((m) => !m.resolved).length;
+        // QA (achado do Iago — pedidos de período já fechado "saindo das
+        // pendências"): mesma exclusão de AvisosScreen.jsx (`isSolicitationStale`),
+        // pra o selo da barra lateral bater com a contagem que a própria
+        // tela de Avisos mostra por padrão (sem isto, o selo continuaria
+        // contando pedidos antigos escondidos por padrão na tela).
+        const avisosOpenPeriod = getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY);
+        const pendingRequests = c.missingItems.filter((m) => !m.resolved && !isSolicitationStale(m, avisosOpenPeriod)).length;
         const managementItems = MENU_ITEMS.map((item) => ({
           key: item.key, icon: item.icon, label: tSidebar[item.key],
           badge: item.key === "horas" ? (overtimePending || undefined)
@@ -135,7 +141,7 @@ export default function App() {
               <HistoricoScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} closedPeriods={c.closedPeriods} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} />
             )}
             {c.screen === "avisos" && (
-              <AvisosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} clients={c.clients} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} setHorasData={c.setHorasData} />
+              <AvisosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} clients={c.clients} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} setHorasData={c.setHorasData} closedPeriods={c.closedPeriods} cutoffDay={c.cutoffDay} />
             )}
             {c.screen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />

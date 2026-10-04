@@ -13,7 +13,11 @@ import { Plus } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
 import { RADIUS } from "../../../../styles/tokens.js";
 
-function DayPanel({ title, forecastLabel, lockBadge, children, emptyState, onAddClient, addClientLabel = "+ Adicionar outro cliente" }) {
+// QA (achado do Iago): "+" duplicado — este componente já desenha o
+// `<Plus>` abaixo como ícone separado, então um rótulo com "+ " embutido
+// (era o padrão daqui E o valor passado por EmployeeHorasScreen.jsx via
+// `t.addClientButton`) mostrava dois sinais de mais seguidos.
+function DayPanel({ title, forecastLabel, lockBadge, children, emptyState, onAddClient, addClientLabel = "Adicionar outro cliente" }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>

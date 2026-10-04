@@ -558,12 +558,18 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               ))}
             </DayPanel>
 
+            {/* QA (achado do Iago): "passam despercebido" — eram
+                `variant="ghost"` (sem fundo nem contorno, 2.5/4.4: pensado
+                pra ações menores tipo "Redefinir"), mas estas duas são
+                ações do dia tão importantes quanto o resto do painel, não
+                um link secundário. `variant="secondary"` dá contorno +
+                fundo, igual a qualquer outro botão de ação do app. */}
             {!weekLockedFlag && !markedNoClient && hasAgendaToday && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: -6 }}>
                 {entriesForDay.length === 0 && selectedDate <= TODAY && (
-                  <Button variant="ghost" onClick={() => setNoClientConfirmOpen(true)}>{t.noClientDayButton}</Button>
+                  <Button variant="secondary" onClick={() => setNoClientConfirmOpen(true)}>{t.noClientDayButton}</Button>
                 )}
-                <Button variant="ghost" onClick={() => setAdvanceOpen(true)}>{t.advanceButton}</Button>
+                <Button variant="secondary" onClick={() => setAdvanceOpen(true)}>{t.advanceButton}</Button>
               </div>
             )}
 
