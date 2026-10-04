@@ -122,8 +122,16 @@ export default function App() {
           ? { name: c.me.name, subtitle: T[c.lang].acessos.roleGerencia }
           : { name: c.company.name, photoUrl: c.company.photoUrl, subtitle: T[c.lang].acessos.roleGerencia };
 
+        // QA (achado do Iago — "Agendas"): a grade de 7 dias precisa de
+        // mais largura do que o `shell` padrão (1200) dá depois da
+        // sidebar — com isso, nem 4 dias cabiam sem rolar, escondendo
+        // "hoje" (geralmente o dia mais à direita) e sobrando uma faixa
+        // enorme de fundo vazio dos dois lados do `shell` em ecrãs
+        // largos. Só esta tela ganha um `shell` mais largo (1680); as
+        // outras continuam exatamente como estavam.
+        const shellStyle = c.screen === "agendas" ? { ...styles.shell, maxWidth: 1680 } : styles.shell;
         return (
-        <div style={styles.shell}>
+        <div style={shellStyle}>
           <AppSidebar
             items={managementItems} activeKey={c.screen} onNavigate={c.setScreen}
             density="gerencia" collapsed={managementCollapsed}

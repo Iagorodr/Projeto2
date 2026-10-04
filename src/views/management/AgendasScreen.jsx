@@ -19,6 +19,21 @@ import {
 // mudar o que o cabeçalho já faz).
 const TODAY_COLUMN_BG = "#F5FAF7";
 
+// QA (achado do Iago — "Agendas"): a grade "Por funcionário" tinha
+// colunas de dia com largura fixa (170px); com 7 dias + a coluna de
+// funcionário (230px) isso passava de 1400px, muito mais do que a área
+// de conteúdo tinha disponível — sobrava uma faixa enorme de fundo vazio
+// à direita do cartão (nem usava a largura que o `shell` mais largo desta
+// tela já dá, ver App.jsx) e ainda obrigava a rolar pro lado pra ver
+// qui/sex/sáb/dom, escondendo "hoje" quando calha de ser um desses dias.
+// Grid com colunas elásticas (`minmax`) estica os 7 dias pra preencher o
+// espaço disponível, cabendo sem rolar na maioria dos PCs (o `shell` mais
+// largo desta tela, em App.jsx, ajuda bastante aqui) — só volta a rolar
+// pro lado (rede de segurança, ver `overflowX: "auto"` mais abaixo) em
+// portáteis mais estreitos (ex.: 1280-1366px, comuns o bastante pra não
+// poderem simplesmente esconder dias sem alcance nenhum).
+const AGENDA_GRID_COLS = "230px repeat(7, minmax(110px, 1fr))";
+
 // Lote 4, 4.6 (achado da Marta): "quem está no cliente" — o bloco
 // compartilhado (chip na vista "Por funcionário", avatares na coluna
 // "Quem" da vista "Por dia") vira um botão focável; isto é o popover que
@@ -29,7 +44,7 @@ const TODAY_COLUMN_BG = "#F5FAF7";
 // só enquanto aberto), adaptado de tooltip pra popover/diálogo: aqui
 // abre só por clique/Enter (não por hover/focus), e usa `role="dialog"`
 // em vez de `role="tooltip"` porque o conteúdo já não é só texto.
-function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, onAdd, onClose }) {
+function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, onAdd, onClose, dir = "down" }) {
   const [adding, setAdding] = useState(false);
   const [addSearch, setAddSearch] = useState("");
   const rootRef = useRef(null);
@@ -57,7 +72,8 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
     <div
       ref={rootRef} role="dialog" aria-labelledby={titleId}
       style={{
-        position: "absolute", top: "100%", left: 0, marginTop: 4, width: 240, zIndex: 20,
+        position: "absolute", left: 0, width: 240, zIndex: 20,
+        ...(dir === "up" ? { bottom: "100%", marginBottom: 4 } : { top: "100%", marginTop: 4 }),
         background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control,
         boxShadow: SHADOW.sh2, padding: 10,
       }}
@@ -140,6 +156,15 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   const [search, setSearch] = useState("");
   const [view, setView] = useState("staff"); // "staff" | "day"
   const [openCell, setOpenCell] = useState(null);
+  // Lote 4, 4.6 (achado do Iago — "a busca de cliente aparece muito em
+  // baixo"): o popover de adicionar cliente/ver equipa sempre abria PARA
+  // BAIXO (`top: 100%`), então numa linha perto do fim da tabela ele
+  // nascia fora da vista, obrigando a rolar a página só pra achar o campo
+  // de busca que tinha acabado de abrir. `popoverDir` olha o espaço real
+  // (`getBoundingClientRect` contra `window.innerHeight`) no momento do
+  // clique e decide abrir pra cima quando não cabe embaixo.
+  const [openCellDir, setOpenCellDir] = useState("down");
+  const [openTeamDir, setOpenTeamDir] = useState("down");
   const [cellSearch, setCellSearch] = useState("");
   const [hoverCell, setHoverCell] = useState(null);
   const [toast, setToast] = useState(null);
@@ -159,6 +184,14 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   function showToast(message, opts) {
     setToast({ message, ...opts });
     setTimeout(() => setToast((cur) => (cur && cur.message === message ? null : cur)), 5000);
+  }
+
+  // ~260px é a altura máxima aproximada de qualquer um dos dois
+  // popovers (lista de clientes com busca, ou equipa do cliente) —
+  // espaço insuficiente abaixo do botão clicado manda abrir pra cima.
+  function popoverDir(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return window.innerHeight - rect.bottom < 260 ? "up" : "down";
   }
 
   function cellKey(staffId, day) { return `${staffId}-${day}`; }
@@ -249,10 +282,10 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   function renderStaffRow(s) {
     const inactive = !isStaffActive(s, TODAY);
     return (
-      <div key={s.id} style={{ display: "flex", borderBottom: `1px solid ${COLORS.lineSoft}`, opacity: inactive ? 0.6 : 1 }}>
+      <div key={s.id} style={{ display: "grid", gridTemplateColumns: AGENDA_GRID_COLS, borderBottom: `1px solid ${COLORS.lineSoft}`, opacity: inactive ? 0.6 : 1 }}>
         <div
           style={{
-            width: 230, flexShrink: 0, position: "sticky", left: 0, zIndex: 1, background: COLORS.card,
+            position: "sticky", left: 0, zIndex: 1, background: COLORS.card,
             display: "flex", flexDirection: "column", justifyContent: "center", gap: 4, padding: "10px 16px",
             borderRight: `1px solid ${COLORS.line}`,
           }}
@@ -290,7 +323,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
               onMouseEnter={() => setHoverCell(key)}
               onMouseLeave={() => setHoverCell((h) => (h === key ? null : h))}
               style={{
-                width: 170, flexShrink: 0, position: "relative", padding: 8, display: "flex", flexDirection: "column", gap: 6,
+                position: "relative", padding: 8, display: "flex", flexDirection: "column", gap: 6, minWidth: 0,
                 minHeight: 56, background: isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
               }}
             >
@@ -322,7 +355,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                       <button
                         type="button" title={tooltip}
                         aria-haspopup="dialog" aria-expanded={isTeamOpen}
-                        onClick={() => setOpenTeam((k) => (k === thisTeamKey ? null : thisTeamKey))}
+                        onClick={(e) => { setOpenTeam((k) => (k === thisTeamKey ? null : thisTeamKey)); setOpenTeamDir(popoverDir(e)); }}
                         style={{
                           display: "flex", alignItems: "center", gap: 4, height: 30, width: "100%", borderRadius: RADIUS.chip,
                           padding: "0 8px", background: COLORS.clayTint, fontSize: 12.5, border: "none", cursor: "pointer",
@@ -344,6 +377,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                           onRemove={(staffId) => removeClient(staffId, day, cid)}
                           onAdd={(staffId) => mergeAdd(cellKey(staffId, day), cid)}
                           onClose={() => setOpenTeam(null)}
+                          dir={openTeamDir}
                         />
                       )}
                     </div>
@@ -380,7 +414,8 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
               {isOpenPopover ? (
                 <div
                   style={{
-                    position: "absolute", top: "100%", left: 0, marginTop: 4, width: 250, zIndex: 10,
+                    position: "absolute", left: 0, width: 250, zIndex: 10,
+                    ...(openCellDir === "up" ? { bottom: "100%", marginBottom: 4 } : { top: "100%", marginTop: 4 }),
                     background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, boxShadow: SHADOW.sh2, padding: 10,
                   }}
                 >
@@ -418,7 +453,9 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                 </div>
               ) : isHovered && (
                 <button
-                  type="button" onClick={() => setOpenCell(key)} aria-label={t.addClientPlaceholder}
+                  type="button"
+                  onClick={(e) => { setOpenCell(key); setOpenCellDir(popoverDir(e)); }}
+                  aria-label={t.addClientPlaceholder}
                   style={{
                     height: 28, borderRadius: RADIUS.chip, border: `1.5px dashed ${COLORS.lineInput}`, background: "transparent",
                     color: COLORS.ink3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
@@ -507,7 +544,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
           <div style={{ position: "relative" }}>
             <button
               type="button" aria-haspopup="dialog" aria-expanded={isOpen}
-              onClick={() => setOpenTeam((k) => (k === key ? null : key))}
+              onClick={(e) => { setOpenTeam((k) => (k === key ? null : key)); setOpenTeamDir(popoverDir(e)); }}
               style={{
                 display: "flex", flexWrap: "wrap", gap: 8, border: "none", background: "transparent",
                 cursor: "pointer", padding: 0, fontFamily: "inherit", textAlign: "left",
@@ -526,6 +563,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                 onRemove={(staffId) => removeClient(staffId, selectedDay, r.client.id)}
                 onAdd={(staffId) => mergeAdd(cellKey(staffId, selectedDay), r.client.id)}
                 onClose={() => setOpenTeam(null)}
+                dir={openTeamDir}
               />
             )}
           </div>
@@ -543,7 +581,19 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   ];
 
   return (
-    <div style={styles.content}>
+    // QA (achado do Iago — "Agendas"): `styles.content` (partilhado com
+    // as outras telas de gerência) tem `overflowY: "auto"` — mas como
+    // nada acima dele (`shell`, o wrapper de App.jsx) dá uma altura
+    // fixa, essa div nunca chega a rolar sozinha de verdade (quem rola é
+    // a página toda); na prática o único efeito real desse `auto` aqui é
+    // "roubar" a referência do `position: sticky` do cabeçalho/rodapé da
+    // grade logo abaixo (overflow diferente de "visible" vira a nova
+    // caixa de referência do sticky) — o cabeçalho parava de prender no
+    // topo assim que a página rolava, porque "prendia" a esta caixa que
+    // nunca é clipada de verdade, não à janela. `overflowY: "visible"`
+    // aqui (só nesta tela — `styles.content` continua igual nas outras)
+    // devolve o sticky pra janela real.
+    <div style={{ ...styles.content, overflowY: "visible" }}>
       <PageHeader title={t.title} subtitle={t.subtitle} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
@@ -583,14 +633,30 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
       </div>
 
       {view === "staff" ? (
-        <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, overflow: "hidden", background: COLORS.card }}>
-          <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: "100%", width: "max-content" }}>
+        // QA (achado do Iago — "Agendas"): era `overflowX: "auto"` sozinho
+        // numa div sem `overflowY` — por regra da especificação de CSS,
+        // isso faz o browser computar o eixo vertical também como "auto"
+        // (não dá pra ter só um eixo "visible" e o outro não), transformando
+        // esta div num segundo contentor de rolagem por cima do scroll
+        // normal da página (daí a sensação de "scroll vertical que não
+        // funciona bem"). `overflowY: "hidden"` explícito ao lado do
+        // `overflowX: "auto"` tira essa ambiguidade: só o eixo horizontal
+        // continua como rede de segurança pra janelas estreitas (abaixo do
+        // piso de `AGENDA_GRID_COLS`, ex.: muitos portáteis em 1280-1366px
+        // de largura) — sem essa rede, dias inteiros ficariam escondidos
+        // sem nenhuma forma de alcançá-los. (Isto NÃO resolve o
+        // `position: sticky` do cabeçalho/rodapé não prender de verdade à
+        // janela ao rolar a página — esse já era o comportamento de antes
+        // desta QA, ver comentário em `AGENDA_GRID_COLS`; preferimos manter
+        // os 7 dias sempre alcançáveis a "consertar" o sticky às custas de
+        // esconder dados em telas mais estreitas.)
+        <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, overflowX: "auto", overflowY: "hidden", background: COLORS.card }}>
+          <div style={{ minWidth: "100%" }}>
               {/* Cabeçalho pegajoso */}
-              <div style={{ display: "flex", position: "sticky", top: 0, zIndex: 3, background: COLORS.headerTint, borderBottom: `1px solid ${COLORS.line}` }}>
+              <div style={{ display: "grid", gridTemplateColumns: AGENDA_GRID_COLS, position: "sticky", top: 0, zIndex: 3, background: COLORS.headerTint, borderBottom: `1px solid ${COLORS.line}` }}>
                 <div
                   style={{
-                    width: 230, flexShrink: 0, position: "sticky", left: 0, zIndex: 4, background: COLORS.headerTint,
+                    position: "sticky", left: 0, zIndex: 4, background: COLORS.headerTint,
                     display: "flex", alignItems: "center", padding: "0 16px", height: 44,
                     fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: COLORS.ink2,
                     borderRight: `1px solid ${COLORS.line}`,
@@ -605,15 +671,15 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                     <div
                       key={day}
                       style={{
-                        width: 170, flexShrink: 0, height: 44, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                        height: 44, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, minWidth: 0,
                         background: isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
                       }}
                     >
-                      <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", color: isToday ? COLORS.forest800 : COLORS.ink2 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", color: isToday ? COLORS.forest800 : COLORS.ink2, whiteSpace: "nowrap" }}>
                         {dayLabels[day]} {pad2(date.getDate())}
                       </span>
                       {isToday && (
-                        <span style={{ background: COLORS.clay, color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "1px 7px" }}>
+                        <span style={{ background: COLORS.clay, color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "1px 7px", flexShrink: 0 }}>
                           {t.todayBadge}
                         </span>
                       )}
@@ -655,10 +721,10 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
               )}
 
               {/* Rodapé pegajoso */}
-              <div style={{ display: "flex", position: "sticky", bottom: 0, background: COLORS.headerTint, borderTop: `1px solid ${COLORS.line}` }}>
+              <div style={{ display: "grid", gridTemplateColumns: AGENDA_GRID_COLS, position: "sticky", bottom: 0, background: COLORS.headerTint, borderTop: `1px solid ${COLORS.line}` }}>
                 <div
                   style={{
-                    width: 230, flexShrink: 0, position: "sticky", left: 0, background: COLORS.headerTint,
+                    position: "sticky", left: 0, background: COLORS.headerTint,
                     padding: "10px 16px", fontSize: 12, fontWeight: 700, color: COLORS.ink2, borderRight: `1px solid ${COLORS.line}`,
                   }}
                 >
@@ -672,7 +738,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                     <div
                       key={day}
                       style={{
-                        width: 170, flexShrink: 0, padding: "10px 8px", fontSize: 12, fontWeight: 600, color: COLORS.ink2, textAlign: "center",
+                        padding: "10px 8px", fontSize: 12, fontWeight: 600, color: COLORS.ink2, textAlign: "center", minWidth: 0,
                         background: isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
                       }}
                     >
@@ -681,7 +747,6 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                   );
                 })}
               </div>
-            </div>
           </div>
         </div>
       ) : (
