@@ -57,6 +57,14 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   }
   const tier = useBreakpoint();
   const isDesktop = tier === "desktop";
+  // No mobile "puro" (<640), a MobileBottomBar da casca (App.jsx) convive
+  // com esta BottomActionBar (QA antiga, ver comentário em
+  // MobileBottomBar.jsx) — passamos essa flag pra ela saber que precisa
+  // flutuar ACIMA da barra de navegação, em vez de colar no fundo real da
+  // janela, onde as duas (ambas `position:sticky,bottom:0`) disputavam o
+  // mesmo lugar. No tablet (640-1023) a MobileBottomBar não existe (ver
+  // App.jsx), então aqui continua colada no fundo normalmente.
+  const isMobileTier = tier === "mobile";
 
   // Período aberto pelo histórico real de fechamentos (getOpenPeriod), em
   // blocos (opção B, 6.1) — igual ao que já estava antes do redesenho.
@@ -396,8 +404,21 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const dayMarkedCount = dayCards.filter((c) => c.checked).length;
   const containerMaxWidth = isDesktop ? 1040 : 560;
 
+  // QA (achado do Iago, 3ª volta — "menu mobile pagina de horas ele
+  // espande.. deixe todas as telas expandido igual com a mesma
+  // dimensao"): este ecrã era o ÚNICO dos ecrãs do funcionário com
+  // `minHeight:"100vh"` no próprio div raiz — todos os outros
+  // (Início/Agenda/Clientes/Avisos/Histórico/Notas) deixam a altura só
+  // para a casca em App.jsx (`minHeight:"100dvh"` na coluna flex, ver
+  // App.jsx). Essa 2ª altura extra empilhada SOBRE a da casca é o que
+  // fazia a área "esticar" de forma diferente nesta tela — a barra
+  // inferior (MobileBottomBar) e a BottomActionBar deste ecrã, ambas
+  // `position:sticky,bottom:0` sem coordenação entre si, resolviam a
+  // posição de formas visivelmente diferentes consoante essa altura
+  // extra. Removido: sem risco de "costura" de cor, porque
+  // `COLORS.page` e `COLORS.bg` (fundo da casca) são o mesmo tom.
   return (
-    <div style={{ minHeight: "100vh", background: COLORS.page, paddingBottom: (!isDesktop && chunkZone !== "before" && !monthFinalized) ? 132 : 32 }}>
+    <div style={{ background: COLORS.page, paddingBottom: (!isDesktop && chunkZone !== "before" && !monthFinalized) ? 132 : 32 }}>
       <div style={{ padding: "16px 16px 0", maxWidth: containerMaxWidth, margin: "0 auto" }}>
         <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
@@ -672,6 +693,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           primaryDisabledReason={!weekLockedFlag && entriesForDay.length === 0 ? t.noClientsDisabledReason : undefined}
           secondaryLabel={weekEligible ? t.finalizeWeek : undefined}
           onSecondary={weekEligible ? () => setConfirmWeekOpen(true) : undefined}
+          floatAboveMobileBar={isMobileTier}
         />
       )}
 
