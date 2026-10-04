@@ -66,7 +66,23 @@ function AppSidebar({
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+      {/* QA (achado do Iago, pós-Lote 4.3): num menu com muitos itens
+          (gerência, 11 + Sair) ou numa janela baixa, o conteúdo passava do
+          `100dvh` da barra e os últimos itens (Definições, Sair) ficavam
+          cortados sem nenhum jeito de rolar até eles — um filho `flex: 1`
+          com conteúdo maior que o espaço livre não encolhe nem ganha
+          scroll por padrão (precisa de `minHeight: 0` pra isso; sem ele o
+          flexbox deixa o conteúdo simplesmente transbordar a caixa pai).
+          `overflowY: "auto"` dá a rolagem SÓ nesta lista (a barra em si
+          continua presa à janela); scrollbarWidth/-ms a deixam fina e
+          discreta sobre o fundo verde escuro. */}
+      <div
+        style={{
+          display: "flex", flexDirection: "column", gap: 3, flex: 1,
+          minHeight: 0, overflowY: "auto", scrollbarWidth: "thin",
+          scrollbarColor: "rgba(255,255,255,.25) transparent",
+        }}
+      >
         {items.map((item) => {
           const active = item.key === activeKey;
           const Icon = item.icon;

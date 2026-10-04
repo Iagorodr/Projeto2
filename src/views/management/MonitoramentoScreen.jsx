@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, Check, Lock } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
-import { RADIUS, FONT } from "../../styles/tokens.js";
+import { RADIUS, FONT, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
@@ -214,7 +214,14 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       },
     })),
     {
-      key: "gaps", label: t.colGaps, width: 1.4,
+      // QA (achado do Iago): mesmo problema já corrigido em
+      // ClientesScreen.jsx ("Horas no período") — só `width` relativo, sem
+      // `minWidth` próprio, então em janelas mais estreitas a célula
+      // encolhia abaixo do que o botão "Ver extrato" precisa e ele saía
+      // cortado (sem reticências, porque o `overflow: hidden` de
+      // DataTable.jsx não aplica elipse a um filho em flex/bloco como um
+      // `<Button>`, só a texto que estoura direto na célula).
+      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 180,
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(ev) => ev.stopPropagation()}>
           {row.totalGaps > 0 && <span style={{ fontWeight: 700, color: COLORS.alert, fontSize: 13 }}>{row.totalGaps}</span>}
@@ -294,12 +301,21 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
 
       <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} mobile style={{ marginBottom: 14 }} />
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: RADIUS.control, background: totalWithGaps > 0 ? COLORS.alertTint : COLORS.okTint, color: totalWithGaps > 0 ? COLORS.alert : COLORS.okInk, fontSize: 13, fontWeight: 700 }}>
+      {/* QA (achado do Iago, "parece a tela antiga/não responsiva"): este
+          ramo era a única parte do ecrã sem o acabamento do resto do app
+          redesenhado — divs soltas sem `boxShadow` nem borda (o ramo de
+          gerência, acima, já embrulha os números equivalentes num `Card`),
+          e a faixa de resumo sem `flexWrap`, então num telemóvel estreito
+          os dois blocos + o (i) podiam espremer/estourar em vez de quebrar
+          linha. Mantido o mesmo esquema de cor (verde/alerta conforme
+          `totalWithGaps`), só com `RADIUS.card` + `SHADOW.sh1` (os mesmos
+          tokens que todo cartão do app usa) e `flexWrap: "wrap"`. */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 180px", display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: RADIUS.card, boxShadow: SHADOW.sh1, background: totalWithGaps > 0 ? COLORS.alertTint : COLORS.okTint, color: totalWithGaps > 0 ? COLORS.alert : COLORS.okInk, fontSize: 13, fontWeight: 700 }}>
           {totalWithGaps > 0 ? <AlertTriangle size={15} /> : <Check size={15} />}
           {t.summaryWithGapsCount(totalWithGaps)}
         </div>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: RADIUS.control, background: COLORS.okTint, color: COLORS.okInk, fontSize: 13, fontWeight: 700 }}>
+        <div style={{ flex: "1 1 180px", display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: RADIUS.card, boxShadow: SHADOW.sh1, background: COLORS.okTint, color: COLORS.okInk, fontSize: 13, fontWeight: 700 }}>
           <Check size={15} />
           {t.summaryOkCount(totalOk)}
         </div>
@@ -318,7 +334,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
               onClick={() => setOpenStaffId(s.id)}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, height: 64, padding: "0 16px",
-                borderRadius: RADIUS.card, border: `1px solid ${COLORS.line}`, background: COLORS.card, cursor: "pointer", textAlign: "left", width: "100%", boxSizing: "border-box",
+                borderRadius: RADIUS.card, border: `1px solid ${COLORS.line}`, background: COLORS.card, boxShadow: SHADOW.sh1, cursor: "pointer", textAlign: "left", width: "100%", boxSizing: "border-box",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>

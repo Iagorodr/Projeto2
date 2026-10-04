@@ -96,6 +96,11 @@ function ClientesScreen({
   const [typeFilter, setTypeFilter] = useState(null);
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [contractFilterOn, setContractFilterOn] = useState(false);
+  // QA (achado do Iago): só existia filtro pra "contrato a acabar"
+  // (`st.kind === "ending"`) — faltava o espelho pra quem já venceu
+  // (`st.kind === "expired"`), que a própria `contractStatus` já
+  // distingue (ver função acima) mas não tinha chip nenhum pra filtrar.
+  const [expiredFilterOn, setExpiredFilterOn] = useState(false);
 
   const [openClientId, setOpenClientId] = useState(null); // id | "new" | null
   const [mode, setMode] = useState("view"); // "view" | "edit"
@@ -116,6 +121,10 @@ function ClientesScreen({
     if (contractFilterOn) {
       const st = contractStatus(c, contractAlertDays);
       if (!st || st.kind !== "ending") return false;
+    }
+    if (expiredFilterOn) {
+      const st = contractStatus(c, contractAlertDays);
+      if (!st || st.kind !== "expired") return false;
     }
     return true;
   });
@@ -210,7 +219,15 @@ function ClientesScreen({
       render: (c) => <TeamAvatars ids={clientTeamStaffIds(assignments, c.id)} staff={staff} moreLabel={t.teamMore} />,
     },
     {
-      key: "hours", label: t.colHoursPeriod, width: 1.6,
+      // QA (achado do Iago): o texto do rótulo ("0h de 32h30") estava
+      // sendo cortado sem reticências — a célula só tinha `width: 1.6`
+      // (proporção de flex), sem nenhum `minWidth` próprio, então em
+      // janelas mais estreitas ela encolhia abaixo do que o rótulo
+      // precisa e o conteúdo simplesmente estourava escondido pelo
+      // `overflow: hidden` da célula (herdado de DataTable.jsx). O
+      // `minWidth: 150` que já existia era só no `style` do ProgressBar
+      // (um filho), não na coluna em si — não segurava a célula.
+      key: "hours", label: t.colHoursPeriod, width: 1.6, minWidth: 190,
       render: (c) => {
         if (!c.hoursMonth) return <span style={{ fontSize: 12, color: COLORS.ink3 }}>—</span>;
         const logged = clientTotalHours(horasData, c.id, period);
@@ -238,7 +255,7 @@ function ClientesScreen({
     },
   ];
 
-  const anyFilterActive = !!(search.trim() || cityFilter || typeFilter || contractFilterOn);
+  const anyFilterActive = !!(search.trim() || cityFilter || typeFilter || contractFilterOn || expiredFilterOn);
 
   const drawerClient = isNew ? draft : openClient;
   const drawerStatus = drawerClient && mode === "view" ? contractStatus(drawerClient, contractAlertDays) : null;
@@ -274,6 +291,9 @@ function ClientesScreen({
         ))}
         <FilterChip active={contractFilterOn} onClick={() => setContractFilterOn((v) => !v)}>
           {t.contractAlertChip}
+        </FilterChip>
+        <FilterChip active={expiredFilterOn} onClick={() => setExpiredFilterOn((v) => !v)}>
+          {t.contractExpired}
         </FilterChip>
         <div style={{ position: "relative" }}>
           <FilterChip active={!!typeFilter} onClick={() => setTypeMenuOpen((o) => !o)}>

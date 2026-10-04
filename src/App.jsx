@@ -246,23 +246,34 @@ export default function App() {
             // navegação) no MoreSheet.jsx.
             { key: "logout", icon: LogOut, label: T[c.lang].common.logout, logout: true, onSelect: () => c.logout() },
           ];
-          const hideBottomBar = c.empScreen === "horas";
+          // QA (achado do Iago): "em horas o menu em baixo desapare, quero
+          // que fique fixo e aparece nessa tela tambem, deve esta igual
+          // para funcionario" — era `hideBottomBar = c.empScreen === "horas"`,
+          // que tirava a `MobileBottomBar` de navegação inteira nessa tela
+          // (decisão antiga do próprio componente, ver comentário em
+          // MobileBottomBar.jsx: "substituída" pela `BottomActionBar" do
+          // ecrã). O Iago pediu o contrário agora — as duas convivem: a
+          // `BottomActionBar` do ecrã (total do dia + "Finalizar dia")
+          // continua exatamente igual (ela mesma decide quando aparece,
+          // ver EmployeeHorasScreen.jsx), e por baixo dela a barra de
+          // navegação normal, igual a todo o resto do app. Sem `if`
+          // nenhum: supervisor e funcionário já passam pelo mesmo ramo
+          // (`empTier === "mobile"`) aqui, então os dois ganham o mesmo
+          // comportamento automaticamente.
           // Sem padding aqui: a `pageStyle` do topo do App já dá os 14px de
           // margem em telemóvel (igual já dava a todos estes ecrãs antes
           // desta casca existir) — só acrescento espaço por baixo pra não
           // ficar tapado pela barra inferior fixa.
           return (
             <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-              <div style={{ flex: 1, paddingBottom: hideBottomBar ? 0 : 8 }}>
+              <div style={{ flex: 1, paddingBottom: 8 }}>
                 {body}
               </div>
-              {!hideBottomBar && (
-                <MobileBottomBar
-                  activeKey={c.empScreen === "mais" ? "" : c.empScreen}
-                  onNavigate={(key) => (key === "mais" ? setMoreSheetOpen(true) : c.setEmpScreen(key))}
-                  items={bottomItems}
-                />
-              )}
+              <MobileBottomBar
+                activeKey={c.empScreen === "mais" ? "" : c.empScreen}
+                onNavigate={(key) => (key === "mais" ? setMoreSheetOpen(true) : c.setEmpScreen(key))}
+                items={bottomItems}
+              />
               <MoreSheet open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} items={moreItems} user={{ name: c.me.name }} />
             </div>
           );

@@ -78,7 +78,7 @@ const T = {
     clientes: {
       title: "Clientes",
       subtitle: (n) => `${n} cliente${n === 1 ? "" : "s"} ativo${n === 1 ? "" : "s"}`,
-      searchPlaceholder: "Pesquisar cliente", newClient: "+ Novo cliente",
+      searchPlaceholder: "Pesquisar cliente", newClient: "Novo cliente",
       colClient: "Cliente", colName: "Nome", colCity: "Cidade", colContact: "Contacto", colHours: "Horas",
       colContractRange: "Início \\ Fim", colTeam: "Equipa", colHoursPeriod: "Horas no período", colContract: "Contrato",
       perMonth: "por mês",
@@ -221,7 +221,7 @@ const T = {
     funcionarios: {
       title: "Funcionários",
       subtitle: (n) => `${n} funcionário${n === 1 ? "" : "s"}`,
-      searchPlaceholder: "Pesquisar funcionário", newStaff: "+ Novo Funcionário",
+      searchPlaceholder: "Pesquisar funcionário", newStaff: "Novo Funcionário",
       colName: "Nome", colEmail: "Email", colContact: "Contacto", colClients: "Clientes", colStatus: "Status",
       accountFixed: "Fixo", accountReplacement: "Replacement temporário",
       modalNewTitle: "Novo Funcionário", modalEditTitle: "Editar Funcionário",
@@ -634,7 +634,7 @@ const T = {
     clientes: {
       title: "Clients",
       subtitle: (n) => `${n} active client${n === 1 ? "" : "s"}`,
-      searchPlaceholder: "Search client", newClient: "+ New client",
+      searchPlaceholder: "Search client", newClient: "New client",
       colClient: "Client", colName: "Name", colCity: "City", colContact: "Contact", colHours: "Hours",
       colContractRange: "Start \\ End", colTeam: "Team", colHoursPeriod: "Hours this period", colContract: "Contract",
       perMonth: "per month",
@@ -767,7 +767,7 @@ const T = {
     funcionarios: {
       title: "Staff",
       subtitle: (n) => `${n} staff member${n === 1 ? "" : "s"}`,
-      searchPlaceholder: "Search staff", newStaff: "+ New Staff",
+      searchPlaceholder: "Search staff", newStaff: "New Staff",
       colName: "Name", colEmail: "Email", colContact: "Contact", colClients: "Clients", colStatus: "Status",
       accountFixed: "Regular", accountReplacement: "Temporary replacement",
       modalNewTitle: "New Staff", modalEditTitle: "Edit Staff",
@@ -1143,7 +1143,7 @@ const T = {
     clientes: {
       title: "Clients",
       subtitle: (n) => `${n} client${n === 1 ? "" : "s"} actif${n === 1 ? "" : "s"}`,
-      searchPlaceholder: "Rechercher un client", newClient: "+ Nouveau client",
+      searchPlaceholder: "Rechercher un client", newClient: "Nouveau client",
       colClient: "Client", colName: "Nom", colCity: "Ville", colContact: "Contact", colHours: "Heures",
       colContractRange: "Début \\ Fin", colTeam: "Équipe", colHoursPeriod: "Heures sur la période", colContract: "Contrat",
       perMonth: "par mois",
@@ -1276,7 +1276,7 @@ const T = {
     funcionarios: {
       title: "Employés",
       subtitle: (n) => `${n} employé${n === 1 ? "" : "s"}`,
-      searchPlaceholder: "Rechercher un employé", newStaff: "+ Nouvel employé",
+      searchPlaceholder: "Rechercher un employé", newStaff: "Nouvel employé",
       colName: "Nom", colEmail: "Email", colContact: "Contact", colClients: "Clients", colStatus: "Statut",
       accountFixed: "Fixe", accountReplacement: "Remplacement temporaire",
       modalNewTitle: "Nouvel employé", modalEditTitle: "Modifier l'employé",
