@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useId } from "react";
+import { useState, useEffect, useId } from "react";
 import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -28,40 +28,90 @@ const TODAY_COLUMN_BG = "#F5FAF7";
 // qui/sex/sáb/dom, escondendo "hoje" quando calha de ser um desses dias.
 // Grid com colunas elásticas (`minmax`) estica os 7 dias pra preencher o
 // espaço disponível, cabendo sem rolar na maioria dos PCs (o `shell` mais
-// largo desta tela, em App.jsx, ajuda bastante aqui) — só volta a rolar
-// pro lado (rede de segurança, ver `overflowX: "auto"` mais abaixo) em
-// portáteis mais estreitos (ex.: 1280-1366px, comuns o bastante pra não
-// poderem simplesmente esconder dias sem alcance nenhum).
-const AGENDA_GRID_COLS = "230px repeat(7, minmax(110px, 1fr))";
+// largo desta tela, em App.jsx, ajuda bastante aqui).
+//
+// QA (achado do Iago, 2ª volta): mesmo com `minmax`, a largura MÍNIMA
+// somada (coluna de funcionário + 7×110px) ainda passava da área de
+// conteúdo disponível em portáteis comuns (1280-1366px), sobrando a
+// barra de scroll horizontal que se queria evitar. A coluna de
+// funcionário (230px) é onde dava pra cortar mais sem perder nada: o
+// layout horizontal (avatar + nome + etiquetas todos numa linha, que
+// quebrava em várias) só existia por causa da largura generosa; empilhar
+// avatar/nome/etiquetas/horas verticalmente (ver `renderStaffRow` mais
+// abaixo) lê tão bem numa coluna estreita quanto na larga, e os 90px
+// que isso liberta (230 -> 140) vão inteiros pros 7 dias, que é a parte
+// que a gerência realmente quer ver sem rolar.
+const AGENDA_GRID_COLS = "140px repeat(7, minmax(110px, 1fr))";
+
+// QA (achado do Iago — "Agendas"): os dois popovers desta tela ("quem
+// está no cliente" e "adicionar cliente", ambos abaixo) eram pedaços de
+// UI `position: absolute` ancorados à célula clicada — dentro de uma
+// grade com `overflowX: auto` (ver `AGENDA_GRID_COLS` mais abaixo) isso
+// cortava o popover sempre que a célula estava perto da borda ou numa
+// linha perto do fim, daí toda a lógica de `popoverDir`/`dir` só pra
+// decidir se abria pra cima ou pra baixo — e mesmo assim nem sempre
+// cabia. Virar diálogo modal centrado (mesmo padrão do `ConfirmDialog`:
+// fundo `rgba(15,49,41,.45)`, cartão branco com `RADIUS.card`/
+// `SHADOW.sh2`, Esc e clique fora fecham) resolve de raiz — um modal
+// `position: fixed` nunca é cortado pelo scroll da grade, e sobra o
+// mesmo componente pros dois popovers (`AgendaModal`, com cabeçalho +
+// botão fechar padronizados), em vez de reimplementar o fecho por
+// Esc/clique-fora em cada um.
+function AgendaModal({ title, titleId, onClose, closeLabel, width = 340, children }) {
+  useEffect(() => {
+    function onKeyDown(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog" aria-labelledby={titleId}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(15,49,41,.45)", zIndex: 90,
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.card, width, maxWidth: "100%", maxHeight: "min(80vh, 480px)",
+          display: "flex", flexDirection: "column", borderRadius: RADIUS.card, boxShadow: SHADOW.sh2,
+          padding: 18, boxSizing: "border-box",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+          <div id={titleId} style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{title}</div>
+          <button
+            type="button" onClick={onClose} aria-label={closeLabel}
+            style={{
+              width: 28, height: 28, borderRadius: "50%", border: "none", background: COLORS.bg,
+              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+              color: COLORS.ink3, flexShrink: 0,
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ overflowY: "auto", minHeight: 0 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Lote 4, 4.6 (achado da Marta): "quem está no cliente" — o bloco
 // compartilhado (chip na vista "Por funcionário", avatares na coluna
-// "Quem" da vista "Por dia") vira um botão focável; isto é o popover que
+// "Quem" da vista "Por dia") vira um botão focável; isto é o modal que
 // abre, com nomes+mini-avatares+duração de cada um, "Remover" sempre
 // visível (sem precisar de hover) e "Adicionar" pra juntar outro
-// funcionário a este cliente neste dia. Esc e clique fora fecham —
-// mesmo padrão do `InfoTip.jsx` (useEffect com listeners em `document`
-// só enquanto aberto), adaptado de tooltip pra popover/diálogo: aqui
-// abre só por clique/Enter (não por hover/focus), e usa `role="dialog"`
-// em vez de `role="tooltip"` porque o conteúdo já não é só texto.
-function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, onAdd, onClose, dir = "down" }) {
+// funcionário a este cliente neste dia.
+function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, onAdd, onClose }) {
   const [adding, setAdding] = useState(false);
   const [addSearch, setAddSearch] = useState("");
-  const rootRef = useRef(null);
   const titleId = useId();
-
-  useEffect(() => {
-    function onKeyDown(e) { if (e.key === "Escape") onClose(); }
-    function onPointerDown(e) {
-      if (rootRef.current && !rootRef.current.contains(e.target)) onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
-  }, [onClose]);
 
   const availableStaff = staff
     .filter((s) => !team.some((m) => m.id === s.id))
@@ -69,18 +119,7 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <div
-      ref={rootRef} role="dialog" aria-labelledby={titleId}
-      style={{
-        position: "absolute", left: 0, width: 240, zIndex: 20,
-        ...(dir === "up" ? { bottom: "100%", marginBottom: 4 } : { top: "100%", marginTop: 4 }),
-        background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control,
-        boxShadow: SHADOW.sh2, padding: 10,
-      }}
-    >
-      <div id={titleId} style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>
-        {client.name} · {t.peopleLabel(team.length)}
-      </div>
+    <AgendaModal titleId={titleId} title={`${client.name} · ${t.peopleLabel(team.length)}`} onClose={onClose} closeLabel={c0.close}>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {team.map((member) => (
           <div key={member.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -140,7 +179,7 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
           <Plus size={13} /> {t.addPerson}
         </button>
       )}
-    </div>
+    </AgendaModal>
   );
 }
 
@@ -155,16 +194,15 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
   const [search, setSearch] = useState("");
   const [view, setView] = useState("staff"); // "staff" | "day"
-  const [openCell, setOpenCell] = useState(null);
   // Lote 4, 4.6 (achado do Iago — "a busca de cliente aparece muito em
-  // baixo"): o popover de adicionar cliente/ver equipa sempre abria PARA
-  // BAIXO (`top: 100%`), então numa linha perto do fim da tabela ele
-  // nascia fora da vista, obrigando a rolar a página só pra achar o campo
-  // de busca que tinha acabado de abrir. `popoverDir` olha o espaço real
-  // (`getBoundingClientRect` contra `window.innerHeight`) no momento do
-  // clique e decide abrir pra cima quando não cabe embaixo.
-  const [openCellDir, setOpenCellDir] = useState("down");
-  const [openTeamDir, setOpenTeamDir] = useState("down");
+  // baixo"): o popover de adicionar cliente/ver equipa já abriu PARA
+  // BAIXO (`top: 100%`) ancorado à célula — numa linha perto do fim da
+  // tabela ele nascia fora da vista, obrigando a rolar a página só pra
+  // achar o campo de busca que tinha acabado de abrir. Virou modal
+  // centrado (ver `AgendaModal`, mais acima) nesta volta de QA, o que já
+  // resolve isto por conta própria — sem precisar mais de saber a direção
+  // de abertura.
+  const [openCell, setOpenCell] = useState(null);
   const [cellSearch, setCellSearch] = useState("");
   const [hoverCell, setHoverCell] = useState(null);
   const [toast, setToast] = useState(null);
@@ -184,14 +222,6 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   function showToast(message, opts) {
     setToast({ message, ...opts });
     setTimeout(() => setToast((cur) => (cur && cur.message === message ? null : cur)), 5000);
-  }
-
-  // ~260px é a altura máxima aproximada de qualquer um dos dois
-  // popovers (lista de clientes com busca, ou equipa do cliente) —
-  // espaço insuficiente abaixo do botão clicado manda abrir pra cima.
-  function popoverDir(e) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    return window.innerHeight - rect.bottom < 260 ? "up" : "down";
   }
 
   function cellKey(staffId, day) { return `${staffId}-${day}`; }
@@ -283,25 +313,36 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
     const inactive = !isStaffActive(s, TODAY);
     return (
       <div key={s.id} style={{ display: "grid", gridTemplateColumns: AGENDA_GRID_COLS, borderBottom: `1px solid ${COLORS.lineSoft}`, opacity: inactive ? 0.6 : 1 }}>
+        {/* QA (achado do Iago, 2ª volta — "Agendas"): era uma linha
+            horizontal (avatar + nome + etiquetas lado a lado, quebrando
+            quando não cabia) dentro de uma coluna de 230px; estreitada
+            pra 140px (`AGENDA_GRID_COLS`, pra libertar espaço pros 7
+            dias e matar a barra de scroll horizontal), essa disposição
+            ficaria espremida. Empilhada (avatar no topo, nome/etiquetas/
+            horas centrados abaixo) lê bem numa coluna estreita sem
+            encolher o avatar nem cortar nomes longos. */}
         <div
           style={{
             position: "sticky", left: 0, zIndex: 1, background: COLORS.card,
-            display: "flex", flexDirection: "column", justifyContent: "center", gap: 4, padding: "10px 16px",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            textAlign: "center", gap: 4, padding: "10px 8px",
             borderRight: `1px solid ${COLORS.line}`,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <Avatar name={s.name} size={32} />
-            <span style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.ink }}>{s.name}</span>
-            {/* Bug pré-existente (Etapa 4e) encontrado de passagem ao mexer
-                nesta linha agora: `funcionarios.roleSupervisor` nunca
-                existiu no i18n (só `acessos.roleSupervisor`) — a etiqueta
-                renderizava a palavra "undefined" pra qualquer supervisor
-                nesta grelha. Corrigido aqui (ver LEIA-ME). */}
-            {s.role === "supervisor" && <SupervisorTag kind="role">{T[lang].acessos.roleSupervisor}</SupervisorTag>}
-            {inactive && <Pill variant="missing">{T[lang].common.inactive}</Pill>}
-          </div>
-          <div style={{ fontSize: 11.5, color: COLORS.ink2, paddingLeft: 40 }}>
+          <Avatar name={s.name} size={32} />
+          <span style={{ fontWeight: 600, fontSize: 12.5, color: COLORS.ink, lineHeight: 1.25, wordBreak: "break-word" }}>{s.name}</span>
+          {/* Bug pré-existente (Etapa 4e) encontrado de passagem ao mexer
+              nesta linha agora: `funcionarios.roleSupervisor` nunca
+              existiu no i18n (só `acessos.roleSupervisor`) — a etiqueta
+              renderizava a palavra "undefined" pra qualquer supervisor
+              nesta grelha. Corrigido aqui (ver LEIA-ME). */}
+          {(s.role === "supervisor" || inactive) && (
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 4 }}>
+              {s.role === "supervisor" && <SupervisorTag kind="role">{T[lang].acessos.roleSupervisor}</SupervisorTag>}
+              {inactive && <Pill variant="missing">{T[lang].common.inactive}</Pill>}
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: COLORS.ink2 }}>
             {inactive && s.accountType === "replacement" && s.validUntil
               ? t.inactiveExpiredOn(dmFromIso(s.validUntil))
               : `${fmtHoursScreen(staffWeekMinutes(s.id) / 60)} ${t.weekTotalSuffix}`}
@@ -355,7 +396,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                       <button
                         type="button" title={tooltip}
                         aria-haspopup="dialog" aria-expanded={isTeamOpen}
-                        onClick={(e) => { setOpenTeam((k) => (k === thisTeamKey ? null : thisTeamKey)); setOpenTeamDir(popoverDir(e)); }}
+                        onClick={() => setOpenTeam((k) => (k === thisTeamKey ? null : thisTeamKey))}
                         style={{
                           display: "flex", alignItems: "center", gap: 4, height: 30, width: "100%", borderRadius: RADIUS.chip,
                           padding: "0 8px", background: COLORS.clayTint, fontSize: 12.5, border: "none", cursor: "pointer",
@@ -377,7 +418,6 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                           onRemove={(staffId) => removeClient(staffId, day, cid)}
                           onAdd={(staffId) => mergeAdd(cellKey(staffId, day), cid)}
                           onClose={() => setOpenTeam(null)}
-                          dir={openTeamDir}
                         />
                       )}
                     </div>
@@ -411,24 +451,13 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                 );
               })}
 
-              {isOpenPopover ? (
-                <div
-                  style={{
-                    position: "absolute", left: 0, width: 250, zIndex: 10,
-                    ...(openCellDir === "up" ? { bottom: "100%", marginBottom: 4 } : { top: "100%", marginTop: 4 }),
-                    background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, boxShadow: SHADOW.sh2, padding: 10,
-                  }}
+              {isOpenPopover && (
+                <AgendaModal
+                  titleId={`cell-add-${key}`} title={t.addClientPlaceholder} closeLabel={c0.cancel}
+                  onClose={() => { setOpenCell(null); setCellSearch(""); }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                    <SearchField value={cellSearch} onChange={setCellSearch} placeholder={t.addClientPlaceholder} style={{ flex: 1 }} />
-                    <button
-                      type="button" onClick={() => { setOpenCell(null); setCellSearch(""); }} aria-label={c0.cancel}
-                      style={{ border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, flexShrink: 0, display: "flex" }}
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                  <div style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+                  <SearchField value={cellSearch} onChange={setCellSearch} placeholder={t.addClientPlaceholder} style={{ marginBottom: 10, width: "100%" }} />
+                  <div style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
                     {availableClients.length === 0 ? (
                       <div style={{ fontSize: 12.5, color: COLORS.ink2, padding: "8px 6px" }}>{t.noClientsAvailable}</div>
                     ) : availableClients.map((c) => {
@@ -450,11 +479,12 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                       );
                     })}
                   </div>
-                </div>
-              ) : isHovered && (
+                </AgendaModal>
+              )}
+              {!isOpenPopover && isHovered && (
                 <button
                   type="button"
-                  onClick={(e) => { setOpenCell(key); setOpenCellDir(popoverDir(e)); }}
+                  onClick={() => setOpenCell(key)}
                   aria-label={t.addClientPlaceholder}
                   style={{
                     height: 28, borderRadius: RADIUS.chip, border: `1.5px dashed ${COLORS.lineInput}`, background: "transparent",
@@ -544,7 +574,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
           <div style={{ position: "relative" }}>
             <button
               type="button" aria-haspopup="dialog" aria-expanded={isOpen}
-              onClick={(e) => { setOpenTeam((k) => (k === key ? null : key)); setOpenTeamDir(popoverDir(e)); }}
+              onClick={() => setOpenTeam((k) => (k === key ? null : key))}
               style={{
                 display: "flex", flexWrap: "wrap", gap: 8, border: "none", background: "transparent",
                 cursor: "pointer", padding: 0, fontFamily: "inherit", textAlign: "left",
@@ -563,7 +593,6 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                 onRemove={(staffId) => removeClient(staffId, selectedDay, r.client.id)}
                 onAdd={(staffId) => mergeAdd(cellKey(staffId, selectedDay), r.client.id)}
                 onClose={() => setOpenTeam(null)}
-                dir={openTeamDir}
               />
             )}
           </div>
@@ -657,9 +686,9 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                 <div
                   style={{
                     position: "sticky", left: 0, zIndex: 4, background: COLORS.headerTint,
-                    display: "flex", alignItems: "center", padding: "0 16px", height: 44,
-                    fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: COLORS.ink2,
-                    borderRight: `1px solid ${COLORS.line}`,
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: "0 8px", height: 44,
+                    fontSize: 11.5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: COLORS.ink2,
+                    borderRight: `1px solid ${COLORS.line}`, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
                   }}
                 >
                   {t.colStaff}
@@ -725,7 +754,8 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                 <div
                   style={{
                     position: "sticky", left: 0, background: COLORS.headerTint,
-                    padding: "10px 16px", fontSize: 12, fontWeight: 700, color: COLORS.ink2, borderRight: `1px solid ${COLORS.line}`,
+                    padding: "10px 8px", fontSize: 11.5, fontWeight: 700, color: COLORS.ink2, textAlign: "center",
+                    borderRight: `1px solid ${COLORS.line}`,
                   }}
                 >
                   {t.footerLabel}

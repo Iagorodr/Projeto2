@@ -46,6 +46,18 @@ const inputStyle = {
 // fluxo": a branch `isSupabaseConfigured` (login real) e o modo de
 // demonstração (toggle Gerência/Funcionário) continuam exatamente como
 // estavam — só a casca visual muda.
+//
+// QA (achado do Iago): os dois "gradientes" desta tela não apareciam de
+// verdade. (1) O fundo era uma cor lisa (`#E2EBE7`, sem transição
+// nenhuma) — só o nome da variável/comentário chamava de "fundo", nunca
+// foi de facto um gradiente. (2) O brilho radial clay estava centrado em
+// "50% 28%" — exatamente onde o cartão (também centrado, 420px) fica
+// por cima dele — então o próprio brilho nascia escondido debaixo do
+// cartão opaco, sobrando só uma sombra quase impercetível nas bordas.
+// Fundo trocado por um `linear-gradient` real (tons forest/verde claro,
+// mesma "teoria" de paleta do `AppSidebar.jsx`, só que em claro em vez
+// de escuro) e o brilho clay subido pro topo ("50% 0%"), onde fica
+// visível por cima e ao lado do cartão em vez de atrás dele.
 function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLoginWithPassword, authLoading, authError, company, staff }) {
   const t = T[lang].login;
   const [mode, setMode] = useState("gerencia"); // 'gerencia' | 'funcionario' — só usado no modo de demonstração
@@ -64,14 +76,15 @@ function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLogi
     <div
       style={{
         minHeight: "100vh", width: "100%", position: "relative", boxSizing: "border-box",
-        background: "#E2EBE7", display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        background: "linear-gradient(160deg, #EDF4F1 0%, #DCE8E2 55%, #CBDDD3 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       }}
     >
       <div
         aria-hidden="true"
         style={{
           position: "absolute", inset: 0,
-          background: "radial-gradient(circle at 50% 28%, rgba(226,138,101,.16), transparent 60%)",
+          background: "radial-gradient(circle at 50% 0%, rgba(226,138,101,.22), transparent 55%)",
         }}
       />
 
