@@ -2,7 +2,19 @@
 import { COLORS } from "./colors.js";
 
 const styles = {
-  page: { background: COLORS.bg, minHeight: "700px", display: "flex", justifyContent: "center", padding: "20px", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", color: COLORS.text },
+  // QA (achado do Iago — "às vezes dá esse erro, tenho que fechar e abrir
+  // de novo"): faltava `flexDirection: "column"` aqui. Sem ela, um
+  // `display:flex` vira `row` por padrão — invisível enquanto só existe
+  // UM filho direto (a tela em si, ver App.jsx), mas o aviso
+  // `c.loadError` (App.jsx, quando uma leitura do Supabase falha) é um
+  // SEGUNDO filho direto deste mesmo contentor. Em `row`, os dois filhos
+  // disputavam a mesma linha horizontal — o aviso virava uma faixa
+  // estreita colada à esquerda e a tela inteira espremia/cortava ao
+  // lado dele, em vez do aviso simplesmente aparecer empilhado por cima
+  // da tela. Não era preciso "fechar e abrir de novo" pra corrigir —
+  // só não havia como sair desse estado pela interface, já que o
+  // próprio layout tinha quebrado.
+  page: { background: COLORS.bg, minHeight: "700px", display: "flex", flexDirection: "column", justifyContent: "center", padding: "20px", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", color: COLORS.text },
   // Lote 4, 4.2 (achado da Marta): era `overflow: "hidden"` — isso faz
   // deste `shell` a "janela de rolagem" de referência para qualquer
   // `position: sticky` lá dentro (mesmo sem overflow real, por ser
