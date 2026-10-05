@@ -420,13 +420,18 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   return (
     <div style={{ background: COLORS.page, paddingBottom: (!isDesktop && chunkZone !== "before" && !monthFinalized) ? 132 : 32 }}>
       <div style={{ padding: "16px 16px 0", maxWidth: containerMaxWidth, margin: "0 auto" }}>
-        <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+        {/* QA (achado do Iago, 3ª volta): título "Horas" removido daqui —
+            o item ativo do menu de baixo já diz em que tela se está, e
+            sem o título a fileira de troca de semana sobe, ficando mais
+            perto do cabeçalho (voltar + idioma). Mesmo tratamento da
+            Agenda, pro par de telas ficar igual. */}
+        <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
         {!monthFinalized && myHoras.reopened && (
           <div style={{ marginBottom: 10 }}><Pill variant="reopened">{t.reopenedPill}</Pill></div>
         )}
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 6, marginTop: -4 }}>
           <button type="button" onClick={() => goChunk(-1)} aria-label="anterior" style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
             <ChevronLeftMini />
           </button>
@@ -687,10 +692,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       {chunkZone !== "before" && !monthFinalized && !isDesktop && (
         <BottomActionBar
           totalLabel={`${t.dayTotalLabel} · ${fmtHoursScreen(dayTotalHours(selectedKey))}`}
-          primaryLabel={t.finalizeDay}
+          primaryLabel={entriesForDay.length === 0 ? t.markClientButton : t.finalizeDay}
           onPrimary={() => setFinalizeDaySheetOpen(true)}
           primaryDisabled={weekLockedFlag || entriesForDay.length === 0}
-          primaryDisabledReason={!weekLockedFlag && entriesForDay.length === 0 ? t.noClientsDisabledReason : undefined}
           secondaryLabel={weekEligible ? t.finalizeWeek : undefined}
           onSecondary={weekEligible ? () => setConfirmWeekOpen(true) : undefined}
           floatAboveMobileBar={isMobileTier}

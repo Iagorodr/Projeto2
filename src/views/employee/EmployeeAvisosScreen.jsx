@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, MapPin, HelpCircle, PackageX, Home as HouseIcon } from "lucide-react";
+import { Plus, MapPin, HelpCircle, PackageX } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -7,9 +7,9 @@ import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { clientById, staffById, isoDateStr, fmtNoteDate, getAssignedClientIds } from "../../models/utils.js";
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
-import { LangSwitcher, Field } from "../shared/Layout.jsx";
+import { Field } from "../shared/Layout.jsx";
 import {
-  PageHeader, Button, Drawer, Pill, SupervisorTag, FilterChip, SearchSelect, PhotoDropzone, Card, Toast,
+  PageHeader, Button, Drawer, Pill, SupervisorTag, FilterChip, SearchSelect, PhotoDropzone, Card, Toast, MobileHeader,
 } from "../shared/ui/index.js";
 import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
 
@@ -378,13 +378,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
 
   return (
     <div style={mobStyles.phone}>
-      <div style={mobStyles.header}>
-        <button style={mobStyles.homeIcon} onClick={onHome} aria-label={t.backLabel}>
-          <HouseIcon size={18} color={COLORS.textSoft} />
-        </button>
-        <LangSwitcher lang={lang} setLang={setLang} />
-      </div>
-      <h1 style={mobStyles.title}>{t.title}</h1>
+      <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
       <Button size="mobile" icon={Plus} onClick={openSheet} style={{ width: "100%", marginBottom: isSupervisor ? 8 : 16 }}>{t.newAviso}</Button>
       {isSupervisor && (

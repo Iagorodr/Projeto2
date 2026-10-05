@@ -73,11 +73,18 @@ function CompactLangSwitcher({ lang, setLang, langNames }) {
 // EmployeeAvisosScreen, EmployeeAgendaScreen, EmployeeHistoricoScreen) —
 // "unificar". Os dois passam a usar o mesmo alvo mínimo de toque (48 no
 // celular, via `useControlSize`).
+//
+// QA (achado do Iago, 3ª volta): `title` agora é OPCIONAL — pedido
+// explícito pra Horas ("retire o título Horas de dentro da página", o
+// nome da tela já está claro pelo item ativo do menu de baixo) e seguido
+// também na Agenda, pra ficar igual ("seguindo o estilo da página
+// horas", mesmo pedido). Sem título, a margem de baixo some (era só
+// espaço entre o título e o que vem a seguir).
 function MobileHeader({ onBack, backLabel = "Voltar", title, lang, setLang, langNames }) {
   const { minTap: backDim } = useControlSize();
   return (
-    <div style={{ marginBottom: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+    <div style={{ marginBottom: title ? 18 : 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         {onBack ? (
           <button
             type="button" onClick={onBack} aria-label={backLabel}
@@ -91,9 +98,11 @@ function MobileHeader({ onBack, backLabel = "Voltar", title, lang, setLang, lang
         ) : <span />}
         {lang && setLang && langNames && <CompactLangSwitcher lang={lang} setLang={setLang} langNames={langNames} />}
       </div>
-      <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 28, color: COLORS.ink, textAlign: "left" }}>
-        {title}
-      </div>
+      {title && (
+        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 28, color: COLORS.ink, textAlign: "left", marginTop: 14 }}>
+          {title}
+        </div>
+      )}
     </div>
   );
 }

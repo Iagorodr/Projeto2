@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Search, Home as HouseIcon, Store, MapPin, Clock, Megaphone } from "lucide-react";
+import { ChevronDown, Search, Store, MapPin, Clock, Megaphone } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -7,8 +7,7 @@ import { RADIUS } from "../../styles/tokens.js";
 import { TYPE_ICONS, LANG_NAMES } from "../../models/data.js";
 import { fmtMinutes, getAssignedClientIds } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
-import { LangSwitcher } from "../shared/Layout.jsx";
-import { PageHeader, SearchField, Card } from "../shared/ui/index.js";
+import { PageHeader, SearchField, Card, MobileHeader } from "../shared/ui/index.js";
 
 // Mesma divisão de nome usada em ClientesScreen.jsx (gerência, Etapa 4f) —
 // duplicada aqui de propósito (não há módulo de utilidades "só de ecrã"
@@ -185,12 +184,7 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
 
   return (
     <div style={mobStyles.phone}>
-      <div style={mobStyles.header}>
-        <button style={mobStyles.homeIcon} onClick={onHome} aria-label={t.backLabel}>
-          <HouseIcon size={18} color={COLORS.textSoft} />
-        </button>
-        <LangSwitcher lang={lang} setLang={setLang} />
-      </div>
+      <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
       <div
         style={{
           ...mobStyles.searchWrap,

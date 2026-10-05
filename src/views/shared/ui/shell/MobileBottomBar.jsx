@@ -7,47 +7,41 @@
 //
 // Introduzido na Etapa 3 (casca); já ligado a App.jsx desde a Etapa 4.
 //
-// QA (achado do Iago, 2ª volta — "tá feio, segue estes exemplos"):
-// mandou uma folha de referência com 11 estilos de barra inferior
-// (Glassmorphism, Floating, Neumorphism, Pill Highlight, Center FAB,
-// Gradient Bold, Outline Icons, Tab with Indicator, Curved Background,
-// Dock Style iOS...) pra escolher uma direção e adotar — confirmado
-// "Dock flutuante, verde escuro": mistura "Dock Style (iOS)" +
-// "Pill Highlight" dos exemplos, mas SEM trocar de paleta — mantém o
-// mesmo gradiente forest escuro + brilho clay do `AppSidebar.jsx` (ver
-// comentário mais antigo abaixo), só muda a FORMA. Antes era uma faixa
-// reta, encostada nas 3 bordas (esquerda/direita/baixo), sem elevação —
-// agora "descola": margem nos 3 lados, cantos arredondados nos 4
-// (RADIUS.card, mesmo raio das outras superfícies elevadas do app, não
-// um valor novo) e `SHADOW.sh2` (mesma sombra de popover/diálogo) pra
-// dar profundidade. O item ativo ganha uma pílula CLAY SÓLIDA (antes era
-// um branco translúcido quase imperceptível) — ícone escuro por cima
-// (`#3A1A0D`, mesmo tom já usado no texto do selo de Avisos sobre clay,
-// pra manter contraste) — mais perto do "Pill Highlight" do exemplo.
-// `marginBottom` passa a somar a área segura do iPhone (`env(...)`) à
-// folga de flutuação (10px) em vez de só `paddingBottom`, senão a barra
-// flutuante ficaria "grudada" no próprio entalhe/gesture-bar.
+// QA (achado do Iago, 3ª volta — texto do Tomás/Toni): volta a ficar
+// COLADA nas 3 bordas (esquerda/direita/baixo), sem margem nem cantos
+// arredondados nem sombra de elevação — desfaz o "dock flutuante" da 2ª
+// volta (decisão revista explicitamente pelo Iago depois de ver o texto
+// do Tomás, não um esquecimento). Também cresce: conteúdo com ~100px de
+// altura total (antes ~60), ícone 26→28, rótulo 12→13.5 semibold. Como já
+// não flutua, a área segura do iPhone (`env(...)`) vira `paddingBottom`
+// da própria barra (soma à altura visível) em vez de `marginBottom`
+// (que só fazia sentido pra abrir um vão por baixo da barra flutuante).
+// `BottomActionBar.jsx` (Horas) tem seu próprio comentário explicando
+// como o novo offset acompanha essa altura maior.
 //
 // QA (achado do Iago, 1ª volta): recolorida pra seguir a mesma "teoria"
-// do menu de PC/tablet (AppSidebar.jsx) — fundo verde-escuro (gradiente,
-// não só forest900 sólido — ver `background` abaixo), ícone/rótulo
-// brancos translúcidos por omissão e clay (laranja) no item selecionado.
-// Faixa também ficou mais alta (ícone 24→26, blocos e paddings maiores).
+// do menu de PC/tablet (AppSidebar.jsx) — fundo verde-escuro (gradiente),
+// ícone/rótulo brancos translúcidos por omissão e clay (laranja) no item
+// selecionado.
+//
+// QA (achado do Iago, 3ª volta): gradiente trocado por um verde mais
+// vivo — era quase preto (#16483A→#0F3129, perto do forest900); agora
+// forest600→forest800, a mesma família mas claramente mais verde/vivo em
+// vez de ficar quase sem matiz.
 import { COLORS } from "../../../../styles/colors.js";
-import { RADIUS, SHADOW } from "../../../../styles/tokens.js";
+import { RADIUS } from "../../../../styles/tokens.js";
 
 function MobileBottomBar({ items, activeKey, onNavigate }) {
   return (
     <div
       style={{
         position: "sticky", bottom: 0, zIndex: 30,
-        margin: "0 10px", marginBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)",
-        borderRadius: RADIUS.card, boxShadow: SHADOW.sh2,
         background:
           "radial-gradient(circle at 10% 8%, rgba(226,138,101,.18), transparent 45%), " +
-          "linear-gradient(180deg, #16483A 0%, #0F3129 100%)",
+          "linear-gradient(180deg, #1F6F5C 0%, #143F35 100%)",
         display: "flex", justifyContent: "space-around",
-        padding: "10px 4px",
+        padding: "18px 4px",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)",
       }}
     >
       {items.map((item) => {
@@ -61,18 +55,18 @@ function MobileBottomBar({ items, activeKey, onNavigate }) {
             type="button"
             onClick={() => onNavigate(item.key)}
             style={{
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
-              width: 64, height: 40, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
+              width: 66, height: 64, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit",
               position: "relative",
             }}
           >
             <span
               style={{
-                width: 46, height: 30, borderRadius: RADIUS.chip, display: "flex", alignItems: "center", justifyContent: "center",
+                width: 48, height: 32, borderRadius: RADIUS.chip, display: "flex", alignItems: "center", justifyContent: "center",
                 background: active ? COLORS.clay : "transparent", position: "relative",
               }}
             >
-              <Icon size={26} strokeWidth={1.8} color={iconColor} />
+              <Icon size={28} strokeWidth={1.8} color={iconColor} />
               {item.badge != null && item.badge > 0 && (
                 <span
                   style={{
@@ -86,7 +80,7 @@ function MobileBottomBar({ items, activeKey, onNavigate }) {
                 </span>
               )}
             </span>
-            <span style={{ fontSize: 12, fontWeight: active ? 700 : 500, color: labelColor }}>
+            <span style={{ fontSize: 13.5, fontWeight: active ? 700 : 600, color: labelColor }}>
               {item.label}
             </span>
           </button>

@@ -12,9 +12,18 @@
 // lugar no fundo da janela em vez de empilhar. `floatAboveMobileBar`
 // (quem monta o ecrã decide, conforme a camada — ver
 // EmployeeHorasScreen.jsx) sobe esta barra pra ficar ACIMA do espaço que
-// a MobileBottomBar ocupa (altura 60 + folga de flutuação 10 + área
-// segura do iPhone, ver MobileBottomBar.jsx) em vez de ficar colada em
-// `bottom:0`, com mais 8px de respiro entre as duas.
+// a MobileBottomBar ocupa em vez de ficar colada em `bottom:0`. Offset
+// atualizado junto com a volta da MobileBottomBar pro estilo "colado"
+// (mesma volta, texto do Tomás/Toni): 100px de altura de conteúdo
+// (18px + botão 64 + 18px, ver MobileBottomBar.jsx) + área segura do
+// iPhone, já que agora ela soma via `paddingBottom` da própria barra em
+// vez de `marginBottom` de um vão de flutuação.
+//
+// QA (achado do Iago, 3ª volta): o botão principal passa a TROCAR DE
+// TEXTO ("Marque um cliente" enquanto não há nada marcado → "Finalizar
+// dia" assim que há) em vez do padrão do resto do app (mesmo texto +
+// explicação por baixo quando desativado) — decisão consciente, pedida
+// explicitamente pro Tomás/Toni, só pra este botão.
 import { COLORS } from "../../../../styles/colors.js";
 import { FONT } from "../../../../styles/tokens.js";
 import { Button } from "../Button.jsx";
@@ -27,7 +36,7 @@ function BottomActionBar({
     <div
       style={{
         position: "sticky",
-        bottom: floatAboveMobileBar ? "calc(env(safe-area-inset-bottom, 0px) + 78px)" : 0,
+        bottom: floatAboveMobileBar ? "calc(env(safe-area-inset-bottom, 0px) + 100px)" : 0,
         left: 0, right: 0, background: COLORS.card,
         borderTop: `1px solid ${COLORS.line}`, padding: "12px 16px",
         display: "flex", flexDirection: "column", gap: 10,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Home as HouseIcon, RefreshCw, UsersRound } from "lucide-react";
+import { RefreshCw, UsersRound } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -10,8 +10,7 @@ import {
   weekLabelPT, isStaffActive, monthAbbr,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
-import { LangSwitcher } from "../shared/Layout.jsx";
-import { PageHeader, Pill } from "../shared/ui/index.js";
+import { PageHeader, Pill, MobileHeader } from "../shared/ui/index.js";
 import { ChevronLeftMini, ChevronRightMini } from "../shared/Icons.jsx";
 
 // Mesma divisão de nome usada em EmployeeClientesScreen.jsx/ClientesScreen.jsx
@@ -237,17 +236,23 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
 
   return (
     <div style={mobStyles.phone}>
-      <div style={mobStyles.header}>
-        <button style={mobStyles.homeIcon} onClick={onHome} aria-label={t.backLabel}>
-          <HouseIcon size={18} color={COLORS.textSoft} />
+      {/* QA (achado do Iago, 3ª volta — "mesmo contexto, páginas
+          diferentes"): cabeçalho trocado pelo `MobileHeader` já usado em
+          Horas (seta de voltar em vez do ícone de casa, idioma "PT"
+          compacto no mesmo lugar, sem título — ver comentário em
+          EmployeeHorasScreen.jsx) e a fileira de troca de semana que
+          segue usa o MESMO estilo de botão de Horas (círculo 40,
+          COLORS.line/COLORS.card) em vez do `mobStyles.periodNav`
+          antigo (48, cantos só arredondados, cores diferentes). */}
+      <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 16 }}>
+        <button type="button" aria-label={t.previousWeek} onClick={() => goWeek(-1)} style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <ChevronLeftMini />
         </button>
-        <LangSwitcher lang={lang} setLang={setLang} />
-      </div>
-      <h1 style={mobStyles.title}>{t.title}</h1>
-      <div style={mobStyles.weekNav}>
-        <button type="button" aria-label={t.previousWeek} style={{ ...mobStyles.periodNav, width: 48, height: 48 }} onClick={() => goWeek(-1)}><ChevronLeftMini /></button>
-        <span style={mobStyles.weekLabel}>{weekLabelPT(weekStart, lang)}</span>
-        <button type="button" aria-label={t.nextWeek} style={{ ...mobStyles.periodNav, width: 48, height: 48 }} onClick={() => goWeek(1)}><ChevronRightMini /></button>
+        <span style={{ fontSize: 22, fontWeight: 700, color: COLORS.ink, textAlign: "center" }}>{weekLabelPT(weekStart, lang)}</span>
+        <button type="button" aria-label={t.nextWeek} onClick={() => goWeek(1)} style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <ChevronRightMini />
+        </button>
       </div>
       <div style={mobStyles.dayList}>
         {AGENDA_DAYS.map((day) => {

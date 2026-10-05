@@ -3,7 +3,17 @@ import { COLORS } from "./colors.js";
 
 const mobStyles = {
   page: { background: COLORS.bg, minHeight: "700px", display: "flex", justifyContent: "center", padding: "24px 16px", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", color: COLORS.text },
-  phone: { width: "100%", maxWidth: 400, background: COLORS.surface, borderRadius: 20, border: `1px solid ${COLORS.border}`, padding: "18px 18px 22px", position: "relative" },
+  // QA (achado do Iago, 3ª volta — "só a página Horas não tem o fundo
+  // branco atrás"): era o contrário do que parecia — Horas (ecrã mais
+  // novo) não embrulha tudo numa caixa branca sólida, só deixa o fundo
+  // claro da própria casca (COLORS.bg/page, #F3F6F4 — já não é #FFFFFF
+  // puro) aparecer por trás dos cartões brancos individuais. Estas telas
+  // mais antigas faziam o oposto: uma única "caixa" branca (`background`/
+  // `border`/`borderRadius` abaixo) por cima de tudo, escondendo esse
+  // tom. Removidos os três pra ficar igual a Horas em todas — o Iago
+  // pediu exatamente este tom (não branco puro) "fora da caixa" em
+  // qualquer tela.
+  phone: { width: "100%", maxWidth: 400, padding: "18px 18px 22px", position: "relative" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   phoneProductRow: { display: "flex", justifyContent: "center", marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${COLORS.border}` },
   // Varredura de QA pós-Etapa 4: 36px ficava abaixo do alvo de toque mínimo

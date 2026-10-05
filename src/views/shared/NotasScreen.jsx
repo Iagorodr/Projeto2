@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { Plus, Trash2, Home as HouseIcon, StickyNote } from "lucide-react";
+import { Plus, Trash2, StickyNote } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { COLORS } from "../../styles/colors.js";
-import { RADIUS } from "../../styles/tokens.js";
+import { RADIUS, FONT } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { isoDateStr, addDays, startOfISOWeek, notesForOwner, monthAbbr } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
-import { LangSwitcher, Field } from "./Layout.jsx";
-import { PageHeader, Button, IconButton, Drawer, Pill, Card, Toast, InfoTip } from "./ui/index.js";
+import { Field } from "./Layout.jsx";
+import { PageHeader, Button, IconButton, Drawer, Pill, Card, Toast, InfoTip, MobileHeader } from "./ui/index.js";
 import { usePushNotifications } from "../../hooks/usePushNotifications.js";
 
 // "YYYY-MM-DD" -> Date local (meia-noite local, não UTC) — mesmo padrão já
@@ -235,14 +235,13 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
 
   return (
     <div style={{ ...mobStyles.phone, maxWidth: 460 }}>
-      <div style={mobStyles.header}>
-        <button style={mobStyles.homeIcon} onClick={onHome} aria-label={t.backLabel}>
-          <HouseIcon size={18} color={COLORS.textSoft} />
-        </button>
-        <LangSwitcher lang={lang} setLang={setLang} />
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginBottom: 14 }}>
-        <h1 style={{ ...mobStyles.title, marginBottom: 0 }}>{t.title}</h1>
+      {/* QA (achado do Iago, 3ª volta — "botão de voltar padrão"):
+          cabeçalho trocado pelo `MobileHeader` (seta, igual ao resto);
+          título fica fora dele (em vez do prop `title`) só pra manter o
+          `InfoTip` ao lado, que o MobileHeader não tem onde encaixar. */}
+      <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: -4, marginBottom: 14 }}>
+        <h1 style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 28, color: COLORS.ink, margin: 0 }}>{t.title}</h1>
         <InfoTip text={t.subtitle} label={c0.moreInfoLabel} />
       </div>
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, Home as HouseIcon } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -7,8 +7,7 @@ import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { clientById, fmtEuro, fmtHoursScreen, fmtNoteDate } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
-import { LangSwitcher } from "../shared/Layout.jsx";
-import { PageHeader, Pill, Drawer, Button, Card } from "../shared/ui/index.js";
+import { PageHeader, Pill, Drawer, Button, Card, MobileHeader } from "../shared/ui/index.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
 
 // Uma linha da lista de períodos (documento, 5.5): "20 jul – 19 ago" à
@@ -139,13 +138,11 @@ function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, company, clie
 
   return (
     <div style={mobStyles.phone}>
-      <div style={mobStyles.header}>
-        <button style={mobStyles.homeIcon} onClick={onHome} aria-label={t.backLabel}>
-          <HouseIcon size={18} color={COLORS.textSoft} />
-        </button>
-        <LangSwitcher lang={lang} setLang={setLang} />
-      </div>
-      <h1 style={mobStyles.title}>{t.title}</h1>
+      {/* QA (achado do Iago, 3ª volta — "botão de voltar padrão"):
+          cabeçalho trocado pelo `MobileHeader` (seta, igual Horas/Agenda)
+          em vez do ícone de casa antigo; título mantido (só Horas e
+          Agenda perderam o título, ver comentário lá). */}
+      <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
       {mine.length === 0 ? (
         <div style={mobStyles.emptyState}>{t.noneYet}</div>
