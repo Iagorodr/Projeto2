@@ -1,8 +1,12 @@
 // Cabeçalho mobile (documento de design, 3.3): em cima à esquerda botão
 // redondo de 44 (voltar/início), à direita seletor de língua compacto
 // ("PT ▾", altura 40); por baixo o título em FRASE NORMAL (nunca
-// maiúsculas), alinhado à esquerda, Poppins 600 28 — acaba com o título
-// centrado, em maiúsculas e o ícone solto ao lado que o app tem hoje.
+// maiúsculas), Poppins 600 28 — acaba com o título em maiúsculas e o
+// ícone solto ao lado que o app tem hoje.
+//
+// QA (achado do Iago, 3ª volta, 2ª rodada de ajustes): título passa de
+// alinhado à esquerda para CENTRADO — pedido explícito ("centralize
+// todos"), depois de ver o conjunto já com o padrão único aplicado.
 //
 // Introduzido na Etapa 2 (componentes); usado como componente em
 // MonitoramentoScreen.jsx e EmployeeHorasScreen.jsx. Nos outros ecrãs
@@ -76,10 +80,15 @@ function CompactLangSwitcher({ lang, setLang, langNames }) {
 //
 // QA (achado do Iago, 3ª volta): `title` agora é OPCIONAL — pedido
 // explícito pra Horas ("retire o título Horas de dentro da página", o
-// nome da tela já está claro pelo item ativo do menu de baixo) e seguido
-// também na Agenda, pra ficar igual ("seguindo o estilo da página
-// horas", mesmo pedido). Sem título, a margem de baixo some (era só
-// espaço entre o título e o que vem a seguir).
+// nome da tela já está claro pelo item ativo do menu de baixo). Sem
+// título, a margem de baixo some (era só espaço entre o título e o que
+// vem a seguir).
+//
+// QA (achado do Iago, 3ª volta, 2ª rodada): correção — só a Horas fica
+// sem título ("quem fica sem o título é a página horas, o resto tem
+// título"); a Agenda, que na 1ª rodada também tinha perdido o título
+// (interpretação errada do "seguir o estilo de Horas" como igual ao
+// título incluso), voltou a passar `title` de novo no caller.
 function MobileHeader({ onBack, backLabel = "Voltar", title, lang, setLang, langNames }) {
   const { minTap: backDim } = useControlSize();
   return (
@@ -99,7 +108,7 @@ function MobileHeader({ onBack, backLabel = "Voltar", title, lang, setLang, lang
         {lang && setLang && langNames && <CompactLangSwitcher lang={lang} setLang={setLang} langNames={langNames} />}
       </div>
       {title && (
-        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 28, color: COLORS.ink, textAlign: "left", marginTop: 14 }}>
+        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 28, color: COLORS.ink, textAlign: "center", marginTop: 14 }}>
           {title}
         </div>
       )}

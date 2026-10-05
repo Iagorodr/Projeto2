@@ -184,7 +184,10 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
 
   return (
     <div style={mobStyles.phone}>
-      <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      {/* QA (achado do Iago, 3ª volta, 2ª rodada): título adicionado —
+          "só a Horas fica sem título, o resto tem título" (esta tela
+          nunca teve título, não só não tinha sido tocada nesta rodada). */}
+      <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
       <div
         style={{
           ...mobStyles.searchWrap,

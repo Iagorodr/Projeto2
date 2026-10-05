@@ -239,12 +239,14 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
       {/* QA (achado do Iago, 3ª volta — "mesmo contexto, páginas
           diferentes"): cabeçalho trocado pelo `MobileHeader` já usado em
           Horas (seta de voltar em vez do ícone de casa, idioma "PT"
-          compacto no mesmo lugar, sem título — ver comentário em
-          EmployeeHorasScreen.jsx) e a fileira de troca de semana que
+          compacto no mesmo lugar) e a fileira de troca de semana que
           segue usa o MESMO estilo de botão de Horas (círculo 40,
           COLORS.line/COLORS.card) em vez do `mobStyles.periodNav`
-          antigo (48, cantos só arredondados, cores diferentes). */}
-      <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+          antigo (48, cantos só arredondados, cores diferentes).
+          QA (2ª rodada): título de volta — só a Horas fica sem título
+          ("quem fica sem o título é a página horas, o resto tem
+          título"); aqui tinha sido removido também por engano. */}
+      <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 16 }}>
         <button type="button" aria-label={t.previousWeek} onClick={() => goWeek(-1)} style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
           <ChevronLeftMini />

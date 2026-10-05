@@ -52,13 +52,23 @@ function BottomActionBar({
           {secondaryLabel}
         </Button>
       )}
+      {/* QA (achado do Iago, 2ª rodada, com print): "Total do dia" em
+          Poppins 600 26 + botão nunca tinham `min-width:0`/encolhimento
+          — num telemóvel estreito a dupla ficava maior que a largura
+          disponível e o texto (nowrap) vazava por cima do botão em vez
+          de encolher ou cortar. Label ganha `minWidth:0` +
+          `overflow:hidden` + `textOverflow:"ellipsis"` (encolhe e corta
+          em "…" se faltar espaço, nunca mais invade o botão) e desce um
+          pouco de tamanho (22, vinha de 26); botão ganha
+          `flexShrink:0` pra nunca perder a própria largura. */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 26, color: COLORS.ink, whiteSpace: "nowrap" }}>
+        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 22, color: COLORS.ink, whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
           {totalLabel}
         </div>
         <Button
           variant="primary" size="actionBarPrimary" onClick={onPrimary}
           disabled={primaryDisabled} disabledReason={primaryDisabledReason} disabledReasonBelow
+          style={{ flexShrink: 0 }}
         >
           {primaryLabel}
         </Button>

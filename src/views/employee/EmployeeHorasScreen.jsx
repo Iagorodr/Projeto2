@@ -589,13 +589,34 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                 pra ações menores tipo "Redefinir"), mas estas duas são
                 ações do dia tão importantes quanto o resto do painel, não
                 um link secundário. `variant="secondary"` dá contorno +
-                fundo, igual a qualquer outro botão de ação do app. */}
+                fundo, igual a qualquer outro botão de ação do app.
+                QA (2ª rodada, achado do Iago com print): com
+                `flexWrap:"wrap"` e texto `nowrap` (padrão do `Button`),
+                num telemóvel estreito os dois não cabiam lado a lado e
+                quebravam pra linhas separadas (um em cima do outro) em
+                vez de ficarem lado a lado. Agora cada botão usa
+                `flex:1` (dividem a largura em partes iguais, sempre na
+                mesma linha) e o texto pode quebrar em 2 linhas dentro do
+                próprio botão (`whiteSpace:"normal"`, altura automática)
+                em vez de estourar a largura. */}
             {!weekLockedFlag && !markedNoClient && hasAgendaToday && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: -6 }}>
+              <div style={{ display: "flex", flexWrap: "nowrap", gap: 10, marginTop: -6, alignItems: "stretch" }}>
                 {entriesForDay.length === 0 && selectedDate <= TODAY && (
-                  <Button variant="secondary" onClick={() => setNoClientConfirmOpen(true)}>{t.noClientDayButton}</Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setNoClientConfirmOpen(true)}
+                    style={{ flex: 1, minWidth: 0, height: "auto", minHeight: 48, whiteSpace: "normal", textAlign: "center", lineHeight: 1.2, padding: "10px 10px" }}
+                  >
+                    {t.noClientDayButton}
+                  </Button>
                 )}
-                <Button variant="secondary" onClick={() => setAdvanceOpen(true)}>{t.advanceButton}</Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setAdvanceOpen(true)}
+                  style={{ flex: 1, minWidth: 0, height: "auto", minHeight: 48, whiteSpace: "normal", textAlign: "center", lineHeight: 1.2, padding: "10px 10px" }}
+                >
+                  {t.advanceButton}
+                </Button>
               </div>
             )}
 
@@ -690,11 +711,22 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       </div>
 
       {chunkZone !== "before" && !monthFinalized && !isDesktop && (
+        // QA (achado do Iago, 2ª rodada, com print): quando não havia
+        // nenhuma marcação no dia, o botão principal mostrava "Marque um
+        // cliente" só no TEXTO, mas continuava com
+        // `primaryDisabled = entriesForDay.length === 0` — ou seja,
+        // sempre desativado exatamente na única situação em que o texto
+        // convida a tocar nele (o print mostrava o botão esverdeado
+        // claro/"apagado", que é a aparência de `disabled`). Agora,
+        // enquanto não há cliente marcado, o botão fica ATIVO e abre a
+        // mesma folha de "adicionar cliente" do painel do dia; só volta a
+        // chamar a confirmação de "Finalizar dia" depois de já existir
+        // pelo menos uma marcação.
         <BottomActionBar
           totalLabel={`${t.dayTotalLabel} · ${fmtHoursScreen(dayTotalHours(selectedKey))}`}
           primaryLabel={entriesForDay.length === 0 ? t.markClientButton : t.finalizeDay}
-          onPrimary={() => setFinalizeDaySheetOpen(true)}
-          primaryDisabled={weekLockedFlag || entriesForDay.length === 0}
+          onPrimary={() => (entriesForDay.length === 0 ? setAddClientOpen(true) : setFinalizeDaySheetOpen(true))}
+          primaryDisabled={weekLockedFlag}
           secondaryLabel={weekEligible ? t.finalizeWeek : undefined}
           onSecondary={weekEligible ? () => setConfirmWeekOpen(true) : undefined}
           floatAboveMobileBar={isMobileTier}
