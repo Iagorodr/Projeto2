@@ -418,7 +418,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // extra. Removido: sem risco de "costura" de cor, porque
   // `COLORS.page` e `COLORS.bg` (fundo da casca) são o mesmo tom.
   return (
-    <div style={{ background: COLORS.page, paddingBottom: (!isDesktop && chunkZone !== "before" && !monthFinalized) ? 132 : 32 }}>
+    <div style={{ background: COLORS.page, paddingBottom: (!isDesktop && chunkZone !== "before" && !monthFinalized) ? (isMobileTier ? 170 : 132) : 32 }}>
       <div style={{ padding: "16px 16px 0", maxWidth: containerMaxWidth, margin: "0 auto" }}>
         {/* QA (achado do Iago, 3ª volta): título "Horas" removido daqui —
             o item ativo do menu de baixo já diz em que tela se está, e

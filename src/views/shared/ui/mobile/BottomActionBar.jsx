@@ -35,12 +35,15 @@ function BottomActionBar({
   return (
     <div
       style={{
-        position: "sticky",
+        // QA (achado do Iago, print, 2ª rodada): com `sticky`, a barra só
+        // "gruda" depois que a página rola — com pouco conteúdo (dia sem
+        // marcações) ela ficava solta no meio da tela, com um vão em
+        // cima do menu. No telemóvel agora é `fixed`: sempre presa à
+        // tela, encostada em cima da barra de navegação (100px + área
+        // segura, a mesma altura da MobileBottomBar), na largura toda.
+        // Fora do telemóvel (tablet) continua `sticky` como antes.
+        position: floatAboveMobileBar ? "fixed" : "sticky",
         bottom: floatAboveMobileBar ? "calc(env(safe-area-inset-bottom, 0px) + 100px)" : 0,
-        // Mesma margem de 14px da casca (App.jsx `pageStyle`) que deixava
-        // a barra "Total do dia" com vão dos lados: sangra até as bordas
-        // só quando está acima da barra de baixo do telemóvel.
-        margin: floatAboveMobileBar ? "0 -14px" : 0,
         left: 0, right: 0, background: COLORS.card,
         borderTop: `1px solid ${COLORS.line}`, padding: "12px 16px",
         display: "flex", flexDirection: "column", gap: 10,
