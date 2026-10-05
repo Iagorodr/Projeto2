@@ -37,6 +37,10 @@ function BottomActionBar({
       style={{
         position: "sticky",
         bottom: floatAboveMobileBar ? "calc(env(safe-area-inset-bottom, 0px) + 100px)" : 0,
+        // Mesma margem de 14px da casca (App.jsx `pageStyle`) que deixava
+        // a barra "Total do dia" com vão dos lados: sangra até as bordas
+        // só quando está acima da barra de baixo do telemóvel.
+        margin: floatAboveMobileBar ? "0 -14px" : 0,
         left: 0, right: 0, background: COLORS.card,
         borderTop: `1px solid ${COLORS.line}`, padding: "12px 16px",
         display: "flex", flexDirection: "column", gap: 10,

@@ -35,6 +35,12 @@ function MobileBottomBar({ items, activeKey, onNavigate }) {
   return (
     <div
       style={{
+        // QA (achado do Iago, print): a `pageStyle` do App.jsx dá 14px de
+        // margem em volta de tudo no telemóvel e esta barra vive DENTRO
+        // dela — ficava com vão nos dois lados e 14px acima do fundo.
+        // Margem negativa faz sangrar até as bordas sem trocar o elemento
+        // sticky por um wrapper (que quebraria o `position:sticky`).
+        margin: "0 -14px -14px",
         position: "sticky", bottom: 0, zIndex: 30,
         background:
           "radial-gradient(circle at 10% 8%, rgba(226,138,101,.18), transparent 45%), " +
