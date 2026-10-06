@@ -116,6 +116,14 @@ export function useAppController() {
       }
 
       if (appDataRes.error) { console.error("Erro ao carregar dados do app:", appDataRes.error); ok = false; }
+      else if (!appDataRes.data) {
+        // Banco novo sem a linha id=1 de app_data: sem ela, todas as gravações
+        // (`update ... eq("id", 1)`) ficam a "gravar" zero linhas em silêncio —
+        // agenda, horas e avisos perdiam-se ao recarregar. Cria-a (valores por
+        // omissão vazios do schema).
+        const { error: insErr } = await supabase.from("app_data").insert({ id: 1 });
+        if (insErr) { console.error("Erro ao criar linha de dados do app:", insErr); ok = false; }
+      }
       else if (appDataRes.data) {
         const row = appDataRes.data;
         if (row.assignments && Object.keys(row.assignments).length > 0) setAssignments(row.assignments);
