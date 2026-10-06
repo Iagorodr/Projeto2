@@ -51,7 +51,15 @@ export default function App() {
   // styles.page tem minHeight fixo de 700px, pensado para desktop. Em telemóveis
   // (ex.: iPhone SE tem só 667px de altura) isso força o corpo a ficar mais alto
   // que o próprio ecrã, criando um pequeno scroll vertical sempre presente.
-  const pageStyle = isMobile ? { ...styles.page, minHeight: "100dvh", padding: "14px" } : styles.page;
+  const basePageStyle = isMobile ? { ...styles.page, minHeight: "100dvh", padding: "14px" } : styles.page;
+  // QA (achado do Iago, print do login): o fundo em gradiente do login
+  // ficava "dentro de uma caixa" por causa do padding da página (14px no
+  // telemóvel, 20px nos outros tamanhos). Na tela de login a página não
+  // tem padding nem centragem: o LoginScreen ocupa a tela toda, em
+  // qualquer tamanho.
+  const pageStyle = c.perspective === "login"
+    ? { ...basePageStyle, padding: 0, minHeight: "100dvh", justifyContent: "flex-start", alignItems: "stretch" }
+    : basePageStyle;
 
   return (
     <div style={pageStyle}>

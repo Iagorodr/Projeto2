@@ -78,7 +78,7 @@ function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLogi
   return (
     <div
       style={{
-        minHeight: "100vh", width: "100%", position: "relative", boxSizing: "border-box",
+        minHeight: "100dvh", flex: 1, width: "100%", position: "relative", boxSizing: "border-box",
         background: "linear-gradient(155deg, #E3F2EA 0%, #A9D9C2 45%, #4D9D7E 85%, #2E8570 100%)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       }}
