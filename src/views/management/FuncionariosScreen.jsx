@@ -249,6 +249,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
   }
 
   async function createAccountNow() {
+    if (openStaff?.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(openStaff.email.trim())) { setCreateError(ta.resetInvalidEmail); return; }
     if (!openStaff?.email || !supabase) { setCreateError(ta.resetFailed); return; }
     setCreateBusy(true); setCreateError(null);
     try {

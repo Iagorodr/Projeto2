@@ -153,6 +153,7 @@ function AcessosScreen({ lang, setLang, staff, setStaff }) {
     const target = staff.find((s) => s.id === resetTargetId);
     const email = (target?.email || "").trim();
     if (!email) { setResetError(t.resetNeedsEmail); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setResetError(t.resetInvalidEmail); return; }
     if (!supabase) { setResetError(t.resetFailed); return; }
     setResetBusy(true);
     setResetError(null);
