@@ -6,7 +6,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   clientById, entryClientName, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
-  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, getOpenPeriod, getCutoffPeriod,
+  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, partnerOf, getOpenPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
 } from "../../models/utils.js";
@@ -112,6 +112,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const [confirmWeekOpen, setConfirmWeekOpen] = useState(false);
   const [reopenWeekOpen, setReopenWeekOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
+  const [pairOffDays, setPairOffDays] = useState({});
   const [splitTarget, setSplitTarget] = useState(null);
   const [splitDraft, setSplitDraft] = useState(0);
   const [customName, setCustomName] = useState("");
@@ -189,6 +190,12 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     setSelectedDateKey(isoDateStr(calPeriodDays(chunks.list[next])[0]));
   }
 
+  // Dupla: com parceiro definido pela gerência, marcar um cliente cria também
+  // a linha do parceiro (etiquetada "automático"), salvo se o dia estiver
+  // desligado ou a semana/mês do parceiro já estiver fechado. Apagar nunca
+  // apaga a do outro.
+  const partner = partnerOf(staff, staffId, TODAY);
+  const pairOn = !!partner && !pairOffDays[selectedKey];
   function addClientEntry(clientId, replacesDate) {
     if (weekLockedFlag) return;
     const client = clientById(clients, clientId);
@@ -197,7 +204,16 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       const current = prev[staffId] || emptyHoras();
       const entry = { date: selectedKey, clientId, hours: (client.duration || 60) / 60, extra: false, extraMinutes: 0, approved: false, voided: false };
       if (replacesDate) entry.replacesDate = replacesDate;
-      const withNew = { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
+      let withNew = { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
+      if (pairOn && !replacesDate) {
+        const pH = prev[partner.id] || emptyHoras();
+        const pLocked = pH.status === "finalizado" || !!(pH.lockedWeeks && pH.lockedWeeks[chunkKey]);
+        const pHas = pH.entries.some((e) => !e.voided && e.date === selectedKey && e.clientId === clientId);
+        if (!pLocked && !pHas) {
+          const pEntry = { ...entry, autoFrom: staffId };
+          withNew = { ...withNew, [partner.id]: { ...pH, entries: [...pH.entries, pEntry] } };
+        }
+      }
       return recomputeSharedHours(withNew, clients, selectedKey, clientId);
     });
   }
@@ -349,6 +365,20 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // cartão por lançamento manual (adicionado à parte ou adiantado PARA
   // este dia) que não faz parte da agenda do dia.
   const scheduledIds = new Set(scheduledToday.map((c) => c.id));
+  function autoTagFor(entry) {
+    if (!entry) return undefined;
+    if (entry.autoFrom) {
+      const by = staff.find((x) => x.id === entry.autoFrom);
+      return t.autoByTag(((by && by.name) || "").split(" ")[0]);
+    }
+    if (partner) {
+      const pe = ((horasData[partner.id] && horasData[partner.id].entries) || []).find(
+        (e) => !e.voided && e.date === entry.date && e.clientId === entry.clientId && e.autoFrom === staffId
+      );
+      if (pe) return t.alsoMarkedTag(partner.name.split(" ")[0]);
+    }
+    return undefined;
+  }
   const scheduledCards = scheduledToday.map((client) => {
     const advancedAway = myHoras.entries.find((e) => !e.voided && e.clientId === client.id && e.replacesDate === selectedKey);
     if (advancedAway) {
@@ -371,7 +401,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     return {
       id: `sched-${client.id}`, clientId: client.id, name: client.name,
       subtitle: entry ? subtitleFor(entry) : fmtMinutes(client.duration),
-      checked: !!entry, entry,
+      checked: !!entry, entry, autoTag: autoTagFor(entry),
       extraPill: entry && entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
     };
   });
@@ -379,7 +409,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     const isCustom = !entry.clientId && !!entry.custom;
     return {
       id: `adhoc-${entry.clientId}-${entry.date}-${ai}`, clientId: entry.clientId, name: entryClientName(clients, entry), isCustom,
-      subtitle: isCustom ? `${subtitleFor(entry)} · ${t.customClientPending}` : subtitleFor(entry), checked: true, entry,
+      subtitle: isCustom ? `${subtitleFor(entry)} · ${t.customClientPending}` : subtitleFor(entry), checked: true, entry, autoTag: autoTagFor(entry),
       extraPill: entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
     };
   });
@@ -633,6 +663,24 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               </Button>
             )}
 
+            {partner && !weekLockedFlag && (
+              <button
+                type="button"
+                onClick={() => setPairOffDays((m) => ({ ...m, [selectedKey]: pairOn }))}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", cursor: "pointer",
+                  padding: "12px 14px", borderRadius: RADIUS.control, fontFamily: "inherit", fontSize: 14, fontWeight: 600,
+                  border: `1px solid ${pairOn ? COLORS.forest600 : COLORS.line}`,
+                  background: pairOn ? COLORS.forest50 : COLORS.card, color: COLORS.ink,
+                }}
+              >
+                <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, border: `2px solid ${pairOn ? COLORS.forest600 : COLORS.lineInput}`, background: pairOn ? COLORS.forest600 : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14 }}>
+                  {pairOn ? "✓" : ""}
+                </span>
+                {t.pairToggle(partner.name.split(" ")[0])}
+              </button>
+            )}
+
             <DayPanel
               title={`${weekdayFull[selectedDate.getDay()]}, ${dmOf(selectedDate)}`}
               forecastLabel={hasAgendaToday && !weekLockedFlag ? t.forecast(fmtHoursScreen(scheduledToday.reduce((s, c) => s + c.duration / 60, 0))) : undefined}
@@ -663,6 +711,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                   dimmedNote={card.dimmedNote}
                   readOnly={weekLockedFlag || card.readOnly}
                   extraPill={card.extraPill}
+                  autoTag={card.autoTag}
                   onToggle={() => (card.isCustom ? removeEntryObj(card.entry) : toggleScheduledClient(card.clientId))}
                   onExtraTime={card.checked && card.entry ? () => openExtra(card.entry) : undefined}
                   onAdjustSplit={card.checked && card.entry && card.entry.sharedCount > 1 ? () => openSplit(card.entry) : undefined}

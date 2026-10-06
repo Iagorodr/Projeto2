@@ -458,6 +458,11 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                   ) : (
                                     <>
                                       {pendingClient && <Pill variant="pending">{t.clientPendingTag}</Pill>}
+                                      {e.autoFrom && (
+                                        <span style={{ background: "#E4ECFA", color: "#1E3A6E", fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "2px 9px" }}>
+                                          {t.autoRowTag(((staff.find((x) => x.id === e.autoFrom) || {}).name || "").split(" ")[0])}
+                                        </span>
+                                      )}
                                       {e.splitAdjusted && e.sharedCount > 1 && (
                                         <span style={{ background: "#C9D9F4", color: "#1E3A6E", fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "2px 9px" }}>{t.splitAdjustedTag}</span>
                                       )}

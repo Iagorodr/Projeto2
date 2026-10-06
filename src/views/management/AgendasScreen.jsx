@@ -7,7 +7,7 @@ import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
-  isStaffActive, formatPeriodLabel,
+  isStaffActive, formatPeriodLabel, partnerOf,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import {
@@ -372,8 +372,31 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
       return { ...prev, [key]: next };
     });
   }
+  // Dupla: marcas "automático" guardadas junto das atribuições, em chaves
+  // `auto:<staffId>-<dia>` (lista de clientes que vieram do parceiro, não de
+  // uma escolha manual naquela célula).
+  function autoKey(staffId, day) { return `auto:${cellKey(staffId, day)}`; }
+  function getAutoIds(staffId, day) { return assignments[autoKey(staffId, day)] || []; }
+  function setAuto(staffId, day, clientId, on) {
+    setAssignments((prev) => {
+      const k = autoKey(staffId, day);
+      const cur = prev[k] || [];
+      const has = cur.includes(clientId);
+      if (on === has) return prev;
+      const next = on ? [...cur, clientId] : cur.filter((id) => id !== clientId);
+      return { ...prev, [k]: next };
+    });
+  }
   function addClient(staffId, day, clientId) {
     mergeAdd(cellKey(staffId, day), clientId);
+    setAuto(staffId, day, clientId, false); // escolha manual nesta célula
+    const p = partnerOf(staff, staffId, TODAY);
+    if (p && !getCellClientIds(p.id, day).includes(clientId)) {
+      mergeAdd(cellKey(p.id, day), clientId);
+      setAuto(p.id, day, clientId, true);
+      const client = clientById(clients, clientId);
+      showToast(t.autoAddedToast(client?.name || "", p.name.split(" ")[0]));
+    }
     setCellSearch(""); setOpenCell(null);
   }
   function removeClient(staffId, day, clientId) {
@@ -381,6 +404,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
     const client = clientById(clients, clientId);
     const member = staffById(staff, staffId);
     setAssignments((prev) => ({ ...prev, [key]: (prev[key] || []).filter((id) => id !== clientId) }));
+    setAuto(staffId, day, clientId, false); // remover só desta pessoa; o parceiro fica como está
     const dayAbbr = dayLabels[day].toLowerCase();
     showToast(t.removedToast(client?.name || "", (member?.name || "").split(" ")[0], dayAbbr), {
       actionLabel: t.undo,
@@ -538,6 +562,9 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                         <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500, color: COLORS.clayInk }}>
                           {client.name}
                         </span>
+                        {getAutoIds(s.id, day).includes(cid) && (
+                          <span title={t.autoChipTitle} style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "1px 6px", background: "#E4ECFA", color: "#1E3A6E" }}>{t.autoChip}</span>
+                        )}
                         <span style={{ flexShrink: 0, fontWeight: 600, color: COLORS.clayInk }}>
                           {fmtMinutes(perPerson)}
                         </span>
@@ -566,7 +593,10 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
                     <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500, color: COLORS.ink }}>
                       {client.name}
                     </span>
-                    <span style={{ flexShrink: 0, fontWeight: 600, color: COLORS.ink2 }}>
+                    {getAutoIds(s.id, day).includes(cid) && (
+                          <span title={t.autoChipTitle} style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "1px 6px", background: "#E4ECFA", color: "#1E3A6E" }}>{t.autoChip}</span>
+                        )}
+                        <span style={{ flexShrink: 0, fontWeight: 600, color: COLORS.ink2 }}>
                       {fmtMinutes(perPerson)}
                     </span>
                     {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: COLORS.ink3 }} />}

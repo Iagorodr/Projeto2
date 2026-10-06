@@ -95,6 +95,27 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId) {
 
 function staffById(staff, id) { return staff.find((s) => s.id === id); }
 
+// Dupla (casal/parceiros habituais): definida pela gerência em Funcionários,
+// sempre mútua. `partnerOf` devolve o parceiro só se a ligação é recíproca e
+// ele está ativo — senão null (sem dupla, nada é preenchido por ele).
+function partnerOf(staffList, staffId, date) {
+  const me = staffList.find((s) => s.id === staffId);
+  if (!me || !me.partnerId) return null;
+  const p = staffList.find((s) => s.id === me.partnerId);
+  if (!p || p.partnerId !== me.id) return null;
+  return isStaffActive(p, date || new Date()) ? p : null;
+}
+// Liga `staffId` a `partnerId` (ou desliga com null), mantendo a ligação
+// mútua e limpando qualquer parceiro antigo de qualquer um dos dois.
+function linkPartners(staffList, staffId, partnerId) {
+  return staffList.map((s) => {
+    if (s.id === staffId) return { ...s, partnerId: partnerId || null };
+    if (partnerId && s.id === partnerId) return { ...s, partnerId: staffId };
+    if (s.partnerId === staffId || (partnerId && s.partnerId === partnerId)) return { ...s, partnerId: null };
+    return s;
+  });
+}
+
 // Etapa 4j (documento, 4.9) — único auxiliar que decide se um funcionário
 // está "ativo" em todo o app: `estado Ativo && !(tipo Replacement &&
 // validade < data)`. A validade é INCLUSIVA (no próprio dia da validade
@@ -652,6 +673,7 @@ function clientTotalHours(horasData, clientId, period) {
 function clientTeamStaffIds(assignments, clientId) {
   const ids = new Set();
   Object.entries(assignments).forEach(([key, cids]) => {
+    if (!/^\d+-\d+$/.test(key)) return; // ignora marcas auxiliares (ex.: "auto:5-3")
     if ((cids || []).includes(clientId)) {
       const staffId = Number(key.slice(0, key.lastIndexOf("-")));
       ids.add(staffId);
@@ -687,4 +709,4 @@ function pctChange(current, previous) {
   return ((current - previous) / previous) * 100;
 }
 
-export { entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };
+export { partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };

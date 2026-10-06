@@ -3,7 +3,7 @@ import { Pencil, Eye, EyeOff, Copy, Check, AlertTriangle, Plus } from "lucide-re
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { TODAY, LANG_NAMES } from "../../models/data.js";
-import { getAssignedClientIds, clientById, isStaffActive } from "../../models/utils.js";
+import { getAssignedClientIds, clientById, isStaffActive, linkPartners } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
 import {
@@ -14,7 +14,7 @@ import { supabase } from "../../models/supabaseClient.js";
 
 const EMPTY_STAFF = {
   name: "", email: "", contact: "", accountType: "fixo", status: "ativo", validUntil: "",
-  iban: "", role: "funcionario", canViewAllClients: false, documents: [null, null, null, null],
+  iban: "", role: "funcionario", canViewAllClients: false, partnerId: null, documents: [null, null, null, null],
 };
 
 // "YYYY-MM-DD" -> "23/09" (documento, 4.9: "Expirou a 23/09", "até 23/09").
@@ -195,7 +195,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
     if (Object.keys(errs).length > 0) return;
     if (isNew) {
       const created = { ...draft, id: Date.now() };
-      setStaff((prev) => [...prev, created]);
+      setStaff((prev) => linkPartners([...prev, { ...created, partnerId: null }], created.id, draft.partnerId));
       setOpenId(created.id);
       setCreateResult(null); setCreateError(null);
       // Só oferece o passo "Conta criada" quando há email — sem ele a Edge
@@ -203,7 +203,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
       setMode(created.email && created.email.trim() ? "created" : "view");
     } else {
       const updated = { ...draft, id: openStaff.id };
-      setStaff((prev) => prev.map((s) => (s.id === openStaff.id ? updated : s)));
+      setStaff((prev) => linkPartners(prev.map((s) => (s.id === openStaff.id ? updated : s)), openStaff.id, draft.partnerId));
       setMode("view");
     }
   }
@@ -376,6 +376,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
               {openStaff.accountType === "replacement" && (
                 <ViewField label={t.fValidUntil}>{openStaff.validUntil || "-"}</ViewField>
               )}
+              <ViewField label={t.fPartner}>{(staff.find((s) => s.id === openStaff.partnerId) || {}).name || t.partnerNone}</ViewField>
               <ViewField label={t.fCanViewAllClients}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <ReadOnlyToggle on={!!openStaff.canViewAllClients} />
@@ -484,6 +485,18 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
                 <option value="ativo">{c0.active}</option>
                 <option value="inativo">{c0.inactive}</option>
               </select>
+            </Field>
+            <Field label={t.fPartner}>
+              <select
+                style={styles.input} value={draft.partnerId || ""}
+                onChange={(e) => updateDraft("partnerId", e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">{t.partnerNone}</option>
+                {staff.filter((s) => s.id !== (isNew ? null : openStaff?.id) && s.role !== "gerencia").map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.partnerHint}</div>
             </Field>
             <Field label={t.fCanViewAllClients}>
               <button

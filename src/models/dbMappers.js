@@ -75,6 +75,7 @@ function toDbStaff(s) {
     iban: s.iban,
     role: s.role,
     can_view_all_clients: !!s.canViewAllClients,
+    partner_id: s.partnerId || null,
   };
 }
 
@@ -90,6 +91,7 @@ function fromDbStaff(row) {
     iban: row.iban || "",
     role: row.role,
     canViewAllClients: !!row.can_view_all_clients,
+    partnerId: row.partner_id || null,
   };
 }
 
