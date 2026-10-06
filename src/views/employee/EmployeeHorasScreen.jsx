@@ -142,7 +142,10 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
 
   // 5.2.10: duas colunas só na vista normal/editável (nem "antes do
   // período" nem "mês finalizado" — ver comentário no topo do ficheiro).
-  const canReopenWeek = weekLockedRaw && chunkZone !== "before" && !monthFinalized && !myHoras.paid;
+  // Só dentro do período ainda aberto: nunca em período já fechado pela
+  // gerência (histórico `closedPeriods`) nem em semana de antes do período.
+  const chunkInClosedPeriod = (closedPeriods || []).some((cp) => cp.periodEnd && isoDateStr(chunk.end) <= cp.periodEnd);
+  const canReopenWeek = weekLockedRaw && chunkZone === "within" && !chunkInClosedPeriod && !monthFinalized && !myHoras.paid;
   const showTwoColumn = isDesktop && chunkZone !== "before" && !monthFinalized;
 
   const migratedLocked = migrateLockedWeeksToBlocks(myHoras.lockedWeeks, payPeriod, cutoffDay);
