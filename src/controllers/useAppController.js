@@ -62,9 +62,23 @@ export function useAppController() {
   // falhou, incluindo exceção) além de `companyEmail`/`staffList` — antes
   // só fazia `console.error`, sem contar isso a quem chamou, então
   // `hydrated`/as gravações não tinham como saber que a leitura falhou.
+  // Falhas intermitentes (rede móvel instável) eram mostradas logo como erro:
+  // agora tenta até 3 vezes (pausa crescente) antes de avisar, e volta a
+  // tentar sozinho quando a internet volta ou a app volta ao primeiro plano.
   async function loadAllData() {
     setReadOk(false);
     setLoadError(false);
+    let result;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      result = await loadAllDataOnce();
+      if (result.ok) break;
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    }
+    if (!result.ok) setLoadError(true);
+    return result;
+  }
+
+  async function loadAllDataOnce() {
     let companyEmail = company.email;
     let staffList = staff;
     let ok = true;
@@ -111,7 +125,6 @@ export function useAppController() {
       console.error("Erro ao carregar dados do Supabase:", err);
       ok = false;
     }
-    if (!ok) setLoadError(true);
     return { companyEmail, staffList, ok };
   }
 
@@ -172,6 +185,26 @@ export function useAppController() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !loadError) return;
+    let busy = false;
+    async function retry() {
+      if (busy || document.visibilityState === "hidden") return;
+      busy = true;
+      try {
+        const { ok } = await loadAllData();
+        if (ok) setReadOk(true);
+      } finally { busy = false; }
+    }
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", retry);
+    return () => {
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", retry);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadError]);
 
   async function loginWithPassword(email, password) {
     setAuthError(null);
