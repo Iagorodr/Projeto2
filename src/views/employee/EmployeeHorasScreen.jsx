@@ -145,7 +145,12 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // Só dentro do período ainda aberto: nunca em período já fechado pela
   // gerência (histórico `closedPeriods`) nem em semana de antes do período.
   const chunkInClosedPeriod = (closedPeriods || []).some((cp) => cp.periodEnd && isoDateStr(chunk.end) <= cp.periodEnd);
-  const canReopenWeek = weekLockedRaw && chunkZone === "within" && !chunkInClosedPeriod && !monthFinalized && !myHoras.paid;
+  // E nunca numa semana de um período que já passou no calendário (ex.: em
+  // 6/out não se reabre uma semana de setembro anterior ao dia de corte),
+  // mesmo que a gerência ainda não tenha fechado esse período.
+  const calendarPeriod = getCutoffPeriod(TODAY, cutoffDay, 0);
+  const chunkInPastPeriod = chunk.start < calendarPeriod.start;
+  const canReopenWeek = weekLockedRaw && chunkZone === "within" && !chunkInClosedPeriod && !chunkInPastPeriod && !monthFinalized && !myHoras.paid;
   const showTwoColumn = isDesktop && chunkZone !== "before" && !monthFinalized;
 
   const migratedLocked = migrateLockedWeeksToBlocks(myHoras.lockedWeeks, payPeriod, cutoffDay);
