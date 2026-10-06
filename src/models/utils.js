@@ -8,6 +8,15 @@ function monthAbbr(lang, monthIndex) {
 }
 
 function clientById(clients, id) { return clients.find((c) => c.id === id); }
+// Cliente "fora da lista": o funcionário escreveu o nome à mão (sem clientId)
+// e a gerência corrige depois. Devolve o nome a mostrar para qualquer linha.
+function entryClientName(clients, e) {
+  const c = clientById(clients, e.clientId);
+  if (c) return c.name;
+  if (e.custom && e.custom.name) return e.custom.city ? `${e.custom.name} (${e.custom.city})` : e.custom.name;
+  return "—";
+}
+function isPendingClientEntry(e) { return !e.voided && !e.clientId && !!(e.custom && e.custom.name); }
 
 // Um dia conta como "coberto" (fechado, não em falta) se tiver pelo menos um
 // lançamento válido OU se o funcionário tiver marcado "Hoje não tive
@@ -662,4 +671,4 @@ function pctChange(current, previous) {
   return ((current - previous) / previous) * 100;
 }
 
-export { clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };
+export { entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };

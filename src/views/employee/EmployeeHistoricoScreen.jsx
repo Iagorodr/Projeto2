@@ -5,7 +5,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
-import { clientById, fmtEuro, fmtHoursScreen, fmtNoteDate } from "../../models/utils.js";
+import { clientById, entryClientName, fmtEuro, fmtHoursScreen, fmtNoteDate } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { PageHeader, Pill, Drawer, Button, Card, MobileHeader } from "../shared/ui/index.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -109,7 +109,7 @@ function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, company, clie
                   const c = clientById(clients, e.clientId);
                   return (
                     <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${COLORS.lineSoft}`, fontSize: 13 }}>
-                      <span>{fmtNoteDate(e.date)} · {c ? c.name : "—"}</span>
+                      <span>{fmtNoteDate(e.date)} · {entryClientName(clients, e)}</span>
                       <span style={{ fontWeight: 600 }}>{fmtHoursScreen(e.hours)}</span>
                     </div>
                   );

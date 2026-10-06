@@ -138,10 +138,10 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     return acc;
   }, { pending: 0, paid: 0, unpaid: 0 });
 
-  let overtimePending = 0, reopenedCount = 0;
+  let overtimePending = 0, reopenedCount = 0, customClientPending = 0;
   Object.values(horasData).forEach((data) => {
     if (data.reopened) reopenedCount += 1;
-    data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; });
+    data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; if (!e.voided && !e.clientId && e.custom) customClientPending += 1; });
   });
   // "Avisos e pedidos por ler" (documento, 4.1): não existe, em lado
   // nenhum do modelo de dados, um sinal de "a gerência ainda não viu esta
@@ -292,6 +292,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
         <Card style={{ flex: "1 1 420px", minWidth: 260 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>{t.pendingTitle}</div>
           <PendingRow icon={Clock} label={t.pendingOvertime} count={overtimePending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
+          <PendingRow icon={Clock} label={t.pendingCustomClient} count={customClientPending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
           <PendingRow icon={Undo2} label={t.pendingReopened} count={reopenedCount} onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
           <PendingRow icon={Bell} label={t.pendingUnread} count={pendingRequests} onClick={() => onNavigate("avisos")} okLabel={t.pendingAllOk} />
           {/* "Contratos a vencer -> Clientes (filtro)": a navegação ainda não

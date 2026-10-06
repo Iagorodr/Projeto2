@@ -3,7 +3,7 @@
 // imprimia a tela como estava (com botões, ícones de edição etc.).
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { clientById, fmtEuro, fmtHoursNum } from "./utils.js";
+import { clientById, entryClientName, fmtEuro, fmtHoursNum } from "./utils.js";
 
 const BRAND = [31, 111, 92]; // COLORS.primary
 const BRAND_DARK = [20, 63, 53]; // COLORS.primaryDark
@@ -83,7 +83,7 @@ function exportStaffHorasPdf({ companyName, staffName, periodLabel, entries, cli
       const pendingMark = e.extra && !e.approved ? "*" : "";
       return [
         shortDate(e.date),
-        c ? c.name : "—",
+        entryClientName(clients, e),
         `${fmtHoursNum(e.hours)}${pendingMark}`,
         fmtEuro(valueHour),
         fmtEuro(e.hours * valueHour),

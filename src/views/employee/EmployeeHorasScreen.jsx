@@ -5,7 +5,7 @@ import { RADIUS, FONT } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
-  clientById, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
+  clientById, entryClientName, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
   startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, getOpenPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
@@ -111,6 +111,10 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const [finalizeDaySheetOpen, setFinalizeDaySheetOpen] = useState(false);
   const [confirmWeekOpen, setConfirmWeekOpen] = useState(false);
   const [reopenWeekOpen, setReopenWeekOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customCity, setCustomCity] = useState("");
+  const [customHours, setCustomHours] = useState(1);
   const [finalizeMonthConfirmOpen, setFinalizeMonthConfirmOpen] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionText, setCorrectionText] = useState("");
@@ -186,6 +190,21 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       const withNew = { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
       return recomputeSharedHours(withNew, clients, selectedKey, clientId);
     });
+  }
+  // Cliente fora da lista: nome (e cidade) escritos à mão, sem clientId; as
+  // horas entram como pendentes e a gerência confirma o cliente certo.
+  function addCustomEntry() {
+    if (weekLockedFlag || !customName.trim()) return;
+    const entry = {
+      date: selectedKey, clientId: null, custom: { name: customName.trim(), city: customCity.trim() },
+      hours: Number(customHours) || 1, extra: false, extraMinutes: 0, approved: false, voided: false,
+    };
+    setHorasData((prev) => {
+      const current = prev[staffId] || emptyHoras();
+      return { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
+    });
+    setCustomOpen(false); setAddClientOpen(false);
+    setCustomName(""); setCustomCity(""); setCustomHours(1);
   }
   function removeEntryObj(entry) {
     if (weekLockedFlag) return;
@@ -308,11 +327,11 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       extraPill: entry && entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
     };
   });
-  const adHocCards = entriesForDay.filter((e) => !scheduledIds.has(e.clientId)).map((entry) => {
-    const c = clientById(clients, entry.clientId);
+  const adHocCards = entriesForDay.filter((e) => !scheduledIds.has(e.clientId)).map((entry, ai) => {
+    const isCustom = !entry.clientId && !!entry.custom;
     return {
-      id: `adhoc-${entry.clientId}-${entry.date}`, clientId: entry.clientId, name: c ? c.name : "—",
-      subtitle: subtitleFor(entry), checked: true, entry,
+      id: `adhoc-${entry.clientId}-${entry.date}-${ai}`, clientId: entry.clientId, name: entryClientName(clients, entry), isCustom,
+      subtitle: isCustom ? `${subtitleFor(entry)} · ${t.customClientPending}` : subtitleFor(entry), checked: true, entry,
       extraPill: entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
     };
   });
@@ -595,7 +614,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                   dimmedNote={card.dimmedNote}
                   readOnly={weekLockedFlag || card.readOnly}
                   extraPill={card.extraPill}
-                  onToggle={() => toggleScheduledClient(card.clientId)}
+                  onToggle={() => (card.isCustom ? removeEntryObj(card.entry) : toggleScheduledClient(card.clientId))}
                   onExtraTime={card.checked && card.entry ? () => openExtra(card.entry) : undefined}
                   extraTimeLabel={t.extraTimeButton}
                 />
@@ -754,6 +773,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       {/* Folha: adicionar cliente fora da agenda do dia */}
       <Drawer open={addClientOpen} onClose={() => { setAddClientOpen(false); setAddClientSearch(""); }} title={t.addClientSheetTitle} width={420}>
         <SearchField value={addClientSearch} onChange={setAddClientSearch} placeholder={t.search} mobile />
+        <Button variant="secondary" style={{ width: "100%", marginTop: 12 }} onClick={() => setCustomOpen(true)}>
+          {t.customClientButton}
+        </Button>
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {addClientResults.map((c) => (
             <button
@@ -769,6 +791,24 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             </button>
           ))}
         </div>
+      </Drawer>
+
+      {/* Folha: cliente fora da lista (nome escrito à mão) */}
+      <Drawer
+        open={customOpen} onClose={() => setCustomOpen(false)} title={t.customClientTitle} width={420}
+        footer={<><Button variant="secondary" onClick={() => setCustomOpen(false)}>{t.confirmNo}</Button><Button variant="primary" onClick={addCustomEntry} disabled={!customName.trim()}>{t.customClientAdd}</Button></>}
+      >
+        <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 14 }}>{t.customClientHint}</div>
+        {[["customClientName", customName, setCustomName, "text"], ["customClientCity", customCity, setCustomCity, "text"], ["customClientHours", customHours, setCustomHours, "number"]].map(([k, v, set, type]) => (
+          <label key={k} style={{ display: "block", marginBottom: 12 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink2, marginBottom: 4 }}>{t[k]}</div>
+            <input
+              type={type} step={type === "number" ? 0.5 : undefined} min={type === "number" ? 0.5 : undefined}
+              value={v} onChange={(ev) => set(ev.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", height: 48, borderRadius: RADIUS.control, border: `1px solid ${COLORS.line}`, padding: "0 12px", fontSize: 16, fontFamily: "inherit" }}
+            />
+          </label>
+        ))}
       </Drawer>
 
       {/* Folha: "Fiz o cliente de outro dia" (adiantar) */}
@@ -813,10 +853,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
           {entriesForDay.map((e, i) => {
-            const c = clientById(clients, e.clientId);
             return (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13.5 }}>
-                <span style={{ color: COLORS.ink }}>{c ? c.name : "—"}</span>
+                <span style={{ color: COLORS.ink }}>{entryClientName(clients, e)}</span>
                 <span style={{ color: COLORS.ink2, fontVariantNumeric: "tabular-nums" }}>{fmtHoursScreen(e.hours)}</span>
               </div>
             );

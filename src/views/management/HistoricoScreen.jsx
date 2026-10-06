@@ -6,7 +6,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
-import { clientById, fmtEuro, fmtHoursNum, fmtHoursScreen, fmtNoteDate, pctChange } from "../../models/utils.js";
+import { clientById, entryClientName, fmtEuro, fmtHoursNum, fmtHoursScreen, fmtNoteDate, pctChange } from "../../models/utils.js";
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { exportGenericTablePdf } from "../../models/pdfExport.js";
 import {
@@ -359,7 +359,7 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, recla
                     const c = clientById(clients, e.clientId);
                     return (
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${COLORS.lineSoft}`, fontSize: 13 }}>
-                        <span>{fmtNoteDate(e.date)} · {c ? c.name : "—"}</span>
+                        <span>{fmtNoteDate(e.date)} · {entryClientName(clients, e)}</span>
                         <span style={{ fontWeight: 600 }}>{fmtHoursScreen(e.hours)}{e.extra ? " *" : ""}</span>
                       </div>
                     );

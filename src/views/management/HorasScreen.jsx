@@ -6,7 +6,7 @@ import { RADIUS, FONT } from "../../styles/tokens.js";
 import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { TODAY } from "../../models/data.js";
 import {
-  clientById, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
+  clientById, entryClientName, isPendingClientEntry, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
   weekBlocksOfPayPeriod, calPeriodLabel, boardStaff,
@@ -223,12 +223,12 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   function toggleVoid(staffId, i) {
     updateHoras(staffId, (h) => ({ ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, voided: !e.voided } : e)) }));
   }
-  function startEditRow(i, entry) { setEditingIndex(i); setRowDraft({ clientId: entry.clientId, hours: entry.hours }); }
+  function startEditRow(i, entry) { setEditingIndex(i); setRowDraft({ clientId: entry.clientId || "", hours: entry.hours }); }
   function cancelEditRow() { setEditingIndex(null); }
   function saveEditRow(staffId, i) {
     updateHoras(staffId, (h) => ({
       ...h,
-      entries: h.entries.map((e, idx) => (idx === i ? { ...e, clientId: rowDraft.clientId, hours: Number(rowDraft.hours) || 0, approved: e.extra ? false : e.approved } : e)),
+      entries: h.entries.map((e, idx) => (idx === i ? { ...e, clientId: rowDraft.clientId || e.clientId, custom: rowDraft.clientId ? undefined : e.custom, hours: Number(rowDraft.hours) || 0, approved: e.extra ? false : e.approved } : e)),
     }));
     setEditingIndex(null);
   }
@@ -261,7 +261,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       key: "extras", label: t.miniExtrasLabel, width: 1,
       render: (s) => {
         const h = horasData[s.id] || { entries: [] };
-        const n = h.entries.filter((e) => e.extra && !e.approved && !e.voided).length;
+        const n = h.entries.filter((e) => (e.extra && !e.approved && !e.voided) || isPendingClientEntry(e)).length;
         return n > 0 ? <Pill variant="pending">{n}</Pill> : <span style={{ color: COLORS.ink3 }}>–</span>;
       },
     },
@@ -420,6 +420,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                         const i = e._idx;
                         const isEditing = editingIndex === i;
                         const client = clientById(clients, e.clientId);
+                        const pendingClient = isPendingClientEntry(e);
                         const valueHour = client ? client.valueHour : 0;
                         const d = parseISODate(e.date);
                         const dateLabel = `${dayAbbr[d.getDay()].toLowerCase()} ${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
@@ -428,13 +429,14 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                             key={i}
                             style={{
                               borderRadius: RADIUS.chip, border: `1px solid ${COLORS.line}`, padding: "10px 12px",
-                              background: e.voided ? COLORS.lineSoft : (e.extra && !e.approved) ? COLORS.amberBg : COLORS.card,
+                              background: e.voided ? COLORS.lineSoft : ((e.extra && !e.approved) || pendingClient) ? COLORS.amberBg : COLORS.card,
                               opacity: e.voided ? 0.6 : 1,
                             }}
                           >
                             {isEditing ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                                 <select value={rowDraft.clientId || ""} onChange={(ev) => setRowDraft((dft) => ({ ...dft, clientId: Number(ev.target.value) }))} style={{ flex: 1, minWidth: 140, height: 36, borderRadius: RADIUS.control, border: `1px solid ${COLORS.lineInput}`, padding: "0 8px", fontFamily: "inherit" }}>
+                                  <option value="" disabled>{t.clientPickPlaceholder}</option>
                                   {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
                                 <input type="number" step="0.5" value={rowDraft.hours} onChange={(ev) => setRowDraft((dft) => ({ ...dft, hours: ev.target.value }))} style={{ width: 70, height: 36, borderRadius: RADIUS.control, border: `1px solid ${COLORS.lineInput}`, padding: "0 8px", fontFamily: "inherit" }} />
@@ -444,7 +446,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                             ) : (
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                                 <div style={{ fontSize: 13.5, color: COLORS.ink, textDecoration: e.voided ? "line-through" : "none" }}>
-                                  {dateLabel} · {client ? client.name : "—"} · {fmtHoursScreen(e.hours)} · {fmtEuro(valueHour)}/h · {fmtEuro(e.hours * valueHour)}
+                                  {dateLabel} · {entryClientName(clients, e)} · {fmtHoursScreen(e.hours)} · {fmtEuro(valueHour)}/h · {fmtEuro(e.hours * valueHour)}
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                   {e.voided ? (
@@ -454,6 +456,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                     </>
                                   ) : (
                                     <>
+                                      {pendingClient && <Pill variant="pending">{t.clientPendingTag}</Pill>}
                                       {e.extra && (e.approved ? (
                                         <>
                                           <Pill variant="paid"><Check size={11} /> {t.approved}</Pill>
