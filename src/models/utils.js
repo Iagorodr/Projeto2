@@ -60,7 +60,22 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId) {
     (horasDataObj[sid].entries || []).some((e) => e.date === date && e.clientId === clientId && !e.voided)
   );
   const count = staffIdsInvolved.length || 1;
-  const perPerson = baseDuration / count;
+  // Divisão: igual por padrão. Quem ajustou a própria parte (`splitAdjusted`
+  // + `splitHours`, base sem extra) fica com o valor escolhido; o restante do
+  // total do cliente divide-se por igual entre os que não ajustaram. A soma
+  // das partes ajustadas nunca passa do total do cliente.
+  const adjustedBase = {};
+  let adjustedSum = 0, adjustedCount = 0;
+  staffIdsInvolved.forEach((sid) => {
+    const e = horasDataObj[sid].entries.find((x) => x.date === date && x.clientId === clientId && !x.voided);
+    if (count > 1 && e && e.splitAdjusted && typeof e.splitHours === "number") {
+      const room = Math.max(0, baseDuration - adjustedSum);
+      adjustedBase[sid] = Math.min(e.splitHours, room);
+      adjustedSum += adjustedBase[sid]; adjustedCount += 1;
+    }
+  });
+  const restCount = count - adjustedCount;
+  const perPerson = restCount > 0 ? Math.max(0, baseDuration - adjustedSum) / restCount : baseDuration / count;
   const next = { ...horasDataObj };
   staffIdsInvolved.forEach((sid) => {
     next[sid] = {
@@ -68,7 +83,8 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId) {
       entries: next[sid].entries.map((e) => {
         if (e.date === date && e.clientId === clientId && !e.voided) {
           const extraH = (e.extraMinutes || 0) / 60;
-          return { ...e, hours: perPerson + extraH, sharedCount: count };
+          const base = adjustedBase[sid] !== undefined ? adjustedBase[sid] : perPerson;
+          return { ...e, hours: base + extraH, sharedCount: count };
         }
         return e;
       }),

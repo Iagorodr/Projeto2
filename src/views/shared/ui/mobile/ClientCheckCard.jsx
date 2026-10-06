@@ -18,7 +18,7 @@ import { Pill } from "../Pill.jsx";
 
 function ClientCheckCard({
   name, subtitle, checked, onToggle, onExtraTime, extraTimeLabel = "Fiz mais tempo",
-  extraPill, readOnly, dimmed, dimmedNote,
+  extraPill, readOnly, dimmed, dimmedNote, onAdjustSplit, adjustSplitLabel,
 }) {
   return (
     <div
@@ -51,6 +51,14 @@ function ClientCheckCard({
           {dimmed && dimmedNote ? dimmedNote : subtitle}
         </div>
         {extraPill && <div style={{ marginTop: 6 }}><Pill variant="pending">{extraPill}</Pill></div>}
+        {!readOnly && !dimmed && onAdjustSplit && (
+          <button
+            type="button" onClick={onAdjustSplit}
+            style={{ marginTop: 6, padding: 0, border: "none", background: "transparent", color: COLORS.forest700, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
+          >
+            {adjustSplitLabel}
+          </button>
+        )}
       </div>
 
       {!readOnly && !dimmed && onExtraTime && (

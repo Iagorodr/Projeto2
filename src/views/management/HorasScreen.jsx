@@ -429,7 +429,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                             key={i}
                             style={{
                               borderRadius: RADIUS.chip, border: `1px solid ${COLORS.line}`, padding: "10px 12px",
-                              background: e.voided ? COLORS.lineSoft : ((e.extra && !e.approved) || pendingClient) ? COLORS.amberBg : COLORS.card,
+                              background: e.voided ? COLORS.lineSoft : ((e.extra && !e.approved) || pendingClient) ? COLORS.amberBg
+                                : (e.extra && e.approved) ? COLORS.okTint : (e.splitAdjusted && e.sharedCount > 1) ? "#E4ECFA" : COLORS.card,
                               opacity: e.voided ? 0.6 : 1,
                             }}
                           >
@@ -457,6 +458,9 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                   ) : (
                                     <>
                                       {pendingClient && <Pill variant="pending">{t.clientPendingTag}</Pill>}
+                                      {e.splitAdjusted && e.sharedCount > 1 && (
+                                        <span style={{ background: "#C9D9F4", color: "#1E3A6E", fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "2px 9px" }}>{t.splitAdjustedTag}</span>
+                                      )}
                                       {e.extra && (e.approved ? (
                                         <>
                                           <Pill variant="paid"><Check size={11} /> {t.approved}</Pill>

@@ -112,6 +112,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const [confirmWeekOpen, setConfirmWeekOpen] = useState(false);
   const [reopenWeekOpen, setReopenWeekOpen] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);
+  const [splitTarget, setSplitTarget] = useState(null);
+  const [splitDraft, setSplitDraft] = useState(0);
   const [customName, setCustomName] = useState("");
   const [customCity, setCustomCity] = useState("");
   const [customHours, setCustomHours] = useState(1);
@@ -205,6 +207,44 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     });
     setCustomOpen(false); setAddClientOpen(false);
     setCustomName(""); setCustomCity(""); setCustomHours(1);
+  }
+  // Dupla/equipa: cada um ajusta a própria parte (múltiplos de 30 min); o
+  // restante do total do cliente vai automaticamente para os colegas.
+  function splitLimits(entry) {
+    const client = clientById(clients, entry.clientId);
+    const total = client ? client.duration / 60 : 0;
+    const othersAdjusted = Object.keys(horasData).reduce((sum, sid) => {
+      if (String(sid) === String(staffId)) return sum;
+      const o = (horasData[sid].entries || []).find((x) => x.date === entry.date && x.clientId === entry.clientId && !x.voided && x.splitAdjusted);
+      return sum + (o ? o.splitHours || 0 : 0);
+    }, 0);
+    return { total, max: Math.max(0, total - othersAdjusted) };
+  }
+  function openSplit(entry) {
+    if (weekLockedFlag) return;
+    setSplitDraft(entry.hours - (entry.extraMinutes || 0) / 60);
+    setSplitTarget(entry);
+  }
+  function saveSplit(reset) {
+    const target = splitTarget;
+    if (!target) return;
+    setHorasData((prev) => {
+      const current = prev[staffId];
+      const { max } = splitLimits(target);
+      const withIt = {
+        ...prev,
+        [staffId]: {
+          ...current,
+          entries: current.entries.map((e) => {
+            if (e !== target) return e;
+            if (reset) { const { splitAdjusted, splitHours, ...rest } = e; return rest; }
+            return { ...e, splitAdjusted: true, splitHours: Math.min(Math.max(0, splitDraft), max) };
+          }),
+        },
+      };
+      return recomputeSharedHours(withIt, clients, target.date, target.clientId);
+    });
+    setSplitTarget(null);
   }
   function removeEntryObj(entry) {
     if (weekLockedFlag) return;
@@ -341,6 +381,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     const baseHours = entry.hours - (entry.extraMinutes || 0) / 60;
     let s = fmtHoursScreen(baseHours);
     if (entry.sharedCount > 1) s += ` · ${t.sharedWith(entry.sharedCount - 1)}`;
+    if (entry.splitAdjusted) s += ` · ${t.adjustedTag}`;
     return s;
   }
 
@@ -616,6 +657,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                   extraPill={card.extraPill}
                   onToggle={() => (card.isCustom ? removeEntryObj(card.entry) : toggleScheduledClient(card.clientId))}
                   onExtraTime={card.checked && card.entry ? () => openExtra(card.entry) : undefined}
+                  onAdjustSplit={card.checked && card.entry && card.entry.sharedCount > 1 ? () => openSplit(card.entry) : undefined}
+                  adjustSplitLabel={t.adjustSplit}
                   extraTimeLabel={t.extraTimeButton}
                 />
               ))}
@@ -792,6 +835,27 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           ))}
         </div>
       </Drawer>
+
+      {/* Folha: ajustar a minha parte numa dupla */}
+      {splitTarget && (() => {
+        const { total, max } = splitLimits(splitTarget);
+        const draft = Math.min(Math.max(0, splitDraft), max);
+        return (
+          <Drawer
+            open onClose={() => setSplitTarget(null)} title={t.adjustSplitTitle} width={380}
+            footer={<><Button variant="secondary" onClick={() => saveSplit(true)}>{t.adjustSplitReset}</Button><Button variant="primary" onClick={() => saveSplit(false)}>{t.adjustSplitSave}</Button></>}
+          >
+            <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 18 }}>
+              {t.adjustSplitHint(fmtHoursScreen(total), fmtHoursScreen(Math.max(0, total - draft)))}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18 }}>
+              <button type="button" aria-label="-" onClick={() => setSplitDraft(Math.max(0, draft - 0.5))} style={{ width: 56, height: 56, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, fontSize: 28, cursor: "pointer" }}>−</button>
+              <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 32, minWidth: 90, textAlign: "center" }}>{fmtHoursScreen(draft)}</div>
+              <button type="button" aria-label="+" onClick={() => setSplitDraft(Math.min(max, draft + 0.5))} style={{ width: 56, height: 56, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, fontSize: 28, cursor: "pointer" }}>+</button>
+            </div>
+          </Drawer>
+        );
+      })()}
 
       {/* Folha: cliente fora da lista (nome escrito à mão) */}
       <Drawer
