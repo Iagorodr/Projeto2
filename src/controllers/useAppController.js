@@ -18,6 +18,10 @@ import {
   toDbCompanySettings, fromDbCompanySettings,
 } from "../models/dbMappers.js";
 
+// Empresas novas (deploy com VITE_START_EMPTY=true na Vercel) começam SEM os
+// dados de demonstração embutidos no código; as já existentes ficam como estão.
+const START_EMPTY = import.meta.env.VITE_START_EMPTY === "true";
+
 export function useAppController() {
   const [perspective, setPerspective] = useState("login"); // 'login' | 'management' | 'employee'
   const [screen, setScreen] = useState("dashboard");
@@ -32,13 +36,13 @@ export function useAppController() {
   const [reclamacaoExcelenteCount, setReclamacaoExcelenteCount] = useState(1);
   const [reclamacaoRazoavelCount, setReclamacaoRazoavelCount] = useState(3);
 
-  const [clients, setClients] = useState(INITIAL_CLIENTS);
-  const [staff, setStaff] = useState(INITIAL_STAFF);
-  const [assignments, setAssignments] = useState(INITIAL_ASSIGNMENTS);
-  const [horasData, setHorasData] = useState(INITIAL_HORAS);
-  const [closedPeriods, setClosedPeriods] = useState(INITIAL_CLOSED_PERIODS);
-  const [missingItems, setMissingItems] = useState(INITIAL_MISSING);
-  const [sentItems, setSentItems] = useState(INITIAL_SENT);
+  const [clients, setClients] = useState(START_EMPTY ? [] : INITIAL_CLIENTS);
+  const [staff, setStaff] = useState(START_EMPTY ? [] : INITIAL_STAFF);
+  const [assignments, setAssignments] = useState(START_EMPTY ? {} : INITIAL_ASSIGNMENTS);
+  const [horasData, setHorasData] = useState(START_EMPTY ? {} : INITIAL_HORAS);
+  const [closedPeriods, setClosedPeriods] = useState(START_EMPTY ? [] : INITIAL_CLOSED_PERIODS);
+  const [missingItems, setMissingItems] = useState(START_EMPTY ? [] : INITIAL_MISSING);
+  const [sentItems, setSentItems] = useState(START_EMPTY ? [] : INITIAL_SENT);
   const [personalNotes, setPersonalNotes] = useState([]);
 
   const [hydrated, setHydrated] = useState(!isSupabaseConfigured);
