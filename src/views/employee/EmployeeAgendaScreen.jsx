@@ -272,7 +272,11 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
                 <span style={{ ...mobStyles.dayHeaderLeft, flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={mobStyles.dayAbbrBold}>{dayLabels[day]}</span>
-                    {isToday && <span style={{ ...mobStyles.todayDot, background: COLORS.clay }} />}
+                    {isToday && (
+                      <span style={{ background: COLORS.clay, color: "#3A1A0D", fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "2px 9px", lineHeight: 1.3 }}>
+                        {t.todayPill}
+                      </span>
+                    )}
                   </span>
                   {/* Novo (documento, 5.3): resumo dos clientes numa linha
                       quando o dia está fechado, pra dar pra ver sem abrir. */}

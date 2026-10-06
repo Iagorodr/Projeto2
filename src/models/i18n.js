@@ -451,7 +451,7 @@ const T = {
       extraHint: "Isto fica marcado com * e visível para a gerência.",
       minutesUnit: "min", save: "Guardar", cancel: "Cancelar",
       finalizeDay: "Finalizar dia", daySaved: "Dia guardado", finalizeWeek: "Finalizar semana",
-      weekTotal: "Total da semana", weekDoneTag: "Semana finalizada", periodTotal: "Total do período",
+      weekTotal: "Total da semana", reopenWeek: "Reabrir semana", reopenWeekTitle: "Reabrir esta semana?", reopenWeekBody: "A semana volta a ficar editável. Quando terminar, finalize-a de novo.", reopenWeekConfirm: "Sim, reabrir", weekDoneTag: "Semana finalizada", periodTotal: "Total do período",
       lockedBody: "Os dados desta semana ficaram bloqueados e já não podem ser alterados.",
       confirmWeekTitle: "Finalizar a semana?",
       confirmWeekBody: "Depois disto já não vai poder editar nenhum dia. Só finalize quando tiver a certeza.",
@@ -522,7 +522,7 @@ const T = {
       // anteriores (ex.: `notas.title`, `employeeHistorico.title`) — essas
       // não foram tocadas aqui pra não misturar etapas já fechadas, mas
       // fica no LEIA-ME como possível acerto futuro.
-      title: "Agenda", noClients: "Sem clientes neste dia", noClientsShort: "Sem clientes",
+      title: "Agenda", todayPill: "Hoje", noClients: "Sem clientes neste dia", noClientsShort: "Sem clientes",
       freqWeekly: "toda semana", freqBiweekly: "quinzenal", freqMonthly: "mensal",
       // Novo (4k): resumo de clientes numa linha quando o dia está fechado
       // ("Cliente 33 · Cliente 5 +1") e pílula "Hoje" da vista PC/tablet.
@@ -988,7 +988,7 @@ const T = {
       extraHint: "This gets marked with * and is visible to management.",
       minutesUnit: "min", save: "Save", cancel: "Cancel",
       finalizeDay: "Finish day", daySaved: "Day saved", finalizeWeek: "Finish week",
-      weekTotal: "Week total", weekDoneTag: "Week finished", periodTotal: "Period total",
+      weekTotal: "Week total", reopenWeek: "Reopen week", reopenWeekTitle: "Reopen this week?", reopenWeekBody: "The week becomes editable again. Finalize it again when you are done.", reopenWeekConfirm: "Yes, reopen", weekDoneTag: "Week finished", periodTotal: "Period total",
       lockedBody: "This week's data is locked and can no longer be changed.",
       confirmWeekTitle: "Finish the week?",
       confirmWeekBody: "After this you won't be able to edit any day. Only finish when you're sure.",
@@ -1050,7 +1050,7 @@ const T = {
       periodBlockOverdue: "Needs finishing", periodBlockFuture: "–",
     },
     employeeAgenda: {
-      title: "Schedule", noClients: "No clients on this day", noClientsShort: "No clients",
+      title: "Schedule", todayPill: "Today", noClients: "No clients on this day", noClientsShort: "No clients",
       freqWeekly: "every week", freqBiweekly: "biweekly", freqMonthly: "monthly",
       peopleLabel: (n) => (n === 1 ? "1 person" : `${n} people`), each: "each",
       todayPill: "Today",
@@ -1503,7 +1503,7 @@ const T = {
       extraHint: "Ceci est marqué d'un * et visible par la direction.",
       minutesUnit: "min", save: "Enregistrer", cancel: "Annuler",
       finalizeDay: "Terminer la journée", daySaved: "Journée enregistrée", finalizeWeek: "Terminer la semaine",
-      weekTotal: "Total de la semaine", weekDoneTag: "Semaine terminée", periodTotal: "Total de la période",
+      weekTotal: "Total de la semaine", reopenWeek: "Rouvrir la semaine", reopenWeekTitle: "Rouvrir cette semaine ?", reopenWeekBody: "La semaine redevient modifiable. Terminez-la à nouveau quand vous avez fini.", reopenWeekConfirm: "Oui, rouvrir", weekDoneTag: "Semaine terminée", periodTotal: "Total de la période",
       lockedBody: "Les données de cette semaine sont verrouillées et ne peuvent plus être modifiées.",
       confirmWeekTitle: "Terminer la semaine ?",
       confirmWeekBody: "Après cela, vous ne pourrez plus modifier aucun jour. Ne terminez que si vous êtes sûr.",
@@ -1565,7 +1565,7 @@ const T = {
       periodBlockOverdue: "À terminer", periodBlockFuture: "–",
     },
     employeeAgenda: {
-      title: "Planning", noClients: "Aucun client ce jour-là", noClientsShort: "Aucun client",
+      title: "Planning", todayPill: "Aujourd'hui", noClients: "Aucun client ce jour-là", noClientsShort: "Aucun client",
       freqWeekly: "toutes les semaines", freqBiweekly: "bimensuel", freqMonthly: "mensuel",
       peopleLabel: (n) => (n === 1 ? "1 personne" : `${n} personnes`), each: "chacun",
       todayPill: "Aujourd'hui",

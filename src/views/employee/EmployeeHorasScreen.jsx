@@ -110,6 +110,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const [noClientConfirmOpen, setNoClientConfirmOpen] = useState(false);
   const [finalizeDaySheetOpen, setFinalizeDaySheetOpen] = useState(false);
   const [confirmWeekOpen, setConfirmWeekOpen] = useState(false);
+  const [reopenWeekOpen, setReopenWeekOpen] = useState(false);
   const [finalizeMonthConfirmOpen, setFinalizeMonthConfirmOpen] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionText, setCorrectionText] = useState("");
@@ -135,6 +136,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
 
   // 5.2.10: duas colunas só na vista normal/editável (nem "antes do
   // período" nem "mês finalizado" — ver comentário no topo do ficheiro).
+  const canReopenWeek = weekLockedRaw && chunkZone !== "before" && !monthFinalized && !myHoras.paid;
   const showTwoColumn = isDesktop && chunkZone !== "before" && !monthFinalized;
 
   const migratedLocked = migrateLockedWeeksToBlocks(myHoras.lockedWeeks, payPeriod, cutoffDay);
@@ -238,6 +240,16 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   function finalizeWeek() {
     updateMyHoras((h) => ({ ...h, lockedWeeks: { ...(h.lockedWeeks || {}), [chunkKey]: true } }));
     setConfirmWeekOpen(false);
+  }
+  // Reabrir a própria semana: só enquanto o mês não foi finalizado e a
+  // gerência não marcou como pago (decisão do Iago, "opção 2").
+  function reopenWeek() {
+    updateMyHoras((h) => {
+      const lw = { ...(h.lockedWeeks || {}) };
+      delete lw[chunkKey];
+      return { ...h, lockedWeeks: lw };
+    });
+    setReopenWeekOpen(false);
   }
   function finalizeMonth() {
     updateMyHoras((h) => ({ ...h, status: "finalizado", reopened: false }));
@@ -547,6 +559,12 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               </Card>
             )}
 
+            {canReopenWeek && (
+              <Button variant="secondary" style={{ width: "100%" }} onClick={() => setReopenWeekOpen(true)}>
+                {t.reopenWeek}
+              </Button>
+            )}
+
             <DayPanel
               title={`${weekdayFull[selectedDate.getDay()]}, ${dmOf(selectedDate)}`}
               forecastLabel={hasAgendaToday && !weekLockedFlag ? t.forecast(fmtHoursScreen(scheduledToday.reduce((s, c) => s + c.duration / 60, 0))) : undefined}
@@ -820,6 +838,11 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         open={confirmWeekOpen} title={t.confirmWeekTitle} body={t.confirmWeekBody}
         cancelLabel={t.confirmNo} confirmLabel={t.confirmYes} destructive
         onCancel={() => setConfirmWeekOpen(false)} onConfirm={finalizeWeek}
+      />
+      <ConfirmDialog
+        open={reopenWeekOpen} title={t.reopenWeekTitle} body={t.reopenWeekBody}
+        cancelLabel={t.confirmNo} confirmLabel={t.reopenWeekConfirm}
+        onCancel={() => setReopenWeekOpen(false)} onConfirm={reopenWeek}
       />
       <ConfirmDialog
         open={finalizeMonthConfirmOpen} title={t.finalizeMonthConfirmTitle} body={t.finalizeMonthConfirmBody}
