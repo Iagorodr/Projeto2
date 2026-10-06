@@ -5,6 +5,7 @@ import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { TYPE_ICONS, AGENDA_DAYS, TODAY, LANG_NAMES, EMPTY_CLIENT } from "../../models/data.js";
 import {
+  startOfISOWeek, addDays, isoDateStr, clientAppliesThisWeek, weekLabelPT,
   parseDMY, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -421,6 +422,10 @@ function ClientesScreen({
             <SectionTitle>{t.sectionService}</SectionTitle>
             <div style={styles.viewGrid}>
               <ViewField label={t.fFrequency}>{FREQS[openClient.frequency] || "—"}</ViewField>
+              {(openClient.frequency === "biweekly" || openClient.frequency === "monthly") && (() => {
+                const next = [0, 1, 2, 3].map((i) => addDays(startOfISOWeek(TODAY), 7 * i)).find((ws) => clientAppliesThisWeek(openClient, ws));
+                return next ? <ViewField label={t.fNextVisitWeek}>{weekLabelPT(next, lang)}</ViewField> : null;
+              })()}
               <ViewField label={t.fHoursPerDay}>{openClient.duration ? fmtMinutes(openClient.duration) : "—"}</ViewField>
               <ViewField label={t.fDaysPerWeek} full>
                 {openClient.days && openClient.days.length > 0
@@ -531,6 +536,30 @@ function ClientesScreen({
                 {Object.keys(FREQS).map((k) => <option key={k} value={k}>{FREQS[k]}</option>)}
               </select>
             </Field>
+            {(draft.frequency === "biweekly" || draft.frequency === "monthly") && (
+              <Field label={t.formVisitWeek}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {Array.from({ length: draft.frequency === "monthly" ? 4 : 2 }, (_, i) => {
+                    const ws = addDays(startOfISOWeek(TODAY), 7 * i);
+                    const selected = clientAppliesThisWeek(draft, ws);
+                    const prefix = i === 0 ? `${t.weekThis} · ` : i === 1 ? `${t.weekNext} · ` : "";
+                    return (
+                      <button
+                        key={i} type="button" onClick={() => updateDraft("frequencyAnchor", isoDateStr(ws))}
+                        style={{
+                          padding: "10px 14px", borderRadius: RADIUS.control, cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600,
+                          border: `1.5px solid ${selected ? COLORS.primaryDark : COLORS.line}`,
+                          background: selected ? COLORS.primaryDark : COLORS.card, color: selected ? "#fff" : COLORS.ink,
+                        }}
+                      >
+                        {prefix}{weekLabelPT(ws, lang)}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.visitWeekHint}</div>
+              </Field>
+            )}
             <Field label={t.formContractStart} required error={formErrors.contractStart ? c0.requiredField : undefined}>
               <input style={styles.input} placeholder="dd/mm/aaaa" value={draft.contractStart} onChange={(e) => updateDraft("contractStart", e.target.value)} />
             </Field>

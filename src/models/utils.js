@@ -342,7 +342,14 @@ function weekDiff(weekStart, ref) { return Math.round((weekStart - ref) / (7 * 2
 const REFERENCE_WEEK_START = startOfISOWeek(new Date(2026, 8, 1));
 
 function clientAppliesThisWeek(client, weekStart) {
-  const diff = weekDiff(weekStart, REFERENCE_WEEK_START);
+  // Semana de referência própria do cliente (escolhida pela gerência no
+  // cadastro, "YYYY-MM-DD"); sem ela vale a referência global de antes.
+  let ref = REFERENCE_WEEK_START;
+  if (client.frequencyAnchor && /^\d{4}-\d{2}-\d{2}$/.test(client.frequencyAnchor)) {
+    const [y, m, d] = client.frequencyAnchor.split("-").map(Number);
+    ref = startOfISOWeek(new Date(y, m - 1, d));
+  }
+  const diff = weekDiff(weekStart, ref);
   if (client.frequency === "weekly") return true;
   if (client.frequency === "biweekly") return ((diff % 2) + 2) % 2 === 0;
   if (client.frequency === "monthly") return ((diff % 4) + 4) % 4 === 0;

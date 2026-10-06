@@ -15,6 +15,7 @@ create table if not exists clients (
   hours_month numeric,
   value_hour numeric,
   frequency text,
+  frequency_anchor text, -- bancos já existentes: alter table clients add column if not exists frequency_anchor text;
   availability text,
   duration integer,
   days integer[],
