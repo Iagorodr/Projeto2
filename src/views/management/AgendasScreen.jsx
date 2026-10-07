@@ -7,7 +7,7 @@ import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
-  isStaffActive, formatPeriodLabel, partnerOf,
+  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import {
@@ -301,7 +301,7 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
 // cliente em cada dia da semana". `assignments` é uma semana-tipo (repete
 // todas as semanas), independente de `client.days`/`frequency` — isso já
 // era assim no ecrã antigo e não muda aqui; só a apresentação muda.
-function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignments }) {
+function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments, setAssignments }) {
   const t = T[lang].agendas;
   const c0 = T[lang].common;
   const tc = T[lang].clientes;
@@ -356,7 +356,15 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   }
 
   function cellKey(staffId, day) { return `${staffId}-${day}`; }
-  function getCellClientIds(staffId, day) { return assignments[cellKey(staffId, day)] || []; }
+  // Só os clientes que realmente têm visita na SEMANA EM EXIBIÇÃO: quinzenal
+  // aparece de 15 em 15 dias, mensal a cada 4 semanas (ver
+  // `clientAppliesThisWeek`). O molde semanal em `assignments` não muda.
+  function getCellClientIds(staffId, day) {
+    return (assignments[cellKey(staffId, day)] || []).filter((cid) => {
+      const c = clientById(clients, cid);
+      return !c || clientAppliesThisWeek(c, weekStart);
+    });
+  }
   function teamSizeFor(day, clientId) { return staff.filter((s) => getCellClientIds(s.id, day).includes(clientId)).length; }
   // Lote 4, 4.6: mesma lista que `teamSizeFor` conta, mas devolvendo quem
   // são (não só quantos) — pro popover "quem está no cliente".
@@ -388,6 +396,15 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
     });
   }
   function addClient(staffId, day, clientId) {
+    // Cliente quinzenal/mensal colocado numa semana em que não teria visita:
+    // a semana mostrada passa a ser a "semana de referência" dele, e a
+    // próxima aparição conta a partir daqui.
+    const picked = clientById(clients, clientId);
+    if (picked && !clientAppliesThisWeek(picked, weekStart) && setClients) {
+      const anchor = isoDateStr(weekStart);
+      setClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, frequencyAnchor: anchor } : c)));
+      showToast(t.anchoredToast(picked.name));
+    }
     mergeAdd(cellKey(staffId, day), clientId);
     setAuto(staffId, day, clientId, false); // escolha manual nesta célula
     const p = partnerOf(staff, staffId, TODAY);
@@ -671,7 +688,7 @@ function AgendasScreen({ lang, setLang, clients, staff, assignments, setAssignme
   function dayRows(day) {
     const byClient = new Map();
     clients.forEach((c) => {
-      if ((c.days || []).includes(day)) byClient.set(c.id, { client: c, staffIds: new Set() });
+      if ((c.days || []).includes(day) && clientAppliesThisWeek(c, weekStart)) byClient.set(c.id, { client: c, staffIds: new Set() });
     });
     staff.forEach((s) => {
       getCellClientIds(s.id, day).forEach((cid) => {
