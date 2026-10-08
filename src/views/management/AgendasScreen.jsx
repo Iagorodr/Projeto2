@@ -327,7 +327,6 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   // `day-${day}-${clientId}`, sem staffId porque ali o botão não pertence
   // a uma linha de funcionário) — null quando nenhum está aberto.
   const [openTeam, setOpenTeam] = useState(null);
-  const [weekendOpen, setWeekendOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState(null); // funcionário de origem do "Copiar agenda"
   const tAbs = T[lang].absences;
   const { height: ctrlHeight, radius: ctrlRadius } = useControlSize();
@@ -485,10 +484,12 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   // As atribuições em si não se tocam (`assignments` continua intacto),
   // só a apresentação muda, para a prolongação da validade continuar a
   // trazer a pessoa de volta às linhas normais sem perder nada.
-  const weekendHasData = [6, 7].some((day) => staff.some((s) => getCellClientIds(s.id, day).length > 0 || absenceFor(s.id, day)));
-  const showWeekend = weekendOpen || weekendHasData;
-  const shownDays = showWeekend ? AGENDA_DAYS : AGENDA_DAYS.filter((d) => d <= 5);
-  const gridCols = `140px repeat(${shownDays.length}, minmax(${showWeekend ? 135 : 150}px, 1fr))`;
+  // Sábado e domingo ficam SEMPRE visíveis (nada passa despercebido); só
+  // estreitam quando ninguém tem cliente nem falta nesse dia, e alargam
+  // sozinhos assim que houver algo.
+  const shownDays = AGENDA_DAYS;
+  const narrowDays = new Set(AGENDA_DAYS.filter((day) => day >= 6 && !staff.some((s) => getCellClientIds(s.id, day).length > 0 || absenceFor(s.id, day))));
+  const gridCols = `140px ${AGENDA_DAYS.map((day) => (narrowDays.has(day) ? "minmax(64px, 0.45fr)" : "minmax(120px, 1fr)")).join(" ")}`;
   const weekAbsenceRows = [];
   staff.forEach((s) => {
     AGENDA_DAYS.forEach((day) => {
@@ -610,14 +611,14 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                         aria-haspopup="dialog" aria-expanded={isTeamOpen}
                         onClick={() => setOpenTeam((k) => (k === thisTeamKey ? null : thisTeamKey))}
                         style={{
-                          display: "flex", alignItems: "center", gap: 4, minHeight: 30, width: "100%", borderRadius: RADIUS.chip,
+                          display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 30, width: "100%", borderRadius: RADIUS.chip,
                           padding: "4px 8px", background: COLORS.clayTint, fontSize: 12.5, border: "none", cursor: "pointer",
                           fontFamily: "inherit", textAlign: "left",
                           outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
                         }}
                       >
                         <UsersRound size={12} style={{ flexShrink: 0, color: COLORS.clayInk }} />
-                        <span style={{ flex: 1, minWidth: 0, whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.clayInk }}>
+                        <span style={{ flex: "1 1 64px", minWidth: 0, whiteSpace: "normal", overflowWrap: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.clayInk }}>
                           {client.name}
                         </span>
                         {getAutoIds(s.id, day).includes(cid) && (
@@ -644,11 +645,11 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                   <div
                     key={cid} title={tooltip}
                     style={{
-                      display: "flex", alignItems: "center", gap: 4, minHeight: 30, borderRadius: RADIUS.chip, padding: "4px 8px",
+                      display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 30, borderRadius: RADIUS.chip, padding: "4px 8px",
                       background: COLORS.lineSoft, fontSize: 12.5, outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
                     }}
                   >
-                    <span style={{ flex: 1, minWidth: 0, whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.ink }}>
+                    <span style={{ flex: "1 1 64px", minWidth: 0, whiteSpace: "normal", overflowWrap: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.ink }}>
                       {client.name}
                     </span>
                     {getAutoIds(s.id, day).includes(cid) && (
@@ -908,12 +909,6 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
           value={view} onChange={setView}
         />
         <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
-        {view === "staff" && !weekendHasData && (
-          <button type="button" onClick={() => setWeekendOpen((v) => !v)}
-            style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, color: COLORS.forest600, textDecoration: "underline" }}>
-            {weekendOpen ? tAbs.hideWeekend : tAbs.showWeekend}
-          </button>
-        )}
       </div>
 
       {weekAbsenceRows.length > 0 && (
@@ -1086,7 +1081,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                         background: isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
                       }}
                     >
-                      {t.footerSummary(count, fmtMinutes(totalMin))}
+                      {narrowDays.has(day) && count === 0 ? "–" : t.footerSummary(count, fmtMinutes(totalMin))}
                     </div>
                   );
                 })}
