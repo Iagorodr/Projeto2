@@ -234,7 +234,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       // cortado (sem reticências, porque o `overflow: hidden` de
       // DataTable.jsx não aplica elipse a um filho em flex/bloco como um
       // `<Button>`, só a texto que estoura direto na célula).
-      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 180,
+      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 290,
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(ev) => ev.stopPropagation()}>
           {row.totalGaps > 0 && <span style={{ fontWeight: 700, color: COLORS.alert, fontSize: 13 }}>{row.totalGaps}</span>}
