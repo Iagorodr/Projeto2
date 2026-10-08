@@ -1,3 +1,4 @@
+import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
 import { useState } from "react";
 import { Plus, Pencil, MapPin, Phone, Calendar, Euro, ChevronDown, Users, Megaphone } from "lucide-react";
 import { styles } from "../../styles/styles.js";
@@ -105,6 +106,7 @@ function ClientesScreen({
 
   const [openClientId, setOpenClientId] = useState(null); // id | "new" | null
   const [mode, setMode] = useState("view"); // "view" | "edit"
+  const [copyOpen, setCopyOpen] = useState(false);
   const [draft, setDraft] = useState(EMPTY_CLIENT_FORM);
   const [formErrors, setFormErrors] = useState({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -365,6 +367,7 @@ function ClientesScreen({
         footer={
           mode === "view" && openClient ? (
             <>
+              <Button variant="secondary" onClick={() => setCopyOpen(true)}>{T[lang].absences.shareBtn}</Button>
               <Button variant="secondary" icon={Pencil} onClick={startEdit}>{c0.edit}</Button>
               <Button variant="dangerSoft" onClick={() => setDeleteConfirmOpen(true)}>{c0.delete}</Button>
             </>
@@ -623,6 +626,9 @@ function ClientesScreen({
           </div>
         )}
       </Drawer>
+      {copyOpen && openClient && (
+        <CopyClientsDialog lang={lang} title={T[lang].absences.shareTitleOne(openClient.name)} clients={[openClient]} onClose={() => setCopyOpen(false)} />
+      )}
 
       <ConfirmDialog
         open={deleteConfirmOpen && !!openClient}

@@ -10,6 +10,7 @@ import {
   isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, absenceOn,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
+import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
 import {
   PageHeader, SegmentedControl, SearchField, FilterChip, Avatar, Pill, SupervisorTag, DataTable, Toast, InfoTip,
 } from "../shared/ui/index.js";
@@ -328,7 +329,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   const [openTeam, setOpenTeam] = useState(null);
   const [weekendOpen, setWeekendOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState(null); // funcionário de origem do "Copiar agenda"
-  const [copyTarget, setCopyTarget] = useState("");
+  const [copyDay, setCopyDay] = useState(1);
   const tAbs = T[lang].absences;
   const { height: ctrlHeight, radius: ctrlRadius } = useControlSize();
   // QA (achado do Iago — "Agendas"): antes era `const weekStart =
@@ -500,29 +501,6 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   });
   function toggleHandled(id) { setAbsences((prev) => (prev || []).map((a) => (a.id === id ? { ...a, handled: !a.handled } : a))); }
 
-  // Copiar a agenda fixa semanal de um funcionário para outro (junta, sem apagar nada do destino).
-  function doCopyAgenda() {
-    if (!copyFrom || !copyTarget) return;
-    const targetId = copyTarget;
-    let added = 0;
-    setAssignments((prev) => {
-      const next = { ...prev };
-      AGENDA_DAYS.forEach((day) => {
-        const src = prev[cellKey(copyFrom.id, day)] || [];
-        const dst = prev[cellKey(targetId, day)] || [];
-        const merged = [...dst, ...src.filter((id) => !dst.includes(id))];
-        if (merged.length !== dst.length) {
-          added += merged.length - dst.length;
-          next[cellKey(targetId, day)] = merged.sort((a, b) => (clientById(clients, a)?.name || "").localeCompare(clientById(clients, b)?.name || ""));
-        }
-      });
-      return next;
-    });
-    const targetName = (staffById(staff, targetId)?.name || "").split(" ")[0];
-    const fromName = copyFrom.name.split(" ")[0];
-    setCopyFrom(null);
-    showToast(tAbs.copyDone(fromName, targetName));
-  }
   const matchingStaff = staff.filter(staffMatchesSearch);
   const visibleStaff = matchingStaff.filter((s) => isStaffActive(s, TODAY));
   const inactiveStaff = matchingStaff.filter((s) => !isStaffActive(s, TODAY));
@@ -564,9 +542,9 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
             </div>
           )}
           {!inactive && (
-            <button type="button" onClick={() => { setCopyFrom(s); setCopyTarget(""); }}
+            <button type="button" onClick={() => { setCopyFrom(s); setCopyDay(selectedDay); }}
               style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: COLORS.forest600, textDecoration: "underline", padding: 0 }}>
-              {tAbs.copyBtn}
+              {tAbs.shareDayBtn}
             </button>
           )}
           <div style={{ fontSize: 11, color: COLORS.ink2 }}>
@@ -958,17 +936,19 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
       )}
 
       {copyFrom && (
-        <AgendaModal titleId="copy-agenda" title={tAbs.copyTitle(copyFrom.name.split(" ")[0])} closeLabel={c0.cancel} onClose={() => setCopyFrom(null)}>
-          <div style={{ fontSize: 12.5, color: COLORS.ink2, marginBottom: 10 }}>{tAbs.copyHint}</div>
-          <select value={copyTarget} onChange={(e) => setCopyTarget(e.target.value)} style={{ ...styles.input, width: "100%", boxSizing: "border-box", marginBottom: 12 }}>
-            <option value="">{tAbs.copyTargetPlaceholder}</option>
-            {staff.filter((o) => o.id !== copyFrom.id && isStaffActive(o, TODAY)).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
-          <button type="button" disabled={!copyTarget} onClick={doCopyAgenda}
-            style={{ width: "100%", height: 40, borderRadius: RADIUS.control, border: "none", background: copyTarget ? COLORS.forest600 : COLORS.line, color: "#fff", fontFamily: "inherit", fontWeight: 600, fontSize: 14, cursor: copyTarget ? "pointer" : "default" }}>
-            {tAbs.copyConfirm}
-          </button>
-        </AgendaModal>
+        <CopyClientsDialog
+          lang={lang} title={tAbs.shareTitleDay(copyFrom.name.split(" ")[0])}
+          clients={getCellClientIds(copyFrom.id, copyDay).map((cid) => clientById(clients, cid)).filter(Boolean)}
+          onClose={() => setCopyFrom(null)}
+          header={
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 13, color: COLORS.ink2 }}>{tAbs.shareDayLabel}</span>
+              <select value={copyDay} onChange={(e) => setCopyDay(Number(e.target.value))} style={{ ...styles.input, flex: 1 }}>
+                {AGENDA_DAYS.map((d) => <option key={d} value={d}>{dayLabels[d]} {pad2(weekDates[d - 1].getDate())}</option>)}
+              </select>
+            </div>
+          }
+        />
       )}
 
       {/* Legenda (documento, 4.3): duração, cliente partilhado, recorrência. */}
