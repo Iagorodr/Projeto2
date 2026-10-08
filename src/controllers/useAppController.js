@@ -44,6 +44,8 @@ export function useAppController() {
   const [missingItems, setMissingItems] = useState(START_EMPTY ? [] : INITIAL_MISSING);
   const [sentItems, setSentItems] = useState(START_EMPTY ? [] : INITIAL_SENT);
   const [personalNotes, setPersonalNotes] = useState([]);
+  // Avisos de falta: { id, staffId, date:"YYYY-MM-DD", note, createdAt, handled }
+  const [absences, setAbsences] = useState([]);
 
   const [hydrated, setHydrated] = useState(!isSupabaseConfigured);
   // QA pós-auditoria (Lote 1, "Gravar só depois de ler"): só true quando
@@ -132,6 +134,7 @@ export function useAppController() {
         if (row.sent_items && row.sent_items.length > 0) setSentItems(row.sent_items);
         if (row.closed_periods && row.closed_periods.length > 0) setClosedPeriods(row.closed_periods);
         if (row.personal_notes && row.personal_notes.length > 0) setPersonalNotes(row.personal_notes);
+        if (row.absences && row.absences.length > 0) setAbsences(row.absences);
       }
     } catch (err) {
       console.error("Erro ao carregar dados do Supabase:", err);
@@ -329,6 +332,13 @@ export function useAppController() {
     });
   }, [hydrated, readOk, personalNotes]);
 
+  useEffect(() => {
+    if (!hydrated || !isSupabaseConfigured || !readOk) return;
+    supabase.from("app_data").update({ absences }).eq("id", 1).then(({ error }) => {
+      if (error) console.error("Erro ao gravar ausências:", error);
+    });
+  }, [hydrated, readOk, absences]);
+
   function enterManagement() { setPerspective("management"); setScreen("dashboard"); }
   function enterEmployee(staffId) { setLoggedInStaffId(staffId); setPerspective("employee"); setEmpScreen("menu"); }
 
@@ -411,7 +421,7 @@ export function useAppController() {
     clients, setClients, staff, setStaff, assignments, setAssignments,
     horasData, setHorasData, closedPeriods, setClosedPeriods,
     missingItems, setMissingItems, sentItems, setSentItems,
-    personalNotes, setPersonalNotes,
+    personalNotes, setPersonalNotes, absences, setAbsences,
     enterManagement, enterEmployee, deleteClient, deleteStaff,
     formatAllData, verifyPassword,
     authLoading, authError, loginWithPassword, logout,

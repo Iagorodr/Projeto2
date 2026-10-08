@@ -7,7 +7,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   getOpenPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, formatPeriodLabel, isoDateStr, pad2,
-  clientById, clientAppliesThisWeek, startOfISOWeek, dayIsCovered, isStaffActive,
+  clientById, clientAppliesThisWeek, startOfISOWeek, dayIsCovered, isStaffActive, absenceOn,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
@@ -26,7 +26,7 @@ import {
 // redesenhar só um deles deixaria o outro com um visual completamente
 // desencontrado (tabela/gaveta novas dum lado, cartões antigos do outro).
 // Optei por redesenhar os dois já nesta leva.
-function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignments, cutoffDay, closedPeriods, onHome }) {
+function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignments, cutoffDay, closedPeriods, absences, sentItems, setSentItems, onHome }) {
   const t = T[lang].monitoramento;
   const th = T[lang].horas;
   const c0 = T[lang].common;
@@ -34,6 +34,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   const [search, setSearch] = useState("");
   const [onlyGaps, setOnlyGaps] = useState(true);
   const [openStaffId, setOpenStaffId] = useState(null);
+  const [remindedIds, setRemindedIds] = useState([]); // lembrados nesta sessão (evita repetir sem querer)
   const tier = useBreakpoint();
   const isSupervisorView = !!onHome;
 
@@ -57,6 +58,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   // extrato — consolidar as duas exigiria mudar a assinatura pública de
   // `staffWithGapsCount`, o que ficou fora do risco aceitável desta leva.
   function hasAgendaOnDay(staffId, d) {
+    if (absenceOn(absences, staffId, isoDateStr(d))) return false;
     const clientIds = assignments[`${staffId}-${isoWeekday(d)}`] || [];
     const weekStart = startOfISOWeek(d);
     return clientIds.some((id) => {
@@ -86,6 +88,17 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       const gaps = locked || notStarted ? 0 : dayStatuses.filter((st) => st === "missed").length;
       return { chunk, locked, notStarted, days, dayStatuses, gaps };
     });
+  }
+
+  // "Lembrar funcionário": deixa um aviso na caixa de Avisos dele (com o selo
+  // de não lido no app). Um por funcionário e por dia, para não encher a caixa.
+  function remindStaff(staffId, gaps) {
+    const today = isoDateStr(TODAY);
+    setSentItems((prev) => [
+      { id: Date.now(), type: "aviso", staffId, clientId: null, text: t.remindText(gaps), date: today, hasPhoto: false, seenByManagement: true },
+      ...prev,
+    ]);
+    setRemindedIds((ids) => [...ids, staffId]);
   }
 
   const monitored = staff
@@ -225,6 +238,11 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(ev) => ev.stopPropagation()}>
           {row.totalGaps > 0 && <span style={{ fontWeight: 700, color: COLORS.alert, fontSize: 13 }}>{row.totalGaps}</span>}
+          {row.totalGaps > 0 && setSentItems && (
+            <Button variant="secondary" disabled={remindedIds.includes(row.staffMember.id)} onClick={() => remindStaff(row.staffMember.id, row.totalGaps)}>
+              {remindedIds.includes(row.staffMember.id) ? t.reminded : t.remind}
+            </Button>
+          )}
           <Button variant="secondary" onClick={() => setOpenStaffId(row.staffMember.id)}>{t.viewExtract}</Button>
         </div>
       ),

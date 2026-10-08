@@ -147,12 +147,12 @@ export default function App() {
           />
           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
             {c.screen === "dashboard" && (
-              <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} onNavigate={c.setScreen} />
+              <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} onNavigate={c.setScreen} />
             )}
             {c.screen === "clientes" && <ClientesScreen lang={c.lang} setLang={c.setLang} clients={c.clients} setClients={c.setClients} onDeleteClient={c.deleteClient} staff={c.staff} assignments={c.assignments} horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} contractAlertDays={c.contractAlertDays} onNavigate={c.setScreen} />}
-            {c.screen === "agendas" && <AgendasScreen lang={c.lang} setLang={c.setLang} clients={c.clients} setClients={c.setClients} staff={c.staff} assignments={c.assignments} setAssignments={c.setAssignments} />}
+            {c.screen === "agendas" && <AgendasScreen lang={c.lang} setLang={c.setLang} absences={c.absences} setAbsences={c.setAbsences} clients={c.clients} setClients={c.setClients} staff={c.staff} assignments={c.assignments} setAssignments={c.setAssignments} />}
             {c.screen === "horas" && <HorasScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setClosedPeriods={c.setClosedPeriods} sentItems={c.sentItems} missingItems={c.missingItems} setSentItems={c.setSentItems} setMissingItems={c.setMissingItems} />}
-            {c.screen === "monitoramento" && <MonitoramentoScreen lang={c.lang} setLang={c.setLang} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} />}
+            {c.screen === "monitoramento" && <MonitoramentoScreen lang={c.lang} setLang={c.setLang} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} absences={c.absences} sentItems={c.sentItems} setSentItems={c.setSentItems} />}
             {c.screen === "historico" && (
               <HistoricoScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} closedPeriods={c.closedPeriods} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} />
             )}
@@ -200,14 +200,14 @@ export default function App() {
               <EmployeeInicioScreen
                 lang={c.lang} setLang={c.setLang} me={c.me} onNavigate={c.setEmpScreen}
                 avisosBadge={c.myUnreadBadge} clients={c.clients} staff={c.staff} assignments={c.assignments}
-                horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes}
+                horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences}
               />
             )}
             {c.empScreen === "horas" && (
               <EmployeeHorasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setMissingItems={c.setMissingItems} />
             )}
             {c.empScreen === "avisos" && (
-              <EmployeeAvisosScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} isSupervisor={isSupervisor} desktop={empTier !== "mobile"} />
+              <EmployeeAvisosScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} absences={c.absences} setAbsences={c.setAbsences} isSupervisor={isSupervisor} desktop={empTier !== "mobile"} />
             )}
             {c.empScreen === "agenda" && (
               <EmployeeAgendaScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} staff={c.staff} clients={c.clients} assignments={c.assignments} desktop={empTier !== "mobile"} />
@@ -219,7 +219,7 @@ export default function App() {
               <EmployeeHistoricoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} closedPeriods={c.closedPeriods} desktop={empTier !== "mobile"} />
             )}
             {c.empScreen === "monitoramento" && (
-              <MonitoramentoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} />
+              <MonitoramentoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} absences={c.absences} />
             )}
             {c.empScreen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} ownerId={c.me.id} personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop={empTier !== "mobile"} />
@@ -257,7 +257,7 @@ export default function App() {
                 c.staff, c.horasData, c.clients, c.assignments,
                 getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY),
                 weekBlocksOfPayPeriod(getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY), c.cutoffDay),
-                c.cutoffDay, TODAY
+                c.cutoffDay, TODAY, c.absences
               ).staffCount || undefined,
               onSelect: () => c.setEmpScreen("monitoramento"),
             }] : []),

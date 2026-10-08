@@ -567,7 +567,7 @@ function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staff
 // só que devolvendo as datas em vez da contagem, pra dar pra mostrar a
 // primeira em falta ("Segunda-feira, 28/09"). Ordenadas da mais antiga pra
 // mais recente.
-function periodMissingDays(clients, assignments, staffId, horasEntry, payPeriodChunks, today, staffMember) {
+function periodMissingDays(clients, assignments, staffId, horasEntry, payPeriodChunks, today, staffMember, absences) {
   const missing = [];
   payPeriodChunks.forEach((chunk) => {
     calPeriodDays(chunk).forEach((d) => {
@@ -575,7 +575,7 @@ function periodMissingDays(clients, assignments, staffId, horasEntry, payPeriodC
       // uma conta Replacement nunca conta como "em falta" (não há mais
       // agenda real nesse dia, só a atribuição antiga que fica guardada).
       const activeOnDay = !staffMember || isStaffActive(staffMember, d);
-      if (d <= today && activeOnDay && dayScheduledClients(clients, assignments, staffId, d).length > 0 && !dayIsCovered(horasEntry, isoDateStr(d))) {
+      if (d <= today && activeOnDay && !absenceOn(absences, staffId, isoDateStr(d)) && dayScheduledClients(clients, assignments, staffId, d).length > 0 && !dayIsCovered(horasEntry, isoDateStr(d))) {
         missing.push(d);
       }
     });
@@ -602,9 +602,10 @@ function periodMissingDays(clients, assignments, staffId, horasEntry, payPeriodC
 // linhas). Devolve os dois números: quem só precisava do selo de
 // funcionários (badge da folha "Mais", App.jsx) lê `.staffCount`; quem
 // precisa do total de dias (Início) lê `.totalDays`.
-function staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, today) {
+function staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, today, absences) {
   function isoWeekday(d) { const wd = d.getDay(); return wd === 0 ? 7 : wd; }
   function hasAgendaOnDay(staffId, d) {
+    if (absenceOn(absences, staffId, isoDateStr(d))) return false;
     const clientIds = assignments[`${staffId}-${isoWeekday(d)}`] || [];
     const weekStart = startOfISOWeek(d);
     return clientIds.some((id) => { const c = clientById(clients, id); return c && clientAppliesThisWeek(c, weekStart); });
@@ -641,6 +642,20 @@ function notesForOwner(personalNotes, ownerId) {
     .filter((n) => n.ownerId === ownerId)
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// Ausências (avisos de falta): uma linha por funcionário e dia.
+function absenceOn(absences, staffId, isoDate) {
+  return (absences || []).find((a) => a.staffId === staffId && a.date === isoDate) || null;
+}
+// Todos os dias de `from` a `to` (inclusive, "YYYY-MM-DD"), no máximo 62.
+function isoDatesBetween(from, to) {
+  const [y1, m1, d1] = from.split("-").map(Number);
+  const [y2, m2, d2] = to.split("-").map(Number);
+  const out = [];
+  const end = new Date(y2, m2 - 1, d2);
+  for (let d = new Date(y1, m1 - 1, d1); d <= end && out.length < 62; d = addDays(d, 1)) out.push(isoDateStr(d));
+  return out;
 }
 
 // "YYYY-MM-DD" (formato do <input type="date">) -> "DD/MM" pra exibição.
@@ -716,4 +731,4 @@ function pctChange(current, previous) {
   return ((current - previous) / previous) * 100;
 }
 
-export { partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };
+export { partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };

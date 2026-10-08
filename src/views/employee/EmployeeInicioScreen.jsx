@@ -37,7 +37,7 @@ function dotStyle(state) {
 // EmployeeMenuScreen/SupervisorDashboardScreen antes deste ecrã existir).
 function EmployeeInicioScreen({
   lang, setLang, me, onNavigate, avisosBadge,
-  clients, staff, assignments, horasData, cutoffDay, closedPeriods, personalNotes,
+  clients, staff, assignments, horasData, cutoffDay, closedPeriods, personalNotes, absences,
 }) {
   const t = T[lang].employeeInicio;
   const tMenu = T[lang].employeeMenu;
@@ -72,13 +72,13 @@ function EmployeeInicioScreen({
   // --- "Precisa da sua atenção" ---
   const payPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
   const payPeriodChunks = weekBlocksOfPayPeriod(payPeriod, cutoffDay);
-  const missingDays = periodMissingDays(clients, assignments, me.id, horasEntry, payPeriodChunks, TODAY, me);
+  const missingDays = periodMissingDays(clients, assignments, me.id, horasEntry, payPeriodChunks, TODAY, me, absences);
   // QA pós-auditoria (Lote 2, "dias em falta na equipa" contando dias):
   // `staffWithGapsCount` passou a devolver { staffCount, totalDays } — o
   // cartão mostra `totalDays` (bate com o total do Monitoramento) e usa
   // `staffCount` só na legenda de apoio ("X funcionários").
   const teamGaps = isSupervisor
-    ? staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, TODAY)
+    ? staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, TODAY, absences)
     : { staffCount: 0, totalDays: 0 };
 
   const attentionItems = [];

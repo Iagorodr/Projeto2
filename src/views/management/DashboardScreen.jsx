@@ -1,4 +1,4 @@
-import { Users, Building2, RotateCcw, Clock, Undo2, Bell, Calendar, Check } from "lucide-react";
+import { Users, Building2, RotateCcw, Clock, Undo2, Bell, Calendar, CalendarX, Check } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
@@ -7,7 +7,7 @@ import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, parseDMY, getOpenPeriod, formatPeriodLabel, staffTotalHours, staffTotalPay,
   recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
-  monthAbbr, isStaffActive, boardStaff, activeClientsCount,
+  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
 import {
@@ -98,8 +98,10 @@ function PendingRow({ icon: Icon, label, count, amber, onClick, okLabel, last })
 // cartão de Notas (o documento pede explicitamente que o duplicado
 // desapareça) e os dois gráficos de 6 períodos (2.14) no lugar dos SVGs
 // antigos.
-function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, onNavigate }) {
+function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, absences, onNavigate }) {
   const t = T[lang].dashboard;
+  const tAbs = T[lang].absences;
+  const absencesPending = (absences || []).filter((a) => !a.handled && a.date >= isoDateStr(TODAY)).length;
   const th = T[lang].horas;
   const tn = T[lang].notas;
   // Lote 4, 4.4 (achado da Marta, item "Ver todas →" 87×19): usado abaixo
@@ -299,6 +301,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
               sabe levar um filtro pré-aplicado (Clientes em si só é
               redesenhado na 4f) — por agora só abre a tela, como o
               Dashboard antigo já fazia. */}
+          <PendingRow icon={CalendarX} label={tAbs.pendency} count={absencesPending} amber onClick={() => onNavigate("agendas")} okLabel={t.pendingAllOk} />
           <PendingRow icon={Calendar} label={t.pendingContracts} count={contractsNearExpiry} onClick={() => onNavigate("clientes")} okLabel={t.pendingAllOk} />
           {/* QA pós-auditoria (Lote 3): linha própria para os já vencidos —
               "Em dia" só aparece quando NEM esta nem a de cima têm contagem. */}

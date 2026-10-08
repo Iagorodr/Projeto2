@@ -12,6 +12,7 @@ import {
   PageHeader, Button, Drawer, Pill, SupervisorTag, FilterChip, SearchSelect, PhotoDropzone, Card, Toast, MobileHeader,
 } from "../shared/ui/index.js";
 import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
+import AbsenceSheet from "../shared/AbsenceSheet.jsx";
 
 // Ícone por "Assunto" do Pedido (documento, 5.6: "só há 3 opções fixas:
 // 'Falta de produto', 'Problema no local', 'Outro'"). As 3 opções
@@ -178,8 +179,10 @@ function SentFeedCard({ entry, staff, clients, lang, t, c0 }) {
 // "+ Novo aviso" (abre sheet/gaveta) + 2 separadores ("Recebidos" funde
 // Reclamações/Elogios/Avisos; "Enviados por mim" funde Pedidos + relatórios
 // do supervisor).
-function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, assignments, missingItems, setMissingItems, sentItems, setSentItems, isSupervisor, desktop }) {
+function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, assignments, missingItems, setMissingItems, sentItems, setSentItems, absences, setAbsences, isSupervisor, desktop }) {
   const t = T[lang].employeeAvisos;
+  const tAbs = T[lang].absences;
+  const [absenceOpen, setAbsenceOpen] = useState(false);
   const tr = T[lang].reportar;
   const avT = T[lang].avisos;
   const c0 = T[lang].common;
@@ -361,6 +364,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
           title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES}
           actions={
             <>
+              <Button variant="secondary" onClick={() => setAbsenceOpen(true)}>{tAbs.btn}</Button>
               {isSupervisor && <Button variant="secondary" onClick={openReportSheet}>{t.reportColleagueSection}</Button>}
               <Button icon={Plus} onClick={openSheet}>{t.newAviso}</Button>
             </>
@@ -370,6 +374,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
         {listBody}
         {newAvisoSheet}
         {reportSheet}
+        <AbsenceSheet lang={lang} open={absenceOpen} onClose={() => setAbsenceOpen(false)} staffId={staffId} absences={absences} setAbsences={setAbsences} />
         {toastMsg && <Toast message={toastMsg} onDismiss={() => setToastMsg(null)} closeLabel={c0.close} />}
         {reportToastMsg && <Toast message={reportToastMsg} onDismiss={() => setReportToastMsg(null)} closeLabel={c0.close} />}
       </div>
@@ -381,6 +386,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
       <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
       <Button size="mobile" icon={Plus} onClick={openSheet} style={{ width: "100%", marginBottom: isSupervisor ? 8 : 16 }}>{t.newAviso}</Button>
+      <Button variant="secondary" onClick={() => setAbsenceOpen(true)} style={{ width: "100%", marginBottom: isSupervisor ? 8 : 16 }}>{tAbs.btn}</Button>
       {isSupervisor && (
         <Button variant="secondary" onClick={openReportSheet} style={{ width: "100%", marginBottom: 16 }}>{t.reportColleagueSection}</Button>
       )}
@@ -390,6 +396,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
 
       {newAvisoSheet}
       {reportSheet}
+      <AbsenceSheet lang={lang} open={absenceOpen} onClose={() => setAbsenceOpen(false)} staffId={staffId} absences={absences} setAbsences={setAbsences} />
       {toastMsg && <Toast message={toastMsg} onDismiss={() => setToastMsg(null)} closeLabel={c0.close} />}
       {reportToastMsg && <Toast message={reportToastMsg} onDismiss={() => setReportToastMsg(null)} closeLabel={c0.close} />}
     </div>

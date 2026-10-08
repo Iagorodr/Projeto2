@@ -7,7 +7,7 @@ import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
-  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek,
+  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, absenceOn,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import {
@@ -301,7 +301,7 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
 // cliente em cada dia da semana". `assignments` é uma semana-tipo (repete
 // todas as semanas), independente de `client.days`/`frequency` — isso já
 // era assim no ecrã antigo e não muda aqui; só a apresentação muda.
-function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments, setAssignments }) {
+function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClients, staff, assignments, setAssignments }) {
   const t = T[lang].agendas;
   const c0 = T[lang].common;
   const tc = T[lang].clientes;
@@ -326,6 +326,10 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
   // `day-${day}-${clientId}`, sem staffId porque ali o botão não pertence
   // a uma linha de funcionário) — null quando nenhum está aberto.
   const [openTeam, setOpenTeam] = useState(null);
+  const [weekendOpen, setWeekendOpen] = useState(false);
+  const [copyFrom, setCopyFrom] = useState(null); // funcionário de origem do "Copiar agenda"
+  const [copyTarget, setCopyTarget] = useState("");
+  const tAbs = T[lang].absences;
   const { height: ctrlHeight, radius: ctrlRadius } = useControlSize();
   // QA (achado do Iago — "Agendas"): antes era `const weekStart =
   // startOfISOWeek(TODAY)`, fixo — só dava pra ver a semana corrente.
@@ -369,6 +373,13 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
   // Lote 4, 4.6: mesma lista que `teamSizeFor` conta, mas devolvendo quem
   // são (não só quantos) — pro popover "quem está no cliente".
   function staffOnClient(day, clientId) { return staff.filter((s) => getCellClientIds(s.id, day).includes(clientId)); }
+  // Ausências desta semana (avisos de falta), por funcionário e dia.
+  function absenceFor(staffId, day) { return absenceOn(absences, staffId, isoDateStr(weekDates[day - 1])); }
+  // Cliente de quem falta sem nenhum colega presente nesse dia: "sem cobertura".
+  function isUncovered(staffId, day, clientId) {
+    if (!absenceFor(staffId, day)) return false;
+    return !staff.some((o) => o.id !== staffId && !absenceFor(o.id, day) && getCellClientIds(o.id, day).includes(clientId));
+  }
   function teamKey(staffId, day, clientId) { return `${staffId}-${day}-${clientId}`; }
   function dayTeamKey(day, clientId) { return `day-${day}-${clientId}`; }
 
@@ -474,6 +485,44 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
   // As atribuições em si não se tocam (`assignments` continua intacto),
   // só a apresentação muda, para a prolongação da validade continuar a
   // trazer a pessoa de volta às linhas normais sem perder nada.
+  const weekendHasData = [6, 7].some((day) => staff.some((s) => getCellClientIds(s.id, day).length > 0 || absenceFor(s.id, day)));
+  const showWeekend = weekendOpen || weekendHasData;
+  const shownDays = showWeekend ? AGENDA_DAYS : AGENDA_DAYS.filter((d) => d <= 5);
+  const gridCols = `140px repeat(${shownDays.length}, minmax(${showWeekend ? 135 : 150}px, 1fr))`;
+  const weekAbsenceRows = [];
+  staff.forEach((s) => {
+    AGENDA_DAYS.forEach((day) => {
+      const a = absenceFor(s.id, day);
+      if (!a) return;
+      const uncovered = getCellClientIds(s.id, day).filter((cid) => isUncovered(s.id, day, cid)).map((cid) => clientById(clients, cid)?.name).filter(Boolean);
+      weekAbsenceRows.push({ a, staffMember: s, day, uncovered });
+    });
+  });
+  function toggleHandled(id) { setAbsences((prev) => (prev || []).map((a) => (a.id === id ? { ...a, handled: !a.handled } : a))); }
+
+  // Copiar a agenda fixa semanal de um funcionário para outro (junta, sem apagar nada do destino).
+  function doCopyAgenda() {
+    if (!copyFrom || !copyTarget) return;
+    const targetId = copyTarget;
+    let added = 0;
+    setAssignments((prev) => {
+      const next = { ...prev };
+      AGENDA_DAYS.forEach((day) => {
+        const src = prev[cellKey(copyFrom.id, day)] || [];
+        const dst = prev[cellKey(targetId, day)] || [];
+        const merged = [...dst, ...src.filter((id) => !dst.includes(id))];
+        if (merged.length !== dst.length) {
+          added += merged.length - dst.length;
+          next[cellKey(targetId, day)] = merged.sort((a, b) => (clientById(clients, a)?.name || "").localeCompare(clientById(clients, b)?.name || ""));
+        }
+      });
+      return next;
+    });
+    const targetName = (staffById(staff, targetId)?.name || "").split(" ")[0];
+    const fromName = copyFrom.name.split(" ")[0];
+    setCopyFrom(null);
+    showToast(tAbs.copyDone(fromName, targetName));
+  }
   const matchingStaff = staff.filter(staffMatchesSearch);
   const visibleStaff = matchingStaff.filter((s) => isStaffActive(s, TODAY));
   const inactiveStaff = matchingStaff.filter((s) => !isStaffActive(s, TODAY));
@@ -484,7 +533,7 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
   function renderStaffRow(s) {
     const inactive = !isStaffActive(s, TODAY);
     return (
-      <div key={s.id} style={{ display: "grid", gridTemplateColumns: AGENDA_GRID_COLS, borderBottom: `1px solid ${COLORS.lineSoft}`, opacity: inactive ? 0.6 : 1 }}>
+      <div key={s.id} style={{ display: "grid", gridTemplateColumns: gridCols, borderBottom: `1px solid ${COLORS.lineSoft}`, opacity: inactive ? 0.6 : 1 }}>
         {/* QA (achado do Iago, 2ª volta — "Agendas"): era uma linha
             horizontal (avatar + nome + etiquetas lado a lado, quebrando
             quando não cabia) dentro de uma coluna de 230px; estreitada
@@ -514,16 +563,24 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
               {inactive && <Pill variant="missing">{T[lang].common.inactive}</Pill>}
             </div>
           )}
+          {!inactive && (
+            <button type="button" onClick={() => { setCopyFrom(s); setCopyTarget(""); }}
+              style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: COLORS.forest600, textDecoration: "underline", padding: 0 }}>
+              {tAbs.copyBtn}
+            </button>
+          )}
           <div style={{ fontSize: 11, color: COLORS.ink2 }}>
             {inactive && s.accountType === "replacement" && s.validUntil
               ? t.inactiveExpiredOn(dmFromIso(s.validUntil))
               : `${fmtHoursScreen(staffWeekMinutes(s.id) / 60)} ${t.weekTotalSuffix}`}
           </div>
         </div>
-        {AGENDA_DAYS.map((day, i) => {
+        {shownDays.map((day) => {
+          const i = day - 1;
           const date = weekDates[i];
           const isToday = isoDateStr(date) === todayIso;
           const clientIds = getCellClientIds(s.id, day);
+          const absence = absenceFor(s.id, day);
           const key = cellKey(s.id, day);
           const isOpenPopover = openCell === key;
           const isHovered = hoverCell === key;
@@ -537,9 +594,15 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
               onMouseLeave={() => setHoverCell((h) => (h === key ? null : h))}
               style={{
                 position: "relative", padding: 8, display: "flex", flexDirection: "column", gap: 6, minWidth: 0,
-                minHeight: 56, background: isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
+                minHeight: 56, background: absence ? "repeating-linear-gradient(135deg, #FBEFEA, #FBEFEA 8px, #FFF7F3 8px, #FFF7F3 16px)" : isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
               }}
             >
+              {absence && (
+                <span title={absence.note ? `${tAbs.absentTitle(s.name.split(" ")[0])}: ${absence.note}` : tAbs.absentTitle(s.name.split(" ")[0])}
+                  style={{ alignSelf: "flex-start", fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "2px 8px", background: COLORS.alert, color: "#fff" }}>
+                  {tAbs.absentTag}{absence.handled ? " ✓" : ""}
+                </span>
+              )}
               {clientIds.map((cid) => {
                 const client = clientById(clients, cid);
                 if (!client) return null;
@@ -570,17 +633,18 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
                         aria-haspopup="dialog" aria-expanded={isTeamOpen}
                         onClick={() => setOpenTeam((k) => (k === thisTeamKey ? null : thisTeamKey))}
                         style={{
-                          display: "flex", alignItems: "center", gap: 4, height: 30, width: "100%", borderRadius: RADIUS.chip,
-                          padding: "0 8px", background: COLORS.clayTint, fontSize: 12.5, border: "none", cursor: "pointer",
+                          display: "flex", alignItems: "center", gap: 4, minHeight: 30, width: "100%", borderRadius: RADIUS.chip,
+                          padding: "4px 8px", background: COLORS.clayTint, fontSize: 12.5, border: "none", cursor: "pointer",
                           fontFamily: "inherit", textAlign: "left",
+                          outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
                         }}
                       >
                         <UsersRound size={12} style={{ flexShrink: 0, color: COLORS.clayInk }} />
-                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500, color: COLORS.clayInk }}>
+                        <span style={{ flex: 1, minWidth: 0, whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.clayInk }}>
                           {client.name}
                         </span>
                         {getAutoIds(s.id, day).includes(cid) && (
-                          <span title={t.autoChipTitle} style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "1px 6px", background: "#E4ECFA", color: "#1E3A6E" }}>{t.autoChip}</span>
+                          <span title={t.autoChipTitle} style={{ flexShrink: 0, width: 8, height: 8, borderRadius: "50%", background: "#2F5FB3" }} />
                         )}
                         <span style={{ flexShrink: 0, fontWeight: 600, color: COLORS.clayInk }}>
                           {fmtMinutes(perPerson)}
@@ -603,15 +667,15 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
                   <div
                     key={cid} title={tooltip}
                     style={{
-                      display: "flex", alignItems: "center", gap: 4, height: 30, borderRadius: RADIUS.chip, padding: "0 8px",
-                      background: COLORS.lineSoft, fontSize: 12.5,
+                      display: "flex", alignItems: "center", gap: 4, minHeight: 30, borderRadius: RADIUS.chip, padding: "4px 8px",
+                      background: COLORS.lineSoft, fontSize: 12.5, outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
                     }}
                   >
-                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500, color: COLORS.ink }}>
+                    <span style={{ flex: 1, minWidth: 0, whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.ink }}>
                       {client.name}
                     </span>
                     {getAutoIds(s.id, day).includes(cid) && (
-                          <span title={t.autoChipTitle} style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "1px 6px", background: "#E4ECFA", color: "#1E3A6E" }}>{t.autoChip}</span>
+                          <span title={t.autoChipTitle} style={{ flexShrink: 0, width: 8, height: 8, borderRadius: "50%", background: "#2F5FB3" }} />
                         )}
                         <span style={{ flexShrink: 0, fontWeight: 600, color: COLORS.ink2 }}>
                       {fmtMinutes(perPerson)}
@@ -867,7 +931,45 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
           value={view} onChange={setView}
         />
         <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
+        {view === "staff" && !weekendHasData && (
+          <button type="button" onClick={() => setWeekendOpen((v) => !v)}
+            style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, color: COLORS.forest600, textDecoration: "underline" }}>
+            {weekendOpen ? tAbs.hideWeekend : tAbs.showWeekend}
+          </button>
+        )}
       </div>
+
+      {weekAbsenceRows.length > 0 && (
+        <div style={{ border: `1px solid ${COLORS.alert}`, background: "#FFF7F3", borderRadius: RADIUS.card, padding: "10px 14px", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>{tAbs.noCover}</div>
+          {weekAbsenceRows.map(({ a, staffMember, day, uncovered }) => (
+            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "5px 0", fontSize: 12.5, color: COLORS.ink, opacity: a.handled ? 0.55 : 1 }}>
+              <span style={{ fontWeight: 600 }}>{staffMember.name.split(" ")[0]} · {dayLabels[day]} {pad2(weekDates[day - 1].getDate())}</span>
+              <span style={{ color: COLORS.ink2, flex: "1 1 200px" }}>
+                {a.note ? `${a.note} — ` : ""}{uncovered.length > 0 ? uncovered.join(", ") : tAbs.allCovered}
+              </span>
+              <button type="button" onClick={() => toggleHandled(a.id)}
+                style={{ border: `1px solid ${COLORS.line}`, background: COLORS.card, borderRadius: RADIUS.chip, cursor: "pointer", fontFamily: "inherit", fontSize: 12, padding: "4px 10px", color: COLORS.ink }}>
+                {a.handled ? tAbs.reopenAbsence : tAbs.markHandled}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {copyFrom && (
+        <AgendaModal titleId="copy-agenda" title={tAbs.copyTitle(copyFrom.name.split(" ")[0])} closeLabel={c0.cancel} onClose={() => setCopyFrom(null)}>
+          <div style={{ fontSize: 12.5, color: COLORS.ink2, marginBottom: 10 }}>{tAbs.copyHint}</div>
+          <select value={copyTarget} onChange={(e) => setCopyTarget(e.target.value)} style={{ ...styles.input, width: "100%", boxSizing: "border-box", marginBottom: 12 }}>
+            <option value="">{tAbs.copyTargetPlaceholder}</option>
+            {staff.filter((o) => o.id !== copyFrom.id && isStaffActive(o, TODAY)).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+          <button type="button" disabled={!copyTarget} onClick={doCopyAgenda}
+            style={{ width: "100%", height: 40, borderRadius: RADIUS.control, border: "none", background: copyTarget ? COLORS.forest600 : COLORS.line, color: "#fff", fontFamily: "inherit", fontWeight: 600, fontSize: 14, cursor: copyTarget ? "pointer" : "default" }}>
+            {tAbs.copyConfirm}
+          </button>
+        </AgendaModal>
+      )}
 
       {/* Legenda (documento, 4.3): duração, cliente partilhado, recorrência. */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "center", marginBottom: 16, fontSize: 12.5, color: COLORS.ink2 }}>
@@ -918,7 +1020,7 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
         <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, overflowX: "auto", overflowY: "hidden", background: COLORS.card }}>
           <div style={{ minWidth: "100%" }}>
               {/* Cabeçalho pegajoso */}
-              <div style={{ display: "grid", gridTemplateColumns: AGENDA_GRID_COLS, position: "sticky", top: 0, zIndex: 3, background: COLORS.headerTint, borderBottom: `1px solid ${COLORS.line}` }}>
+              <div style={{ display: "grid", gridTemplateColumns: gridCols, position: "sticky", top: 0, zIndex: 3, background: COLORS.headerTint, borderBottom: `1px solid ${COLORS.line}` }}>
                 <div
                   style={{
                     position: "sticky", left: 0, zIndex: 4, background: COLORS.headerTint,
@@ -929,7 +1031,8 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
                 >
                   {t.colStaff}
                 </div>
-                {AGENDA_DAYS.map((day, i) => {
+                {shownDays.map((day) => {
+                  const i = day - 1;
                   const date = weekDates[i];
                   const isToday = isoDateStr(date) === todayIso;
                   return (
@@ -986,7 +1089,7 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
               )}
 
               {/* Rodapé pegajoso */}
-              <div style={{ display: "grid", gridTemplateColumns: AGENDA_GRID_COLS, position: "sticky", bottom: 0, background: COLORS.headerTint, borderTop: `1px solid ${COLORS.line}` }}>
+              <div style={{ display: "grid", gridTemplateColumns: gridCols, position: "sticky", bottom: 0, background: COLORS.headerTint, borderTop: `1px solid ${COLORS.line}` }}>
                 <div
                   style={{
                     position: "sticky", left: 0, background: COLORS.headerTint,
@@ -996,7 +1099,8 @@ function AgendasScreen({ lang, setLang, clients, setClients, staff, assignments,
                 >
                   {t.footerLabel}
                 </div>
-                {AGENDA_DAYS.map((day, i) => {
+                {shownDays.map((day) => {
+                  const i = day - 1;
                   const date = weekDates[i];
                   const isToday = isoDateStr(date) === todayIso;
                   const { count, totalMin } = dayFooter(day);
