@@ -20,13 +20,18 @@ function clientShareText(client, { withNote, labels }) {
   return lines.join("\n");
 }
 
-function CopyClientsDialog({ lang, title, clients, header, onClose }) {
+// `groups` ([{ title, clients }]) agrupa por dia/título; sem ele usa `clients` direto.
+function CopyClientsDialog({ lang, title, clients: clientsProp, groups, header, onClose }) {
   const t = T[lang].absences;
   const c0 = T[lang].common;
   const [withNote, setWithNote] = useState(false);
   const [copied, setCopied] = useState(false);
   const labels = { biweekly: t.shareBiweekly, monthly: t.shareMonthly, note: t.shareNoteLabel };
-  const text = clients.map((c) => clientShareText(c, { withNote, labels })).join("\n\n");
+  const nonEmptyGroups = (groups || []).filter((g) => g.clients.length > 0);
+  const clients = groups ? nonEmptyGroups.flatMap((g) => g.clients) : clientsProp;
+  const text = groups
+    ? nonEmptyGroups.map((g) => `${g.title}\n${g.clients.map((c) => clientShareText(c, { withNote, labels })).join("\n\n")}`).join("\n\n———\n\n")
+    : clients.map((c) => clientShareText(c, { withNote, labels })).join("\n\n");
 
   useEffect(() => {
     function onKeyDown(e) { if (e.key === "Escape") onClose(); }
@@ -60,7 +65,7 @@ function CopyClientsDialog({ lang, title, clients, header, onClose }) {
               <input type="checkbox" checked={withNote} onChange={(e) => setWithNote(e.target.checked)} />
               {t.shareWithNote}
             </label>
-            <textarea readOnly value={text} rows={Math.min(14, text.split("\n").length + 1)} onFocus={(e) => e.target.select()}
+            <textarea readOnly value={text} rows={Math.min(16, text.split("\n").length + 1)} onFocus={(e) => e.target.select()}
               style={{ ...styles.textarea, width: "100%", boxSizing: "border-box", fontSize: 13 }} />
           </>
         )}

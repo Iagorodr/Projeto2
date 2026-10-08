@@ -329,7 +329,6 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   const [openTeam, setOpenTeam] = useState(null);
   const [weekendOpen, setWeekendOpen] = useState(false);
   const [copyFrom, setCopyFrom] = useState(null); // funcionário de origem do "Copiar agenda"
-  const [copyDay, setCopyDay] = useState(1);
   const tAbs = T[lang].absences;
   const { height: ctrlHeight, radius: ctrlRadius } = useControlSize();
   // QA (achado do Iago — "Agendas"): antes era `const weekStart =
@@ -542,9 +541,9 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
             </div>
           )}
           {!inactive && (
-            <button type="button" onClick={() => { setCopyFrom(s); setCopyDay(selectedDay); }}
+            <button type="button" onClick={() => setCopyFrom(s)}
               style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: COLORS.forest600, textDecoration: "underline", padding: 0 }}>
-              {tAbs.shareDayBtn}
+              {tAbs.shareWeekBtn}
             </button>
           )}
           <div style={{ fontSize: 11, color: COLORS.ink2 }}>
@@ -937,17 +936,12 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
 
       {copyFrom && (
         <CopyClientsDialog
-          lang={lang} title={tAbs.shareTitleDay(copyFrom.name.split(" ")[0])}
-          clients={getCellClientIds(copyFrom.id, copyDay).map((cid) => clientById(clients, cid)).filter(Boolean)}
+          lang={lang} title={tAbs.shareTitleWeek(copyFrom.name.split(" ")[0])}
+          groups={AGENDA_DAYS.map((day) => ({
+            title: `${dayLabels[day]} ${pad2(weekDates[day - 1].getDate())}/${pad2(weekDates[day - 1].getMonth() + 1)}`,
+            clients: getCellClientIds(copyFrom.id, day).map((cid) => clientById(clients, cid)).filter(Boolean),
+          }))}
           onClose={() => setCopyFrom(null)}
-          header={
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 13, color: COLORS.ink2 }}>{tAbs.shareDayLabel}</span>
-              <select value={copyDay} onChange={(e) => setCopyDay(Number(e.target.value))} style={{ ...styles.input, flex: 1 }}>
-                {AGENDA_DAYS.map((d) => <option key={d} value={d}>{dayLabels[d]} {pad2(weekDates[d - 1].getDate())}</option>)}
-              </select>
-            </div>
-          }
         />
       )}
 
