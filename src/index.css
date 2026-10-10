@@ -85,6 +85,11 @@ button {
    visível é `COLORS.page`, quase branco, e a faixa ficava imperceptível. */
 body {
   margin: 0;
+  /* Fonte do app em TODO o lado, mesmo em ecrãs fora do contentor principal (ex.: nova palavra-passe). */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+input, select, textarea {
+  font-family: inherit;
 }
 
 /* Lote 4, 4.1 (achado da Marta): "html, body" fazia o `body` virar a sua

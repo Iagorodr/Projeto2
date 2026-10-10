@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { COLORS } from "../styles/colors.js";
-import { RADIUS, SHADOW } from "../styles/tokens.js";
+import { RADIUS, SHADOW, FONT } from "../styles/tokens.js";
 import { T } from "../models/i18n.js";
 import { Button } from "./shared/ui/index.js";
 
@@ -33,9 +33,9 @@ function SetNewPasswordScreen({ lang, mode, onSave, onLogout }) {
   }
 
   return (
-    <div style={{ minHeight: "100dvh", flex: 1, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, boxSizing: "border-box", background: "linear-gradient(155deg, #E3F2EA 0%, #A9D9C2 45%, #4D9D7E 85%, #2E8570 100%)" }}>
+    <div style={{ minHeight: "100dvh", flex: 1, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, boxSizing: "border-box", fontFamily: FONT.body, background: "linear-gradient(155deg, #E3F2EA 0%, #A9D9C2 45%, #4D9D7E 85%, #2E8570 100%)" }}>
       <form onSubmit={submit} style={{ width: 420, maxWidth: "100%", background: COLORS.card, borderRadius: RADIUS.card, boxShadow: SHADOW.sh2, padding: "32px 28px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.ink }}>{mode === "recovery" ? t.setPwTitleRecovery : t.setPwTitleTemp}</div>
+        <div style={{ fontFamily: FONT.heading, fontSize: 22, fontWeight: 600, color: COLORS.ink }}>{mode === "recovery" ? t.setPwTitleRecovery : t.setPwTitleTemp}</div>
         <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 6 }}>{mode === "recovery" ? t.setPwIntroRecovery : t.setPwIntroTemp}</div>
         <div style={{ position: "relative" }}>
           <input type={show ? "text" : "password"} value={pw} onChange={(e) => setPw(e.target.value)} placeholder={t.setPwNew} autoComplete="new-password" style={inputStyle} />
