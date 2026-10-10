@@ -173,11 +173,35 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   // Destaques: top 5 por horas nos últimos 3 meses (janela móvel até hoje),
   // cruzando elogios/reclamações da mesma janela.
   const highlightsWindow = { start: new Date(TODAY.getFullYear(), TODAY.getMonth() - 3, TODAY.getDate() + 1), end: TODAY };
+  // Horas dos últimos 3 meses = períodos fechados (histórico) que caem na
+  // janela + lançamentos do período aberto (depois do último fecho).
+  const lastClosedEnd = (closedPeriods && closedPeriods[0]) ? closedPeriods[0].periodEnd : "";
+  const inWindow = (dateStr) => dateStrInPeriod(dateStr, highlightsWindow);
+  const hoursByStaff = {};
+  (closedPeriods || []).forEach((cp) => {
+    if (!cp.periodEnd || new Date(cp.periodEnd + "T00:00:00") < highlightsWindow.start) return;
+    (cp.staffSummaries || []).forEach((ss) => {
+      const ents = (ss.entries || []).filter((e) => !e.voided);
+      const h = ents.length
+        ? ents.filter((e) => inWindow(e.date)).reduce((t, e) => t + e.hours, 0)
+        : (new Date(cp.periodStart + "T00:00:00") >= highlightsWindow.start ? ss.hours : 0);
+      hoursByStaff[ss.staffId] = (hoursByStaff[ss.staffId] || 0) + (h || 0);
+    });
+  });
+  board.forEach((s) => {
+    const live = ((horasData[s.id] || { entries: [] }).entries || [])
+      .filter((e) => !e.voided && inWindow(e.date) && (!lastClosedEnd || e.date > lastClosedEnd))
+      .reduce((t, e) => t + e.hours, 0);
+    hoursByStaff[s.id] = (hoursByStaff[s.id] || 0) + live;
+  });
+  const feedbackItems = new Map();
+  [...(sentItems || []), ...(closedPeriods || []).flatMap((cp) => [...(cp.elogiosItems || []), ...(cp.reclamacoesItems || [])])]
+    .forEach((i) => { if (inWindow(i.date)) feedbackItems.set(i.id ?? JSON.stringify(i), i); });
   const topStaff = board
-    .map((s) => ({ staffId: s.id, name: s.name, hours: staffTotalHours(horasData[s.id] || { entries: [] }, highlightsWindow) }))
+    .map((s) => ({ staffId: s.id, name: s.name, hours: hoursByStaff[s.id] || 0 }))
     .filter((s) => s.hours > 0)
     .map((s) => {
-      const mine = (sentItems || []).filter((i) => i.staffId === s.staffId && dateStrInPeriod(i.date, highlightsWindow));
+      const mine = [...feedbackItems.values()].filter((i) => i.staffId === s.staffId);
       return { ...s, praises: mine.filter((i) => i.type === "elogio").length, complaints: mine.filter((i) => i.type === "reclamacao").length };
     })
     .sort((a, b) => b.hours - a.hours)
