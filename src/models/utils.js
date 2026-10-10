@@ -302,8 +302,26 @@ function getOpenPeriod(closedPeriods, cutoffDay, today) {
   // nova (dia do corte, não dia-1) — o período fica um dia mais longo essa
   // única vez (ex.: 20 Ago a 20 Set), e dali em diante os dois lados já
   // nascem na convenção nova (21 a 20).
-  const end = new Date(start.getFullYear(), start.getMonth() + 1, cutoffDay);
-  return { start, end };
+  let end = new Date(start.getFullYear(), start.getMonth() + 1, cutoffDay);
+  // Histórico muito atrasado (ex.: períodos antigos nunca fechados no sistema):
+  // se o fim já passou há mais de 10 dias, avança pro período em que HOJE cai,
+  // senão horas lançadas agora ficam fora do "período aberto".
+  let st = start;
+  while (addDays(end, 10) < today) {
+    st = addDays(end, 1);
+    end = new Date(st.getFullYear(), st.getMonth() + 1, cutoffDay);
+  }
+  return { start: st, end };
+}
+
+// Início de atividade do funcionário: campo explícito ou, para contas criadas
+// no app (id = Date.now()), a data de criação. Antes disso não há "dias em falta".
+function staffStartedOn(staffMember, d) {
+  if (!staffMember) return true;
+  let t = staffMember.startDate ? new Date(staffMember.startDate + "T00:00:00") : (Number(staffMember.id) > 1e12 ? new Date(Number(staffMember.id)) : null);
+  if (!t || isNaN(t)) return true;
+  t = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  return d >= t;
 }
 
 // QA (achado do Iago, Avisos — "esses pedidos são de um mês já fechado"):
@@ -561,7 +579,7 @@ function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staff
     // para lá da validade de uma conta Replacement conta como "sem
     // clientes", mesmo que a agenda/atribuição ainda exista (as
     // atribuições não se apagam — só deixam de se aplicar nesses dias).
-    const activeOnDay = !staffMember || isStaffActive(staffMember, d);
+    const activeOnDay = !staffMember || (isStaffActive(staffMember, d) && staffStartedOn(staffMember, d));
     const scheduled = activeOnDay ? dayScheduledClients(clients, assignments, staffId, d) : [];
     const hasAgenda = scheduled.length > 0;
     scheduledHours += scheduled.reduce((s, c) => s + (c.duration || 0) / 60, 0);
@@ -594,7 +612,7 @@ function periodMissingDays(clients, assignments, staffId, horasEntry, payPeriodC
       // `staffMember` opcional (Etapa 4j, 4.9): dia já fora da validade de
       // uma conta Replacement nunca conta como "em falta" (não há mais
       // agenda real nesse dia, só a atribuição antiga que fica guardada).
-      const activeOnDay = !staffMember || isStaffActive(staffMember, d);
+      const activeOnDay = !staffMember || (isStaffActive(staffMember, d) && staffStartedOn(staffMember, d));
       if (d <= today && activeOnDay && !absenceOn(absences, staffId, isoDateStr(d)) && dayScheduledClients(clients, assignments, staffId, d).length > 0 && !dayIsCovered(horasEntry, isoDateStr(d))) {
         missing.push(d);
       }
@@ -642,7 +660,7 @@ function staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, p
         const notStarted = chunk.start > today;
         if (locked || notStarted) return sum;
         const missed = calPeriodDays(chunk).filter(
-          (d) => d <= today && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d))
+          (d) => d <= today && staffStartedOn(s, d) && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d))
         ).length;
         return sum + missed;
       }, 0);
@@ -778,4 +796,4 @@ function pctChange(current, previous) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, staffStartedOn, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

@@ -10,6 +10,7 @@ import {
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
+  staffStartedOn,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -54,7 +55,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // mostra-se sem agenda ("sem clientes"), mesmo que a atribuição em si
   // continue guardada (só deixa de se aplicar nesses dias).
   function scheduledIfActive(d) {
-    return isStaffActive(me, d) ? dayScheduledClients(clients, assignments, staffId, d) : [];
+    return (isStaffActive(me, d) && staffStartedOn(me, d)) ? dayScheduledClients(clients, assignments, staffId, d) : [];
   }
   const tier = useBreakpoint();
   const isDesktop = tier === "desktop";
