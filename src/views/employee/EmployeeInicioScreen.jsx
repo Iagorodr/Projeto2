@@ -6,7 +6,7 @@ import { useBreakpoint, useControlSize } from "../../hooks/useBreakpoint.js";
 import {
   dayScheduledClients, thisWeekSummary, periodMissingDays, staffWithGapsCount, isStaffActive,
   fmtHoursScreen, pad2, isoDateStr, notesForOwner, fmtNoteDate,
-  getOpenPeriod, weekBlocksOfPayPeriod,
+  getOpenPeriod, weekBlocksOfPayPeriod, staffTotalPay, staffTotalHours, fmtEuro, calPeriodLabel,
   isSupervisorRole,
 } from "../../models/utils.js";
 import { T, formatTodayLabel, WEEKDAY_FULL_BY_LANG, DAY_ABBR_SUN0_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -107,6 +107,19 @@ function EmployeeInicioScreen({
 
   // --- Notas ---
   const notes = notesForOwner(personalNotes, me.id).slice(0, 2);
+
+  const earnedPay = staffTotalPay(horasEntry, clients, payPeriod);
+  const earnedHours = staffTotalHours(horasEntry, payPeriod);
+  const earningsCard = (
+    <Card>
+      <div style={cardTitleStyle}>{t.earningsTitle}</div>
+      <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 34, lineHeight: 1.1, color: COLORS.ink, marginTop: 8 }}>{fmtEuro(earnedPay)}</div>
+      <div style={{ fontSize: 13, color: COLORS.ink2, marginTop: 6 }}>
+        {t.earningsSub(fmtHoursScreen(earnedHours), calPeriodLabel(payPeriod, lang))}
+      </div>
+      <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 8 }}>{t.earningsNote}</div>
+    </Card>
+  );
 
   const heroCard = (
     <Card variant="hero">
@@ -301,6 +314,7 @@ function EmployeeInicioScreen({
           </div>
         </div>
         <div style={{ padding: "0 4px", marginTop: -22, display: "flex", flexDirection: "column", gap: 16 }}>
+          {earningsCard}
           {heroCard}
           {weekCard}
           {attentionCard}
@@ -323,6 +337,7 @@ function EmployeeInicioScreen({
       <PageHeader title={`${tMenu.hello}, ${me.name}`} subtitle={formatTodayLabel(lang)} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
       <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "7 1 420px", display: "flex", flexDirection: "column", gap: 20, minWidth: 320 }}>
+          {earningsCard}
           {heroCard}
           {weekCard}
         </div>

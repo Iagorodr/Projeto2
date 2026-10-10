@@ -420,6 +420,7 @@ const T = {
     },
     // Etapa 4b (secção 5.1 do documento) — Início do funcionário/supervisor.
     employeeInicio: {
+      earningsTitle: "O que já ganhou", earningsSub: (h, p) => `${h} registadas · ${p}`, earningsNote: "Valor das horas registadas neste período, antes de qualquer ajuste da gerência.",
       heroTitle: "Hoje",
       heroEmptyTitle: "Hoje não tem clientes. Bom descanso.",
       heroRegisterButton: "Registar horas",
@@ -1001,6 +1002,7 @@ const T = {
       report: "REPORT", monitoring: "MONITORING", myNotes: "NOTES",
     },
     employeeInicio: {
+      earningsTitle: "What you have earned so far", earningsSub: (h, p) => `${h} logged · ${p}`, earningsNote: "Value of the hours logged this period, before any adjustment by management.",
       heroTitle: "Today",
       heroEmptyTitle: "No clients today. Enjoy the rest.",
       heroRegisterButton: "Log hours",
@@ -1551,6 +1553,7 @@ const T = {
       report: "SIGNALER", monitoring: "SURVEILLANCE", myNotes: "NOTES",
     },
     employeeInicio: {
+      earningsTitle: "Ce que vous avez gagné jusqu'ici", earningsSub: (h, p) => `${h} enregistrées · ${p}`, earningsNote: "Valeur des heures enregistrées sur cette période, avant tout ajustement de la direction.",
       heroTitle: "Aujourd'hui",
       heroEmptyTitle: "Pas de client aujourd'hui. Bon repos.",
       heroRegisterButton: "Enregistrer les heures",
