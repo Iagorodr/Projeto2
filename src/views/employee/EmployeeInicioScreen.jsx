@@ -7,6 +7,7 @@ import {
   dayScheduledClients, thisWeekSummary, periodMissingDays, staffWithGapsCount, isStaffActive,
   fmtHoursScreen, pad2, isoDateStr, notesForOwner, fmtNoteDate,
   getOpenPeriod, weekBlocksOfPayPeriod,
+  isSupervisorRole,
 } from "../../models/utils.js";
 import { T, formatTodayLabel, WEEKDAY_FULL_BY_LANG, DAY_ABBR_SUN0_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { Card, Button, Pill, ProgressBar, PageHeader, ClientCheckCard } from "../shared/ui/index.js";
@@ -51,7 +52,7 @@ function EmployeeInicioScreen({
   // Lote 4, 4.4 (achado da Marta, item "Ver todas →" 87×19): usado no link
   // "Ver todas" do cartão de Notas, mesma régua do resto.
   const { height: seeAllHeight } = useControlSize();
-  const isSupervisor = me.role === "supervisor";
+  const isSupervisor = isSupervisorRole(me.role);
   const horasEntry = horasData[me.id] || { entries: [], noClientDays: [] };
   const todayKey = isoDateStr(TODAY);
 

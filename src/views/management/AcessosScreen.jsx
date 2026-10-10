@@ -19,6 +19,7 @@ import { supabase } from "../../models/supabaseClient.js";
 // {bg: forest100, ink: forest800}, exatamente a cor pedida aqui, por isso
 // é reaproveitada em vez de inventar uma variante nova só para isto.
 function RoleTag({ role, t }) {
+  if (role === "gerencia_supervisor") return <SupervisorTag kind="role">{t.roleGerenciaSupervisor}</SupervisorTag>;
   if (role === "supervisor") return <SupervisorTag kind="role">{t.roleSupervisor}</SupervisorTag>;
   if (role === "gerencia") return <Pill variant="owed">{t.roleGerencia}</Pill>;
   return <Pill variant="neutral">{t.roleFuncionario}</Pill>;
@@ -257,6 +258,7 @@ function AcessosScreen({ lang, setLang, staff, setStaff }) {
               <select style={styles.input} value={draft.role} onChange={(e) => onRoleChange(e.target.value)}>
                 <option value="funcionario">{t.roleFuncionario}</option>
                 <option value="supervisor">{t.roleSupervisor}</option>
+                <option value="gerencia_supervisor">{t.roleGerenciaSupervisor}</option>
                 <option value="gerencia">{t.roleGerencia}</option>
               </select>
             </Field>

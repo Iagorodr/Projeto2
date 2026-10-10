@@ -11,6 +11,8 @@ import {
   INITIAL_CLIENTS, INITIAL_STAFF, INITIAL_ASSIGNMENTS, INITIAL_HORAS,
   INITIAL_MISSING, INITIAL_SENT,
 } from "../models/data.js";
+import { TODAY } from "../models/data.js";
+import { activeClientsCount } from "../models/utils.js";
 import { INITIAL_CLOSED_PERIODS } from "../models/seedHistory.js";
 import { supabase, isSupabaseConfigured } from "../models/supabaseClient.js";
 import {
@@ -35,6 +37,7 @@ export function useAppController() {
 
   const [company, setCompany] = useState({ name: "Empresa X", email: "empresax@login1.gmail.com", password: "", photoUrl: null });
   const [cutoffDay, setCutoffDay] = useState(20);
+  const [emailDomain, setEmailDomain] = useState("");
   const [contractAlertDays, setContractAlertDays] = useState(30);
   const [reclamacaoBaseClients, setReclamacaoBaseClients] = useState(10);
   const [reclamacaoExcelenteCount, setReclamacaoExcelenteCount] = useState(1);
@@ -115,6 +118,7 @@ export function useAppController() {
         companyEmail = mapped.company.email;
         setCompany(mapped.company);
         setCutoffDay(mapped.cutoffDay);
+        setEmailDomain(mapped.emailDomain || "");
         setContractAlertDays(mapped.contractAlertDays);
         setReclamacaoBaseClients(mapped.reclamacaoBaseClients);
         setReclamacaoExcelenteCount(mapped.reclamacaoExcelenteCount);
@@ -283,13 +287,19 @@ export function useAppController() {
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
     const payload = toDbCompanySettings({
-      company, cutoffDay, contractAlertDays,
+      company, cutoffDay, contractAlertDays, emailDomain,
       reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount,
     });
     supabase.from("company_settings").update(payload).eq("id", 1).then(({ error }) => {
-      if (error) console.error("Erro ao gravar definições:", error);
+      if (!error) return;
+      // Coluna email_domain ainda não criada na base (supabase/add_email_domain.sql):
+      // grava o resto das definições sem ela, para nada deixar de guardar.
+      if (/email_domain/.test(error.message || "")) {
+        const { email_domain: _omit, ...rest } = payload;
+        supabase.from("company_settings").update(rest).eq("id", 1).then(({ error: e2 }) => { if (e2) console.error("Erro ao gravar definições:", e2); });
+      } else console.error("Erro ao gravar definições:", error);
     });
-  }, [hydrated, readOk, perspective, company, cutoffDay, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount]);
+  }, [hydrated, readOk, perspective, company, cutoffDay, emailDomain, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount]);
 
   // `app_data` continua gravado por todas as sessões (gerência, supervisor
   // e funcionário escrevem horas/avisos/notas aqui) — só ganha o novo
@@ -418,8 +428,9 @@ export function useAppController() {
   return {
     perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen,
     loggedInStaffId, setLoggedInStaffId, lang, setLang,
-    company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays,
-    reclamacaoBaseClients, setReclamacaoBaseClients,
+    company, setCompany, emailDomain, setEmailDomain, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays,
+    // Base do medidor de reclamações = nº de clientes ativos (automático, não editável).
+    reclamacaoBaseClients: Math.max(1, activeClientsCount(clients, TODAY)), setReclamacaoBaseClients,
     reclamacaoExcelenteCount, setReclamacaoExcelenteCount,
     reclamacaoRazoavelCount, setReclamacaoRazoavelCount,
     clients, setClients, staff, setStaff, assignments, setAssignments,

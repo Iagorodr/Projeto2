@@ -8,7 +8,7 @@ import { AppSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useBreakpoint } from "./hooks/useBreakpoint.js";
 import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
-import { getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, isSolicitationStale } from "./models/utils.js";
+import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, isSolicitationStale } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
 import LoginScreen from "./views/LoginScreen.jsx";
@@ -162,10 +162,10 @@ export default function App() {
             {c.screen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />
             )}
-            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} />}
+            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} emailDomain={c.emailDomain} />}
             {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} />}
             {c.screen === "definicoes" && (
-              <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
+              <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} emailDomain={c.emailDomain} setEmailDomain={c.setEmailDomain} />
             )}
           </div>
         </div>
@@ -179,7 +179,7 @@ export default function App() {
         // barra inferior + folha "Mais". "Regra de ouro" (documento, 5):
         // os dois papéis usam os MESMOS ecrãs — a única diferença é
         // Monitoramento (só supervisor) e o selo de papel.
-        const isSupervisor = c.me.role === "supervisor";
+        const isSupervisor = isSupervisorRole(c.me.role);
         const tSidebar = T[c.lang].supervisorSidebar;
         // SUPERVISOR_MENU_ITEMS já tem a ordem certa do documento
         // (Início, Horas, Avisos, Agenda, Clientes, Histórico,

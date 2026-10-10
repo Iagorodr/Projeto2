@@ -9,6 +9,7 @@ import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
   isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, absenceOn,
+  isSupervisorRole,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
@@ -536,9 +537,9 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
               existiu no i18n (só `acessos.roleSupervisor`) — a etiqueta
               renderizava a palavra "undefined" pra qualquer supervisor
               nesta grelha. Corrigido aqui (ver LEIA-ME). */}
-          {(s.role === "supervisor" || inactive) && (
+          {(isSupervisorRole(s.role) || inactive) && (
             <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 4 }}>
-              {s.role === "supervisor" && <SupervisorTag kind="role">{T[lang].acessos.roleSupervisor}</SupervisorTag>}
+              {isSupervisorRole(s.role) && <SupervisorTag kind="role">{T[lang].acessos.roleSupervisor}</SupervisorTag>}
               {inactive && <Pill variant="missing">{T[lang].common.inactive}</Pill>}
             </div>
           )}

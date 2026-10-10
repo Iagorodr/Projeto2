@@ -1,3 +1,4 @@
+import { isSupervisorRole } from "../models/utils.js";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { COLORS } from "../styles/colors.js";
@@ -185,7 +186,7 @@ function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLogi
                     }}
                   >
                     {s.name}
-                    {s.role === "supervisor" && (
+                    {isSupervisorRole(s.role) && (
                       <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: COLORS.forest700 }}>{t.supervisorTag}</span>
                     )}
                   </button>

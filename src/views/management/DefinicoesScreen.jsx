@@ -44,7 +44,7 @@ const SECTIONS = [
 // escrita ao mudar o dia de fecho, pré-visualização ao vivo das faixas de
 // reclamações, "Formatar dados" com palavra digitada em vez de
 // palavra-passe, e barra de guardar fixa no lugar da frase vermelha.
-function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, reclamacaoBaseClients, setReclamacaoBaseClients, reclamacaoExcelenteCount, setReclamacaoExcelenteCount, reclamacaoRazoavelCount, setReclamacaoRazoavelCount, clients, onFormatData, onVerifyPassword }) {
+function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, reclamacaoBaseClients, setReclamacaoBaseClients, reclamacaoExcelenteCount, setReclamacaoExcelenteCount, reclamacaoRazoavelCount, setReclamacaoRazoavelCount, clients, onFormatData, onVerifyPassword, emailDomain = "", setEmailDomain = () => {} }) {
   const t = T[lang].definicoes;
   const c0 = T[lang].common;
 
@@ -185,6 +185,11 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                     <input style={styles.defTextInput} value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} />
                   </div>
                   <div>
+                    <div style={styles.defSettingLabel}>{t.emailDomainLabel}</div>
+                    <input style={styles.defTextInput} value={emailDomain} placeholder="empresax.be" onChange={(e) => setEmailDomain(e.target.value.replace(/^@/, "").replace(/\s/g, "").toLowerCase())} />
+                    <div style={styles.defSettingHint}>{t.emailDomainHint}</div>
+                  </div>
+                  <div>
                     {/* Lote 4, 4.5 (achado da Marta): hint fixo (11.5px)
                         vira (i) ao lado do rótulo. */}
                     <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
@@ -228,6 +233,10 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                 </div>
                 <input type="number" min={1} style={styles.defNumberInput} value={contractAlertDays} onChange={(e) => setContractAlertDays(Number(e.target.value))} />
               </div>
+            </Card>
+            <Card style={{ marginTop: 16 }}>
+              <div style={styles.sectionTitle}>{t.complaintMeterTitle}</div>
+              <div style={{ ...styles.defSettingHint, marginTop: -6, marginBottom: 10 }}>{t.complaintMeterIntro}</div>
               <div style={styles.defSettingRow}>
                 <div style={{ flex: 1 }}>
                   {/* Lote 4, 4.5 (achado da Marta, gaugeBaseHint): idem. */}
@@ -236,7 +245,7 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                     <InfoTip text={t.gaugeBaseHint} label={c0.moreInfoLabel} />
                   </div>
                 </div>
-                <input type="number" min={1} style={styles.defNumberInput} value={reclamacaoBaseClients} onChange={(e) => setReclamacaoBaseClients(Number(e.target.value))} />
+                <input type="number" readOnly disabled style={{ ...styles.defNumberInput, background: COLORS.surface2 || "#F3F3F1", cursor: "not-allowed" }} value={reclamacaoBaseClients} />
               </div>
               <div style={styles.defSettingRow}>
                 <div style={{ flex: 1 }}>

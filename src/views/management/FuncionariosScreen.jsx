@@ -3,7 +3,7 @@ import { Pencil, Eye, EyeOff, Copy, Check, AlertTriangle, Plus } from "lucide-re
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { TODAY, LANG_NAMES } from "../../models/data.js";
-import { getAssignedClientIds, clientById, isStaffActive, linkPartners } from "../../models/utils.js";
+import { getAssignedClientIds, clientById, isStaffActive, linkPartners, isSupervisorRole } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
 import {
@@ -131,7 +131,7 @@ function StatusBlock({ s, t, c0 }) {
 // `isStaffActive` (Etapa 4j) refletida na lista e na gaveta. `onNavigate`
 // é opcional (liga "Clientes atribuídos" à tela de Agendas, mesmo padrão
 // já usado em ClientesScreen.jsx).
-function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate }) {
+function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate, emailDomain = "" }) {
   const t = T[lang].funcionarios;
   const ta = T[lang].acessos;
   const c0 = T[lang].common;
@@ -160,7 +160,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
     todos: () => true,
     fixos: (s) => s.accountType === "fixo",
     replacement: (s) => s.accountType === "replacement",
-    supervisores: (s) => s.role === "supervisor",
+    supervisores: (s) => isSupervisorRole(s.role),
     inativos: (s) => !isStaffActive(s, TODAY),
   };
   const filtered = staff
@@ -185,7 +185,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
     const errs = {};
     if (!draft.name.trim()) errs.name = true;
     if (!draft.contact.trim()) errs.contact = true;
-    if (!draft.iban.trim()) errs.iban = true;
+    if (isNew && !draft.email.trim()) errs.email = true;
     if (!draft.accountType) errs.accountType = true;
     return errs;
   }
@@ -280,7 +280,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <Avatar name={s.name} size={32} />
           <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-          {s.role === "supervisor" && <SupervisorTag kind="role">{ta.roleSupervisor}</SupervisorTag>}
+          {isSupervisorRole(s.role) && <SupervisorTag kind="role">{s.role === "gerencia_supervisor" ? ta.roleGerenciaSupervisor : ta.roleSupervisor}</SupervisorTag>}
         </div>
       ),
     },
@@ -460,15 +460,19 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
               <input style={styles.input} value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} />
             </Field>
             {isNew && (
-              <Field label={t.fEmailNewOnly} full>
-                <input type="email" style={styles.input} value={draft.email} onChange={(e) => updateDraft("email", e.target.value)} />
+              <Field label={t.fEmailNewOnly} full required error={formErrors.email ? c0.requiredField : undefined}>
+                <input
+                  type="email" style={styles.input} value={draft.email} placeholder={emailDomain ? `nome@${emailDomain}` : ""}
+                  onChange={(e) => updateDraft("email", e.target.value)}
+                  onBlur={() => { const v = draft.email.trim(); if (v && emailDomain && !v.includes("@")) updateDraft("email", `${v}@${emailDomain}`); }}
+                />
                 <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.emailHintNew}</div>
               </Field>
             )}
             <Field label={t.fContact} required error={formErrors.contact ? c0.requiredField : undefined}>
               <input style={styles.input} value={draft.contact} onChange={(e) => updateDraft("contact", e.target.value)} />
             </Field>
-            <Field label={t.fIban} required error={formErrors.iban ? c0.requiredField : undefined}>
+            <Field label={t.fIban}>
               <input type="text" style={styles.input} value={draft.iban} onChange={(e) => updateDraft("iban", e.target.value)} placeholder="BE00 0000 0000 0000" />
             </Field>
             <Field label={t.fAccountType} required>
@@ -480,6 +484,15 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
             {draft.accountType === "replacement" && (
               <Field label={t.fValidUntil}><input type="date" style={styles.input} value={draft.validUntil} onChange={(e) => updateDraft("validUntil", e.target.value)} /></Field>
             )}
+            <Field label={t.fRole}>
+              <select style={styles.input} value={draft.role || "funcionario"} onChange={(e) => updateDraft("role", e.target.value)}>
+                <option value="funcionario">{ta.roleFuncionario}</option>
+                <option value="supervisor">{ta.roleSupervisor}</option>
+                <option value="gerencia_supervisor">{ta.roleGerenciaSupervisor}</option>
+                {draft.role === "gerencia" && <option value="gerencia" disabled>{ta.roleGerencia}</option>}
+              </select>
+              <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.roleHint}</div>
+            </Field>
             <Field label={t.fStatus}>
               <select style={styles.input} value={draft.status} onChange={(e) => updateDraft("status", e.target.value)}>
                 <option value="ativo">{c0.active}</option>
