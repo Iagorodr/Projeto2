@@ -65,7 +65,7 @@ const T = {
     },
     dashboard: {
       title: "Dashboard",
-      kpiStaffActive: "Funcionários ativos", kpiClients: "Clientes", kpiReplacementClients: "Replacement", highlightsTitle: "Destaques da equipa", highlightsSubtitle: "Top 5 por horas neste período, com elogios e reclamações", highlightsEmpty: "Ainda sem horas registadas neste período.", highlightsPraises: "Elogios", highlightsComplaints: "Reclamações",
+      kpiStaffActive: "Funcionários ativos", kpiClients: "Clientes", kpiReplacementClients: "Replacement", highlightsTitle: "Destaques da equipa", highlightsSubtitle: "Top 5 por horas nos últimos 3 meses, com elogios e reclamações", highlightsEmpty: "Ainda sem horas registadas nos últimos 3 meses.", highlightsPraises: "Elogios", highlightsComplaints: "Reclamações",
       pendingTitle: "Pendências",
       pendingOvertime: "Horas extra por aprovar", pendingCustomClient: "Clientes por confirmar",
       pendingReopened: "Reabertos para correção",
@@ -671,7 +671,7 @@ const T = {
     },
     dashboard: {
       title: "Dashboard",
-      kpiStaffActive: "Active staff", kpiClients: "Clients", kpiReplacementClients: "Replacement", highlightsTitle: "Team highlights", highlightsSubtitle: "Top 5 by hours this period, with praises and complaints", highlightsEmpty: "No hours logged yet this period.", highlightsPraises: "Praises", highlightsComplaints: "Complaints",
+      kpiStaffActive: "Active staff", kpiClients: "Clients", kpiReplacementClients: "Replacement", highlightsTitle: "Team highlights", highlightsSubtitle: "Top 5 by hours over the last 3 months, with praises and complaints", highlightsEmpty: "No hours logged in the last 3 months.", highlightsPraises: "Praises", highlightsComplaints: "Complaints",
       pendingTitle: "Pending items",
       pendingOvertime: "Overtime to approve", pendingCustomClient: "Clients to confirm",
       pendingReopened: "Reopened for correction",
@@ -1222,7 +1222,7 @@ const T = {
     },
     dashboard: {
       title: "Tableau de bord",
-      kpiStaffActive: "Employés actifs", kpiClients: "Clients", kpiReplacementClients: "Remplacement", highlightsTitle: "Points forts de l'équipe", highlightsSubtitle: "Top 5 par heures sur la période, avec éloges et réclamations", highlightsEmpty: "Aucune heure enregistrée sur cette période.", highlightsPraises: "Éloges", highlightsComplaints: "Réclamations",
+      kpiStaffActive: "Employés actifs", kpiClients: "Clients", kpiReplacementClients: "Remplacement", highlightsTitle: "Points forts de l'équipe", highlightsSubtitle: "Top 5 par heures sur les 3 derniers mois, avec éloges et réclamations", highlightsEmpty: "Aucune heure enregistrée sur les 3 derniers mois.", highlightsPraises: "Éloges", highlightsComplaints: "Réclamations",
       pendingTitle: "En attente",
       pendingOvertime: "Heures supplémentaires à approuver", pendingCustomClient: "Clients à confirmer",
       pendingReopened: "Rouverts pour correction",

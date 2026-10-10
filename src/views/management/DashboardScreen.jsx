@@ -170,12 +170,14 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     return diffDays < 0;
   }).length;
 
-  // Destaques: top 5 por horas no período, cruzando elogios/reclamações do mesmo período.
+  // Destaques: top 5 por horas nos últimos 3 meses (janela móvel até hoje),
+  // cruzando elogios/reclamações da mesma janela.
+  const highlightsWindow = { start: new Date(TODAY.getFullYear(), TODAY.getMonth() - 3, TODAY.getDate() + 1), end: TODAY };
   const topStaff = board
-    .map((s) => ({ staffId: s.id, name: s.name, hours: staffTotalHours(horasData[s.id] || { entries: [] }, currentPeriod) }))
+    .map((s) => ({ staffId: s.id, name: s.name, hours: staffTotalHours(horasData[s.id] || { entries: [] }, highlightsWindow) }))
     .filter((s) => s.hours > 0)
     .map((s) => {
-      const mine = (sentItems || []).filter((i) => i.staffId === s.staffId && dateStrInPeriod(i.date, currentPeriod));
+      const mine = (sentItems || []).filter((i) => i.staffId === s.staffId && dateStrInPeriod(i.date, highlightsWindow));
       return { ...s, praises: mine.filter((i) => i.type === "elogio").length, complaints: mine.filter((i) => i.type === "reclamacao").length };
     })
     .sort((a, b) => b.hours - a.hours)
