@@ -40,10 +40,14 @@ function SegmentedBar({ segments }) {
 // `children`: conteúdo extra por baixo do número (o Dashboard usa isto
 // pros "5 avatares empilhados e '+8'" do KPI "Funcionários ativos") — sem
 // `children`, o cartão fica exatamente como já estava.
-function KpiCard({ icon: Icon, label, value, variant = "default", segments, iconBg, iconColor, children, style }) {
+function KpiCard({ icon: Icon, label, value, variant = "default", segments, iconBg, iconColor, children, style, onClick }) {
   const isHero = variant === "hero";
   return (
-    <Card variant={isHero ? "hero" : "default"} style={{ minHeight: 172, display: "flex", flexDirection: "column", ...style }}>
+    <Card
+      variant={isHero ? "hero" : "default"}
+      style={{ minHeight: 172, display: "flex", flexDirection: "column", ...(onClick ? { cursor: "pointer" } : null), ...style }}
+      {...(onClick ? { onClick, role: "button", tabIndex: 0, onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } } : null)}
+    >
       {Icon && (
         <div
           style={{

@@ -92,10 +92,12 @@ function PeriodLineChart({ data, valueFormatter = (v) => `${v}`, averageLabel, t
         })}
       </svg>
 
-      {hoverIdx != null && (
+      {/* altura reservada: o tooltip aparecer/sumir não pode mexer no layout da página */}
+      <div style={{ height: 58, marginTop: 8 }}>
+        {hoverIdx != null && (
         <div
           style={{
-            marginTop: 8, display: "inline-block", background: COLORS.card, border: `1px solid ${COLORS.line}`,
+            display: "inline-block", background: COLORS.card, border: `1px solid ${COLORS.line}`,
             borderRadius: RADIUS.control, boxShadow: SHADOW.sh2, padding: "8px 12px", fontSize: 12,
           }}
         >
@@ -103,6 +105,7 @@ function PeriodLineChart({ data, valueFormatter = (v) => `${v}`, averageLabel, t
           <div style={{ fontWeight: 700, color: COLORS.ink }}>{valueFormatter(data[hoverIdx].value)}</div>
         </div>
       )}
+      </div>
     </div>
   );
 }

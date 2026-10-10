@@ -131,7 +131,7 @@ function FeedbackHistory({ t, items }) {
 function ClientesScreen({
   lang, setLang, clients, setClients, onDeleteClient,
   staff = [], assignments = {}, horasData = {}, cutoffDay = 25, closedPeriods = [], contractAlertDays = 30,
-  onNavigate, sentItems = [],
+  onNavigate, sentItems = [], navIntent = null,
 }) {
   const t = T[lang].clientes;
   const c0 = T[lang].common;
@@ -150,6 +150,7 @@ function ClientesScreen({
   // (`st.kind === "expired"`), que a própria `contractStatus` já
   // distingue (ver função acima) mas não tinha chip nenhum pra filtrar.
   const [expiredFilterOn, setExpiredFilterOn] = useState(false);
+  const [replacementFilterOn, setReplacementFilterOn] = useState(() => navIntent?.filter === "replacement");
 
   const [openClientId, setOpenClientId] = useState(null); // id | "new" | null
   const [mode, setMode] = useState("view"); // "view" | "edit"
@@ -172,6 +173,7 @@ function ClientesScreen({
       const st = contractStatus(c, contractAlertDays);
       if (!st || st.kind !== "ending") return false;
     }
+    if (replacementFilterOn && c.clientType !== "replacement") return false;
     if (expiredFilterOn) {
       const st = contractStatus(c, contractAlertDays);
       if (!st || st.kind !== "expired") return false;
@@ -306,7 +308,7 @@ function ClientesScreen({
     },
   ];
 
-  const anyFilterActive = !!(search.trim() || cityFilter || typeFilter || contractFilterOn || expiredFilterOn);
+  const anyFilterActive = !!(search.trim() || cityFilter || typeFilter || contractFilterOn || expiredFilterOn || replacementFilterOn);
 
   const drawerClient = isNew ? draft : openClient;
   const drawerStatus = drawerClient && mode === "view" ? contractStatus(drawerClient, contractAlertDays) : null;
@@ -342,6 +344,9 @@ function ClientesScreen({
         ))}
         <FilterChip active={contractFilterOn} onClick={() => setContractFilterOn((v) => !v)}>
           {t.contractAlertChip}
+        </FilterChip>
+        <FilterChip active={replacementFilterOn} onClick={() => setReplacementFilterOn((v) => !v)}>
+          {t.clientTypeReplacement}
         </FilterChip>
         <FilterChip active={expiredFilterOn} onClick={() => setExpiredFilterOn((v) => !v)}>
           {t.contractExpired}

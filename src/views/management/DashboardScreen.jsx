@@ -7,7 +7,7 @@ import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, parseDMY, getOpenPeriod, formatPeriodLabel, staffTotalHours, staffTotalPay,
   recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
-  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr,
+  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
 import {
@@ -170,6 +170,16 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     return diffDays < 0;
   }).length;
 
+  // Destaques: top 5 por horas no período, cruzando elogios/reclamações do mesmo período.
+  const topStaff = board
+    .filter((s) => s.hours > 0)
+    .map((s) => {
+      const mine = (sentItems || []).filter((i) => i.staffId === s.staffId && dateStrInPeriod(i.date, currentPeriod));
+      return { ...s, praises: mine.filter((i) => i.type === "elogio").length, complaints: mine.filter((i) => i.type === "reclamacao").length };
+    })
+    .sort((a, b) => b.hours - a.hours)
+    .slice(0, 5);
+
   const replacementClientsActive = clients.filter((c) => {
     if (c.clientType !== "replacement") return false;
     if (!c.clientValidUntil) return true;
@@ -249,7 +259,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           </div>
         </Card>
 
-        <KpiCard icon={Users} label={t.kpiStaffActive} value={activeStaff.length}>
+        <KpiCard icon={Users} label={t.kpiStaffActive} value={activeStaff.length} onClick={() => onNavigate("funcionarios")}>
           <div style={{ display: "flex", alignItems: "center", marginTop: 14 }}>
             {activeStaff.slice(0, 5).map((s, i) => (
               <div key={s.id} style={{ marginLeft: i === 0 ? 0 : -10, borderRadius: "50%", border: "2px solid #fff", boxShadow: `0 0 0 1px ${COLORS.line}` }}>
@@ -274,11 +284,12 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
             definição só"): usa a mesma `activeClientsCount` do subtítulo
             de ClientesScreen.jsx, pra nunca divergir. Reconfirmado pelo
             Iago em 04/10: conta todo cliente cadastrado (41). */}
-        <KpiCard icon={Building2} label={t.kpiClients} value={activeClientsCount(clients, TODAY)} />
+        <KpiCard icon={Building2} label={t.kpiClients} value={activeClientsCount(clients, TODAY)} onClick={() => onNavigate("clientes")} />
 
         <KpiCard
           icon={RotateCcw} label={t.kpiReplacementClients} value={replacementClientsActive}
           iconBg={COLORS.clayTint} iconColor={COLORS.clayInk}
+          onClick={() => onNavigate("clientes", { filter: "replacement" })}
         />
       </div>
 
@@ -308,13 +319,35 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           <PendingRow icon={Calendar} label={t.pendingContractsExpired} count={contractsExpired} amber onClick={() => onNavigate("clientes")} okLabel={t.pendingAllOk} last />
         </Card>
 
-        <div style={{ flex: "1 1 260px", minWidth: 240 }}>
+        <div style={{ flex: "1 1 260px", minWidth: 240, display: "flex", flexDirection: "column", gap: 16 }}>
           <ReclamacoesCard
             current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
             recent={recentComplaints}
             title={t.complaintsTitle} subtitle={t.complaintsSubtitle}
             labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
           />
+          <Card>
+            <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{t.highlightsTitle}</div>
+            <div style={{ fontSize: 12, color: COLORS.ink3, margin: "2px 0 10px" }}>{t.highlightsSubtitle}</div>
+            {topStaff.length === 0 ? (
+              <div style={{ fontSize: 13, color: COLORS.ink2 }}>{t.highlightsEmpty}</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {topStaff.map((s, i) => (
+                  <div key={s.staffId} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ width: 16, fontSize: 12, fontWeight: 700, color: COLORS.ink3 }}>{i + 1}</span>
+                    <Avatar name={s.name} size={28} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                      <div style={{ fontSize: 11.5, color: COLORS.ink3 }}>{fmtHM(Math.round(s.hours * 60))} h</div>
+                    </div>
+                    <span title={t.highlightsPraises} style={{ fontSize: 12, fontWeight: 700, color: COLORS.forest600 }}>★ {s.praises}</span>
+                    <span title={t.highlightsComplaints} style={{ fontSize: 12, fontWeight: 700, color: s.complaints ? COLORS.clayInk : COLORS.ink3 }}>⚠ {s.complaints}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </div>
 
         <Card variant="warm" style={{ flex: "1 1 320px", minWidth: 260 }}>

@@ -24,7 +24,11 @@ const START_EMPTY = import.meta.env.VITE_START_EMPTY === "true";
 
 export function useAppController() {
   const [perspective, setPerspective] = useState("login"); // 'login' | 'management' | 'employee'
-  const [screen, setScreen] = useState("dashboard");
+  const [screen, setScreenRaw] = useState("dashboard");
+  // Intenção de navegação (ex.: clicar no KPI "Replacement" abre Clientes já filtrado).
+  const [navIntent, setNavIntent] = useState(null);
+  const setScreen = (s) => { setNavIntent(null); setScreenRaw(s); };
+  const goTo = (s, intent = null) => { setNavIntent(intent); setScreenRaw(s); };
   const [empScreen, setEmpScreen] = useState("menu");
   const [loggedInStaffId, setLoggedInStaffId] = useState(null);
   const [lang, setLang] = useState("pt");
@@ -412,7 +416,7 @@ export function useAppController() {
   const myUnreadBadge = myReceived.filter((i) => !i.read).length;
 
   return {
-    perspective, setPerspective, screen, setScreen, empScreen, setEmpScreen,
+    perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen,
     loggedInStaffId, setLoggedInStaffId, lang, setLang,
     company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays,
     reclamacaoBaseClients, setReclamacaoBaseClients,
