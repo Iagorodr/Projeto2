@@ -172,6 +172,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
 
   // Destaques: top 5 por horas no período, cruzando elogios/reclamações do mesmo período.
   const topStaff = board
+    .map((s) => ({ staffId: s.id, name: s.name, hours: staffTotalHours(horasData[s.id] || { entries: [] }, currentPeriod) }))
     .filter((s) => s.hours > 0)
     .map((s) => {
       const mine = (sentItems || []).filter((i) => i.staffId === s.staffId && dateStrInPeriod(i.date, currentPeriod));

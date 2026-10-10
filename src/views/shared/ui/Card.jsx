@@ -52,9 +52,9 @@ function variantStyle(variant) {
   }
 }
 
-function Card({ variant = "default", children, style }) {
+function Card({ variant = "default", children, style, ...rest }) {
   return (
-    <div style={{ ...BASE, ...variantStyle(variant), ...style }}>
+    <div style={{ ...BASE, ...variantStyle(variant), ...style }} {...rest}>
       {children}
     </div>
   );

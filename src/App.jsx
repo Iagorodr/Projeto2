@@ -1,7 +1,7 @@
 // Camada "View" raiz: lê o estado do controller e decide qual tela mostrar.
 // Não guarda estado do negócio — só consome useAppController().
 import { useState } from "react";
-import { MoreHorizontal, LogOut } from "lucide-react";
+import { MoreHorizontal, LogOut, Repeat } from "lucide-react";
 import { useAppController } from "./controllers/useAppController.js";
 import { styles } from "./styles/styles.js";
 import { AppSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.js";
@@ -119,6 +119,10 @@ export default function App() {
             : item.key === "avisos" ? (pendingRequests || undefined)
             : undefined,
         }));
+        const canSwitchToEmployee = c.staff.find((s) => s.id === c.loggedInStaffId)?.role === "gerencia_supervisor";
+        const mgmtItemsFull = canSwitchToEmployee
+          ? [...managementItems, { key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsEmployee }]
+          : managementItems;
         const managementCollapsed = empTier === "desktop" ? false : "icons";
         // Nome de quem entrou, não da empresa (achado da Marta) — `staff`
         // não tem campo de foto (igual já era do lado supervisor/
@@ -141,7 +145,7 @@ export default function App() {
         return (
         <div style={shellStyle}>
           <AppSidebar
-            items={managementItems} activeKey={c.screen} onNavigate={c.setScreen}
+            items={mgmtItemsFull} activeKey={c.screen} onNavigate={(k) => (k === "__switch" ? c.enterEmployee(c.loggedInStaffId) : c.setScreen(k))}
             density="gerencia" collapsed={managementCollapsed}
             user={managementUser} onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
           />
@@ -189,10 +193,14 @@ export default function App() {
         // tinha por rota direta até agora (o botão no menu antigo não
         // oferecia isso, mas a rota em si já funcionava).
         const roleItems = SUPERVISOR_MENU_ITEMS.filter((it) => isSupervisor || it.key !== "monitoramento");
-        const sidebarItems = roleItems.map((it) => ({
-          key: it.key, icon: it.icon, label: tSidebar[it.key],
-          badge: it.key === "avisos" ? c.myUnreadBadge : undefined,
-        }));
+        const isGerSup = c.me.role === "gerencia_supervisor";
+        const sidebarItems = [
+          ...roleItems.map((it) => ({
+            key: it.key, icon: it.icon, label: tSidebar[it.key],
+            badge: it.key === "avisos" ? c.myUnreadBadge : undefined,
+          })),
+          ...(isGerSup ? [{ key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsManagement }] : []),
+        ];
 
         const body = (
           <>
@@ -266,6 +274,7 @@ export default function App() {
             // quem entrou vai no cabeçalho da folha, via prop `user` do
             // MoreSheet, não aqui). `logout: true` tira a seta (não é
             // navegação) no MoreSheet.jsx.
+            ...(isGerSup ? [{ key: "switch", icon: Repeat, label: T[c.lang].common.viewAsManagement, onSelect: () => { setMoreSheetOpen(false); c.enterManagement(); } }] : []),
             { key: "logout", icon: LogOut, label: T[c.lang].common.logout, logout: true, onSelect: () => c.logout() },
           ];
           // QA (achado do Iago): "em horas o menu em baixo desapare, quero
@@ -306,7 +315,7 @@ export default function App() {
         return (
           <div style={styles.shell}>
             <AppSidebar
-              items={sidebarItems} activeKey={c.empScreen} onNavigate={c.setEmpScreen}
+              items={sidebarItems} activeKey={c.empScreen} onNavigate={(k) => (k === "__switch" ? c.enterManagement() : c.setEmpScreen(k))}
               density="supervisor" collapsed={empTier === "tablet" ? "rail" : false}
               user={{ name: c.me.name, subtitle: isSupervisor ? T[c.lang].acessos.roleSupervisor : undefined }}
               onLogout={c.logout} logoutLabel={T[c.lang].common.logout}

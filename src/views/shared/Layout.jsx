@@ -168,11 +168,11 @@ function InstallAppButton({ lang }) {
   const { installed, isIOS, canPromptNative, promptInstall } = useInstallPrompt();
   const [showIOSHelp, setShowIOSHelp] = useState(false);
 
-  if (installed || (!canPromptNative && !isIOS)) return null;
+  if (installed) return null;
 
   function handleClick() {
     if (canPromptNative) promptInstall();
-    else if (isIOS) setShowIOSHelp(true);
+    else setShowIOSHelp(true);
   }
 
   return (
@@ -185,17 +185,17 @@ function InstallAppButton({ lang }) {
         <div style={styles.modalOverlay} onClick={() => setShowIOSHelp(false)}>
           <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <div style={styles.modalTitle}>{t.installAppIOSTitle}</div>
+              <div style={styles.modalTitle}>{isIOS ? t.installAppIOSTitle : t.installAppOtherTitle}</div>
               <button style={styles.modalClose} onClick={() => setShowIOSHelp(false)}><X size={16} /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <Share size={16} color={COLORS.primaryDark} style={{ flexShrink: 0, marginTop: 1 }} />
-                <div style={styles.defSettingHint}>{t.installAppIOSStep1}</div>
+                <div style={styles.defSettingHint}>{isIOS ? t.installAppIOSStep1 : t.installAppOtherStep1}</div>
               </div>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <Plus size={16} color={COLORS.primaryDark} style={{ flexShrink: 0, marginTop: 1 }} />
-                <div style={styles.defSettingHint}>{t.installAppIOSStep2}</div>
+                <div style={styles.defSettingHint}>{isIOS ? t.installAppIOSStep2 : t.installAppOtherStep2}</div>
               </div>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <Check size={16} color={COLORS.primaryDark} style={{ flexShrink: 0, marginTop: 1 }} />

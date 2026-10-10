@@ -9,6 +9,7 @@ import {
   startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, partnerOf, getOpenPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
+  parseHoursInput, staffTotalPay, fmtEuro,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -223,7 +224,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     if (weekLockedFlag || !customName.trim()) return;
     const entry = {
       date: selectedKey, clientId: null, custom: { name: customName.trim(), city: customCity.trim() },
-      hours: Number(customHours) || 1, extra: false, extraMinutes: 0, approved: false, voided: false,
+      hours: (parseHoursInput(customHours) ?? 60) / 60 || 1, extra: false, extraMinutes: 0, approved: false, voided: false,
     };
     setHorasData((prev) => {
       const current = prev[staffId] || emptyHoras();
@@ -486,6 +487,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
 
   const periodEntries = myHoras.entries.filter((e) => !e.voided && dateStrInPeriod(e.date, payPeriod));
   const periodHours = periodEntries.reduce((s, e) => s + e.hours, 0);
+  const periodEarned = staffTotalPay(myHoras, clients, payPeriod);
   const periodPendingExtraMinutes = periodEntries.filter((e) => e.extra && !e.approved).reduce((s, e) => s + (e.extraMinutes || 0), 0);
   const periodMissingCount = payPeriodChunks.reduce((sum, c) => sum + calPeriodDays(c).filter((d) =>
     d <= TODAY && scheduledIfActive(d).length > 0 && !dayIsCovered(myHoras, isoDateStr(d))).length, 0);
@@ -597,6 +599,10 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                 <div style={{ flex: 1, background: COLORS.card, borderRadius: RADIUS.control, padding: "10px 12px" }}>
                   <div style={{ fontSize: 11, color: COLORS.ink3 }}>{t.periodTotal}</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.ink }}>{fmtHoursScreen(periodHours)}</div>
+                </div>
+                <div style={{ flex: 1, background: COLORS.card, borderRadius: RADIUS.control, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 11, color: COLORS.ink3 }}>{t.earnedSoFar}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.ink }}>{fmtEuro(periodEarned)}</div>
                 </div>
               </div>
               {/* `muted`: mesmas células do calendário normal, em tons de
@@ -765,6 +771,10 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                   <div style={{ flex: 1, background: COLORS.bg, borderRadius: RADIUS.control, padding: "10px 12px" }}>
                     <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{t.periodHoursLabel(fmtHoursScreen(periodHours))}</div>
                   </div>
+                  <div style={{ flex: 1, background: COLORS.bg, borderRadius: RADIUS.control, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: COLORS.ink3 }}>{t.earnedSoFar}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{fmtEuro(periodEarned)}</div>
+                  </div>
                   {periodPendingExtraMinutes > 0 && (
                     <div style={{ flexShrink: 0 }}><Pill variant="pending">{t.pendingExtraPill(fmtHoursScreen(periodPendingExtraMinutes / 60))}</Pill></div>
                   )}
@@ -920,11 +930,11 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         footer={<><Button variant="secondary" onClick={() => setCustomOpen(false)}>{t.confirmNo}</Button><Button variant="primary" onClick={addCustomEntry} disabled={!customName.trim()}>{t.customClientAdd}</Button></>}
       >
         <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 14 }}>{t.customClientHint}</div>
-        {[["customClientName", customName, setCustomName, "text"], ["customClientCity", customCity, setCustomCity, "text"], ["customClientHours", customHours, setCustomHours, "number"]].map(([k, v, set, type]) => (
+        {[["customClientName", customName, setCustomName, "text"], ["customClientCity", customCity, setCustomCity, "text"], ["customClientHours", customHours, setCustomHours, "text"]].map(([k, v, set, type]) => (
           <label key={k} style={{ display: "block", marginBottom: 12 }}>
             <div style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink2, marginBottom: 4 }}>{t[k]}</div>
             <input
-              type={type} step={type === "number" ? 0.5 : undefined} min={type === "number" ? 0.5 : undefined}
+              type="text" inputMode={k === "customClientHours" ? "text" : undefined} placeholder={k === "customClientHours" ? "1:30" : undefined}
               value={v} onChange={(ev) => set(ev.target.value)}
               style={{ width: "100%", boxSizing: "border-box", height: 48, borderRadius: RADIUS.control, border: `1px solid ${COLORS.line}`, padding: "0 12px", fontSize: 16, fontFamily: "inherit" }}
             />
@@ -959,9 +969,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       >
         <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 16 }}>{t.extraQuestion}</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 14 }}>
-          <button type="button" onClick={() => setExtraDraft((v) => Math.max(0, v - 30))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1px solid ${COLORS.lineInput}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Minus2 /></button>
+          <button type="button" onClick={() => setExtraDraft((v) => Math.max(0, v - 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1px solid ${COLORS.lineInput}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Minus2 /></button>
           <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.ink, minWidth: 80, textAlign: "center" }}>{extraDraft} {t.minutesUnit}</div>
-          <button type="button" onClick={() => setExtraDraft((v) => Math.min(240, v + 30))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1px solid ${COLORS.lineInput}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Plus size={18} /></button>
+          <button type="button" onClick={() => setExtraDraft((v) => Math.min(240, v + 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1px solid ${COLORS.lineInput}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Plus size={18} /></button>
         </div>
         <div style={{ fontSize: 12, color: COLORS.ink3 }}>{t.extraHint}</div>
       </Drawer>
