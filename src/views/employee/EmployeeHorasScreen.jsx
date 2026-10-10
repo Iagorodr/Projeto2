@@ -87,13 +87,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // seguintes (um `getCutoffPeriod` por mês), até ter pelo menos 8 blocos
   // de margem depois de hoje.
   const [chunks] = useState(() => {
+    // Só o período atual fica navegável (sem meses seguintes).
     const list = [...payPeriodChunks];
-    let periodOffset = 1;
-    while (list.length - payPeriodChunks.length < 8) {
-      const nextPeriod = getCutoffPeriod(payPeriod.start, cutoffDay, periodOffset);
-      list.push(...weekBlocksOfPayPeriod(nextPeriod, cutoffDay));
-      periodOffset += 1;
-    }
     const todayIndex = list.findIndex((b) => TODAY >= b.start && TODAY <= b.end);
     return { list, anchorIndex: todayIndex >= 0 ? todayIndex : 0 };
   });
@@ -545,11 +540,11 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         )}
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 6, marginTop: -4 }}>
-          <button type="button" onClick={() => goChunk(-1)} aria-label="anterior" style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <button type="button" onClick={() => goChunk(-1)} disabled={idx <= 0} aria-label="anterior" style={{ opacity: idx <= 0 ? 0.35 : 1, width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
             <ChevronLeftMini />
           </button>
           <span style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{calPeriodLabel(chunk, lang)}</span>
-          <button type="button" onClick={() => goChunk(1)} aria-label="seguinte" style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <button type="button" onClick={() => goChunk(1)} disabled={idx >= chunks.list.length - 1} aria-label="seguinte" style={{ opacity: idx >= chunks.list.length - 1 ? 0.35 : 1, width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
             <ChevronRightMini />
           </button>
         </div>
