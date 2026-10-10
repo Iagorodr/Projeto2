@@ -40,6 +40,8 @@ export function useAppController() {
   const [company, setCompany] = useState({ name: "Empresa X", email: "empresax@login1.gmail.com", password: "", photoUrl: null });
   const [cutoffDay, setCutoffDay] = useState(20);
   const [contractAlertDays, setContractAlertDays] = useState(30);
+  const [highlightsMonths, setHighlightsMonths] = useState(3);
+  const [highlightsRealtime, setHighlightsRealtime] = useState(false);
   const [reclamacaoBaseClients, setReclamacaoBaseClients] = useState(10);
   const [reclamacaoExcelenteCount, setReclamacaoExcelenteCount] = useState(1);
   const [reclamacaoRazoavelCount, setReclamacaoRazoavelCount] = useState(3);
@@ -120,6 +122,8 @@ export function useAppController() {
         setCompany(mapped.company);
         setCutoffDay(mapped.cutoffDay);
         setContractAlertDays(mapped.contractAlertDays);
+        setHighlightsMonths(mapped.highlightsMonths);
+        setHighlightsRealtime(mapped.highlightsRealtime);
         setReclamacaoBaseClients(mapped.reclamacaoBaseClients);
         setReclamacaoExcelenteCount(mapped.reclamacaoExcelenteCount);
         setReclamacaoRazoavelCount(mapped.reclamacaoRazoavelCount);
@@ -316,13 +320,13 @@ export function useAppController() {
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
     const payload = toDbCompanySettings({
-      company, cutoffDay, contractAlertDays,
+      company, cutoffDay, contractAlertDays, highlightsMonths, highlightsRealtime,
       reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount,
     });
     supabase.from("company_settings").update(payload).eq("id", 1).then(({ error }) => {
       if (error) console.error("Erro ao gravar definições:", error);
     });
-  }, [hydrated, readOk, perspective, company, cutoffDay, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount]);
+  }, [hydrated, readOk, perspective, company, cutoffDay, contractAlertDays, highlightsMonths, highlightsRealtime, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount]);
 
   // `app_data` continua gravado por todas as sessões (gerência, supervisor
   // e funcionário escrevem horas/avisos/notas aqui) — só ganha o novo
@@ -451,7 +455,7 @@ export function useAppController() {
   return {
     perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen,
     loggedInStaffId, setLoggedInStaffId, lang, setLang,
-    company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays,
+    company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, highlightsMonths, setHighlightsMonths, highlightsRealtime, setHighlightsRealtime,
     // Base do medidor de reclamações = nº de clientes ativos (automático, não editável).
     reclamacaoBaseClients: Math.max(1, activeClientsCount(clients, TODAY)), setReclamacaoBaseClients,
     reclamacaoExcelenteCount, setReclamacaoExcelenteCount,

@@ -98,7 +98,7 @@ function PendingRow({ icon: Icon, label, count, amber, onClick, okLabel, last })
 // cartão de Notas (o documento pede explicitamente que o duplicado
 // desapareça) e os dois gráficos de 6 períodos (2.14) no lugar dos SVGs
 // antigos.
-function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, absences, onNavigate }) {
+function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, highlightsMonths = 3, highlightsRealtime = false, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, absences, onNavigate }) {
   const t = T[lang].dashboard;
   const tAbs = T[lang].absences;
   const absencesPending = (absences || []).filter((a) => !a.handled && a.date >= isoDateStr(TODAY)).length;
@@ -170,33 +170,22 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     return diffDays < 0;
   }).length;
 
-  // Destaques: top 5 por horas nos últimos 3 meses (janela móvel até hoje),
-  // cruzando elogios/reclamações da mesma janela.
-  const highlightsWindow = { start: new Date(TODAY.getFullYear(), TODAY.getMonth() - 3, TODAY.getDate() + 1), end: TODAY };
-  // Horas dos últimos 3 meses = períodos fechados (histórico) que caem na
-  // janela + lançamentos do período aberto (depois do último fecho).
-  const lastClosedEnd = (closedPeriods && closedPeriods[0]) ? closedPeriods[0].periodEnd : "";
-  const inWindow = (dateStr) => dateStrInPeriod(dateStr, highlightsWindow);
+  // Destaques: top 5 por horas. Dois modos (Definições):
+  //  - tempo real: só o período aberto, atualizado a cada lançamento;
+  //  - fechados (padrão): soma dos N últimos períodos já fechados (Histórico).
+  const usedClosed = highlightsRealtime ? [] : (closedPeriods || []).slice(0, Math.max(1, highlightsMonths));
   const hoursByStaff = {};
-  (closedPeriods || []).forEach((cp) => {
-    if (!cp.periodEnd || new Date(cp.periodEnd + "T00:00:00") < highlightsWindow.start) return;
-    (cp.staffSummaries || []).forEach((ss) => {
-      const ents = (ss.entries || []).filter((e) => !e.voided);
-      const h = ents.length
-        ? ents.filter((e) => inWindow(e.date)).reduce((t, e) => t + e.hours, 0)
-        : (new Date(cp.periodStart + "T00:00:00") >= highlightsWindow.start ? ss.hours : 0);
-      hoursByStaff[ss.staffId] = (hoursByStaff[ss.staffId] || 0) + (h || 0);
-    });
-  });
-  board.forEach((s) => {
-    const live = ((horasData[s.id] || { entries: [] }).entries || [])
-      .filter((e) => !e.voided && inWindow(e.date) && (!lastClosedEnd || e.date > lastClosedEnd))
-      .reduce((t, e) => t + e.hours, 0);
-    hoursByStaff[s.id] = (hoursByStaff[s.id] || 0) + live;
-  });
   const feedbackItems = new Map();
-  [...(sentItems || []), ...(closedPeriods || []).flatMap((cp) => [...(cp.elogiosItems || []), ...(cp.reclamacoesItems || [])])]
-    .forEach((i) => { if (inWindow(i.date)) feedbackItems.set(i.id ?? JSON.stringify(i), i); });
+  const addFeedback = (i) => feedbackItems.set(i.id ?? JSON.stringify(i), i);
+  if (highlightsRealtime) {
+    board.forEach((s) => { hoursByStaff[s.id] = staffTotalHours(horasData[s.id] || { entries: [] }, currentPeriod); });
+    (sentItems || []).filter((i) => dateStrInPeriod(i.date, currentPeriod)).forEach(addFeedback);
+  } else {
+    usedClosed.forEach((cp) => {
+      (cp.staffSummaries || []).forEach((ss) => { hoursByStaff[ss.staffId] = (hoursByStaff[ss.staffId] || 0) + (ss.hours || 0); });
+      [...(cp.elogiosItems || []), ...(cp.reclamacoesItems || [])].forEach(addFeedback);
+    });
+  }
   const topStaff = board
     .map((s) => ({ staffId: s.id, name: s.name, hours: hoursByStaff[s.id] || 0 }))
     .filter((s) => s.hours > 0)
@@ -206,6 +195,8 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     })
     .sort((a, b) => b.hours - a.hours)
     .slice(0, 5);
+  const highlightsSubtitle = highlightsRealtime ? t.highlightsSubtitleRealtime : t.highlightsSubtitleClosed(usedClosed.length || highlightsMonths);
+  const highlightsEmptyText = highlightsRealtime ? t.highlightsEmptyRealtime : t.highlightsEmptyClosed;
 
   const replacementClientsActive = clients.filter((c) => {
     if (c.clientType !== "replacement") return false;
@@ -355,9 +346,9 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           />
           <Card>
             <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{t.highlightsTitle}</div>
-            <div style={{ fontSize: 12, color: COLORS.ink3, margin: "2px 0 10px" }}>{t.highlightsSubtitle}</div>
+            <div style={{ fontSize: 12, color: COLORS.ink3, margin: "2px 0 10px" }}>{highlightsSubtitle}</div>
             {topStaff.length === 0 ? (
-              <div style={{ fontSize: 13, color: COLORS.ink2 }}>{t.highlightsEmpty}</div>
+              <div style={{ fontSize: 13, color: COLORS.ink2 }}>{highlightsEmptyText}</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {topStaff.map((s, i) => (

@@ -44,7 +44,7 @@ const SECTIONS = [
 // escrita ao mudar o dia de fecho, pré-visualização ao vivo das faixas de
 // reclamações, "Formatar dados" com palavra digitada em vez de
 // palavra-passe, e barra de guardar fixa no lugar da frase vermelha.
-function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, reclamacaoBaseClients, setReclamacaoBaseClients, reclamacaoExcelenteCount, setReclamacaoExcelenteCount, reclamacaoRazoavelCount, setReclamacaoRazoavelCount, clients, onFormatData, onVerifyPassword }) {
+function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, highlightsMonths, setHighlightsMonths, highlightsRealtime, setHighlightsRealtime, reclamacaoBaseClients, setReclamacaoBaseClients, reclamacaoExcelenteCount, setReclamacaoExcelenteCount, reclamacaoRazoavelCount, setReclamacaoRazoavelCount, clients, onFormatData, onVerifyPassword }) {
   const t = T[lang].definicoes;
   const c0 = T[lang].common;
 
@@ -227,6 +227,23 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                   <div style={styles.defSettingLabel}>{t.contractAlertLabel}</div>
                 </div>
                 <input type="number" min={1} style={styles.defNumberInput} value={contractAlertDays} onChange={(e) => setContractAlertDays(Number(e.target.value))} />
+              </div>
+            </Card>
+            <Card style={{ marginTop: 16 }}>
+              <div style={styles.sectionTitle}>{t.highlightsSettingsTitle}</div>
+              <div style={{ ...styles.defSettingHint, marginTop: -6, marginBottom: 10 }}>{t.highlightsSettingsIntro}</div>
+              <div style={styles.defSettingRow}>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.defSettingLabel}>{t.highlightsRealtimeLabel}</div>
+                  <div style={styles.defSettingHint}>{t.highlightsRealtimeHint}</div>
+                </div>
+                <input type="checkbox" checked={!!highlightsRealtime} onChange={(e) => setHighlightsRealtime(e.target.checked)} style={{ width: 20, height: 20, cursor: "pointer" }} />
+              </div>
+              <div style={{ ...styles.defSettingRow, opacity: highlightsRealtime ? 0.45 : 1 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.defSettingLabel}>{t.highlightsMonthsLabel}</div>
+                </div>
+                <input type="number" min={1} max={12} disabled={!!highlightsRealtime} style={styles.defNumberInput} value={highlightsMonths} onChange={(e) => setHighlightsMonths(Math.min(12, Math.max(1, Math.round(Number(e.target.value)) || 1)))} />
               </div>
             </Card>
             <Card style={{ marginTop: 16 }}>

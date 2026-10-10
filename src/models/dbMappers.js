@@ -97,7 +97,7 @@ function fromDbStaff(row) {
   };
 }
 
-function toDbCompanySettings({ company, cutoffDay, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount }) {
+function toDbCompanySettings({ company, cutoffDay, contractAlertDays, highlightsMonths, highlightsRealtime, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount }) {
   return {
     id: 1,
     name: company.name,
@@ -105,6 +105,8 @@ function toDbCompanySettings({ company, cutoffDay, contractAlertDays, reclamacao
     photo_url: company.photoUrl || null,
     cutoff_day: cutoffDay,
     contract_alert_days: contractAlertDays,
+    highlights_months: highlightsMonths,
+    highlights_realtime: !!highlightsRealtime,
     reclamacao_base_clients: reclamacaoBaseClients,
     reclamacao_excelente_count: reclamacaoExcelenteCount,
     reclamacao_razoavel_count: reclamacaoRazoavelCount,
@@ -116,6 +118,8 @@ function fromDbCompanySettings(row) {
     company: { name: row.name, email: row.email, photoUrl: row.photo_url || null },
     cutoffDay: row.cutoff_day,
     contractAlertDays: row.contract_alert_days,
+    highlightsMonths: row.highlights_months ?? 3,
+    highlightsRealtime: !!row.highlights_realtime,
     reclamacaoBaseClients: row.reclamacao_base_clients,
     reclamacaoExcelenteCount: row.reclamacao_excelente_count,
     reclamacaoRazoavelCount: row.reclamacao_razoavel_count,
