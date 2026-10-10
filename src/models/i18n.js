@@ -324,7 +324,7 @@ const T = {
       resetSuccessCreated: "Conta criada com sucesso.",
       resetSuccessUpdated: "Palavra-passe redefinida com sucesso.",
       credentialsWarning: "Anote ou copie agora — esta palavra-passe não vai aparecer de novo.",
-      copyCredentials: "Copiar credenciais",
+      copyCredentials: "Copiar palavra-passe",
       copied: "Copiado!",
     },
     historico: {
@@ -907,7 +907,7 @@ const T = {
       resetSuccessCreated: "Account created successfully.",
       resetSuccessUpdated: "Password reset successfully.",
       credentialsWarning: "Write it down or copy it now — this password won't be shown again.",
-      copyCredentials: "Copy credentials",
+      copyCredentials: "Copy password",
       copied: "Copied!",
     },
     historico: {
@@ -1458,7 +1458,7 @@ const T = {
       resetSuccessCreated: "Compte créé avec succès.",
       resetSuccessUpdated: "Mot de passe réinitialisé avec succès.",
       credentialsWarning: "Notez-le ou copiez-le maintenant — ce mot de passe ne sera plus affiché.",
-      copyCredentials: "Copier les identifiants",
+      copyCredentials: "Copier le mot de passe",
       copied: "Copié !",
     },
     historico: {

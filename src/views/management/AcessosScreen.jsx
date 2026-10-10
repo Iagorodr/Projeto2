@@ -174,7 +174,7 @@ function AcessosScreen({ lang, setLang, staff, setStaff }) {
 
   async function copyCredentials() {
     if (!resetResult) return;
-    const text = `${resetResult.email} / ${resetResult.password}`;
+    const text = resetResult.password; // só a palavra-passe: colar no login não pode trazer o email junto
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);

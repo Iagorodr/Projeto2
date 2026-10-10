@@ -267,7 +267,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
   async function copyCreateCredentials() {
     if (!createResult) return;
     try {
-      await navigator.clipboard.writeText(`${createResult.email} / ${createResult.password}`);
+      await navigator.clipboard.writeText(createResult.password);
       setCreateCopied(true);
       setTimeout(() => setCreateCopied(false), 1800);
     } catch {
