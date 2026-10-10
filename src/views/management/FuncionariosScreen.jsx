@@ -131,7 +131,7 @@ function StatusBlock({ s, t, c0 }) {
 // `isStaffActive` (Etapa 4j) refletida na lista e na gaveta. `onNavigate`
 // é opcional (liga "Clientes atribuídos" à tela de Agendas, mesmo padrão
 // já usado em ClientesScreen.jsx).
-function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate, emailDomain = "" }) {
+function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate }) {
   const t = T[lang].funcionarios;
   const ta = T[lang].acessos;
   const c0 = T[lang].common;
@@ -143,6 +143,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
   const [mode, setMode] = useState("view"); // "view" | "edit" | "created"
   const [draft, setDraft] = useState(EMPTY_STAFF);
   const [formErrors, setFormErrors] = useState({});
+  const [emailConfirm, setEmailConfirm] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
@@ -172,7 +173,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
   const drawerOpen = openId !== null;
 
   function openView(s) { setOpenId(s.id); setMode("view"); }
-  function openNew() { setDraft(EMPTY_STAFF); setFormErrors({}); setOpenId("new"); setMode("edit"); }
+  function openNew() { setEmailConfirm(""); setDraft(EMPTY_STAFF); setFormErrors({}); setOpenId("new"); setMode("edit"); }
   function startEdit() { setDraft({ ...openStaff, documents: openStaff.documents || [null, null, null, null] }); setFormErrors({}); setMode("edit"); }
   function cancelEdit() { if (isNew) setOpenId(null); else setMode("view"); }
   function closeDrawer() {
@@ -186,6 +187,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
     if (!draft.name.trim()) errs.name = true;
     if (!draft.contact.trim()) errs.contact = true;
     if (isNew && !draft.email.trim()) errs.email = true;
+    else if (isNew && draft.email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) errs.emailConfirm = true;
     if (!draft.accountType) errs.accountType = true;
     return errs;
   }
@@ -462,11 +464,15 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
             {isNew && (
               <Field label={t.fEmailNewOnly} full required error={formErrors.email ? c0.requiredField : undefined}>
                 <input
-                  type="email" style={styles.input} value={draft.email} placeholder={emailDomain ? `nome@${emailDomain}` : ""}
+                  type="email" style={styles.input} value={draft.email} placeholder="nome@exemplo.com"
                   onChange={(e) => updateDraft("email", e.target.value)}
-                  onBlur={() => { const v = draft.email.trim(); if (v && emailDomain && !v.includes("@")) updateDraft("email", `${v}@${emailDomain}`); }}
                 />
                 <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.emailHintNew}</div>
+              </Field>
+            )}
+            {isNew && (
+              <Field label={t.fEmailConfirm} full required error={formErrors.emailConfirm ? t.emailMismatch : undefined}>
+                <input type="email" style={styles.input} value={emailConfirm} onChange={(e) => setEmailConfirm(e.target.value)} onPaste={(e) => e.preventDefault()} />
               </Field>
             )}
             <Field label={t.fContact} required error={formErrors.contact ? c0.requiredField : undefined}>

@@ -105,6 +105,8 @@ Deno.serve(async (req) => {
     email: targetEmail,
     password: newPassword,
     email_confirm: true,
+    // Senha gerada pela gerência é temporária: a pessoa é obrigada a trocá-la no primeiro login.
+    user_metadata: { must_change_password: usingGeneratedPassword },
   });
   if (!createErr) {
     return json({ email: targetEmail, password: newPassword, created: true });
@@ -119,7 +121,10 @@ Deno.serve(async (req) => {
   const existing = list.users.find((u) => (u.email || "").toLowerCase() === targetEmail);
   if (!existing) return json({ error: "account_not_found" }, 404);
 
-  const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, { password: newPassword });
+  const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, {
+    password: newPassword,
+    user_metadata: { ...(existing.user_metadata || {}), must_change_password: usingGeneratedPassword },
+  });
   if (updErr) return json({ error: "update_failed", detail: updErr.message }, 500);
 
   return json({ email: targetEmail, password: newPassword, created: false });

@@ -12,6 +12,7 @@ import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCo
 import { T } from "./models/i18n.js";
 
 import LoginScreen from "./views/LoginScreen.jsx";
+import SetNewPasswordScreen from "./views/SetNewPasswordScreen.jsx";
 import DashboardScreen from "./views/management/DashboardScreen.jsx";
 import ClientesScreen from "./views/management/ClientesScreen.jsx";
 import AgendasScreen from "./views/management/AgendasScreen.jsx";
@@ -61,6 +62,10 @@ export default function App() {
     ? { ...basePageStyle, padding: 0, minHeight: "100dvh", justifyContent: "flex-start", alignItems: "stretch" }
     : basePageStyle;
 
+  if (c.passwordGate) {
+    return <SetNewPasswordScreen lang={c.lang} mode={c.passwordGate} onSave={c.setNewPassword} onLogout={c.logout} />;
+  }
+
   return (
     <div style={pageStyle}>
       {c.loadError && (
@@ -84,7 +89,7 @@ export default function App() {
         <LoginScreen
           lang={c.lang} setLang={c.setLang}
           onEnterManagement={c.enterManagement} onEnterEmployee={c.enterEmployee}
-          onLoginWithPassword={c.loginWithPassword} authLoading={c.authLoading} authError={c.authError}
+          onLoginWithPassword={c.loginWithPassword} onRequestPasswordReset={c.requestPasswordReset} authLoading={c.authLoading} authError={c.authError}
           company={c.company} staff={c.staff}
         />
       )}
@@ -166,10 +171,10 @@ export default function App() {
             {c.screen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />
             )}
-            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} emailDomain={c.emailDomain} />}
+            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} />}
             {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} />}
             {c.screen === "definicoes" && (
-              <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} emailDomain={c.emailDomain} setEmailDomain={c.setEmailDomain} />
+              <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
             )}
           </div>
         </div>

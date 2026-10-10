@@ -29,6 +29,8 @@ export function useAppController() {
   const [screen, setScreenRaw] = useState("dashboard");
   // Intenção de navegação (ex.: clicar no KPI "Replacement" abre Clientes já filtrado).
   const [navIntent, setNavIntent] = useState(null);
+  // null | "temporary" (palavra-passe gerada pela gerência) | "recovery" (link do email): obriga a escolher palavra-passe nova antes de usar o app.
+  const [passwordGate, setPasswordGate] = useState(null);
   const setScreen = (s) => { setNavIntent(null); setScreenRaw(s); };
   const goTo = (s, intent = null) => { setNavIntent(intent); setScreenRaw(s); };
   const [empScreen, setEmpScreen] = useState("menu");
@@ -37,7 +39,6 @@ export function useAppController() {
 
   const [company, setCompany] = useState({ name: "Empresa X", email: "empresax@login1.gmail.com", password: "", photoUrl: null });
   const [cutoffDay, setCutoffDay] = useState(20);
-  const [emailDomain, setEmailDomain] = useState("");
   const [contractAlertDays, setContractAlertDays] = useState(30);
   const [reclamacaoBaseClients, setReclamacaoBaseClients] = useState(10);
   const [reclamacaoExcelenteCount, setReclamacaoExcelenteCount] = useState(1);
@@ -118,7 +119,6 @@ export function useAppController() {
         companyEmail = mapped.company.email;
         setCompany(mapped.company);
         setCutoffDay(mapped.cutoffDay);
-        setEmailDomain(mapped.emailDomain || "");
         setContractAlertDays(mapped.contractAlertDays);
         setReclamacaoBaseClients(mapped.reclamacaoBaseClients);
         setReclamacaoExcelenteCount(mapped.reclamacaoExcelenteCount);
@@ -194,6 +194,7 @@ export function useAppController() {
           if (cancelled) return;
           if (ok) setReadOk(true);
           const routed = await resolveSessionAndRoute(session.user.email, companyEmail, staffList);
+          if (routed && session.user.user_metadata?.must_change_password) setPasswordGate("temporary");
           if (!routed) {
             console.error("Sessão sem correspondência em funcionários/empresa — a terminar sessão.");
             await supabase.auth.signOut();
@@ -241,6 +242,7 @@ export function useAppController() {
       const { companyEmail, staffList, ok } = await loadAllData();
       if (ok) setReadOk(true);
       const routed = await resolveSessionAndRoute(data.user.email, companyEmail, staffList);
+      if (routed && data.user.user_metadata?.must_change_password) setPasswordGate("temporary");
       if (!routed) {
         setAuthError("no_account");
         await supabase.auth.signOut();
@@ -250,7 +252,30 @@ export function useAppController() {
     }
   }
 
+  // "Esqueci a palavra-passe": envia o link por email (resposta sempre neutra, para não revelar que emails existem).
+  async function requestPasswordReset(email) {
+    if (!isSupabaseConfigured) return false;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    return !error;
+  }
+
+  async function setNewPassword(newPassword) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword, data: { must_change_password: false } });
+    if (error) return false;
+    setPasswordGate(null);
+    return true;
+  }
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setPasswordGate("recovery");
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   async function logout() {
+    setPasswordGate(null);
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
@@ -287,19 +312,13 @@ export function useAppController() {
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
     const payload = toDbCompanySettings({
-      company, cutoffDay, contractAlertDays, emailDomain,
+      company, cutoffDay, contractAlertDays,
       reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount,
     });
     supabase.from("company_settings").update(payload).eq("id", 1).then(({ error }) => {
-      if (!error) return;
-      // Coluna email_domain ainda não criada na base (supabase/add_email_domain.sql):
-      // grava o resto das definições sem ela, para nada deixar de guardar.
-      if (/email_domain/.test(error.message || "")) {
-        const { email_domain: _omit, ...rest } = payload;
-        supabase.from("company_settings").update(rest).eq("id", 1).then(({ error: e2 }) => { if (e2) console.error("Erro ao gravar definições:", e2); });
-      } else console.error("Erro ao gravar definições:", error);
+      if (error) console.error("Erro ao gravar definições:", error);
     });
-  }, [hydrated, readOk, perspective, company, cutoffDay, emailDomain, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount]);
+  }, [hydrated, readOk, perspective, company, cutoffDay, contractAlertDays, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount]);
 
   // `app_data` continua gravado por todas as sessões (gerência, supervisor
   // e funcionário escrevem horas/avisos/notas aqui) — só ganha o novo
@@ -428,7 +447,7 @@ export function useAppController() {
   return {
     perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen,
     loggedInStaffId, setLoggedInStaffId, lang, setLang,
-    company, setCompany, emailDomain, setEmailDomain, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays,
+    company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays,
     // Base do medidor de reclamações = nº de clientes ativos (automático, não editável).
     reclamacaoBaseClients: Math.max(1, activeClientsCount(clients, TODAY)), setReclamacaoBaseClients,
     reclamacaoExcelenteCount, setReclamacaoExcelenteCount,
@@ -439,7 +458,7 @@ export function useAppController() {
     personalNotes, setPersonalNotes, absences, setAbsences,
     enterManagement, enterEmployee, deleteClient, deleteStaff,
     formatAllData, verifyPassword,
-    authLoading, authError, loginWithPassword, logout,
+    authLoading, authError, loginWithPassword, logout, passwordGate, requestPasswordReset, setNewPassword,
     me, myUnreadBadge, loadError,
   };
 }

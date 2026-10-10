@@ -44,7 +44,7 @@ const SECTIONS = [
 // escrita ao mudar o dia de fecho, pré-visualização ao vivo das faixas de
 // reclamações, "Formatar dados" com palavra digitada em vez de
 // palavra-passe, e barra de guardar fixa no lugar da frase vermelha.
-function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, reclamacaoBaseClients, setReclamacaoBaseClients, reclamacaoExcelenteCount, setReclamacaoExcelenteCount, reclamacaoRazoavelCount, setReclamacaoRazoavelCount, clients, onFormatData, onVerifyPassword, emailDomain = "", setEmailDomain = () => {} }) {
+function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, reclamacaoBaseClients, setReclamacaoBaseClients, reclamacaoExcelenteCount, setReclamacaoExcelenteCount, reclamacaoRazoavelCount, setReclamacaoRazoavelCount, clients, onFormatData, onVerifyPassword }) {
   const t = T[lang].definicoes;
   const c0 = T[lang].common;
 
@@ -183,11 +183,6 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                   <div>
                     <div style={styles.defSettingLabel}>{t.email}</div>
                     <input style={styles.defTextInput} value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} />
-                  </div>
-                  <div>
-                    <div style={styles.defSettingLabel}>{t.emailDomainLabel}</div>
-                    <input style={styles.defTextInput} value={emailDomain} placeholder="empresax.be" onChange={(e) => setEmailDomain(e.target.value.replace(/^@/, "").replace(/\s/g, "").toLowerCase())} />
-                    <div style={styles.defSettingHint}>{t.emailDomainHint}</div>
                   </div>
                   <div>
                     {/* Lote 4, 4.5 (achado da Marta): hint fixo (11.5px)

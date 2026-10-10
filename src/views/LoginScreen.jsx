@@ -62,13 +62,21 @@ const inputStyle = {
 // radiais (clay no topo, forest escuro no canto oposto) em vez de um só
 // — eco dos dois tons da marca (verde + clay) em vez de só um ponto de
 // luz.
-function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLoginWithPassword, authLoading, authError, company, staff }) {
+function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLoginWithPassword, onRequestPasswordReset, authLoading, authError, company, staff }) {
   const t = T[lang].login;
   const [mode, setMode] = useState("gerencia"); // 'gerencia' | 'funcionario' — só usado no modo de demonstração
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotHelp, setShowForgotHelp] = useState(false);
+  const [resetState, setResetState] = useState(null); // null | "sending" | "sent" | "failed" | "needEmail"
+
+  async function sendReset() {
+    if (!email.trim()) { setResetState("needEmail"); return; }
+    setResetState("sending");
+    const ok = await onRequestPasswordReset(email.trim());
+    setResetState(ok ? "sent" : "failed");
+  }
 
   function submitRealLogin(e) {
     e.preventDefault();
@@ -149,6 +157,16 @@ function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLogi
             {showForgotHelp && (
               <div style={{ background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: 8, padding: "10px 12px", fontSize: 12.5, color: COLORS.ink2, lineHeight: 1.5 }}>
                 {t.forgotPasswordHelp}
+                <div style={{ marginTop: 10 }}>
+                  <Button type="button" variant="secondary" disabled={resetState === "sending"} onClick={sendReset} style={{ height: 40, width: "100%", fontSize: 13 }}>
+                    {resetState === "sending" ? t.resetSending : t.resetSend}
+                  </Button>
+                </div>
+                {resetState && resetState !== "sending" && (
+                  <div style={{ marginTop: 8, fontWeight: 600, color: resetState === "sent" ? COLORS.forest700 : COLORS.alert }}>
+                    {resetState === "sent" ? t.resetSent : resetState === "needEmail" ? t.resetEmailRequired : t.resetFailed}
+                  </div>
+                )}
               </div>
             )}
 
