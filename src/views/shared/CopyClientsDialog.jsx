@@ -11,7 +11,7 @@ import { T } from "../../models/i18n.js";
 // sensíveis só saem se a gerência marcar a opção.
 function clientShareText(client, { withNote, labels }) {
   const place = [client.address, client.city].filter(Boolean).join(", ");
-  const freq = client.frequency === "biweekly" ? labels.biweekly : client.frequency === "monthly" ? labels.monthly : "";
+  const freq = client.frequency === "biweekly" ? labels.biweekly : client.frequency === "monthly" ? labels.monthly : client.frequency === "alternate" ? labels.alternate : "";
   const when = [client.availability, client.duration ? fmtMinutes(client.duration) : "", freq].filter(Boolean).join(" · ");
   const lines = [client.name];
   if (place) lines.push(place);
@@ -26,7 +26,7 @@ function CopyClientsDialog({ lang, title, clients: clientsProp, groups, header, 
   const c0 = T[lang].common;
   const [withNote, setWithNote] = useState(false);
   const [copied, setCopied] = useState(false);
-  const labels = { biweekly: t.shareBiweekly, monthly: t.shareMonthly, note: t.shareNoteLabel };
+  const labels = { biweekly: t.shareBiweekly, monthly: t.shareMonthly, alternate: t.shareAlternate, note: t.shareNoteLabel };
   const nonEmptyGroups = (groups || []).filter((g) => g.clients.length > 0);
   const clients = groups ? nonEmptyGroups.flatMap((g) => g.clients) : clientsProp;
   const text = groups

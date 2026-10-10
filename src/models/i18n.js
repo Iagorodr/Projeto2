@@ -145,6 +145,7 @@ const T = {
       // InfoTip.
       legendSharedCompact: "Compartilhado",
       legendRecurring: "Ícone de setas = quinzenal ou mensal",
+      legendBiweekly: "Cliente quinzenal", legendMonthly: "Cliente mensal", legendAlternate: "Cliente dia sim, dia não",
       addClientPlaceholder: "Pesquisar cliente",
       noClientsAvailable: "Todos os clientes já estão nesta célula.",
       // Lote 4, 4.6 (achado da Marta): popover "quem está no cliente" —
@@ -223,7 +224,7 @@ const T = {
       showWeekend: "Mostrar fim de semana", hideWeekend: "Esconder fim de semana", allCovered: "todos os clientes têm cobertura",
       copyBtn: "Copiar agenda…", copyTitle: (n) => `Copiar a agenda de ${n}`, copyHint: "Junta todos os clientes da agenda semanal fixa a outro funcionário, sem apagar nada do que ele já tem. Fica na agenda dele até remover.",
       copyTargetPlaceholder: "Escolha quem recebe", copyConfirm: "Copiar", copyDone: (from, to) => `Agenda de ${from} copiada para ${to}.`,
-      shareCopy: "Copiar", shareCopied: "Copiado ✓", shareWithNote: "Incluir observação (código, chave…)", shareNone: "Sem clientes neste dia.", shareNoteLabel: "Obs", shareBiweekly: "quinzenal", shareMonthly: "mensal", shareBtn: "Copiar dados", shareDayBtn: "Copiar clientes do dia…", shareWeekBtn: "Copiar clientes da semana…", shareTitleWeek: (n) => `Clientes da semana de ${n}`, shareTitleOne: (n) => `Copiar dados: ${n}`, shareTitleDay: (n) => `Clientes de ${n}`, shareDayLabel: "Dia",
+      shareCopy: "Copiar", shareCopied: "Copiado ✓", shareWithNote: "Incluir observação (código, chave…)", shareNone: "Sem clientes neste dia.", shareNoteLabel: "Obs", shareBiweekly: "quinzenal", shareMonthly: "mensal", shareAlternate: "dia sim, dia não", shareBtn: "Copiar dados", shareDayBtn: "Copiar clientes do dia…", shareWeekBtn: "Copiar clientes da semana…", shareTitleWeek: (n) => `Clientes da semana de ${n}`, shareTitleOne: (n) => `Copiar dados: ${n}`, shareTitleDay: (n) => `Clientes de ${n}`, shareDayLabel: "Dia",
     },
     avisos: {
       title: "Avisos",
@@ -547,7 +548,7 @@ const T = {
       // não foram tocadas aqui pra não misturar etapas já fechadas, mas
       // fica no LEIA-ME como possível acerto futuro.
       title: "Agenda", todayPill: "Hoje", noClients: "Sem clientes neste dia", noClientsShort: "Sem clientes",
-      freqWeekly: "toda semana", freqBiweekly: "quinzenal", freqMonthly: "mensal",
+      freqWeekly: "toda semana", freqBiweekly: "quinzenal", freqMonthly: "mensal", freqAlternate: "dia sim, dia não",
       // Novo (4k): resumo de clientes numa linha quando o dia está fechado
       // ("Cliente 33 · Cliente 5 +1") e pílula "Hoje" da vista PC/tablet.
       peopleLabel: (n) => (n === 1 ? "1 pessoa" : `${n} pessoas`), each: "cada",
@@ -733,6 +734,7 @@ const T = {
       legendShared: "Orange = 2 or more people on the client (duration split)",
       legendSharedCompact: "Shared",
       legendRecurring: "Arrows icon = biweekly or monthly",
+      legendBiweekly: "Biweekly client", legendMonthly: "Monthly client", legendAlternate: "Every-other-day client",
       addClientPlaceholder: "Search client",
       noClientsAvailable: "All clients are already in this cell.",
       addPerson: "Add",
@@ -799,7 +801,7 @@ const T = {
       showWeekend: "Show weekend", hideWeekend: "Hide weekend", allCovered: "all clients are covered",
       copyBtn: "Copy schedule…", copyTitle: (n) => `Copy ${n}'s schedule`, copyHint: "Adds every client from the fixed weekly schedule to another employee, without removing anything they already have. It stays on their schedule until removed.",
       copyTargetPlaceholder: "Choose who receives it", copyConfirm: "Copy", copyDone: (from, to) => `${from}'s schedule copied to ${to}.`,
-      shareCopy: "Copy", shareCopied: "Copied ✓", shareWithNote: "Include note (access code, key…)", shareNone: "No clients on this day.", shareNoteLabel: "Note", shareBiweekly: "biweekly", shareMonthly: "monthly", shareBtn: "Copy details", shareDayBtn: "Copy day's clients…", shareWeekBtn: "Copy the week's clients…", shareTitleWeek: (n) => `${n}'s clients this week`, shareTitleOne: (n) => `Copy details: ${n}`, shareTitleDay: (n) => `${n}'s clients`, shareDayLabel: "Day",
+      shareCopy: "Copy", shareCopied: "Copied ✓", shareWithNote: "Include note (access code, key…)", shareNone: "No clients on this day.", shareNoteLabel: "Note", shareBiweekly: "biweekly", shareMonthly: "monthly", shareAlternate: "every other day", shareBtn: "Copy details", shareDayBtn: "Copy day's clients…", shareWeekBtn: "Copy the week's clients…", shareTitleWeek: (n) => `${n}'s clients this week`, shareTitleOne: (n) => `Copy details: ${n}`, shareTitleDay: (n) => `${n}'s clients`, shareDayLabel: "Day",
     },
     avisos: {
       title: "Notices",
@@ -1099,7 +1101,7 @@ const T = {
     },
     employeeAgenda: {
       title: "Schedule", todayPill: "Today", noClients: "No clients on this day", noClientsShort: "No clients",
-      freqWeekly: "every week", freqBiweekly: "biweekly", freqMonthly: "monthly",
+      freqWeekly: "every week", freqBiweekly: "biweekly", freqMonthly: "monthly", freqAlternate: "every other day",
       peopleLabel: (n) => (n === 1 ? "1 person" : `${n} people`), each: "each",
       todayPill: "Today",
       legendSampleName: "Client", legendDuration: "is your share of the visit",
@@ -1272,6 +1274,7 @@ const T = {
       legendShared: "Orange = 2 personnes ou plus chez le client (durée partagée)",
       legendSharedCompact: "Partagé",
       legendRecurring: "Icône de flèches = bimensuel ou mensuel",
+      legendBiweekly: "Client bimensuel", legendMonthly: "Client mensuel", legendAlternate: "Client un jour sur deux",
       addClientPlaceholder: "Rechercher un client",
       noClientsAvailable: "Tous les clients sont déjà dans cette cellule.",
       addPerson: "Ajouter",
@@ -1338,7 +1341,7 @@ const T = {
       showWeekend: "Afficher le week-end", hideWeekend: "Masquer le week-end", allCovered: "tous les clients sont couverts",
       copyBtn: "Copier le planning…", copyTitle: (n) => `Copier le planning de ${n}`, copyHint: "Ajoute tous les clients du planning hebdomadaire fixe à un autre employé, sans rien supprimer de ce qu'il a déjà. Il reste dans son planning jusqu'à suppression.",
       copyTargetPlaceholder: "Choisir le destinataire", copyConfirm: "Copier", copyDone: (from, to) => `Planning de ${from} copié vers ${to}.`,
-      shareCopy: "Copier", shareCopied: "Copié ✓", shareWithNote: "Inclure la remarque (code d'accès, clé…)", shareNone: "Aucun client ce jour-là.", shareNoteLabel: "Remarque", shareBiweekly: "bimensuel", shareMonthly: "mensuel", shareBtn: "Copier les infos", shareDayBtn: "Copier les clients du jour…", shareWeekBtn: "Copier les clients de la semaine…", shareTitleWeek: (n) => `Clients de la semaine de ${n}`, shareTitleOne: (n) => `Copier les infos : ${n}`, shareTitleDay: (n) => `Clients de ${n}`, shareDayLabel: "Jour",
+      shareCopy: "Copier", shareCopied: "Copié ✓", shareWithNote: "Inclure la remarque (code d'accès, clé…)", shareNone: "Aucun client ce jour-là.", shareNoteLabel: "Remarque", shareBiweekly: "bimensuel", shareMonthly: "mensuel", shareAlternate: "un jour sur deux", shareBtn: "Copier les infos", shareDayBtn: "Copier les clients du jour…", shareWeekBtn: "Copier les clients de la semaine…", shareTitleWeek: (n) => `Clients de la semaine de ${n}`, shareTitleOne: (n) => `Copier les infos : ${n}`, shareTitleDay: (n) => `Clients de ${n}`, shareDayLabel: "Jour",
     },
     avisos: {
       title: "Avis",
@@ -1638,7 +1641,7 @@ const T = {
     },
     employeeAgenda: {
       title: "Planning", todayPill: "Aujourd'hui", noClients: "Aucun client ce jour-là", noClientsShort: "Aucun client",
-      freqWeekly: "toutes les semaines", freqBiweekly: "bimensuel", freqMonthly: "mensuel",
+      freqWeekly: "toutes les semaines", freqBiweekly: "bimensuel", freqMonthly: "mensuel", freqAlternate: "un jour sur deux",
       peopleLabel: (n) => (n === 1 ? "1 personne" : `${n} personnes`), each: "chacun",
       todayPill: "Aujourd'hui",
       legendSampleName: "Client", legendDuration: "est votre part de la visite",

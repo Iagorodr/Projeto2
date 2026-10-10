@@ -65,8 +65,8 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     const teamSize = teamSizeFor(day, client.id) || 1;
     const shared = teamSize > 1;
     const perPersonMin = Math.round(client.duration / teamSize);
-    const recurring = client.frequency === "biweekly" || client.frequency === "monthly";
-    const freqLabel = client.frequency === "biweekly" ? t.freqBiweekly : t.freqMonthly;
+    const recurring = client.frequency === "biweekly" || client.frequency === "monthly" || client.frequency === "alternate";
+    const freqLabel = client.frequency === "biweekly" ? t.freqBiweekly : client.frequency === "monthly" ? t.freqMonthly : t.freqAlternate;
     return { teamSize, shared, perPersonMin, recurring, freqLabel };
   }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useId } from "react";
 import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CalendarDays, AlertTriangle } from "lucide-react";
 import { styles } from "../../styles/styles.js";
+import { FREQ_STYLE, isRecurringFreq } from "../../styles/freqColors.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { useControlSize } from "../../hooks/useBreakpoint.js";
@@ -588,8 +589,9 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                 const teamSize = team.length;
                 const shared = teamSize > 1;
                 const perPerson = Math.round(client.duration / teamSize);
-                const recurring = client.frequency === "biweekly" || client.frequency === "monthly";
-                const freqLabel = client.frequency === "biweekly" ? tc.freqBiweekly : tc.freqMonthly;
+                const recurring = isRecurringFreq(client.frequency);
+                const freqStyle = recurring ? FREQ_STYLE[client.frequency] : null;
+                const freqLabel = client.frequency === "biweekly" ? tc.freqBiweekly : client.frequency === "monthly" ? tc.freqMonthly : tc.freqAlternate;
                 const tooltip = `${client.name} · ${fmtMinutes(client.duration)}`
                   + (recurring ? ` · ${freqLabel}` : "")
                   + (shared ? ` · ${t.peopleLabel(teamSize)}, ${fmtMinutes(perPerson)} ${t.each}` : "");
@@ -613,7 +615,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                         style={{
                           display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 30, width: "100%", borderRadius: RADIUS.chip,
                           padding: "4px 8px", background: COLORS.clayTint, fontSize: 12.5, border: "none", cursor: "pointer",
-                          fontFamily: "inherit", textAlign: "left",
+                          fontFamily: "inherit", textAlign: "left", boxShadow: freqStyle ? `inset 3px 0 0 ${freqStyle.ink}` : "none",
                           outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
                         }}
                       >
@@ -627,7 +629,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                         <span style={{ flexShrink: 0, fontWeight: 600, color: COLORS.clayInk }}>
                           {fmtMinutes(perPerson)}
                         </span>
-                        {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: COLORS.clayInk }} />}
+                        {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: freqStyle.ink }} />}
                       </button>
                       {isTeamOpen && (
                         <ClientTeamPopover
@@ -646,7 +648,8 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                     key={cid} title={tooltip}
                     style={{
                       display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 30, borderRadius: RADIUS.chip, padding: "4px 8px",
-                      background: COLORS.lineSoft, fontSize: 12.5, outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
+                      background: freqStyle ? freqStyle.bg : COLORS.lineSoft, fontSize: 12.5, outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
+                      boxShadow: freqStyle ? `inset 3px 0 0 ${freqStyle.ink}` : "none",
                     }}
                   >
                     <span style={{ flex: "1 1 64px", minWidth: 0, whiteSpace: "normal", overflowWrap: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.ink }}>
@@ -658,7 +661,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                         <span style={{ flexShrink: 0, fontWeight: 600, color: COLORS.ink2 }}>
                       {fmtMinutes(perPerson)}
                     </span>
-                    {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: COLORS.ink3 }} />}
+                    {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: freqStyle.ink }} />}
                     {isHovered && (
                       <button
                         type="button" onClick={() => removeClient(s.id, day, cid)} aria-label={t.remove}
@@ -940,32 +943,18 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
         />
       )}
 
-      {/* Legenda (documento, 4.3): duração, cliente partilhado, recorrência. */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "center", marginBottom: 16, fontSize: 12.5, color: COLORS.ink2 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 22, borderRadius: 8, padding: "0 8px", background: COLORS.lineSoft, fontSize: 11.5, fontWeight: 600, color: COLORS.ink }}>
-            {t.legendSampleName} <b>1h</b>
-          </span>
-          <span>{t.legendDuration}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 22, borderRadius: 8, padding: "0 8px", background: COLORS.clayTint, fontSize: 11.5, fontWeight: 600, color: COLORS.clayInk }}>
-            <UsersRound size={11} /> {t.legendSampleName} <b>1h</b>
-          </span>
-          {/* Lote 4, 4.5 (achado da Marta): legenda compacta (bolinha
-              laranja + "Compartilhado"); o texto inteiro vai pro InfoTip. */}
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.clay, flexShrink: 0 }} />
-            {t.legendSharedCompact}
-          </span>
+      {/* Legenda: caixas coloridas, sem exemplos repetidos. Laranja =
+          compartilhado (o "i" explica); violeta/azul/âmbar = frequência. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 16, fontSize: 12 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 26, borderRadius: 8, padding: "0 6px 0 9px", background: COLORS.clayTint, fontWeight: 600, color: COLORS.clayInk }}>
+          <UsersRound size={12} /> {t.legendSharedCompact}
           <InfoTip text={t.legendShared} label={c0.moreInfoLabel} />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 22, borderRadius: 8, padding: "0 8px", background: COLORS.lineSoft, fontSize: 11.5, fontWeight: 600, color: COLORS.ink }}>
-            {t.legendSampleName} <b>1h</b> <RefreshCw size={10} />
+        </span>
+        {["biweekly", "monthly", "alternate"].map((f) => (
+          <span key={f} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 26, borderRadius: 8, padding: "0 10px", background: FREQ_STYLE[f].bg, boxShadow: `inset 3px 0 0 ${FREQ_STYLE[f].ink}`, fontWeight: 600, color: FREQ_STYLE[f].ink }}>
+            <RefreshCw size={11} /> {t[f === "biweekly" ? "legendBiweekly" : f === "monthly" ? "legendMonthly" : "legendAlternate"]}
           </span>
-          <span>{t.legendRecurring}</span>
-        </div>
+        ))}
       </div>
 
       {view === "staff" ? (
