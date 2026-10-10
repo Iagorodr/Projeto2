@@ -234,7 +234,11 @@ export function useAppController() {
     setAuthError(null);
     setAuthLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      // Colar a palavra-passe no telemóvel costuma trazer um espaço no fim: tenta de novo sem espaços nas pontas.
+      if (error && password !== password.trim()) {
+        ({ data, error } = await supabase.auth.signInWithPassword({ email, password: password.trim() }));
+      }
       if (error) {
         setAuthError(error.message === "Invalid login credentials" ? "invalid_credentials" : "generic");
         return;
