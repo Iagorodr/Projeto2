@@ -302,16 +302,19 @@ function getOpenPeriod(closedPeriods, cutoffDay, today) {
   // nova (dia do corte, não dia-1) — o período fica um dia mais longo essa
   // única vez (ex.: 20 Ago a 20 Set), e dali em diante os dois lados já
   // nascem na convenção nova (21 a 20).
-  let end = new Date(start.getFullYear(), start.getMonth() + 1, cutoffDay);
-  // Histórico muito atrasado (ex.: períodos antigos nunca fechados no sistema):
-  // se o fim já passou há mais de 10 dias, avança pro período em que HOJE cai,
-  // senão horas lançadas agora ficam fora do "período aberto".
-  let st = start;
-  while (addDays(end, 10) < today) {
-    st = addDays(end, 1);
-    end = new Date(st.getFullYear(), st.getMonth() + 1, cutoffDay);
-  }
-  return { start: st, end };
+  const end = new Date(start.getFullYear(), start.getMonth() + 1, cutoffDay);
+  return { start, end };
+}
+
+// Prazo obrigatório de fecho do mês: o período aberto já terminou (`ended`) e a
+// gerência/funcionário têm `days` dias para finalizar/fechar; passado isso
+// (`overdue`) os lançamentos e o Dashboard ficam bloqueados até fechar.
+function closeDeadlineInfo(period, today, days) {
+  const deadline = addDays(period.end, Math.max(1, days || 7));
+  const ended = today > period.end;
+  const overdue = today > deadline;
+  const daysLeft = Math.max(0, Math.round((deadline - today) / 86400000));
+  return { ended, overdue, deadline, daysLeft };
 }
 
 // Início de atividade do funcionário: campo explícito ou, para contas criadas
@@ -796,4 +799,4 @@ function pctChange(current, previous) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, staffStartedOn, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

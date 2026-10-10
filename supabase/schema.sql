@@ -53,6 +53,7 @@ create table if not exists company_settings (
   photo_url text,
   cutoff_day integer default 20,
   contract_alert_days integer default 30,
+  close_deadline_days integer default 7,
   highlights_months integer default 3,
   highlights_realtime boolean default false,
   reclamacao_base_clients integer default 10,

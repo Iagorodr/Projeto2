@@ -6,6 +6,7 @@ import { TODAY } from "./data.js";
 const T = {
   pt: {
     common: {
+      cdEmpTitle: (d) => `Período terminado: finalize até ${d}`, cdEmpOverdueTitle: "Prazo terminou: período por fechar", cdEmpBody: (n) => `Faltam ${n} dia(s). Finalize o seu mês nas Horas.`, cdEmpOverdueBody: "O prazo acabou. Sem novos lançamentos até a gerência fechar o período; finalize o seu mês agora.", cdMgmtBody: (n) => `Faltam ${n} dia(s) para fechar o período. Feche em Horas.`, cdMgmtOverdueTitle: "Fecho em atraso", cdMgmtLockBody: (p) => `O período ${p} terminou e passou do prazo. Feche-o para voltar a usar o Dashboard.`, cdGoHours: "Ir para Horas", cdMgmtOverdueBanner: "Prazo de fecho terminou. Feche o período em Horas.",
       cancel: "Cancelar", save: "Guardar", saveChanges: "Guardar alterações", discard: "Descartar",
       edit: "Editar", close: "Fechar", search: "Pesquisar", newLabel: "Novo",
       yes: "Sim", no: "Não", active: "Ativo", inactive: "Inativo",
@@ -388,7 +389,7 @@ const T = {
       alerts: "Alertas", contractAlertLabel: "Avisar quando um contrato estiver a vencer em (dias)",
       gaugeBaseLabel: "Base de cálculo (clientes ativos)",
       gaugeBaseHint: "Automática: é o número de clientes ativos. Os limites abaixo são o máximo de reclamações por período para cada nível.",
-      highlightsSettingsTitle: "Destaques da equipa", highlightsSettingsIntro: "Define como é calculado o Top 5 do Dashboard.", highlightsRealtimeLabel: "Acompanhar em tempo real", highlightsRealtimeHint: "Conta só o período aberto, atualizado a cada lançamento. Desligado: conta períodos já fechados.", highlightsMonthsLabel: "Meses fechados a contabilizar", complaintMeterTitle: "Medidor de reclamações", complaintMeterIntro: "Estas definições só afetam o medidor de reclamações do Dashboard e do Histórico.",
+      closeDeadlineTitle: "Fecho do mês", closeDeadlineLabel: "Prazo para finalizar o mês (dias)", closeDeadlineHint: "Depois do fim do período, funcionários e gerência têm este prazo. Passado o prazo, os lançamentos e o Dashboard ficam bloqueados até o período ser fechado.", highlightsSettingsTitle: "Destaques da equipa", highlightsSettingsIntro: "Define como é calculado o Top 5 do Dashboard.", highlightsRealtimeLabel: "Acompanhar em tempo real", highlightsRealtimeHint: "Conta só o período aberto, atualizado a cada lançamento. Desligado: conta períodos já fechados.", highlightsMonthsLabel: "Meses fechados a contabilizar", complaintMeterTitle: "Medidor de reclamações", complaintMeterIntro: "Estas definições só afetam o medidor de reclamações do Dashboard e do Histórico.",
       gaugeExcelenteCountLabel: "Reclamações no limite \"Excelente\"",
       gaugeRazoavelCountLabel: "Reclamações no limite \"Razoável\"",
       gaugePreviewLabel: "Pré-visualização",
@@ -616,6 +617,7 @@ const T = {
 
   en: {
     common: {
+      cdEmpTitle: (d) => `Period ended: finalize by ${d}`, cdEmpOverdueTitle: "Deadline passed: period not closed", cdEmpBody: (n) => `${n} day(s) left. Finalize your month in Hours.`, cdEmpOverdueBody: "The deadline has passed. No new entries until management closes the period; finalize your month now.", cdMgmtBody: (n) => `${n} day(s) left to close the period. Close it in Hours.`, cdMgmtOverdueTitle: "Close overdue", cdMgmtLockBody: (p) => `Period ${p} has ended and is past the deadline. Close it to use the Dashboard again.`, cdGoHours: "Go to Hours", cdMgmtOverdueBanner: "Close deadline passed. Close the period in Hours.",
       cancel: "Cancel", save: "Save", saveChanges: "Save changes", discard: "Discard",
       edit: "Edit", close: "Close", search: "Search", newLabel: "New",
       yes: "Yes", no: "No", active: "Active", inactive: "Inactive",
@@ -971,7 +973,7 @@ const T = {
       alerts: "Alerts", contractAlertLabel: "Warn when a contract is about to expire in (days)",
       gaugeBaseLabel: "Calculation base (active clients)",
       gaugeBaseHint: "Automatic: it is the number of active clients. The limits below are the maximum complaints per period for each level.",
-      highlightsSettingsTitle: "Team highlights", highlightsSettingsIntro: "Sets how the Dashboard Top 5 is calculated.", highlightsRealtimeLabel: "Follow in real time", highlightsRealtimeHint: "Counts only the open period, updated with every entry. Off: counts already closed periods.", highlightsMonthsLabel: "Closed months to count", complaintMeterTitle: "Complaints meter", complaintMeterIntro: "These settings only affect the complaints meter on the Dashboard and History.",
+      closeDeadlineTitle: "Month close", closeDeadlineLabel: "Deadline to finalize the month (days)", closeDeadlineHint: "After the period ends, employees and management have this long. After the deadline, entries and the Dashboard are blocked until the period is closed.", highlightsSettingsTitle: "Team highlights", highlightsSettingsIntro: "Sets how the Dashboard Top 5 is calculated.", highlightsRealtimeLabel: "Follow in real time", highlightsRealtimeHint: "Counts only the open period, updated with every entry. Off: counts already closed periods.", highlightsMonthsLabel: "Closed months to count", complaintMeterTitle: "Complaints meter", complaintMeterIntro: "These settings only affect the complaints meter on the Dashboard and History.",
       gaugeExcelenteCountLabel: "Complaints at the \"Excellent\" limit",
       gaugeRazoavelCountLabel: "Complaints at the \"Reasonable\" limit",
       gaugePreviewLabel: "Preview",
@@ -1167,6 +1169,7 @@ const T = {
 
   fr: {
     common: {
+      cdEmpTitle: (d) => `Période terminée : finalisez avant le ${d}`, cdEmpOverdueTitle: "Délai dépassé : période non clôturée", cdEmpBody: (n) => `Il reste ${n} jour(s). Finalisez votre mois dans Heures.`, cdEmpOverdueBody: "Le délai est dépassé. Plus de nouvelles saisies tant que la direction n'a pas clôturé la période ; finalisez votre mois maintenant.", cdMgmtBody: (n) => `Il reste ${n} jour(s) pour clôturer la période. Clôturez-la dans Heures.`, cdMgmtOverdueTitle: "Clôture en retard", cdMgmtLockBody: (p) => `La période ${p} est terminée et le délai est dépassé. Clôturez-la pour réutiliser le tableau de bord.`, cdGoHours: "Aller à Heures", cdMgmtOverdueBanner: "Délai de clôture dépassé. Clôturez la période dans Heures.",
       cancel: "Annuler", save: "Enregistrer", saveChanges: "Enregistrer les modifications", discard: "Ignorer",
       edit: "Modifier", close: "Fermer", search: "Rechercher", newLabel: "Nouveau",
       yes: "Oui", no: "Non", active: "Actif", inactive: "Inactif",
@@ -1522,7 +1525,7 @@ const T = {
       alerts: "Alertes", contractAlertLabel: "Avertir quand un contrat expire dans (jours)",
       gaugeBaseLabel: "Base de calcul (clients actifs)",
       gaugeBaseHint: "Automatique : c'est le nombre de clients actifs. Les limites ci-dessous sont le maximum de réclamations par période pour chaque niveau.",
-      highlightsSettingsTitle: "Points forts de l'équipe", highlightsSettingsIntro: "Définit comment le Top 5 du tableau de bord est calculé.", highlightsRealtimeLabel: "Suivre en temps réel", highlightsRealtimeHint: "Ne compte que la période ouverte, mise à jour à chaque saisie. Désactivé : compte les périodes déjà clôturées.", highlightsMonthsLabel: "Mois clôturés à comptabiliser", complaintMeterTitle: "Indicateur de réclamations", complaintMeterIntro: "Ces réglages n'affectent que l'indicateur de réclamations du tableau de bord et de l'historique.",
+      closeDeadlineTitle: "Clôture du mois", closeDeadlineLabel: "Délai pour finaliser le mois (jours)", closeDeadlineHint: "Après la fin de la période, employés et direction disposent de ce délai. Passé ce délai, les saisies et le tableau de bord sont bloqués jusqu'à la clôture.", highlightsSettingsTitle: "Points forts de l'équipe", highlightsSettingsIntro: "Définit comment le Top 5 du tableau de bord est calculé.", highlightsRealtimeLabel: "Suivre en temps réel", highlightsRealtimeHint: "Ne compte que la période ouverte, mise à jour à chaque saisie. Désactivé : compte les périodes déjà clôturées.", highlightsMonthsLabel: "Mois clôturés à comptabiliser", complaintMeterTitle: "Indicateur de réclamations", complaintMeterIntro: "Ces réglages n'affectent que l'indicateur de réclamations du tableau de bord et de l'historique.",
       gaugeExcelenteCountLabel: "Réclamations à la limite \"Excellent\"",
       gaugeRazoavelCountLabel: "Réclamations à la limite \"Raisonnable\"",
       gaugePreviewLabel: "Aperçu",

@@ -8,6 +8,8 @@ import { AppSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useBreakpoint } from "./hooks/useBreakpoint.js";
 import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
+import { CloseDeadlineBanner, CloseLockPanel } from "./views/shared/CloseDeadlineBanner.jsx";
+import { formatPeriodLabel, closeDeadlineInfo } from "./models/utils.js";
 import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, isSolicitationStale } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
@@ -117,6 +119,8 @@ export default function App() {
         // tela de Avisos mostra por padrão (sem isto, o selo continuaria
         // contando pedidos antigos escondidos por padrão na tela).
         const avisosOpenPeriod = getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY);
+        const openPeriodNow = avisosOpenPeriod;
+        const closeInfo = closeDeadlineInfo(openPeriodNow, TODAY, c.closeDeadlineDays);
         const pendingRequests = c.missingItems.filter((m) => !m.resolved && !isSolicitationStale(m, avisosOpenPeriod)).length;
         const managementItems = MENU_ITEMS.map((item) => ({
           key: item.key, icon: item.icon, label: tSidebar[item.key],
@@ -155,7 +159,13 @@ export default function App() {
             user={managementUser} onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
           />
           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-            {c.screen === "dashboard" && (
+            {c.screen === "dashboard" && closeInfo.overdue && (
+              <CloseLockPanel lang={c.lang} periodLabel={formatPeriodLabel(openPeriodNow, c.lang)} onGoHours={() => c.setScreen("horas")} />
+            )}
+            {(c.screen === "dashboard" && !closeInfo.overdue || c.screen === "horas") && closeInfo.ended && (
+              <div style={{ padding: "16px 24px 0" }}><CloseDeadlineBanner lang={c.lang} info={closeInfo} role="management" onGoHours={c.screen === "horas" ? undefined : () => c.setScreen("horas")} /></div>
+            )}
+            {c.screen === "dashboard" && !closeInfo.overdue && (
               <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} highlightsMonths={c.highlightsMonths} highlightsRealtime={c.highlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} onNavigate={c.goTo} />
             )}
             {c.screen === "clientes" && <ClientesScreen lang={c.lang} setLang={c.setLang} clients={c.clients} setClients={c.setClients} onDeleteClient={c.deleteClient} staff={c.staff} assignments={c.assignments} horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} contractAlertDays={c.contractAlertDays} onNavigate={c.setScreen} sentItems={c.sentItems} navIntent={c.navIntent} />}
@@ -174,7 +184,7 @@ export default function App() {
             {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} />}
             {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} />}
             {c.screen === "definicoes" && (
-              <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} highlightsMonths={c.highlightsMonths} setHighlightsMonths={c.setHighlightsMonths} highlightsRealtime={c.highlightsRealtime} setHighlightsRealtime={c.setHighlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
+              <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} closeDeadlineDays={c.closeDeadlineDays} setCloseDeadlineDays={c.setCloseDeadlineDays} highlightsMonths={c.highlightsMonths} setHighlightsMonths={c.setHighlightsMonths} highlightsRealtime={c.highlightsRealtime} setHighlightsRealtime={c.setHighlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
             )}
           </div>
         </div>
@@ -207,8 +217,12 @@ export default function App() {
           ...(isGerSup ? [{ key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsManagement }] : []),
         ];
 
+        const empCloseInfo = closeDeadlineInfo(getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY), TODAY, c.closeDeadlineDays);
         const body = (
           <>
+            {(c.empScreen === "menu" || c.empScreen === "horas") && empCloseInfo.ended && (
+              <div style={{ padding: "12px 16px 0" }}><CloseDeadlineBanner lang={c.lang} info={empCloseInfo} role="employee" finalized={(c.horasData[c.me.id] || {}).status === "finalizado"} /></div>
+            )}
             {c.empScreen === "menu" && (
               <EmployeeInicioScreen
                 lang={c.lang} setLang={c.setLang} me={c.me} onNavigate={c.setEmpScreen}

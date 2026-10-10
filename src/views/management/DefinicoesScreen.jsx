@@ -44,7 +44,7 @@ const SECTIONS = [
 // escrita ao mudar o dia de fecho, pré-visualização ao vivo das faixas de
 // reclamações, "Formatar dados" com palavra digitada em vez de
 // palavra-passe, e barra de guardar fixa no lugar da frase vermelha.
-function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, highlightsMonths, setHighlightsMonths, highlightsRealtime, setHighlightsRealtime, reclamacaoBaseClients, setReclamacaoBaseClients, reclamacaoExcelenteCount, setReclamacaoExcelenteCount, reclamacaoRazoavelCount, setReclamacaoRazoavelCount, clients, onFormatData, onVerifyPassword }) {
+function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, closeDeadlineDays, setCloseDeadlineDays, highlightsMonths, setHighlightsMonths, highlightsRealtime, setHighlightsRealtime, reclamacaoBaseClients, setReclamacaoBaseClients, reclamacaoExcelenteCount, setReclamacaoExcelenteCount, reclamacaoRazoavelCount, setReclamacaoRazoavelCount, clients, onFormatData, onVerifyPassword }) {
   const t = T[lang].definicoes;
   const c0 = T[lang].common;
 
@@ -227,6 +227,16 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                   <div style={styles.defSettingLabel}>{t.contractAlertLabel}</div>
                 </div>
                 <input type="number" min={1} style={styles.defNumberInput} value={contractAlertDays} onChange={(e) => setContractAlertDays(Number(e.target.value))} />
+              </div>
+            </Card>
+            <Card style={{ marginTop: 16 }}>
+              <div style={styles.sectionTitle}>{t.closeDeadlineTitle}</div>
+              <div style={styles.defSettingRow}>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.defSettingLabel}>{t.closeDeadlineLabel}</div>
+                  <div style={styles.defSettingHint}>{t.closeDeadlineHint}</div>
+                </div>
+                <input type="number" min={1} max={31} style={styles.defNumberInput} value={closeDeadlineDays} onChange={(e) => setCloseDeadlineDays(Math.min(31, Math.max(1, Math.round(Number(e.target.value)) || 1)))} />
               </div>
             </Card>
             <Card style={{ marginTop: 16 }}>
