@@ -207,7 +207,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   // "última coluna: total em falta + botão 'Ver extrato'").
   const tableColumns = [
     {
-      key: "staff", label: th.colStaff, width: 2,
+      key: "staff", label: th.colStaff, width: 2, minWidth: 170,
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
           <Avatar name={row.staffMember.name} size={32} />
@@ -216,7 +216,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       ),
     },
     ...blocks.map((chunk, bi) => ({
-      key: `block-${bi}`, label: calPeriodLabel(chunk, lang), width: 1,
+      key: `block-${bi}`, label: calPeriodLabel(chunk, lang), width: 1, minWidth: 112,
       render: (row) => {
         const w = row.weeksInfo[bi];
         if (w.locked) return <span style={{ display: "inline-flex", alignItems: "center", color: COLORS.ink3 }}><Lock size={13} /></span>;

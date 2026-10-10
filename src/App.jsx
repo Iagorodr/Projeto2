@@ -137,7 +137,7 @@ export default function App() {
         // enorme de fundo vazio dos dois lados do `shell` em ecrãs
         // largos. Só esta tela ganha um `shell` mais largo (1680); as
         // outras continuam exatamente como estavam.
-        const shellStyle = c.screen === "agendas" ? { ...styles.shell, maxWidth: 1680 } : styles.shell;
+        const shellStyle = (c.screen === "agendas" || c.screen === "monitoramento") ? { ...styles.shell, maxWidth: 1680 } : styles.shell;
         return (
         <div style={shellStyle}>
           <AppSidebar
