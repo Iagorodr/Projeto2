@@ -11,6 +11,7 @@ import {
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
+import { DateField, DurationField } from "../shared/FormInputs.jsx";
 import {
   PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, Drawer, Button, ConfirmDialog, ProgressBar, Card,
 } from "../shared/ui/index.js";
@@ -74,6 +75,52 @@ function TeamAvatars({ ids, staff, moreLabel }) {
   );
 }
 
+// Histórico anual de reclamações e elogios do cliente, agrupado por ano a
+// partir dos avisos enviados (`sentItems`, guardados sem limite). Itens
+// antigos de demonstração têm data "dd/mm" sem ano: contam no ano de hoje.
+function itemYear(i) {
+  const m = /^(\d{4})-\d{2}-\d{2}/.exec(i.date || "");
+  return m ? Number(m[1]) : TODAY.getFullYear();
+}
+function itemDateLabel(i) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(i.date || "");
+  return m ? `${m[3]}/${m[2]}` : (i.date || "");
+}
+function FeedbackHistory({ t, items }) {
+  const years = Array.from(new Set([TODAY.getFullYear(), ...items.map(itemYear)])).sort((a, b) => b - a);
+  const [year, setYear] = useState(TODAY.getFullYear());
+  const inYear = items.filter((i) => itemYear(i) === year);
+  const complaints = inYear.filter((i) => i.type === "reclamacao");
+  const praises = inYear.filter((i) => i.type === "elogio");
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: COLORS.ink3, marginRight: 4 }}>{t.historyYear}</span>
+        {years.map((y) => (
+          <FilterChip key={y} active={y === year} onClick={() => setYear(y)}>{y}</FilterChip>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+        <Pill variant={complaints.length ? "missing" : "neutral"}>{t.historyComplaints(complaints.length)}</Pill>
+        <Pill variant={praises.length ? "paid" : "neutral"}>{t.historyPraises(praises.length)}</Pill>
+      </div>
+      {inYear.length === 0 ? (
+        <div style={{ fontSize: 13, color: COLORS.ink3 }}>{t.historyNone}</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {inYear.map((i) => (
+            <div key={i.id} style={{ fontSize: 13, color: COLORS.ink, display: "flex", gap: 8 }}>
+              <span style={{ color: COLORS.ink3, flexShrink: 0 }}>{itemDateLabel(i)}</span>
+              <span>{i.type === "reclamacao" ? "⚠ " : "★ "}{i.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 8 }}>{t.historyNote}</div>
+    </div>
+  );
+}
+
 // Clientes (documento de design, secção 4.2) — gerência. `staff`,
 // `assignments`, `horasData`, `cutoffDay`, `closedPeriods` e
 // `contractAlertDays` são novos nesta leva (Etapa 4f): o ecrã antigo não
@@ -84,13 +131,13 @@ function TeamAvatars({ ids, staff, moreLabel }) {
 function ClientesScreen({
   lang, setLang, clients, setClients, onDeleteClient,
   staff = [], assignments = {}, horasData = {}, cutoffDay = 25, closedPeriods = [], contractAlertDays = 30,
-  onNavigate,
+  onNavigate, sentItems = [],
 }) {
   const t = T[lang].clientes;
   const c0 = T[lang].common;
   const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
   const CLIENT_TYPES = { store: t.typeStore, office: t.typeOffice, house: t.typeHouse, factory: t.typeFactory };
-  const FREQS = { weekly: t.freqWeekly, biweekly: t.freqBiweekly, monthly: t.freqMonthly };
+  const FREQS = { weekly: t.freqWeekly, biweekly: t.freqBiweekly, monthly: t.freqMonthly, alternate: t.freqAlternate };
   const isMobile = useIsMobile();
 
   const [search, setSearch] = useState("");
@@ -145,11 +192,12 @@ function ClientesScreen({
 
   function validateDraft() {
     const errs = {};
+    // Obrigatórios: nome, cidade, endereço, valor e duração da visita.
     if (!draft.name.trim()) errs.name = true;
+    if (!(draft.city || "").trim()) errs.city = true;
     if (!draft.address.trim()) errs.address = true;
-    if (!draft.contact.trim()) errs.contact = true;
     if (!String(draft.valueHour).trim()) errs.valueHour = true;
-    if (!draft.contractStart.trim()) errs.contractStart = true;
+    if (!(Number(draft.duration) > 0)) errs.duration = true;
     return errs;
   }
   function saveDraft() {
@@ -478,6 +526,9 @@ function ClientesScreen({
               <ViewField label={t.fNote}>{openClient.note || "—"}</ViewField>
             </div>
 
+            <SectionTitle>{t.historyTitle}</SectionTitle>
+            <FeedbackHistory t={t} items={sentItems.filter((i) => i.clientId === openClient.id && (i.type === "reclamacao" || i.type === "elogio"))} />
+
             {/* Upload de documentos — funcionalidade já existente no ecrã
                 antigo, fora do que o documento de design 4.2/5.4 descreve.
                 Mantida por não haver pedido pra removê-la (ver LEIA-ME). */}
@@ -527,15 +578,15 @@ function ClientesScreen({
                 {Object.keys(CLIENT_TYPES).map((k) => <option key={k} value={k}>{CLIENT_TYPES[k]}</option>)}
               </select>
             </Field>
-            <Field label={t.formCity}><input style={styles.input} value={draft.city} onChange={(e) => updateDraft("city", e.target.value)} /></Field>
+            <Field label={t.formCity} required error={formErrors.city ? c0.requiredField : undefined}><input style={styles.input} value={draft.city} onChange={(e) => updateDraft("city", e.target.value)} /></Field>
             <Field label={t.formAddress} full required error={formErrors.address ? c0.requiredField : undefined}>
               <input style={styles.input} value={draft.address} onChange={(e) => updateDraft("address", e.target.value)} />
             </Field>
-            <Field label={t.formContact} required error={formErrors.contact ? c0.requiredField : undefined}>
+            <Field label={t.formContact}>
               <input style={styles.input} value={draft.contact} onChange={(e) => updateDraft("contact", e.target.value)} />
             </Field>
             <Field label={t.formFrequency}>
-              <select style={styles.input} value={draft.frequency} onChange={(e) => updateDraft("frequency", e.target.value)}>
+              <select style={styles.input} value={draft.frequency} onChange={(e) => { const v = e.target.value; setDraft((d) => ({ ...d, frequency: v, frequencyAnchor: v === "alternate" && !d.frequencyAnchor ? isoDateStr(TODAY) : d.frequencyAnchor })); }}>
                 {Object.keys(FREQS).map((k) => <option key={k} value={k}>{FREQS[k]}</option>)}
               </select>
             </Field>
@@ -563,11 +614,17 @@ function ClientesScreen({
                 <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.visitWeekHint}</div>
               </Field>
             )}
-            <Field label={t.formContractStart} required error={formErrors.contractStart ? c0.requiredField : undefined}>
-              <input style={styles.input} placeholder="dd/mm/aaaa" value={draft.contractStart} onChange={(e) => updateDraft("contractStart", e.target.value)} />
+            {draft.frequency === "alternate" && (
+              <Field label={t.formAlternateStart}>
+                <input type="date" style={styles.input} value={draft.frequencyAnchor || ""} onChange={(e) => updateDraft("frequencyAnchor", e.target.value)} />
+                <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.alternateHint}</div>
+              </Field>
+            )}
+            <Field label={t.formContractStart}>
+              <DateField value={draft.contractStart} onChange={(v) => updateDraft("contractStart", v)} openLabel={t.calendarOpen} />
             </Field>
             <Field label={t.formContractEnd}>
-              <input style={styles.input} placeholder="dd/mm/aaaa" value={draft.contractEnd} onChange={(e) => updateDraft("contractEnd", e.target.value)} />
+              <DateField value={draft.contractEnd} onChange={(v) => updateDraft("contractEnd", v)} openLabel={t.calendarOpen} />
             </Field>
             <Field label={t.fClientType}>
               <select style={styles.input} value={draft.clientType} onChange={(e) => updateDraft("clientType", e.target.value)}>
@@ -597,7 +654,10 @@ function ClientesScreen({
               <input type="number" style={styles.input} value={draft.valueHour} onChange={(e) => updateDraft("valueHour", e.target.value)} />
             </Field>
             <Field label={t.formAvailability}><input style={styles.input} value={draft.availability} onChange={(e) => updateDraft("availability", e.target.value)} /></Field>
-            <Field label={t.formDuration}><input type="number" style={styles.input} value={draft.duration} onChange={(e) => updateDraft("duration", e.target.value)} /></Field>
+            <Field label={t.formDuration} required error={formErrors.duration ? c0.requiredField : undefined}>
+              <DurationField value={draft.duration} onChange={(v) => updateDraft("duration", v)} />
+              <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.durationHint}</div>
+            </Field>
             <Field label={t.formDays} full>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {AGENDA_DAYS.map((d) => {

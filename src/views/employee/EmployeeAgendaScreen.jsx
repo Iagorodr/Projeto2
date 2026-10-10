@@ -6,7 +6,7 @@ import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
-  staffById, pad2, fmtMinutes, startOfISOWeek, addDays, isoDateStr, clientAppliesThisWeek,
+  staffById, pad2, fmtMinutes, startOfISOWeek, addDays, isoDateStr, clientAppliesOnDate,
   weekLabelPT, isStaffActive, monthAbbr,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -79,7 +79,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     const clientIds = assignments[`${staffId}-${day}`] || [];
     return clientIds
       .map((id) => clients.find((c) => c.id === id))
-      .filter((c) => c && clientAppliesThisWeek(c, weekStart));
+      .filter((c) => c && clientAppliesOnDate(c, date));
   }
   // Total do dia (pílula): soma da PARTE do próprio em cada cliente, não a
   // duração bruta — senão um cliente partilhado conta a dobrar no total do

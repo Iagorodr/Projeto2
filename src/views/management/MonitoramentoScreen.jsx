@@ -7,7 +7,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   getOpenPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, formatPeriodLabel, isoDateStr, pad2,
-  clientById, clientAppliesThisWeek, startOfISOWeek, dayIsCovered, isStaffActive, absenceOn,
+  clientById, clientAppliesOnDate, startOfISOWeek, dayIsCovered, isStaffActive, absenceOn,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
@@ -60,10 +60,9 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   function hasAgendaOnDay(staffId, d) {
     if (absenceOn(absences, staffId, isoDateStr(d))) return false;
     const clientIds = assignments[`${staffId}-${isoWeekday(d)}`] || [];
-    const weekStart = startOfISOWeek(d);
     return clientIds.some((id) => {
       const c = clientById(clients, id);
-      return c && clientAppliesThisWeek(c, weekStart);
+      return c && clientAppliesOnDate(c, d);
     });
   }
 

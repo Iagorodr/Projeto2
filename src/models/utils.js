@@ -353,7 +353,27 @@ function clientAppliesThisWeek(client, weekStart) {
   if (client.frequency === "weekly") return true;
   if (client.frequency === "biweekly") return ((diff % 2) + 2) % 2 === 0;
   if (client.frequency === "monthly") return ((diff % 4) + 4) % 4 === 0;
+  // "dia sim, dia não" decide-se por DIA (ver clientAppliesOnDate); ao nível
+  // da semana há sempre alguma visita.
   return true;
+}
+
+// Aplicação do cliente numa DATA concreta. Igual a clientAppliesThisWeek,
+// exceto "dia sim, dia não" ("alternate"): visita de 2 em 2 dias a contar do
+// dia de referência do cliente (frequencyAnchor) — ou, sem ele, da
+// referência global. Como o molde semanal tem os mesmos dias em toda a
+// semana, a paridade alterna de uma semana para a outra, como esperado.
+function clientAppliesOnDate(client, date) {
+  if (!clientAppliesThisWeek(client, startOfISOWeek(date))) return false;
+  if (client.frequency !== "alternate") return true;
+  let ref = REFERENCE_WEEK_START;
+  if (client.frequencyAnchor && /^\d{4}-\d{2}-\d{2}$/.test(client.frequencyAnchor)) {
+    const [y, m, d] = client.frequencyAnchor.split("-").map(Number);
+    ref = new Date(y, m - 1, d);
+  }
+  const a = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const b = Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  return (((Math.round((a - b) / 86400000)) % 2) + 2) % 2 === 0;
 }
 
 function weekLabelPT(weekStart, lang) {
@@ -517,7 +537,7 @@ function dayScheduledClients(clients, assignments, staffId, date) {
   const clientIds = assignments[`${staffId}-${dow}`] || [];
   return clientIds
     .map((id) => clientById(clients, id))
-    .filter((c) => c && clientAppliesThisWeek(c, weekStart));
+    .filter((c) => c && clientAppliesOnDate(c, date));
 }
 
 // Etapa 4b (secção 5.1, "Esta semana") — resumo da semana CIVIL corrente
@@ -608,7 +628,7 @@ function staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, p
     if (absenceOn(absences, staffId, isoDateStr(d))) return false;
     const clientIds = assignments[`${staffId}-${isoWeekday(d)}`] || [];
     const weekStart = startOfISOWeek(d);
-    return clientIds.some((id) => { const c = clientById(clients, id); return c && clientAppliesThisWeek(c, weekStart); });
+    return clientIds.some((id) => { const c = clientById(clients, id); return c && clientAppliesOnDate(c, d); });
   }
   let staffCount = 0;
   let totalDays = 0;
@@ -711,7 +731,31 @@ function clientTeamStaffIds(assignments, clientId) {
 // decimal, pronta para `fmtHoursScreen`.
 function agendaHoursSuggestion(client) {
   const weeklyHours = ((client.duration || 0) / 60) * (client.days || []).length;
-  return weeklyHours * 4.33;
+  // "dia sim, dia não": em média metade dos dias marcados cai em cada semana.
+  return weeklyHours * 4.33 / (client.frequency === "alternate" ? 2 : 1);
+}
+
+// Lê uma duração escrita à mão e devolve MINUTOS (ou null se não perceber).
+// Aceita: "1,5" / "1.5" (horas decimais), "1:30" / "0:30", "1h30", "1h",
+// "45min" / "45m", e um número inteiro solto: até 12 conta como horas
+// ("2" = 2h), acima disso como minutos ("45" = 45 min).
+function parseHoursInput(raw) {
+  const str = String(raw == null ? "" : raw).trim().toLowerCase().replace(/\s+/g, "");
+  if (!str) return null;
+  let m;
+  if ((m = str.match(/^(\d{1,2}):(\d{1,2})$/))) { const mm = Number(m[2]); return mm < 60 ? Number(m[1]) * 60 + mm : null; }
+  if ((m = str.match(/^(\d{1,2})h(\d{1,2})(?:m(?:in)?)?$/))) { const mm = Number(m[2]); return mm < 60 ? Number(m[1]) * 60 + mm : null; }
+  if ((m = str.match(/^(\d+(?:[.,]\d+)?)h$/))) return Math.round(parseFloat(m[1].replace(",", ".")) * 60);
+  if ((m = str.match(/^(\d+)(?:m|min|mins|minutos)$/))) return Number(m[1]);
+  if ((m = str.match(/^(\d+[.,]\d+)$/))) return Math.round(parseFloat(m[1].replace(",", ".")) * 60);
+  if ((m = str.match(/^(\d+)$/))) { const n = Number(m[1]); return n <= 12 ? n * 60 : n; }
+  return null;
+}
+
+// Minutos -> "1:30" (para campos de duração).
+function fmtHM(min) {
+  const v = Math.max(0, Math.round(Number(min) || 0));
+  return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}`;
 }
 
 // --- Etapa 4g (Histórico, documento 4.6/5.5) ---
@@ -731,4 +775,4 @@ function pctChange(current, previous) {
   return ((current - previous) / previous) * 100;
 }
 
-export { partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, pctChange };
+export { partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

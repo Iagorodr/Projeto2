@@ -7,7 +7,7 @@ import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
-  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, absenceOn,
+  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, absenceOn,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
@@ -365,7 +365,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   function getCellClientIds(staffId, day) {
     return (assignments[cellKey(staffId, day)] || []).filter((cid) => {
       const c = clientById(clients, cid);
-      return !c || clientAppliesThisWeek(c, weekStart);
+      return !c || clientAppliesOnDate(c, weekDates[day - 1]);
     });
   }
   function teamSizeFor(day, clientId) { return staff.filter((s) => getCellClientIds(s.id, day).includes(clientId)).length; }
@@ -730,7 +730,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   function dayRows(day) {
     const byClient = new Map();
     clients.forEach((c) => {
-      if ((c.days || []).includes(day) && clientAppliesThisWeek(c, weekStart)) byClient.set(c.id, { client: c, staffIds: new Set() });
+      if ((c.days || []).includes(day) && clientAppliesOnDate(c, weekDates[day - 1])) byClient.set(c.id, { client: c, staffIds: new Set() });
     });
     staff.forEach((s) => {
       getCellClientIds(s.id, day).forEach((cid) => {
