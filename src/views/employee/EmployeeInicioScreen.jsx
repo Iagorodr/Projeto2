@@ -1,6 +1,6 @@
 import { AlertTriangle, Bell, Eye, Clock, CalendarDays, UsersRound, ChevronRight } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
-import { FONT, RADIUS } from "../../styles/tokens.js";
+import { FONT, RADIUS, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint, useControlSize } from "../../hooks/useBreakpoint.js";
 import {
@@ -110,15 +110,25 @@ function EmployeeInicioScreen({
 
   const earnedPay = staffTotalPay(horasEntry, clients, payPeriod);
   const earnedHours = staffTotalHours(horasEntry, payPeriod);
+  // Linha discreta "Neste período": período à esquerda, valor à direita; toque abre Horas.
   const earningsCard = (
-    <Card>
-      <div style={cardTitleStyle}>{t.earningsTitle}</div>
-      <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 34, lineHeight: 1.1, color: COLORS.ink, marginTop: 8 }}>{fmtEuro(earnedPay)}</div>
-      <div style={{ fontSize: 13, color: COLORS.ink2, marginTop: 6 }}>
-        {t.earningsSub(fmtHoursScreen(earnedHours), calPeriodLabel(payPeriod, lang))}
-      </div>
-      <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 8 }}>{t.earningsNote}</div>
-    </Card>
+    <button
+      type="button" onClick={() => onNavigate("horas")}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%",
+        padding: "14px 18px", boxSizing: "border-box", textAlign: "left", cursor: "pointer", fontFamily: "inherit",
+        background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, boxShadow: SHADOW.sh1,
+      }}
+    >
+      <span>
+        <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{t.earningsTitle}</span>
+        <span style={{ display: "block", fontSize: 12.5, color: COLORS.ink2, marginTop: 2 }}>{t.earningsSub(fmtHoursScreen(earnedHours))}</span>
+      </span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 24, color: COLORS.ink }}>{fmtEuro(earnedPay)}</span>
+        <ChevronRight size={18} color={COLORS.ink3} />
+      </span>
+    </button>
   );
 
   const heroCard = (
@@ -314,8 +324,8 @@ function EmployeeInicioScreen({
           </div>
         </div>
         <div style={{ padding: "0 4px", marginTop: -22, display: "flex", flexDirection: "column", gap: 16 }}>
-          {earningsCard}
           {heroCard}
+          {earningsCard}
           {weekCard}
           {attentionCard}
           {notesCard}
@@ -337,8 +347,8 @@ function EmployeeInicioScreen({
       <PageHeader title={`${tMenu.hello}, ${me.name}`} subtitle={formatTodayLabel(lang)} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
       <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "7 1 420px", display: "flex", flexDirection: "column", gap: 20, minWidth: 320 }}>
-          {earningsCard}
           {heroCard}
+          {earningsCard}
           {weekCard}
         </div>
         <div style={{ flex: "5 1 300px", minWidth: 280 }}>
