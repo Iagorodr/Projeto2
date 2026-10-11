@@ -37,8 +37,8 @@ function ClientDetail({ client, t }) {
             onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.address)}`, "_blank", "noopener,noreferrer")}
             style={{
               display: "inline-flex", alignItems: "center", gap: 8, height: 48, padding: "0 18px",
-              borderRadius: RADIUS.control, border: "1.5px solid #9FB8AE", background: COLORS.card,
-              color: COLORS.forest700, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+              borderRadius: RADIUS.control, border: `2px solid ${COLORS.vivo}`, background: COLORS.card,
+              color: COLORS.vivo, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
             }}
           >
             <MapPin size={15} strokeWidth={1.8} />

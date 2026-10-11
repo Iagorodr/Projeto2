@@ -1,5 +1,5 @@
 import { useState, useEffect, useId } from "react";
-import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronLeft, ChevronRight, CalendarDays, AlertTriangle } from "lucide-react";
+import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, CalendarDays, AlertTriangle } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { FREQ_STYLE, isRecurringFreq } from "../../styles/freqColors.js";
 import { COLORS } from "../../styles/colors.js";
@@ -13,6 +13,7 @@ import {
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
+import { PeriodNav, RoundArrow } from "../shared/ui/PeriodNav.jsx";
 import {
   PageHeader, SegmentedControl, SearchField, FilterChip, Avatar, Pill, SupervisorTag, DataTable, Toast, InfoTip,
 } from "../shared/ui/index.js";
@@ -145,21 +146,9 @@ function WeekPickerCalendar({ weekStart, lang, t, c0, onSelectWeek, onClose }) {
       onClose={onClose} width={320}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <button
-          type="button" onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-          aria-label={t.previousWeek}
-          style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
-        >
-          <ChevronLeft size={15} />
-        </button>
+        <RoundArrow dir="prev" size={30} onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))} ariaLabel={t.previousWeek} />
         <span style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.ink, textTransform: "capitalize" }}>{monthLabel}</span>
-        <button
-          type="button" onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-          aria-label={t.nextWeek}
-          style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
-        >
-          <ChevronRight size={15} />
-        </button>
+        <RoundArrow dir="next" size={30} onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))} ariaLabel={t.nextWeek} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
         {AGENDA_DAYS.map((day) => (
@@ -208,8 +197,8 @@ function WeekPickerCalendar({ weekStart, lang, t, c0, onSelectWeek, onClose }) {
           type="button" onClick={() => onSelectWeek(TODAY)}
           style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginTop: 10,
-            border: `1.5px dashed ${COLORS.lineInput}`, background: "transparent", color: COLORS.forest700,
-            cursor: "pointer", borderRadius: RADIUS.chip, padding: "8px 0", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
+            border: `2px solid ${COLORS.vivo}`, background: COLORS.card, color: COLORS.vivo,
+            cursor: "pointer", borderRadius: RADIUS.chip, padding: "8px 0", fontSize: 12.5, fontWeight: 700, fontFamily: "inherit",
           }}
         >
           <CalendarDays size={13} /> {t.backToToday}
@@ -288,12 +277,12 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
         <button
           type="button" onClick={() => setAdding(true)}
           style={{
-            display: "flex", alignItems: "center", gap: 6, width: "100%", border: `1.5px dashed ${COLORS.lineInput}`,
-            background: "transparent", color: COLORS.ink3, cursor: "pointer", borderRadius: RADIUS.chip, padding: "6px 8px",
-            fontSize: 12.5, fontFamily: "inherit", marginTop: 8,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", border: `2px dashed ${COLORS.vivoLight}`,
+            background: COLORS.mintBg, color: COLORS.vivo, cursor: "pointer", borderRadius: RADIUS.chip, padding: "8px 10px",
+            fontSize: 12.5, fontWeight: 700, fontFamily: "inherit", marginTop: 8,
           }}
         >
-          <Plus size={13} /> {t.addPerson}
+          <span style={{ width: 18, height: 18, borderRadius: "50%", background: COLORS.vivo, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><Plus size={12} strokeWidth={3} /></span> {t.addPerson}
         </button>
       )}
     </AgendaModal>
@@ -545,7 +534,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
           )}
           {!inactive && (
             <button type="button" onClick={() => setCopyFrom(s)}
-              style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 11, color: COLORS.forest600, textDecoration: "underline", padding: 0 }}>
+              style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 11, fontWeight: 700, color: COLORS.vivo, textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 3, padding: 0 }}>
               {tAbs.shareWeekBtn}
             </button>
           )}
@@ -711,11 +700,11 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                   onClick={() => setOpenCell(key)}
                   aria-label={t.addClientPlaceholder}
                   style={{
-                    height: 28, borderRadius: RADIUS.chip, border: `1.5px dashed ${COLORS.lineInput}`, background: "transparent",
-                    color: COLORS.ink3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                    height: 28, borderRadius: RADIUS.chip, border: `2px dashed ${COLORS.vivoLight}`, background: COLORS.mintBg,
+                    color: COLORS.vivo, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                 >
-                  <Plus size={13} />
+                  <Plus size={14} strokeWidth={2.8} />
                 </button>
               )}
             </div>
@@ -846,26 +835,17 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   const weekRangeLabel = formatPeriodLabel({ start: weekStart, end: addDays(weekStart, 6) }, lang);
   const weekNavControl = (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 2, background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.pill, padding: 3 }}>
-        <button
-          type="button" onClick={() => setWeekStart((d) => addDays(d, -7))} aria-label={t.previousWeek}
-          style={{ width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, padding: "0 4px", whiteSpace: "nowrap" }}>{weekRangeLabel}</span>
-        <button
-          type="button" onClick={() => setWeekStart((d) => addDays(d, 7))} aria-label={t.nextWeek}
-          style={{ width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
+      <PeriodNav
+        label={weekRangeLabel} size={ctrlHeight - 6}
+        onPrev={() => setWeekStart((d) => addDays(d, -7))} onNext={() => setWeekStart((d) => addDays(d, 7))}
+        prevLabel={t.previousWeek} nextLabel={t.nextWeek}
+        labelStyle={{ fontSize: 13 }}
+      />
       <button
         type="button" onClick={() => setWeekPickerOpen(true)} aria-label={t.pickWeek} title={t.pickWeek}
         style={{
-          width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: `1px solid ${COLORS.line}`,
-          background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink,
+          width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: `1.5px solid ${COLORS.iconBorder}`,
+          background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.vivo,
         }}
       >
         <CalendarDays size={16} />
@@ -875,7 +855,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
           type="button" onClick={() => setWeekStart(startOfISOWeek(TODAY))}
           style={{
             height: ctrlHeight, padding: "0 12px", borderRadius: ctrlRadius, border: "none",
-            background: COLORS.forest50, color: COLORS.forest700, fontSize: 12.5, fontWeight: 700,
+            background: COLORS.mint, color: COLORS.vivo, fontSize: 12.5, fontWeight: 700,
             cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
           }}
         >
@@ -926,7 +906,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                 {a.note ? `${a.note} — ` : ""}{uncovered.length > 0 ? uncovered.join(", ") : tAbs.allCovered}
               </span>
               <button type="button" onClick={() => toggleHandled(a.id)}
-                style={{ border: `1px solid ${COLORS.line}`, background: COLORS.card, borderRadius: RADIUS.chip, cursor: "pointer", fontFamily: "inherit", fontSize: 12, padding: "4px 10px", color: COLORS.ink }}>
+                style={{ border: `2px solid ${COLORS.vivo}`, background: COLORS.card, borderRadius: RADIUS.chip, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700, padding: "4px 12px", color: COLORS.vivo }}>
                 {a.handled ? tAbs.reopenAbsence : tAbs.markHandled}
               </button>
             </div>

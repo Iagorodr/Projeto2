@@ -42,7 +42,7 @@ function MobileBottomBar({ items, activeKey, onNavigate }) {
         // sticky por um wrapper (que quebraria o `position:sticky`).
         margin: "0 -14px -14px",
         position: "sticky", bottom: 0, zIndex: 30,
-        background: COLORS.navDeep,
+        background: COLORS.navGradient,
         display: "flex", justifyContent: "space-around",
         padding: "18px 4px",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)",

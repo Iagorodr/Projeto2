@@ -1,4 +1,4 @@
-import { AlertTriangle, Bell, Eye, Clock, CalendarDays, UsersRound, ChevronRight } from "lucide-react";
+import { AlertTriangle, Bell, Eye, Clock, CalendarDays, UsersRound } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { FONT, RADIUS, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
@@ -10,7 +10,7 @@ import {
   isSupervisorRole,
 } from "../../models/utils.js";
 import { T, formatTodayLabel, WEEKDAY_FULL_BY_LANG, DAY_ABBR_SUN0_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
-import { Card, Button, Pill, ProgressBar, PageHeader, ClientCheckCard } from "../shared/ui/index.js";
+import { Card, Button, Pill, ProgressBar, PageHeader, ClientCheckCard, ChevronCircle } from "../shared/ui/index.js";
 
 const cardTitleStyle = { fontFamily: FONT.heading, fontWeight: 600, fontSize: 16, color: COLORS.ink };
 
@@ -126,7 +126,7 @@ function EmployeeInicioScreen({
       </span>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         <span style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 24, color: COLORS.ink }}>{fmtEuro(earnedPay)}</span>
-        <ChevronRight size={18} color={COLORS.ink3} />
+        <ChevronCircle />
       </span>
     </button>
   );
@@ -206,7 +206,7 @@ function EmployeeInicioScreen({
                 <span
                   style={{
                     width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-                    background: COLORS.alertTint, color: COLORS.alert,
+                    background: COLORS.rowIconBg, color: COLORS.rowIconInk,
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                 >
@@ -220,7 +220,7 @@ function EmployeeInicioScreen({
                     <span style={{ display: "block", fontSize: 12, color: COLORS.ink2, marginTop: 2 }}>{item.subtitle}</span>
                   )}
                 </span>
-                <ChevronRight size={16} color={COLORS.ink3} />
+                <ChevronCircle />
               </button>
             );
           })}
@@ -236,7 +236,7 @@ function EmployeeInicioScreen({
         <button
           type="button" onClick={() => onNavigate("notas")}
           style={{
-            border: "none", background: "transparent", color: COLORS.forest700, fontSize: 12.5, fontWeight: 600,
+            border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 700, textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4,
             cursor: "pointer", fontFamily: "inherit", height: seeAllHeight, padding: "0 4px", display: "inline-flex", alignItems: "center",
           }}
         >
@@ -273,11 +273,11 @@ function EmployeeInicioScreen({
             key={key} type="button" onClick={() => onNavigate(key)}
             style={{
               flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-              padding: "16px 8px", borderRadius: RADIUS.chip, border: `1px solid ${COLORS.line}`,
+              padding: "16px 8px", borderRadius: RADIUS.chip, border: `1.5px solid ${COLORS.iconBorder}`,
               background: COLORS.card, cursor: "pointer", fontFamily: "inherit",
             }}
           >
-            <Icon size={20} strokeWidth={1.8} color={COLORS.forest700} />
+            <Icon size={20} strokeWidth={2} color={COLORS.vivo} />
             <span style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink }}>{label}</span>
           </button>
         ))}

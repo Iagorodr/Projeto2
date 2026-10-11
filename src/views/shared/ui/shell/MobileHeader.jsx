@@ -98,11 +98,11 @@ function MobileHeader({ onBack, backLabel = "Voltar", title, lang, setLang, lang
           <button
             type="button" onClick={onBack} aria-label={backLabel}
             style={{
-              width: backDim, height: backDim, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card,
-              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink,
+              width: backDim, height: backDim, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card,
+              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.vivo,
             }}
           >
-            <ChevronLeft size={20} strokeWidth={1.8} />
+            <ChevronLeft size={20} strokeWidth={2.2} />
           </button>
         ) : <span />}
         {lang && setLang && langNames && <CompactLangSwitcher lang={lang} setLang={setLang} langNames={langNames} />}

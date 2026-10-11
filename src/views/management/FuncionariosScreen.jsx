@@ -6,6 +6,7 @@ import { TODAY, LANG_NAMES } from "../../models/data.js";
 import { getAssignedClientIds, clientById, isStaffActive, linkPartners, isSupervisorRole, isoDateStr } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
+import { Toggle } from "../shared/ui/Toggle.jsx";
 import {
   PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, SupervisorTag, Drawer, Button, ConfirmDialog, Card,
 } from "../shared/ui/index.js";
@@ -34,8 +35,8 @@ function isExpiredByValidity(s) {
 }
 
 const iconBtnStyle = {
-  width: 26, height: 26, borderRadius: 8, border: `1px solid ${COLORS.line}`, background: COLORS.card,
-  display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink2, flexShrink: 0, padding: 0,
+  width: 30, height: 30, borderRadius: 10, border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card,
+  display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.vivo, flexShrink: 0, padding: 0,
 };
 
 // IBAN mascarado (documento, 4.9): "PT50 •••• •••• 1234" + botão olho +
@@ -75,16 +76,7 @@ function MaskedIban({ iban, t }) {
 // `onClick`; a edição de verdade acontece só no modo de edição, com o
 // botão normal já usado no resto do projeto (ver mais abaixo).
 function ReadOnlyToggle({ on }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex", alignItems: "center", width: 36, height: 20, borderRadius: 999,
-        background: on ? COLORS.forest600 : COLORS.lineSoft, padding: 2, boxSizing: "border-box", flexShrink: 0,
-      }}
-    >
-      <span style={{ width: 16, height: 16, borderRadius: "50%", background: "#fff", transform: on ? "translateX(16px)" : "translateX(0)", transition: "transform .15s ease" }} />
-    </span>
-  );
+  return <Toggle on={on} readOnly />;
 }
 
 function SectionTitle({ children, first }) {
@@ -514,9 +506,10 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
                       onClick={() => { setWorkedBefore(val); if (!val) updateDraft("startDate", ""); }}
                       style={{
                         flex: 1, height: 44, borderRadius: 12, cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600,
-                        border: `1.5px solid ${workedBefore === val ? COLORS.primary : COLORS.lineInput}`,
-                        background: workedBefore === val ? COLORS.primaryTint : COLORS.card,
-                        color: workedBefore === val ? COLORS.primaryDark : COLORS.ink2,
+                        border: `2px solid ${workedBefore === val ? COLORS.vivo : COLORS.iconBorder}`,
+                        background: workedBefore === val ? COLORS.mintBg : COLORS.card,
+                        color: workedBefore === val ? COLORS.vivoInk : COLORS.ink2,
+                        fontWeight: workedBefore === val ? 700 : 600,
                       }}
                     >{label}</button>
                   ))}
@@ -562,19 +555,10 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
               <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.partnerHint}</div>
             </Field>
             <Field label={t.fCanViewAllClients}>
-              <button
-                type="button"
-                onClick={() => updateDraft("canViewAllClients", !draft.canViewAllClients)}
-                style={{
-                  ...styles.horModalPaidToggle,
-                  background: draft.canViewAllClients ? COLORS.primaryDark : "transparent",
-                  borderColor: COLORS.primaryDark,
-                  color: draft.canViewAllClients ? "#fff" : COLORS.primaryDark,
-                  cursor: "pointer",
-                }}
-              >
-                {draft.canViewAllClients ? c0.yes : c0.no}
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Toggle on={!!draft.canViewAllClients} onChange={(v) => updateDraft("canViewAllClients", v)} ariaLabel={t.fCanViewAllClients} />
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{draft.canViewAllClients ? c0.yes : c0.no}</span>
+              </div>
             </Field>
             {!isNew && <div style={{ ...styles.defSettingHint, gridColumn: "1 / -1" }}>{t.loginNote}</div>}
           </div>

@@ -557,7 +557,7 @@ function ClientesScreen({
                         <button
                           type="button"
                           aria-label={t.removeDoc}
-                          style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: COLORS.extraTint, color: COLORS.extra, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, fontSize: 18 }}
+                          style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: COLORS.dangerBg, color: COLORS.dangerInk, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, fontSize: 18 }}
                           onClick={() => attachDocument(openClient.id, idx, null)}
                         >
                           ×
@@ -613,8 +613,8 @@ function ClientesScreen({
                         key={i} type="button" onClick={() => updateDraft("frequencyAnchor", isoDateStr(ws))}
                         style={{
                           padding: "10px 14px", borderRadius: RADIUS.control, cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600,
-                          border: `1.5px solid ${selected ? COLORS.primaryDark : COLORS.line}`,
-                          background: selected ? COLORS.primaryDark : COLORS.card, color: selected ? "#fff" : COLORS.ink,
+                          border: `2px solid ${selected ? COLORS.vivo : COLORS.iconBorder}`,
+                          background: selected ? COLORS.mintBg : COLORS.card, color: selected ? COLORS.vivoInk : COLORS.ink,
                         }}
                       >
                         {prefix}{weekLabelPT(ws, lang)}
@@ -685,10 +685,10 @@ function ClientesScreen({
                       key={d} type="button"
                       style={{
                         padding: "7px 12px", borderRadius: 8,
-                        border: `1px solid ${active ? COLORS.primary : COLORS.line}`,
-                        background: active ? COLORS.primaryTint : COLORS.card,
-                        color: active ? COLORS.primaryDark : COLORS.ink2,
-                        fontSize: 12, fontWeight: 600, cursor: "pointer",
+                        border: `2px solid ${active ? COLORS.vivo : COLORS.iconBorder}`,
+                        background: active ? COLORS.mintBg : COLORS.card,
+                        color: active ? COLORS.vivoInk : COLORS.ink2,
+                        fontSize: 12, fontWeight: active ? 700 : 600, cursor: "pointer",
                       }}
                       onClick={() => updateDraft("days", active ? (draft.days || []).filter((x) => x !== d) : [...(draft.days || []), d])}
                     >

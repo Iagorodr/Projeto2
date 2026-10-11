@@ -41,7 +41,10 @@ const COLORS = {
   vivoBtnTop: "#238A69", vivoBtnBottom: "#1A6F56", vivoToggleOn: "#27916F",
   mint: "#D4E8DF", mintBg: "#F2FAF6", iconBorder: "#B6D4C8", fieldBorder: "#7A9A8C",
   disabledBg: "#DCE8E2", disabledInk: "#4F6B5F",
-  navDeep: "#0F3129", navText: "#EAF5EF", navIcon: "#BDE6D5", navIconActive: "#F6AE8B", navBottomText: "#E2F1EA",
+  navDeep: "#0F3129",
+  // Fundo padrão dos dois menus (lateral no PC/tablet e inferior no telemóvel):
+  // mesmo gradiente nos dois, para ficarem sempre iguais.
+  navGradient: "radial-gradient(circle at 10% 8%, rgba(226,138,101,.18), transparent 45%), linear-gradient(180deg, #1F6F5C 0%, #143F35 100%)", navText: "#EAF5EF", navIcon: "#BDE6D5", navIconActive: "#F6AE8B", navBottomText: "#E2F1EA",
   dangerInk: "#B3392A", dangerBg: "#FCE6E1", dangerSolid: "#C8442F",
   rowIconBg: "#FBE4DC", rowIconInk: "#B3492E", onClay: "#3A1A0D",
 };

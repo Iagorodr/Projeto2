@@ -45,8 +45,7 @@ function AppSidebar({
         width, flexShrink: 0, display: "flex", flexDirection: "column",
         position: "sticky", top: 0, height: "100dvh", alignSelf: "flex-start",
         padding: iconsOnly || rail ? "20px 8px" : "20px 16px",
-        background:
-          "linear-gradient(180deg, #2A5E50 0%, #143F35 100%)",
+        background: COLORS.navGradient,
         boxSizing: "border-box",
       }}
     >

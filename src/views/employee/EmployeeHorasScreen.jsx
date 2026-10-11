@@ -14,7 +14,8 @@ import {
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
-import { ChevronLeftMini, ChevronRightMini, Minus2 } from "../shared/Icons.jsx";
+import { Minus2 } from "../shared/Icons.jsx";
+import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
 import {
   MobileHeader, WeekStrip, DayPanel, ClientCheckCard, BottomActionBar, PeriodCalendar,
   Card, ConfirmDialog, Drawer, Button, Pill, SearchField, Toast, ProgressBar,
@@ -557,14 +558,13 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           <div style={{ marginBottom: 10 }}><Pill variant="reopened">{t.reopenedPill}</Pill></div>
         )}
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 6, marginTop: -4 }}>
-          <button type="button" onClick={() => goChunk(-1)} disabled={idx <= 0} aria-label="anterior" style={{ opacity: idx <= 0 ? 0.35 : 1, width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-            <ChevronLeftMini />
-          </button>
-          <span style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{calPeriodLabel(chunk, lang)}</span>
-          <button type="button" onClick={() => goChunk(1)} disabled={idx >= chunks.list.length - 1} aria-label="seguinte" style={{ opacity: idx >= chunks.list.length - 1 ? 0.35 : 1, width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-            <ChevronRightMini />
-          </button>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 6, marginTop: -4 }}>
+          <PeriodNav
+            label={calPeriodLabel(chunk, lang)} size={40}
+            onPrev={() => goChunk(-1)} onNext={() => goChunk(1)}
+            prevLabel="anterior" nextLabel="seguinte"
+            prevDisabled={idx <= 0} nextDisabled={idx >= chunks.list.length - 1}
+          />
         </div>
         <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 6 }}>
           {/* QA pós-auditoria (Lote 2, "mês finalizado cinza"): este selo
@@ -930,9 +930,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               {t.adjustSplitHint(fmtHoursScreen(total), fmtHoursScreen(Math.max(0, total - draft)))}
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18 }}>
-              <button type="button" aria-label="-" onClick={() => setSplitDraft(Math.max(0, draft - 0.5))} style={{ width: 56, height: 56, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, fontSize: 28, cursor: "pointer" }}>−</button>
+              <button type="button" aria-label="-" onClick={() => setSplitDraft(Math.max(0, draft - 0.5))} style={{ width: 56, height: 56, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, fontWeight: 700, fontSize: 28, cursor: "pointer" }}>−</button>
               <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 32, minWidth: 90, textAlign: "center" }}>{fmtHoursScreen(draft)}</div>
-              <button type="button" aria-label="+" onClick={() => setSplitDraft(Math.min(max, draft + 0.5))} style={{ width: 56, height: 56, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, fontSize: 28, cursor: "pointer" }}>+</button>
+              <button type="button" aria-label="+" onClick={() => setSplitDraft(Math.min(max, draft + 0.5))} style={{ width: 56, height: 56, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, fontWeight: 700, fontSize: 28, cursor: "pointer" }}>+</button>
             </div>
           </Drawer>
         );
@@ -991,9 +991,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       >
         <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 16 }}>{t.extraQuestion}</div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 14 }}>
-          <button type="button" onClick={() => setExtraDraft((v) => Math.max(0, v - 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1px solid ${COLORS.lineInput}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Minus2 /></button>
+          <button type="button" onClick={() => setExtraDraft((v) => Math.max(0, v - 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Minus2 /></button>
           <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.ink, minWidth: 80, textAlign: "center" }}>{extraDraft} {t.minutesUnit}</div>
-          <button type="button" onClick={() => setExtraDraft((v) => Math.min(240, v + 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1px solid ${COLORS.lineInput}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Plus size={18} /></button>
+          <button type="button" onClick={() => setExtraDraft((v) => Math.min(240, v + 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Plus size={18} strokeWidth={2.4} /></button>
         </div>
         <div style={{ fontSize: 12, color: COLORS.ink3 }}>{t.extraHint}</div>
       </Drawer>

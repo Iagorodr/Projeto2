@@ -11,7 +11,7 @@ import {
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
-  PageHeader, MobileHeader, Card, Pill, Avatar, FilterChip, SearchField, Button, Drawer, DataTable, InfoTip,
+  PageHeader, MobileHeader, Card, Pill, Avatar, FilterChip, SearchField, Button, Drawer, DataTable, InfoTip, ChevronCircle,
 } from "../shared/ui/index.js";
 
 // Monitoramento — documento de design, secções 4.4/4.5 (mesmo ficheiro; o
@@ -399,11 +399,14 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
                 <Avatar name={s.name} size={36} />
                 <span style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
               </div>
-              {totalGaps > 0 ? (
-                <Pill variant="missing">{t.staffDaysMissing(totalGaps)}</Pill>
-              ) : (
-                <Pill variant="paid"><Check size={11} /> {t.summaryOk}</Pill>
-              )}
+              <span style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                {totalGaps > 0 ? (
+                  <Pill variant="missing">{t.staffDaysMissing(totalGaps)}</Pill>
+                ) : (
+                  <Pill variant="paid"><Check size={11} /> {t.summaryOk}</Pill>
+                )}
+                <ChevronCircle />
+              </span>
             </button>
           ))}
         </div>

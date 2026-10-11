@@ -11,7 +11,7 @@ import {
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { PageHeader, Pill, MobileHeader } from "../shared/ui/index.js";
-import { ChevronLeftMini, ChevronRightMini } from "../shared/Icons.jsx";
+import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
 
 // Mesma divisão de nome usada em EmployeeClientesScreen.jsx/ClientesScreen.jsx
 // (duplicada de propósito, ver o comentário lá) — só usada aqui no resumo de
@@ -99,17 +99,13 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   function goWeek(delta) { setWeekStart((w) => addDays(w, delta * 7)); }
 
   const weekNav = (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-      <button type="button" onClick={() => goWeek(-1)} aria-label={t.previousWeek} style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-        <ChevronLeftMini />
-      </button>
-      <span style={{ fontSize: desktop ? 14.5 : 22, fontWeight: 700, color: COLORS.ink, minWidth: desktop ? 120 : undefined, textAlign: "center" }}>
-        {weekLabelPT(weekStart, lang)}
-      </span>
-      <button type="button" onClick={() => goWeek(1)} aria-label={t.nextWeek} style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-        <ChevronRightMini />
-      </button>
-    </div>
+    <PeriodNav
+      label={weekLabelPT(weekStart, lang)} size={40}
+      onPrev={() => goWeek(-1)} onNext={() => goWeek(1)}
+      prevLabel={t.previousWeek} nextLabel={t.nextWeek}
+      style={{ margin: "0 auto" }}
+      labelStyle={{ fontSize: desktop ? 14.5 : 20, minWidth: desktop ? 120 : undefined }}
+    />
   );
 
   // Cartão de cliente, telemóvel (dia aberto): nome completo + duração/parte
@@ -248,14 +244,13 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
           ("quem fica sem o título é a página horas, o resto tem
           título"); aqui tinha sido removido também por engano. */}
       <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 16 }}>
-        <button type="button" aria-label={t.previousWeek} onClick={() => goWeek(-1)} style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-          <ChevronLeftMini />
-        </button>
-        <span style={{ fontSize: 22, fontWeight: 700, color: COLORS.ink, textAlign: "center" }}>{weekLabelPT(weekStart, lang)}</span>
-        <button type="button" aria-label={t.nextWeek} onClick={() => goWeek(1)} style={{ width: 40, height: 40, borderRadius: "50%", border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-          <ChevronRightMini />
-        </button>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+        <PeriodNav
+          label={weekLabelPT(weekStart, lang)} size={40}
+          onPrev={() => goWeek(-1)} onNext={() => goWeek(1)}
+          prevLabel={t.previousWeek} nextLabel={t.nextWeek}
+          labelStyle={{ fontSize: 20 }}
+        />
       </div>
       <div style={mobStyles.dayList}>
         {AGENDA_DAYS.map((day) => {

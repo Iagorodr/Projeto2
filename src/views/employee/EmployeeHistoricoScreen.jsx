@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -7,7 +6,7 @@ import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { clientById, entryClientName, fmtEuro, fmtHoursScreen, fmtNoteDate } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
-import { PageHeader, Pill, Drawer, Button, Card, MobileHeader } from "../shared/ui/index.js";
+import { PageHeader, Pill, Drawer, Button, Card, MobileHeader, ChevronCircle } from "../shared/ui/index.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
 
 // Uma linha da lista de períodos (documento, 5.5): "20 jul – 19 ago" à
@@ -28,7 +27,7 @@ function PeriodRow({ period, hours, onClick }) {
       <span style={{ fontSize: 14.5, fontWeight: 600, color: COLORS.ink }}>{period}</span>
       <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Pill variant="neutral">{hours}</Pill>
-        <ChevronRight size={16} color={COLORS.ink3} />
+        <ChevronCircle />
       </span>
     </button>
   );

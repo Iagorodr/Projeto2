@@ -45,11 +45,11 @@ function StateIcon({ state }) {
 // Legenda com mini-mosaicos iguais aos dias, para a pessoa reconhecer o que
 // cada aspeto quer dizer (em vez de só texto solto).
 function LegendSwatch({ kind }) {
-  const base = { width: 20, height: 24, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxSizing: "border-box" };
-  if (kind === "done") return <span style={{ ...base, background: COLORS.card, border: `1px solid ${COLORS.line}` }}><Check size={12} color={COLORS.ok} strokeWidth={2.4} /></span>;
-  if (kind === "missing") return <span style={{ ...base, background: COLORS.card, border: `2px solid ${COLORS.alert}` }}><AlertTriangle size={11} color={COLORS.alert} strokeWidth={2.2} /></span>;
+  const base = { width: 14, height: 17, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxSizing: "border-box" };
+  if (kind === "done") return <span style={{ ...base, background: COLORS.card, border: `1px solid ${COLORS.line}` }}><Check size={9} color={COLORS.ok} strokeWidth={3} /></span>;
+  if (kind === "missing") return <span style={{ ...base, background: COLORS.card, border: `1.5px solid ${COLORS.alert}` }}><AlertTriangle size={8} color={COLORS.alert} strokeWidth={2.6} /></span>;
   if (kind === "none") return <span style={{ ...base, background: "transparent", border: `1.5px dashed ${COLORS.ink3}` }} />;
-  return <span style={{ ...base, background: "transparent" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.clay }} /></span>;
+  return <span style={{ ...base, background: "transparent" }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: COLORS.clay }} /></span>;
 }
 
 function WeekStrip({ days, onSelectDay, legend = "registado · em falta · tracejado: sem clientes", legendItems }) {
@@ -83,9 +83,9 @@ function WeekStrip({ days, onSelectDay, legend = "registado · em falta · trace
         })}
       </div>
       {legendItems ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 10 }}>
+        <div style={{ display: "flex", flexWrap: "nowrap", justifyContent: "space-between", gap: 8, marginTop: 8, whiteSpace: "nowrap" }}>
           {["done", "missing", "none", "today"].filter((k) => legendItems[k]).map((k) => (
-            <div key={k} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, color: COLORS.ink2 }}>
+            <div key={k} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: COLORS.ink2 }}>
               <LegendSwatch kind={k} />{legendItems[k]}
             </div>
           ))}

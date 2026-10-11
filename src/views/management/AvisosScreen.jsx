@@ -23,8 +23,8 @@ function TypeCard({ type, active, onClick, label }) {
       style={{
         flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "14px 8px",
         borderRadius: RADIUS.control, cursor: "pointer", fontFamily: "inherit",
-        border: active ? `2px solid ${COLORS.forest500}` : `1px solid ${COLORS.line}`,
-        background: active ? COLORS.forest50 : COLORS.card,
+        border: active ? `2px solid ${COLORS.vivo}` : `1.5px solid ${COLORS.iconBorder}`,
+        background: active ? COLORS.mintBg : COLORS.card,
       }}
     >
       <TypeIconBlock type={type} size={38} />

@@ -78,7 +78,7 @@ function DataTable({
                   type="checkbox"
                   checked={rows.length > 0 && selectedCount === rows.length}
                   onChange={onToggleSelectAll}
-                  style={{ cursor: "pointer" }}
+                  style={{ cursor: "pointer", accentColor: COLORS.vivo, width: 18, height: 18 }}
                 />
               </label>
             )}
@@ -148,7 +148,7 @@ function DataTable({
                         type="checkbox"
                         checked={!!selected}
                         onChange={() => onToggleSelect?.(id)}
-                        style={{ cursor: "pointer" }}
+                        style={{ cursor: "pointer", accentColor: COLORS.vivo, width: 18, height: 18 }}
                       />
                     </label>
                   )}

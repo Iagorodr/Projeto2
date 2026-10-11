@@ -11,7 +11,7 @@ import {
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
 import {
-  PageHeader, Card, KpiCard, SegmentedBar, Avatar, ReclamacoesCard, PeriodBarChart, PeriodLineChart,
+  PageHeader, Card, KpiCard, SegmentedBar, Avatar, ReclamacoesCard, PeriodBarChart, PeriodLineChart, ChevronCircle,
 } from "../shared/ui/index.js";
 
 // Pequeno "tile" de data (documento, 4.1 — cartão de Notas): 46×46, dia
@@ -85,6 +85,7 @@ function PendingRow({ icon: Icon, label, count, amber, onClick, okLabel, last })
           {count}
         </div>
       )}
+      <ChevronCircle size={26} />
     </button>
   );
 }
@@ -374,7 +375,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
             <button
               type="button" onClick={() => onNavigate("notas")}
               style={{
-                border: "none", background: "transparent", color: COLORS.clayInk, fontSize: 12.5, fontWeight: 700,
+                border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 700, textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4,
                 cursor: "pointer", fontFamily: "inherit", height: seeAllHeight, padding: "0 4px", display: "inline-flex", alignItems: "center",
               }}
             >

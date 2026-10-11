@@ -44,8 +44,8 @@ function BigSelectCard({ icon: Icon, iconBg, iconColor, active, onClick, label }
       style={{
         display: "flex", alignItems: "center", gap: 12, width: "100%", height: 64, padding: "0 14px",
         borderRadius: RADIUS.control, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-        border: active ? `2px solid ${COLORS.forest500}` : `1px solid ${COLORS.line}`,
-        background: active ? COLORS.forest50 : COLORS.card, boxSizing: "border-box",
+        border: active ? `2px solid ${COLORS.vivo}` : `1.5px solid ${COLORS.iconBorder}`,
+        background: active ? COLORS.mintBg : COLORS.card, boxSizing: "border-box",
       }}
     >
       <div style={{ width: 38, height: 38, borderRadius: RADIUS.chip, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>

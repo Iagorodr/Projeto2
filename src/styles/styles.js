@@ -51,7 +51,7 @@ const styles = {
   // novos — removidos aqui, varredura de QA pós-Etapa 4. A versão mobile
   // equivalente (`mobStyles.searchWrap`/`searchInput`) continua em uso
   // num ecrã (EmployeeClientesScreen.jsx), por isso não foi tocada.
-  newButton: { padding: "10px 16px", borderRadius: 10, border: "none", background: COLORS.primary, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", letterSpacing: "0.1px", boxShadow: "0 1px 3px rgba(20,63,53,0.22)" },
+  newButton: { padding: "10px 16px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", letterSpacing: "0.1px", boxShadow: "0 10px 20px -8px rgba(31,122,95,.7), inset 0 1px 0 rgba(255,255,255,.3)" },
   installAppButton: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "12px 0", background: "none", border: "none", color: COLORS.vivo, fontSize: 13.5, fontWeight: 600, cursor: "pointer", textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4, fontFamily: "inherit" },
   fieldError: { fontSize: 11, fontWeight: 600, color: COLORS.extra, marginTop: 4 },
 
@@ -73,7 +73,7 @@ const styles = {
   modalClose: { width: 28, height: 28, borderRadius: "50%", border: "none", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.textSoft, flexShrink: 0 },
   viewTitleRow: { display: "flex", alignItems: "center", gap: 12 },
   viewIconCircle: { width: 40, height: 40, borderRadius: "50%", background: COLORS.primaryTint, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  editButton: { display: "flex", alignItems: "center", padding: "8px 14px", borderRadius: 9, border: "none", background: COLORS.primary, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", boxShadow: "0 1px 3px rgba(20,63,53,0.22)" },
+  editButton: { display: "flex", alignItems: "center", padding: "8px 14px", borderRadius: 9, border: "none", background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", boxShadow: "0 10px 20px -8px rgba(31,122,95,.7), inset 0 1px 0 rgba(255,255,255,.3)" },
   viewGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 18 },
   viewFieldLabel: { display: "flex", alignItems: "center", fontSize: 11, fontWeight: 700, color: COLORS.textSoft, marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.3px" },
   viewFieldValue: { fontSize: 13.5, color: COLORS.text, lineHeight: 1.4 },
@@ -83,13 +83,13 @@ const styles = {
   input: { width: "100%", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 10px", fontSize: 13, color: COLORS.text, background: COLORS.bg, boxSizing: "border-box" },
   textarea: { width: "100%", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 10px", fontSize: 13, color: COLORS.text, background: COLORS.bg, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" },
   modalActions: { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 },
-  cancelButton: { padding: "10px 18px", borderRadius: 10, border: `1px solid ${COLORS.border}`, background: COLORS.surface, fontSize: 13, fontWeight: 600, cursor: "pointer", color: COLORS.text },
-  saveButton: { padding: "10px 18px", borderRadius: 10, border: "none", background: COLORS.primary, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", letterSpacing: "0.1px", boxShadow: "0 1px 3px rgba(20,63,53,0.22)" },
+  cancelButton: { padding: "10px 18px", borderRadius: 10, border: `2px solid ${COLORS.vivo}`, background: COLORS.surface, fontSize: 13, fontWeight: 600, cursor: "pointer", color: COLORS.vivo },
+  saveButton: { padding: "10px 18px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", letterSpacing: "0.1px", boxShadow: "0 10px 20px -8px rgba(31,122,95,.7), inset 0 1px 0 rgba(255,255,255,.3)" },
 
   sectionTitle: { fontSize: 13, fontWeight: 700, color: COLORS.primaryDark, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.4px" },
   title: { fontFamily: "'Poppins', sans-serif", fontSize: 23, fontWeight: 600, margin: "4px 0 20px", letterSpacing: "0.1px" },
   periodNav: { display: "flex", alignItems: "center", gap: 10 },
-  navButton: { width: 26, height: 26, borderRadius: 7, border: `1px solid ${COLORS.border}`, background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.extra },
+  navButton: { width: 30, height: 30, borderRadius: "50%", border: "none", background: COLORS.mint, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.vivo },
   periodLabel: { fontSize: 15, fontWeight: 700, minWidth: 150, textAlign: "center" },
 
   /* login */
@@ -103,8 +103,8 @@ const styles = {
   loginCompanyName: { fontFamily: "'Poppins', sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 10, color: COLORS.text },
   loginInput: { border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "13px 14px", fontSize: 14, background: COLORS.bg, color: COLORS.text },
   forgotRow: { display: "flex", justifyContent: "flex-end" },
-  forgotLink: { fontSize: 12, color: COLORS.textSoft, textDecoration: "underline", cursor: "pointer", background: "none", border: "none" },
-  enterButton: { marginTop: 14, padding: "13px", borderRadius: 10, border: "none", background: COLORS.primary, color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer", letterSpacing: "0.2px", boxShadow: "0 2px 6px rgba(20,63,53,0.28)" },
+  forgotLink: { fontSize: 12, fontWeight: 700, color: COLORS.vivo, textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4, cursor: "pointer", background: "none", border: "none" },
+  enterButton: { marginTop: 14, padding: "13px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`, color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer", letterSpacing: "0.2px", boxShadow: "0 10px 20px -8px rgba(31,122,95,.7), inset 0 1px 0 rgba(255,255,255,.3)" },
 
   /* dashboard */
   kpiRow: { display: "flex", gap: 16, marginBottom: 20 },
@@ -158,7 +158,7 @@ const styles = {
   agdChipText: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: COLORS.primaryDark, fontWeight: 600 },
   agdTeamBadge: { display: "flex", alignItems: "center", fontSize: 10, fontWeight: 700, color: COLORS.extra, flexShrink: 0 },
   agdChipRemove: { border: "none", background: "transparent", cursor: "pointer", color: COLORS.textSoft, display: "flex", flexShrink: 0 },
-  agdAddCellButton: { border: `1px dashed ${COLORS.border}`, background: "transparent", borderRadius: 6, padding: "4px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.textSoft },
+  agdAddCellButton: { border: `2px dashed ${COLORS.vivoLight}`, background: COLORS.mintBg, borderRadius: 6, padding: "4px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.vivo },
   agdCellPopover: { position: "absolute", top: 4, left: 4, right: 4, background: COLORS.surface, border: `1px solid ${COLORS.primary}`, borderRadius: 8, padding: 6, zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" },
   agdCellSearchInput: { width: "100%", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 7px", fontSize: 11, marginBottom: 4, boxSizing: "border-box" },
   agdCellResults: { maxHeight: 110, overflowY: "auto" },
@@ -189,7 +189,7 @@ const styles = {
   horEditRowButton: { width: 24, height: 24, borderRadius: 6, border: `1px solid ${COLORS.border}`, background: COLORS.surface, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.extra, flexShrink: 0 },
   horVoidRowButton: { width: 24, height: 24, borderRadius: 6, border: `1px solid ${COLORS.border}`, background: COLORS.surface, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.extra, flexShrink: 0 },
   horVoidedTag: { display: "flex", alignItems: "center", fontSize: 11.5, fontWeight: 700, color: COLORS.extra },
-  horApproveButton: { padding: "5px 12px", borderRadius: 7, border: "none", background: COLORS.primary, color: "#fff", fontSize: 11.5, fontWeight: 600, cursor: "pointer" },
+  horApproveButton: { padding: "5px 12px", borderRadius: 7, border: "none", background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`, color: "#fff", fontSize: 11.5, fontWeight: 600, cursor: "pointer" },
   horApprovedTag: { display: "flex", alignItems: "center", fontSize: 11.5, fontWeight: 700, color: COLORS.success },
   horUndoButton: { width: 18, height: 18, borderRadius: "50%", border: "none", background: "rgba(31,111,92,0.12)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.primaryDark, marginLeft: 6 },
   horRowEditInput: { width: "100%", border: `1px solid ${COLORS.primary}`, borderRadius: 6, padding: "5px 7px", fontSize: 12.5, color: COLORS.text, boxSizing: "border-box" },
@@ -208,10 +208,10 @@ const styles = {
   avTypeActiveNotice: { background: COLORS.primaryTint, borderColor: COLORS.primary, color: COLORS.primaryDark },
   avFormRow: { display: "flex", gap: 14 },
   avFormFooterRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 },
-  avAttachButton: { display: "flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: `1px dashed ${COLORS.border}`, background: "transparent", fontSize: 12.5, fontWeight: 600, color: COLORS.textSoft, cursor: "pointer" },
+  avAttachButton: { display: "flex", alignItems: "center", padding: "8px 14px", borderRadius: 8, border: `2px dashed ${COLORS.vivoLight}`, background: COLORS.mintBg, fontSize: 12.5, fontWeight: 700, color: COLORS.vivo, cursor: "pointer" },
   avAttachActive: { borderColor: COLORS.primary, color: COLORS.primaryDark, background: COLORS.primaryTint, borderStyle: "solid" },
   avSentNote: { fontSize: 12, fontWeight: 700, color: COLORS.primary },
-  avSendButtonSmall: { padding: "7px 14px", borderRadius: 8, border: "none", background: COLORS.primary, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", marginTop: 8 },
+  avSendButtonSmall: { padding: "7px 14px", borderRadius: 8, border: "none", background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", marginTop: 8 },
   avSection: { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px", borderRadius: 12, border: `1px solid ${COLORS.border}`, background: COLORS.bg, cursor: "pointer", marginBottom: 10 },
   avSectionTitle: { display: "flex", alignItems: "center", fontSize: 14, fontWeight: 700 },
   avSectionCount: { fontSize: 12, fontWeight: 700, color: COLORS.textSoft, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: "2px 9px" },
@@ -238,7 +238,7 @@ const styles = {
   defPhotoCircle: { width: 76, height: 76, borderRadius: "50%", background: COLORS.primaryTint, display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${COLORS.border}`, overflow: "hidden", position: "relative" },
   defPhotoImg: { width: "100%", height: "100%", objectFit: "cover" },
   defPhotoInitial: { fontSize: 26, fontWeight: 700, color: COLORS.primaryDark },
-  defPhotoButton: { padding: "6px 12px", borderRadius: 8, border: "none", background: COLORS.primary, color: "#fff", fontSize: 11.5, fontWeight: 600, cursor: "pointer" },
+  defPhotoButton: { padding: "6px 12px", borderRadius: 8, border: "none", background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`, color: "#fff", fontSize: 11.5, fontWeight: 600, cursor: "pointer" },
   defPhotoButtonOutline: { padding: "6px 12px", borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.textSoft, fontSize: 11.5, fontWeight: 600, cursor: "pointer" },
   defProfileFields: { flex: 1, display: "flex", flexDirection: "column", gap: 14 },
   defTextInput: { width: "100%", maxWidth: 340, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "9px 10px", fontSize: 13, color: COLORS.text, background: COLORS.bg, boxSizing: "border-box" },

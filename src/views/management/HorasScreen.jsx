@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Check, Pencil, X, RotateCcw } from "lucide-react";
+import { Check, Pencil, X, RotateCcw } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
@@ -18,6 +18,7 @@ import {
   Avatar, DataTable, Drawer, ConfirmDialog, Toast,
 } from "../shared/ui/index.js";
 import { LANG_NAMES } from "../../models/data.js";
+import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
 
 // "2026-09-20" -> Date local (meia-noite), igual ao resto do app faz com
 // datas ISO vindas de `horasData`.
@@ -299,21 +300,12 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         lang={lang} setLang={setLang} langNames={LANG_NAMES}
         actions={(
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 2, background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.pill, padding: 3 }}>
-              <button
-                type="button" onClick={() => setMonthOffset((m) => m - 1)} aria-label={t.previousPeriod}
-                style={{ width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, padding: "0 4px", whiteSpace: "nowrap" }}>{periodLabel}</span>
-              <button
-                type="button" onClick={() => setMonthOffset((m) => m + 1)} aria-label={t.nextPeriod}
-                style={{ width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink }}
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+            <PeriodNav
+              label={periodLabel} size={ctrlHeight - 6}
+              onPrev={() => setMonthOffset((m) => m - 1)} onNext={() => setMonthOffset((m) => m + 1)}
+              prevLabel={t.previousPeriod} nextLabel={t.nextPeriod}
+              labelStyle={{ fontSize: 13 }}
+            />
             <Button variant="secondary" onClick={exportPeriodPdf}>{t.exportPdfGeneral}</Button>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
               <Button variant="primary" disabled={!canClosePeriod} onClick={() => setCloseConfirmOpen(true)}>{t.closePeriod}</Button>

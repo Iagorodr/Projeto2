@@ -6,6 +6,7 @@ import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { T } from "../../models/i18n.js";
 import { PageHeader, Card, Button, ConfirmDialog, SegmentedBar, InfoTip } from "../shared/ui/index.js";
+import { Toggle } from "../shared/ui/Toggle.jsx";
 import { supabase } from "../../models/supabaseClient.js";
 
 // Diálogo simples de "feito" (um botão só) — reaproveitado pelo sucesso de
@@ -170,8 +171,8 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                   </div>
                   <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" style={{ display: "none" }} onChange={handlePhotoPick} />
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button style={styles.defPhotoButton} onClick={() => fileInputRef.current && fileInputRef.current.click()}>{t.changePhoto}</button>
-                    {photoDraft && <button style={styles.defPhotoButtonOutline} onClick={() => setPhotoDraft(null)}>{t.removePhoto}</button>}
+                    <Button onClick={() => fileInputRef.current && fileInputRef.current.click()}>{t.changePhoto}</Button>
+                    {photoDraft && <Button variant="secondary" onClick={() => setPhotoDraft(null)}>{t.removePhoto}</Button>}
                   </div>
                   <div style={{ ...styles.defSettingHint, textAlign: "center", marginTop: 0 }}>{t.photoHint}</div>
                 </div>
@@ -247,7 +248,7 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                   <div style={styles.defSettingLabel}>{t.highlightsRealtimeLabel}</div>
                   <div style={styles.defSettingHint}>{t.highlightsRealtimeHint}</div>
                 </div>
-                <input type="checkbox" checked={!!highlightsRealtime} onChange={(e) => setHighlightsRealtime(e.target.checked)} style={{ width: 20, height: 20, cursor: "pointer" }} />
+                <Toggle on={!!highlightsRealtime} onChange={setHighlightsRealtime} ariaLabel={t.highlightsRealtimeLabel} />
               </div>
               <div style={{ ...styles.defSettingRow, opacity: highlightsRealtime ? 0.45 : 1 }}>
                 <div style={{ flex: 1 }}>

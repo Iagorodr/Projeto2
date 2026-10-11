@@ -62,7 +62,7 @@ function CopyClientsDialog({ lang, title, clients: clientsProp, groups, header, 
         ) : (
           <>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: COLORS.ink, margin: "10px 0" }}>
-              <input type="checkbox" checked={withNote} onChange={(e) => setWithNote(e.target.checked)} />
+              <input type="checkbox" checked={withNote} onChange={(e) => setWithNote(e.target.checked)} style={{ accentColor: COLORS.vivo, width: 18, height: 18 }} />
               {t.shareWithNote}
             </label>
             <textarea readOnly value={text} rows={Math.min(16, text.split("\n").length + 1)} onFocus={(e) => e.target.select()}
