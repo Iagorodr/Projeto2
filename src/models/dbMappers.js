@@ -35,6 +35,7 @@ function toDbClient(c) {
     note: c.note,
     client_type: c.clientType,
     hours_mode: c.hoursMode || "dividida",
+    duration_by_day: c.durationByDay || {},
     client_valid_until: c.clientValidUntil,
     origin: c.origin,
   };
@@ -62,6 +63,7 @@ function fromDbClient(row) {
     note: row.note || "",
     clientType: row.client_type,
     hoursMode: row.hours_mode || "dividida",
+    durationByDay: row.duration_by_day || {},
     clientValidUntil: row.client_valid_until || "",
     origin: row.origin || "",
   };

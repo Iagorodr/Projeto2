@@ -7,7 +7,7 @@ import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
-  clientById, staffById, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
+  clientById, staffById, clientDurationOnDow, clientPartMinutes, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
   isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, absenceOn,
   isSupervisorRole,
 } from "../../models/utils.js";
@@ -452,7 +452,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
         const client = clientById(clients, cid);
         if (!client) return s;
         const teamSize = teamSizeFor(day, cid) || 1;
-        return s + Math.round(client.duration / teamSize);
+        return s + clientPartMinutes(client, day, teamSize);
       }, 0);
     }, 0);
   }
@@ -464,7 +464,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   function dayFooter(day) {
     const ids = new Set();
     staff.forEach((s) => getCellClientIds(s.id, day).forEach((cid) => ids.add(cid)));
-    const totalMin = [...ids].reduce((s, cid) => s + (clientById(clients, cid)?.duration || 0), 0);
+    const totalMin = [...ids].reduce((s, cid) => s + clientDurationOnDow(clientById(clients, cid), day), 0);
     return { count: ids.size, totalMin };
   }
 
@@ -588,12 +588,12 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                 if (!client) return null;
                 const team = staffOnClient(day, cid);
                 const teamSize = team.length;
-                const shared = teamSize > 1;
-                const perPerson = Math.round(client.duration / teamSize);
+                const shared = teamSize > 1 && client.hoursMode !== "individual";
+                const perPerson = clientPartMinutes(client, day, teamSize);
                 const recurring = isRecurringFreq(client.frequency);
                 const freqStyle = recurring ? FREQ_STYLE[client.frequency] : null;
                 const freqLabel = client.frequency === "biweekly" ? tc.freqBiweekly : client.frequency === "monthly" ? tc.freqMonthly : tc.freqAlternate;
-                const tooltip = `${client.name} · ${fmtMinutes(client.duration)}`
+                const tooltip = `${client.name} · ${fmtMinutes(clientDurationOnDow(client, day))}`
                   + (recurring ? ` · ${freqLabel}` : "")
                   + (shared ? ` · ${t.peopleLabel(teamSize)}, ${fmtMinutes(perPerson)} ${t.each}` : "");
 
@@ -697,7 +697,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                         >
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                           <span style={{ flexShrink: 0, fontSize: 11.5, color: COLORS.ink3 }}>
-                            {fmtMinutes(c.duration)}{existingTeamSize > 0 ? ` · ${t.alreadyWith(existingTeamSize)}` : ""}
+                            {fmtMinutes(clientDurationOnDow(c, day))}{existingTeamSize > 0 ? ` · ${t.alreadyWith(existingTeamSize)}` : ""}
                           </span>
                         </button>
                       );
@@ -760,9 +760,10 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
     {
       key: "duration", label: t.colDuration, width: 1.3,
       render: (r) => {
-        if (r.peopleCount < 2) return fmtMinutes(r.client.duration);
-        const per = Math.round(r.client.duration / r.peopleCount);
-        return `${fmtMinutes(r.client.duration)} · ${fmtMinutes(per)} ${t.each}`;
+        const full = clientDurationOnDow(r.client, selectedDay);
+        if (r.peopleCount < 2 || r.client.hoursMode === "individual") return fmtMinutes(full);
+        const per = clientPartMinutes(r.client, selectedDay, r.peopleCount);
+        return `${fmtMinutes(full)} · ${fmtMinutes(per)} ${t.each}`;
       },
     },
     {
@@ -793,7 +794,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
         // Esc/clique fora fecham), em vez de ser só leitura.
         const key = dayTeamKey(selectedDay, r.client.id);
         const isOpen = openTeam === key;
-        const perPerson = Math.round(r.client.duration / r.peopleCount);
+        const perPerson = clientPartMinutes(r.client, selectedDay, r.peopleCount);
         return (
           <div style={{ position: "relative" }}>
             <button

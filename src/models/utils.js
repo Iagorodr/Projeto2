@@ -55,7 +55,8 @@ function dayIsCovered(horasEntry, dateKey) {
 function recomputeSharedHours(horasDataObj, clients, date, clientId) {
   const client = clientById(clients, clientId);
   if (!client) return horasDataObj;
-  const baseDuration = client.duration / 60;
+  const firstEntry = Object.keys(horasDataObj).map((sid) => (horasDataObj[sid].entries || []).find((e) => e.date === date && e.clientId === clientId && !e.voided)).find(Boolean);
+  const baseDuration = clientDurationOn(client, (firstEntry && firstEntry.replacesDate) || date) / 60;
   // Cliente "individual": cada funcionário regista a duração completa, sem divisão.
   if (client.hoursMode === "individual") {
     const nextInd = { ...horasDataObj };
@@ -568,13 +569,37 @@ function getAssignedClientIds(assignments, staffId) {
 // mas para uma data específica, reutilizável em Horas e Agenda. `assignments`
 // guarda `staffId-diaDaSemana(1-7)` -> ids de cliente; `clientAppliesThisWeek`
 // filtra quinzenal/mensal pela semana da data dada.
+// Duração (minutos) de um cliente num dia da semana ISO (1=seg … 7=dom):
+// exceção por dia (`durationByDay`) ou a duração padrão.
+function clientDurationOnDow(client, dow) {
+  if (!client) return 0;
+  const o = client.durationByDay && client.durationByDay[String(dow)];
+  return Number(o) > 0 ? Number(o) : (client.duration || 0);
+}
+function dowOfIso(dateStr) {
+  const [y, m, d] = String(dateStr).slice(0, 10).split("-").map(Number);
+  const wd = new Date(y, m - 1, d).getDay();
+  return wd === 0 ? 7 : wd;
+}
+function clientDurationOn(client, date) {
+  const dow = typeof date === "string" ? dowOfIso(date) : (date.getDay() === 0 ? 7 : date.getDay());
+  return clientDurationOnDow(client, dow);
+}
+// Parte de um funcionário (minutos): total do dia ÷ equipa, ou o total
+// inteiro quando o cliente é "individual".
+function clientPartMinutes(client, dow, teamSize) {
+  const dur = clientDurationOnDow(client, dow);
+  return client && client.hoursMode === "individual" ? dur : Math.round(dur / (teamSize || 1));
+}
+
 function dayScheduledClients(clients, assignments, staffId, date) {
   const dow = date.getDay() === 0 ? 7 : date.getDay();
   const weekStart = startOfISOWeek(date);
   const clientIds = assignments[`${staffId}-${dow}`] || [];
   return clientIds
     .map((id) => clientById(clients, id))
-    .filter((c) => c && clientAppliesOnDate(c, date));
+    .filter((c) => c && clientAppliesOnDate(c, date))
+    .map((c) => { const dur = clientDurationOn(c, date); return dur === c.duration ? c : { ...c, duration: dur }; });
 }
 
 // Etapa 4b (secção 5.1, "Esta semana") — resumo da semana CIVIL corrente
@@ -767,7 +792,7 @@ function clientTeamStaffIds(assignments, clientId) {
 // mês, mesma constante usada em calendários de RH). Devolve horas em
 // decimal, pronta para `fmtHoursScreen`.
 function agendaHoursSuggestion(client) {
-  const weeklyHours = ((client.duration || 0) / 60) * (client.days || []).length;
+  const weeklyHours = (client.days || []).reduce((sum, d) => sum + clientDurationOnDow(client, d) / 60, 0);
   // "dia sim, dia não": em média metade dos dias marcados cai em cada semana.
   return weeklyHours * 4.33 / (client.frequency === "alternate" ? 2 : 1);
 }
@@ -815,4 +840,4 @@ function pctChange(current, previous) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

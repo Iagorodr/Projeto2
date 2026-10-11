@@ -10,7 +10,7 @@ import {
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
-  staffStartedOn, absenceOn,
+  staffStartedOn, absenceOn, clientDurationOn,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -199,7 +199,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     if (!client) return;
     setHorasData((prev) => {
       const current = prev[staffId] || emptyHoras();
-      const entry = { date: selectedKey, clientId, hours: (client.duration || 60) / 60, extra: false, extraMinutes: 0, approved: false, voided: false };
+      const entry = { date: selectedKey, clientId, hours: (clientDurationOn(client, replacesDate || selectedKey) || 60) / 60, extra: false, extraMinutes: 0, approved: false, voided: false };
       if (replacesDate) entry.replacesDate = replacesDate;
       let withNew = { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
       if (pairOn && !replacesDate) {
@@ -233,7 +233,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // restante do total do cliente vai automaticamente para os colegas.
   function splitLimits(entry) {
     const client = clientById(clients, entry.clientId);
-    const total = client ? client.duration / 60 : 0;
+    const total = client ? clientDurationOn(client, entry.replacesDate || entry.date) / 60 : 0;
     const othersAdjusted = Object.keys(horasData).reduce((sum, sid) => {
       if (String(sid) === String(staffId)) return sum;
       const o = (horasData[sid].entries || []).find((x) => x.date === entry.date && x.clientId === entry.clientId && !x.voided && x.splitAdjusted);
@@ -909,7 +909,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             >
               <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{c.name}</span>
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{fmtMinutes(c.duration)}</span>
+                <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{fmtMinutes(clientDurationOn(c, selectedDate))}</span>
                 <Plus size={16} color={COLORS.forest600} />
               </span>
             </button>
@@ -969,7 +969,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 14px", borderRadius: RADIUS.control, border: `1px solid ${COLORS.line}`, background: COLORS.card, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
             >
               <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{client.name}</span>
-              <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{weekdayFull[date.getDay()]} {String(date.getDate()).padStart(2, "0")}/{String(date.getMonth() + 1).padStart(2, "0")} · {fmtMinutes(client.duration)}</span>
+              <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{weekdayFull[date.getDay()]} {String(date.getDate()).padStart(2, "0")}/{String(date.getMonth() + 1).padStart(2, "0")} · {fmtMinutes(clientDurationOn(client, date))}</span>
             </button>
           ));
           const heading = (txt) => <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: COLORS.ink3, margin: "6px 0 -2px" }}>{txt}</div>;

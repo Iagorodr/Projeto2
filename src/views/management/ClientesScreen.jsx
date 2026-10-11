@@ -484,6 +484,11 @@ function ClientesScreen({
                 return next ? <ViewField label={t.fNextVisitWeek}>{weekLabelPT(next, lang)}</ViewField> : null;
               })()}
               <ViewField label={t.fHoursPerDay}>{openClient.duration ? fmtMinutes(openClient.duration) : "—"}</ViewField>
+              {Object.keys(openClient.durationByDay || {}).length > 0 && (
+                <ViewField label={t.durationByDayLabel}>
+                  {Object.entries(openClient.durationByDay).sort(([a], [b]) => a - b).map(([d, m]) => `${dayLabels[d]} ${fmtMinutes(m)}`).join(" · ")}
+                </ViewField>
+              )}
               <ViewField label={t.fDaysPerWeek} full>
                 {openClient.days && openClient.days.length > 0
                   ? `${openClient.days.map((d) => dayLabels[d]).join(" ")} (${openClient.days.length})`
@@ -693,6 +698,31 @@ function ClientesScreen({
                 })}
               </div>
             </Field>
+            {(draft.days || []).length > 0 && (
+              <Field label={t.durationByDayLabel} full>
+                <div style={{ fontSize: 11.5, color: COLORS.ink3, marginBottom: 6 }}>{t.durationByDayHint}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[...(draft.days || [])].sort((a, b) => a - b).map((d) => {
+                    const ov = (draft.durationByDay || {})[String(d)];
+                    return (
+                      <div key={d} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{ width: 44, fontSize: 12.5, fontWeight: 600, color: COLORS.ink2 }}>{dayLabels[d]}</div>
+                        <div style={{ flex: 1 }}>
+                          <DurationField
+                            value={ov || draft.duration}
+                            onChange={(v) => {
+                              const next = { ...(draft.durationByDay || {}) };
+                              if (!v || Number(v) === Number(draft.duration)) delete next[String(d)]; else next[String(d)] = Number(v);
+                              updateDraft("durationByDay", next);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
             <Field label={t.formDescription} full><textarea style={styles.textarea} rows={2} value={draft.description} onChange={(e) => updateDraft("description", e.target.value)} /></Field>
             <Field label={t.formPriorities} full><textarea style={styles.textarea} rows={2} value={draft.priorities} onChange={(e) => updateDraft("priorities", e.target.value)} /></Field>
             <Field label={t.formNote} full><textarea style={styles.textarea} rows={2} value={draft.note} onChange={(e) => updateDraft("note", e.target.value)} /></Field>

@@ -7,7 +7,7 @@ import { RADIUS } from "../../styles/tokens.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   staffById, pad2, fmtMinutes, startOfISOWeek, addDays, isoDateStr, clientAppliesOnDate,
-  weekLabelPT, isStaffActive, monthAbbr,
+  weekLabelPT, isStaffActive, monthAbbr, clientDurationOnDow, clientPartMinutes,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { PageHeader, Pill, MobileHeader } from "../shared/ui/index.js";
@@ -63,11 +63,12 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   // (4.3), só que por dia em vez de somada na semana.
   function occurrenceMeta(day, client) {
     const teamSize = teamSizeFor(day, client.id) || 1;
-    const shared = teamSize > 1;
-    const perPersonMin = Math.round(client.duration / teamSize);
+    const shared = teamSize > 1 && client.hoursMode !== "individual";
+    const dur = clientDurationOnDow(client, day);
+    const perPersonMin = clientPartMinutes(client, day, teamSize);
     const recurring = client.frequency === "biweekly" || client.frequency === "monthly" || client.frequency === "alternate";
     const freqLabel = client.frequency === "biweekly" ? t.freqBiweekly : client.frequency === "monthly" ? t.freqMonthly : t.freqAlternate;
-    return { teamSize, shared, perPersonMin, recurring, freqLabel };
+    return { teamSize, shared, perPersonMin, recurring, freqLabel, dur };
   }
 
   // `isStaffActive(me, date)` por DATA (não por hoje): uma conta Replacement
@@ -116,7 +117,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   // recorrência à parte, separador + descrição. Partilhado: cartão clay-tint
   // com ícone de pessoas (documento, 5.3).
   function ClientCard({ day, client }) {
-    const { shared, perPersonMin, recurring, freqLabel, teamSize } = occurrenceMeta(day, client);
+    const { shared, perPersonMin, recurring, freqLabel, teamSize, dur } = occurrenceMeta(day, client);
     return (
       <div
         style={{
@@ -130,7 +131,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
             <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: shared ? COLORS.clayInk : COLORS.ink2, marginTop: 2 }}>
               {shared && <UsersRound size={12} strokeWidth={1.8} style={{ flexShrink: 0 }} />}
               <span>
-                {shared ? `${t.peopleLabel(teamSize)} · ${fmtMinutes(perPersonMin)} ${t.each}` : fmtMinutes(client.duration)}
+                {shared ? `${t.peopleLabel(teamSize)} · ${fmtMinutes(perPersonMin)} ${t.each}` : fmtMinutes(dur)}
                 {client.availability ? ` · ${client.availability}` : ""}
               </span>
             </div>
@@ -150,8 +151,8 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   // centro") — mesmo visual dos chips de AgendasScreen.jsx (gerência, 4.3),
   // sem descrição (vista de relance, não de detalhe).
   function ClientChip({ day, client }) {
-    const { shared, perPersonMin, recurring, teamSize } = occurrenceMeta(day, client);
-    const tooltip = `${client.name} · ${fmtMinutes(client.duration)}${shared ? ` · ${t.peopleLabel(teamSize)}, ${fmtMinutes(perPersonMin)} ${t.each}` : ""}`;
+    const { shared, perPersonMin, recurring, teamSize, dur } = occurrenceMeta(day, client);
+    const tooltip = `${client.name} · ${fmtMinutes(dur)}${shared ? ` · ${t.peopleLabel(teamSize)}, ${fmtMinutes(perPersonMin)} ${t.each}` : ""}`;
     return (
       <div
         title={tooltip}
@@ -165,7 +166,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
           {client.name}
         </span>
         <span style={{ flexShrink: 0, fontWeight: 600, color: shared ? COLORS.clayInk : COLORS.ink2 }}>
-          {fmtMinutes(shared ? perPersonMin : client.duration)}
+          {fmtMinutes(shared ? perPersonMin : dur)}
         </span>
         {recurring && <RefreshCw size={10} style={{ flexShrink: 0, color: shared ? COLORS.clayInk : COLORS.ink3 }} />}
       </div>
