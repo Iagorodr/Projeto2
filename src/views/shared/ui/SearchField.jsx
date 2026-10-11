@@ -28,14 +28,14 @@ function SearchField({ value, onChange, placeholder, mobile, clearLabel = "Limpa
       style={{
         display: "flex", alignItems: "center", gap: 8, height,
         borderRadius: radius, background: COLORS.card,
-        border: `1px solid ${focused ? COLORS.forest500 : COLORS.lineInput}`,
+        border: `1.5px solid ${focused ? COLORS.vivoLight : COLORS.fieldBorder}`,
         boxShadow: focused ? "0 0 0 3px rgba(46,133,112,.2)" : "none",
         padding: "0 12px", transition: `border-color ${MOTION.fast} ease, box-shadow ${MOTION.fast} ease`,
         boxSizing: "border-box",
         ...style,
       }}
     >
-      <Search size={18} strokeWidth={1.8} color={COLORS.ink3} style={{ flexShrink: 0 }} />
+      <Search size={18} strokeWidth={2} color={COLORS.vivo} style={{ flexShrink: 0 }} />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}

@@ -34,6 +34,16 @@ const COLORS = {
   // cores do Avatar (2.4) — aparece nas duas secções de Componentes mas
   // não tem nome na tabela de cores 1.1, por isso ganha um aqui (Etapa 2).
   steelBg: "#E4EDF1", steelInk: "#3F5A66",
+
+  // Direção "Verde vivo" (Tomás, botões e ícones): o verde passa a ser a cor
+  // de ação em todo o app. Valores com contraste verificado no documento.
+  vivo: "#1F7A5F", vivoLight: "#2A8A73", vivoInk: "#185A4A",
+  vivoBtnTop: "#238A69", vivoBtnBottom: "#1A6F56", vivoToggleOn: "#27916F",
+  mint: "#D4E8DF", mintBg: "#F2FAF6", iconBorder: "#B6D4C8", fieldBorder: "#7A9A8C",
+  disabledBg: "#DCE8E2", disabledInk: "#4F6B5F",
+  navDeep: "#0F3129", navText: "#EAF5EF", navIcon: "#BDE6D5", navIconActive: "#F6AE8B", navBottomText: "#E2F1EA",
+  dangerInk: "#B3392A", dangerBg: "#FCE6E1", dangerSolid: "#C8442F",
+  rowIconBg: "#FBE4DC", rowIconInk: "#B3492E", onClay: "#3A1A0D",
 };
 
 export { COLORS };

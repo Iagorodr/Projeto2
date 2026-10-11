@@ -13,7 +13,7 @@ function SegmentedControl({ options, value, onChange }) {
   return (
     <div
       style={{
-        display: "inline-flex", background: COLORS.segmentBg, borderRadius: RADIUS.control,
+        display: "inline-flex", background: COLORS.mint, borderRadius: RADIUS.control,
         padding: 3, gap: 2,
       }}
     >
@@ -27,9 +27,9 @@ function SegmentedControl({ options, value, onChange }) {
             style={{
               border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
               padding: "7px 14px", borderRadius: RADIUS.control - 2,
-              background: active ? COLORS.card : "transparent",
-              color: active ? COLORS.ink : COLORS.ink2,
-              boxShadow: active ? "0 1px 2px rgba(20,63,53,.12)" : "none",
+              background: active ? COLORS.vivo : "transparent",
+              color: active ? "#fff" : COLORS.vivoInk,
+              boxShadow: active ? "0 2px 6px -2px rgba(31,122,95,.6)" : "none",
               transition: `background ${MOTION.fast} ease, box-shadow ${MOTION.fast} ease`,
               fontFamily: "inherit",
             }}

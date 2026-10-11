@@ -42,9 +42,7 @@ function MobileBottomBar({ items, activeKey, onNavigate }) {
         // sticky por um wrapper (que quebraria o `position:sticky`).
         margin: "0 -14px -14px",
         position: "sticky", bottom: 0, zIndex: 30,
-        background:
-          "radial-gradient(circle at 10% 8%, rgba(226,138,101,.18), transparent 45%), " +
-          "linear-gradient(180deg, #1F6F5C 0%, #143F35 100%)",
+        background: COLORS.navDeep,
         display: "flex", justifyContent: "space-around",
         padding: "18px 4px",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)",
@@ -53,8 +51,8 @@ function MobileBottomBar({ items, activeKey, onNavigate }) {
       {items.map((item) => {
         const active = item.key === activeKey;
         const Icon = item.icon;
-        const iconColor = active ? "#3A1A0D" : "rgba(255,255,255,.78)";
-        const labelColor = active ? "#fff" : "rgba(255,255,255,.78)";
+        const iconColor = active ? COLORS.onClay : COLORS.navBottomText;
+        const labelColor = active ? "#fff" : COLORS.navBottomText;
         return (
           <button
             key={item.key}
@@ -72,7 +70,7 @@ function MobileBottomBar({ items, activeKey, onNavigate }) {
                 background: active ? COLORS.clay : "transparent", position: "relative",
               }}
             >
-              <Icon size={28} strokeWidth={1.8} color={iconColor} />
+              <Icon size={28} strokeWidth={2} color={iconColor} />
               {item.badge != null && item.badge > 0 && (
                 <span
                   style={{

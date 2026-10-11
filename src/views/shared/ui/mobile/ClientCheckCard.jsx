@@ -35,12 +35,12 @@ function ClientCheckCard({
         disabled={readOnly}
         aria-label={name}
         style={{
-          width: 34, height: 34, borderRadius: "50%", flexShrink: 0, border: `2px solid ${checked ? COLORS.ok : COLORS.lineInput}`,
-          background: checked ? COLORS.ok : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+          width: 34, height: 34, borderRadius: "50%", flexShrink: 0, border: `2.5px solid ${COLORS.vivo}`,
+          background: checked ? COLORS.vivo : COLORS.mintBg, display: "flex", alignItems: "center", justifyContent: "center",
           cursor: readOnly ? "default" : "pointer",
         }}
       >
-        {checked && <Check size={18} color="#fff" strokeWidth={2.5} />}
+        {checked && <Check size={18} color="#fff" strokeWidth={3} />}
       </button>
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -61,7 +61,7 @@ function ClientCheckCard({
         {!readOnly && !dimmed && onAdjustSplit && (
           <button
             type="button" onClick={onAdjustSplit}
-            style={{ marginTop: 6, padding: 0, border: "none", background: "transparent", color: COLORS.forest700, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
+            style={{ marginTop: 6, padding: 0, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
           >
             {adjustSplitLabel}
           </button>

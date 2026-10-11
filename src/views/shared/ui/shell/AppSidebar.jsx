@@ -46,8 +46,7 @@ function AppSidebar({
         position: "sticky", top: 0, height: "100dvh", alignSelf: "flex-start",
         padding: iconsOnly || rail ? "20px 8px" : "20px 16px",
         background:
-          "radial-gradient(circle at 10% 8%, rgba(226,138,101,.18), transparent 45%), " +
-          "linear-gradient(180deg, #16483A 0%, #0F3129 100%)",
+          "linear-gradient(180deg, #2A5E50 0%, #143F35 100%)",
         boxSizing: "border-box",
       }}
     >
@@ -97,16 +96,16 @@ function AppSidebar({
                 height: rail ? "auto" : itemHeight, padding: rail ? "10px 4px" : iconsOnly ? "0" : "0 10px",
                 flexDirection: rail ? "column" : "row", justifyContent: iconsOnly ? "center" : "flex-start",
                 borderRadius: 10, border: "1px solid transparent", cursor: "pointer", fontFamily: "inherit",
-                background: active ? "rgba(255,255,255,.13)" : "transparent",
-                borderColor: active ? "rgba(255,255,255,.07)" : "transparent",
-                color: active ? "#fff" : "rgba(255,255,255,.72)",
+                background: active ? "rgba(226,138,101,.22)" : "transparent",
+                borderColor: "transparent",
+                color: active ? "#fff" : COLORS.navText,
               }}
             >
               {active && (
-                <span style={{ position: "absolute", left: rail ? "50%" : 0, top: rail ? "auto" : 0, bottom: rail ? 0 : 0, transform: rail ? "translateX(-50%)" : "none", width: rail ? 28 : 4, height: rail ? 3 : "100%", borderRadius: 2, background: COLORS.clay }} />
+                <span style={{ position: "absolute", left: rail ? "50%" : 0, top: rail ? "auto" : 0, bottom: rail ? 0 : 0, transform: rail ? "translateX(-50%)" : "none", width: rail ? 28 : 3, height: rail ? 3 : "100%", borderRadius: 2, background: COLORS.clay }} />
               )}
               <span style={{ position: "relative", display: "flex" }}>
-                <Icon size={rail ? 24 : 17} strokeWidth={1.8} />
+                <Icon size={rail ? 24 : 17} strokeWidth={1.9} color={active ? COLORS.navIconActive : COLORS.navIcon} />
                 {item.badge != null && item.badge > 0 && (
                   <span
                     style={{
@@ -120,7 +119,7 @@ function AppSidebar({
                 )}
               </span>
               {!iconsOnly && (
-                <span style={{ fontSize: rail ? 12 : 13, fontWeight: active ? 700 : 500, textAlign: rail ? "center" : "left" }}>
+                <span style={{ fontSize: rail ? 12 : 13, fontWeight: active ? 600 : 500, textAlign: rail ? "center" : "left" }}>
                   {item.label}
                 </span>
               )}

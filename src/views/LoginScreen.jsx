@@ -148,7 +148,7 @@ function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLogi
               <button
                 type="button"
                 onClick={() => setShowForgotHelp((v) => !v)}
-                style={{ border: "none", background: "transparent", cursor: "pointer", color: COLORS.forest700, fontSize: 12.5, fontWeight: 600, padding: 0 }}
+                style={{ border: "none", background: "transparent", cursor: "pointer", color: COLORS.vivo, fontSize: 13, fontWeight: 600, padding: "10px 0", textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4, fontFamily: "inherit" }}
               >
                 {t.forgotPassword}
               </button>

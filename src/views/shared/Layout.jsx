@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronRight, LayoutDashboard, Users, CalendarDays, Clock, Bell, UsersRound, Settings,
   Search, X, Pencil, Mail, Phone, Briefcase, Calendar, KeyRound, MapPin, Euro, RotateCcw, Check,
   Plus, Store, Building2, Home as HouseIcon, Factory, MessageSquare, ThumbsUp, PackageX, Info, Archive,
-  Download, Share, LogOut,
+  Download, Share, LogOut, Globe,
 } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -24,6 +24,7 @@ function LangSwitcher({ lang, setLang }) {
   return (
     <div style={{ position: "relative" }}>
       <button style={{ ...styles.langButton, height, borderRadius: radius }} onClick={() => setOpen((o) => !o)}>
+        <Globe size={15} strokeWidth={2} color={COLORS.vivo} style={{ marginRight: 6 }} />
         {LANG_NAMES[lang]}
         <ChevronDown size={14} style={{ marginLeft: 4 }} />
       </button>

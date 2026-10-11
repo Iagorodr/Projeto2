@@ -41,7 +41,7 @@ const styles = {
   content: { flex: 1, padding: "22px 28px", overflowY: "auto" },
   // `topBar`/`todayLabel` eram só do `TopBar` (views/shared/Layout.jsx),
   // removido na limpeza pós-Etapa 4 — removidos junto por ficarem órfãos.
-  langButton: { display: "flex", alignItems: "center", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 13, fontWeight: 500, color: COLORS.text, cursor: "pointer" },
+  langButton: { display: "flex", alignItems: "center", background: COLORS.card, border: `1.5px solid ${COLORS.fieldBorder}`, borderRadius: 8, padding: "6px 10px", fontSize: 13, fontWeight: 600, color: COLORS.vivoInk, cursor: "pointer" },
   langMenu: { position: "absolute", right: 0, top: 34, background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 10, overflow: "hidden", zIndex: 20, minWidth: 120 },
   langMenuItem: { display: "block", width: "100%", textAlign: "left", padding: "9px 12px", fontSize: 13, border: "none", background: "transparent", cursor: "pointer", color: COLORS.text },
 
@@ -52,7 +52,7 @@ const styles = {
   // equivalente (`mobStyles.searchWrap`/`searchInput`) continua em uso
   // num ecrã (EmployeeClientesScreen.jsx), por isso não foi tocada.
   newButton: { padding: "10px 16px", borderRadius: 10, border: "none", background: COLORS.primary, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", letterSpacing: "0.1px", boxShadow: "0 1px 3px rgba(20,63,53,0.22)" },
-  installAppButton: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "8px 0", background: "none", border: "none", color: COLORS.textSoft, fontSize: 12, fontWeight: 500, cursor: "pointer" },
+  installAppButton: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "12px 0", background: "none", border: "none", color: COLORS.vivo, fontSize: 13.5, fontWeight: 600, cursor: "pointer", textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4, fontFamily: "inherit" },
   fieldError: { fontSize: 11, fontWeight: 600, color: COLORS.extra, marginTop: 4 },
 
   tableWrap: { border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: "hidden" },

@@ -5,6 +5,7 @@
 // nenhum ecrã") corrigido aqui, varredura de QA pós-Etapa 4, sem mudança
 // de comportamento.
 import { useState } from "react";
+import { Lock } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";
 import { MOTION } from "../../../styles/tokens.js";
 import { useControlSize } from "../../../hooks/useBreakpoint.js";
@@ -36,8 +37,8 @@ function variantStyle(variant, hover) {
   switch (variant) {
     case "secondary":
       return {
-        background: hover ? COLORS.forest50 : COLORS.card,
-        color: COLORS.forest700, border: `1.5px solid #9FB8AE`,
+        background: hover ? COLORS.mintBg : COLORS.card,
+        color: COLORS.vivo, border: `2px solid ${COLORS.vivo}`,
       };
     case "ghost":
       // Lote 4, 4.4 (achado da Marta, itens "Redefinir" 88×16 e "Tive um
@@ -46,19 +47,23 @@ function variantStyle(variant, hover) {
       // mesmo tamanho, só a área clicável (centrada por `alignItems:
       // center` do BASE) cresce para 40/48.
       return {
-        background: "transparent", color: COLORS.forest700, padding: "0 6px",
-        textDecoration: hover ? "underline" : "none",
+        background: "transparent", color: COLORS.vivo, padding: "0 6px",
+        textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4,
+        opacity: hover ? 0.85 : 1,
       };
     case "dangerSoft":
-      return { background: COLORS.alertTint, color: COLORS.alert };
+      return { background: COLORS.dangerBg, color: COLORS.dangerInk };
     case "dangerSolid":
-      return { background: COLORS.alert, color: "#fff" };
+      return { background: COLORS.dangerSolid, color: "#fff" };
+    case "add":
+      // "Adicionar": tracejado verde, fundo menta, círculo verde cheio com "+".
+      return { background: COLORS.mintBg, color: COLORS.vivo, border: `2px dashed ${COLORS.vivoLight}` };
     case "primary":
     default:
       return {
-        background: `linear-gradient(140deg, #2A8A73, ${COLORS.forest600})`,
+        background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`,
         color: "#fff",
-        boxShadow: "0 8px 18px -8px rgba(31,111,92,.7)",
+        boxShadow: "0 10px 20px -8px rgba(31,122,95,.7), inset 0 1px 0 rgba(255,255,255,.3)",
       };
   }
 }
@@ -89,9 +94,16 @@ function Button({
         borderRadius: variant === "ghost" ? 0 : radius,
         opacity: disabled ? 0.45 : 1,
         cursor: disabled ? "not-allowed" : "pointer",
+        // Principal desativado: verde-menta apagado com cadeado (nunca só
+        // "cinzento a 45%"), sem sombra.
+        ...(disabled && variant === "primary" ? { background: COLORS.disabledBg, color: COLORS.disabledInk, boxShadow: "none", opacity: 1 } : null),
         ...style,
       }}
     >
+      {disabled && variant === "primary" && !Icon && <Lock size={14} strokeWidth={2} />}
+      {variant === "add" && !Icon && (
+        <span style={{ width: 20, height: 20, borderRadius: "50%", background: COLORS.vivo, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 15, lineHeight: 1, fontWeight: 700 }}>+</span>
+      )}
       {Icon && <Icon size={14} strokeWidth={1.8} />}
       {children}
     </button>
@@ -126,14 +138,14 @@ function IconButton({ icon: Icon, size = "gerencia", onClick, ariaLabel, disable
       onMouseLeave={() => setHover(false)}
       style={{
         width: dim, height: dim, borderRadius: radius,
-        border: `1px solid ${COLORS.line}`, background: hover && !disabled ? COLORS.forest50 : COLORS.card,
+        border: `1.5px solid ${COLORS.iconBorder}`, background: hover && !disabled ? COLORS.mintBg : COLORS.card,
         display: "flex", alignItems: "center", justifyContent: "center",
         cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1,
-        color: COLORS.forest700, transition: `background ${MOTION.fast} ease`,
+        color: COLORS.vivo, transition: `background ${MOTION.fast} ease`,
         ...style,
       }}
     >
-      <Icon size={18} strokeWidth={1.8} />
+      <Icon size={18} strokeWidth={2} />
     </button>
   );
 }

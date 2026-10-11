@@ -62,8 +62,8 @@ function MoreSheet({ open, onClose, items, user }) {
                   background: "transparent", cursor: "pointer", fontFamily: "inherit", width: "100%",
                 }}
               >
-                <span style={{ width: 44, height: 44, borderRadius: 14, background: COLORS.forest50, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 }}>
-                  <Icon size={20} strokeWidth={1.8} color={COLORS.forest600} />
+                <span style={{ width: 44, height: 44, borderRadius: 14, background: COLORS.rowIconBg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 }}>
+                  <Icon size={20} strokeWidth={1.9} color={COLORS.rowIconInk} />
                   {item.badge != null && item.badge > 0 && (
                     <span
                       style={{
@@ -79,7 +79,11 @@ function MoreSheet({ open, onClose, items, user }) {
                 <span style={{ flex: 1, textAlign: "left", fontSize: 17, fontWeight: 600, color: COLORS.ink }}>{item.label}</span>
                 {/* "Sair" encerra a sessão em vez de navegar — sem seta,
                     pra não parecer mais uma tela dentro da folha. */}
-                {!isLogout && <ChevronRight size={18} color={COLORS.ink3} />}
+                {!isLogout && (
+                  <span style={{ width: 28, height: 28, borderRadius: "50%", background: COLORS.mint, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <ChevronRight size={16} strokeWidth={2.2} color={COLORS.vivo} />
+                  </span>
+                )}
               </button>
             );
           })}
