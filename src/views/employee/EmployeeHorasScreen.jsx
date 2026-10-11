@@ -342,11 +342,12 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     const dateKey = isoDateStr(d);
     const hasAgenda = scheduledIfActive(d).length > 0;
     const covered = dayIsCovered(myHoras, dateKey);
+    const hasEntries = myHoras.entries.some((e) => e.date === dateKey && !e.voided);
     const isFuture = d > TODAY;
     let state;
     if (weekLockedFlag) state = "weekLocked";
-    else if (!hasAgenda) state = "noClients";
-    else if (covered) state = "registered";
+    else if (!hasAgenda && !hasEntries) state = "noClients";
+    else if (covered || hasEntries) state = "registered";
     else if (isFuture) state = "future";
     else state = "missing";
     if (dateKey === selectedKey) state = "selected";
@@ -711,14 +712,19 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                     <div style={{ marginBottom: weekLockedFlag ? 0 : 8 }}>{t.noAttendanceTitle}</div>
                     {!weekLockedFlag && <Button variant="ghost" onClick={undoNoClientDay}>{t.noAttendanceUndo}</Button>}
                   </div>
-                ) : !hasAgendaToday ? (
+                ) : !hasAgendaToday && dayCards.length === 0 ? (
+                  // Só mostra "não tem clientes hoje" se NÃO houver nada
+                  // registado nesse dia. Antes aparecia sempre que a agenda
+                  // do dia estava vazia e escondia os lançamentos já feitos
+                  // (ex.: semana reaberta, clientes marcados "mesmo assim"):
+                  // o total do dia dizia 8h mas não se via de quê.
                   <div>
                     <div style={{ marginBottom: weekLockedFlag ? 0 : 8 }}>{t.noAgendaTitle}</div>
                     {!weekLockedFlag && <Button variant="ghost" onClick={() => setAddClientOpen(true)}>{t.noAgendaGhost}</Button>}
                   </div>
                 ) : undefined
               }
-              onAddClient={!weekLockedFlag && !markedNoClient && hasAgendaToday ? () => setAddClientOpen(true) : undefined}
+              onAddClient={!weekLockedFlag && !markedNoClient && (hasAgendaToday || dayCards.length > 0) ? () => setAddClientOpen(true) : undefined}
               addClientLabel={t.addClientButton}
             >
               {dayCards.map((card) => (
@@ -756,7 +762,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                 mesma linha) e o texto pode quebrar em 2 linhas dentro do
                 próprio botão (`whiteSpace:"normal"`, altura automática)
                 em vez de estourar a largura. */}
-            {!weekLockedFlag && !markedNoClient && hasAgendaToday && (
+            {!weekLockedFlag && !markedNoClient && (hasAgendaToday || dayCards.length > 0) && (
               <div style={{ display: "flex", flexWrap: "nowrap", gap: 10, marginTop: -6, alignItems: "stretch" }}>
                 {entriesForDay.length === 0 && selectedDate <= TODAY && (
                   <Button
