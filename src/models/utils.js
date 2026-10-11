@@ -56,6 +56,22 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId) {
   const client = clientById(clients, clientId);
   if (!client) return horasDataObj;
   const baseDuration = client.duration / 60;
+  // Cliente "individual": cada funcionário regista a duração completa, sem divisão.
+  if (client.hoursMode === "individual") {
+    const nextInd = { ...horasDataObj };
+    Object.keys(horasDataObj).forEach((sid) => {
+      const list = horasDataObj[sid].entries || [];
+      if (!list.some((e) => e.date === date && e.clientId === clientId && !e.voided)) return;
+      nextInd[sid] = { ...horasDataObj[sid], entries: list.map((e) => {
+        if (e.date === date && e.clientId === clientId && !e.voided) {
+          const { splitAdjusted, splitHours, ...rest } = e;
+          return { ...rest, hours: baseDuration + (e.extraMinutes || 0) / 60, sharedCount: 1 };
+        }
+        return e;
+      }) };
+    });
+    return nextInd;
+  }
   const staffIdsInvolved = Object.keys(horasDataObj).filter((sid) =>
     (horasDataObj[sid].entries || []).some((e) => e.date === date && e.clientId === clientId && !e.voided)
   );

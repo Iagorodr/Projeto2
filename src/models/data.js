@@ -210,7 +210,7 @@ const EMPTY_CLIENT = {
   contractStart: "", contractEnd: "", hoursMonth: "", valueHour: "",
   frequency: "weekly", availability: "", duration: "", days: [],
   description: "", priorities: "", note: "",
-  clientType: "fixo", clientValidUntil: "", origin: "",
+  clientType: "fixo", hoursMode: "dividida", clientValidUntil: "", origin: "",
 };
 
 const CLIENT_TYPES = { store: "Loja", office: "Escritório", house: "Residência", factory: "Fábrica" };

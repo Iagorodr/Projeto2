@@ -34,6 +34,7 @@ function toDbClient(c) {
     priorities: c.priorities,
     note: c.note,
     client_type: c.clientType,
+    hours_mode: c.hoursMode || "dividida",
     client_valid_until: c.clientValidUntil,
     origin: c.origin,
   };
@@ -60,6 +61,7 @@ function fromDbClient(row) {
     priorities: row.priorities || "",
     note: row.note || "",
     clientType: row.client_type,
+    hoursMode: row.hours_mode || "dividida",
     clientValidUntil: row.client_valid_until || "",
     origin: row.origin || "",
   };

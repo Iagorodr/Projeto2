@@ -470,6 +470,7 @@ function ClientesScreen({
               </ViewField>
               <ViewField icon={Euro} label={t.fValueHour}>{openClient.valueHour ? `€ ${openClient.valueHour}` : "—"}</ViewField>
               <ViewField label={t.fHoursMonth}>{openClient.hoursMonth ? fmtHoursScreen(openClient.hoursMonth) : "—"}</ViewField>
+              <ViewField label={t.fHoursMode}>{openClient.hoursMode === "individual" ? t.hoursModeIndividual : t.hoursModeSplit}</ViewField>
               {openClient.clientType === "replacement" && (
                 <ViewField icon={Calendar} label={t.fValidUntil}>{openClient.clientValidUntil || "—"}</ViewField>
               )}
@@ -636,6 +637,13 @@ function ClientesScreen({
                 <option value="fixo">{t.clientTypeFixed}</option>
                 <option value="replacement">{t.clientTypeReplacement}</option>
               </select>
+            </Field>
+            <Field label={t.fHoursMode}>
+              <select style={styles.input} value={draft.hoursMode || "dividida"} onChange={(e) => updateDraft("hoursMode", e.target.value)}>
+                <option value="dividida">{t.hoursModeSplit}</option>
+                <option value="individual">{t.hoursModeIndividual}</option>
+              </select>
+              <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 4 }}>{draft.hoursMode === "individual" ? t.hoursModeIndividualHint : t.hoursModeSplitHint}</div>
             </Field>
             {draft.clientType === "replacement" && (
               <Field label={t.fValidUntil}><input type="date" style={styles.input} value={draft.clientValidUntil} onChange={(e) => updateDraft("clientValidUntil", e.target.value)} /></Field>
