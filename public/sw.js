@@ -17,6 +17,11 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Sem cache nem respondWith: o pedido segue normalmente para a rede. Só
+// existe porque alguns navegadores Android só oferecem "Instalar app" quando
+// o service worker declara um handler de fetch.
+self.addEventListener("fetch", () => {});
+
 self.addEventListener("push", (event) => {
   let payload = { title: "Servix", body: "Você tem um lembrete." };
   try {

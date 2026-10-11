@@ -1,11 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
+import InstallPage from "./views/InstallPage.jsx";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    {window.location.pathname.replace(/\/+$/, "") === "/instalar" ? <InstallPage /> : <App />}
   </React.StrictMode>
 );
 

@@ -158,57 +158,26 @@ function Field({ label, full, required, error, children }) {
 }
 
 // Botão "Baixar app": no Android/Chrome dispara o diálogo nativo de
-// instalação (guardado via beforeinstallprompt). No iOS a Apple não deixa
-// disparar isso por código — lá abrimos um pop-up com o passo a passo
-// manual (Partilhar > Adicionar ao Ecrã Principal). Se a app já está
-// instalada, ou se o navegador não oferece nenhum dos dois caminhos
-// (ex.: desktop), o botão simplesmente não aparece.
+// instalação (guardado via beforeinstallprompt). Nos outros casos leva à
+// página /instalar, que mostra o passo a passo certo para o aparelho e o
+// navegador (e avisa quando a pessoa está dentro do WhatsApp/Instagram).
+// Se a app já está instalada, o botão não aparece.
 function InstallAppButton({ lang }) {
   const t = T[lang].common;
-  const { installed, isIOS, canPromptNative, promptInstall } = useInstallPrompt();
-  const [showIOSHelp, setShowIOSHelp] = useState(false);
+  const { installed, canPromptNative, promptInstall } = useInstallPrompt();
 
   if (installed) return null;
 
   function handleClick() {
     if (canPromptNative) promptInstall();
-    else setShowIOSHelp(true);
+    else window.location.assign(`/instalar?lang=${lang}`);
   }
 
   return (
-    <>
-      <button style={styles.installAppButton} onClick={handleClick}>
-        <Download size={14} style={{ marginRight: 6 }} />
-        {t.installApp}
-      </button>
-      {showIOSHelp && (
-        <div style={styles.modalOverlay} onClick={() => setShowIOSHelp(false)}>
-          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <div style={styles.modalTitle}>{isIOS ? t.installAppIOSTitle : t.installAppOtherTitle}</div>
-              <button style={styles.modalClose} onClick={() => setShowIOSHelp(false)}><X size={16} /></button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <Share size={16} color={COLORS.primaryDark} style={{ flexShrink: 0, marginTop: 1 }} />
-                <div style={styles.defSettingHint}>{isIOS ? t.installAppIOSStep1 : t.installAppOtherStep1}</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <Plus size={16} color={COLORS.primaryDark} style={{ flexShrink: 0, marginTop: 1 }} />
-                <div style={styles.defSettingHint}>{isIOS ? t.installAppIOSStep2 : t.installAppOtherStep2}</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <Check size={16} color={COLORS.primaryDark} style={{ flexShrink: 0, marginTop: 1 }} />
-                <div style={styles.defSettingHint}>{t.installAppIOSStep3}</div>
-              </div>
-            </div>
-            <div style={styles.modalActions}>
-              <button style={styles.saveButton} onClick={() => setShowIOSHelp(false)}>{t.gotIt}</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <button style={styles.installAppButton} onClick={handleClick}>
+      <Download size={14} style={{ marginRight: 6 }} />
+      {t.installApp}
+    </button>
   );
 }
 
