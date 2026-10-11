@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Share, MoreHorizontal, MoreVertical, PlusSquare, Check, Download, Menu, Compass,
-  Chrome, Copy, ExternalLink, Smartphone, CheckCircle2,
+  Chrome, ChevronDown, Copy, ExternalLink, Smartphone, CheckCircle2,
 } from "lucide-react";
 import { COLORS } from "../styles/colors.js";
 import { INSTALL_TEXTS } from "../models/installTexts.js";
+import { Shot } from "./InstallMocks.jsx";
 import { useInstallPrompt } from "../hooks/useInstallPrompt.js";
 
 // Página /instalar — pensada para ser enviada por WhatsApp/SMS. Deteta o
@@ -45,23 +46,26 @@ function initialLang() {
 }
 
 const ICONS = {
-  more: MoreHorizontal, dots: MoreVertical, share: Share, plus: PlusSquare, check: Check,
+  more: MoreHorizontal, down: ChevronDown, dots: MoreVertical, share: Share, plus: PlusSquare, check: Check,
   install: Download, menu: Menu, safari: Compass, chrome: Chrome,
 };
 
-function StepCard({ index, step, word }) {
+function StepCard({ index, step, word, lang }) {
   const Icon = ICONS[step.icon] || Check;
   return (
     <div style={S.step}>
-      <div style={S.stepNum}>{index + 1}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={S.stepHead}>
-          <span style={S.stepWord}>{word} {index + 1}</span>
+      <div style={S.stepRow}>
+        <div style={S.stepNum}>{index + 1}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={S.stepHead}>
+            <span style={S.stepWord}>{word} {index + 1}</span>
+          </div>
+          <div style={S.stepTitle}>{step.title}</div>
+          <div style={S.stepText}>{step.text}</div>
         </div>
-        <div style={S.stepTitle}>{step.title}</div>
-        <div style={S.stepText}>{step.text}</div>
+        <div style={S.stepIcon}><Icon size={26} color={COLORS.primaryDark} strokeWidth={2} /></div>
       </div>
-      <div style={S.stepIcon}><Icon size={26} color={COLORS.primaryDark} strokeWidth={2} /></div>
+      {step.shot && <Shot name={step.shot} lang={lang} />}
     </div>
   );
 }
@@ -117,6 +121,7 @@ function InstallPage() {
 
   return (
     <div style={S.page}>
+      <style>{"@keyframes svxPulse{0%,100%{box-shadow:0 0 0 4px rgba(229,72,77,.35)}50%{box-shadow:0 0 0 9px rgba(229,72,77,.08)}}"}</style>
       <div style={S.wrap}>
         <div style={S.topRow}>
           <div style={S.brand}>
@@ -208,9 +213,8 @@ function InstallPage() {
                 <div style={S.hint}>{t.detected}</div>
 
                 <div style={S.stepList}>
-                  {steps.map((s, i) => <StepCard key={stepsKey + i} index={i} step={s} word={t.stepWord} />)}
+                  {steps.map((s, i) => <StepCard key={stepsKey + lang + i} index={i} step={s} word={t.stepWord} lang={lang} />)}
                 </div>
-                {os === "ios" && <div style={S.hint}>{t.scrollHint}</div>}
               </>
             )}
           </>
@@ -265,7 +269,8 @@ const S = {
   chipOn: { background: COLORS.primaryTint, borderColor: COLORS.primary, color: COLORS.primaryDark },
   hint: { fontSize: 13, color: COLORS.textSoft, lineHeight: 1.4 },
   stepList: { display: "flex", flexDirection: "column", gap: 12 },
-  step: { display: "flex", gap: 14, alignItems: "flex-start", background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 16 },
+  step: { display: "flex", flexDirection: "column", background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 16 },
+  stepRow: { display: "flex", gap: 14, alignItems: "flex-start" },
   stepNum: { width: 34, height: 34, borderRadius: "50%", background: COLORS.primaryDark, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, flexShrink: 0 },
   stepHead: { marginBottom: 2 },
   stepWord: { fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: COLORS.textSoft },
