@@ -1,7 +1,8 @@
 // Camada "View" raiz: lê o estado do controller e decide qual tela mostrar.
 // Não guarda estado do negócio — só consome useAppController().
 import { useState } from "react";
-import { MoreHorizontal, LogOut, Repeat } from "lucide-react";
+import { MoreHorizontal, LogOut, Repeat, Download } from "lucide-react";
+import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { useAppController } from "./controllers/useAppController.js";
 import { styles } from "./styles/styles.js";
 import { AppSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.js";
@@ -9,7 +10,7 @@ import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useBreakpoint } from "./hooks/useBreakpoint.js";
 import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
 import { CloseDeadlineBanner, CloseLockPanel } from "./views/shared/CloseDeadlineBanner.jsx";
-import { formatPeriodLabel, closeDeadlineInfo } from "./models/utils.js";
+import { formatPeriodLabel, closeDeadlineInfo, isoDateStr } from "./models/utils.js";
 import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, isSolicitationStale } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
@@ -44,6 +45,7 @@ import EmployeeInicioScreen from "./views/employee/EmployeeInicioScreen.jsx";
 
 export default function App() {
   const c = useAppController();
+  const install = useInstallPrompt();
   const isMobile = useIsMobile();
   // Casca nova da Etapa 3 (sidebar/rail/barra inferior); a gerência
   // também usa `empTier` pro `AppSidebar` desde o Lote 4, 4.3 — o
@@ -181,7 +183,7 @@ export default function App() {
             {c.screen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />
             )}
-            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} />}
+            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} openPeriodStart={isoDateStr(openPeriodNow.start)} />}
             {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} />}
             {c.screen === "definicoes" && (
               <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} closeDeadlineDays={c.closeDeadlineDays} setCloseDeadlineDays={c.setCloseDeadlineDays} highlightsMonths={c.highlightsMonths} setHighlightsMonths={c.setHighlightsMonths} highlightsRealtime={c.highlightsRealtime} setHighlightsRealtime={c.setHighlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
@@ -294,6 +296,13 @@ export default function App() {
             // MoreSheet, não aqui). `logout: true` tira a seta (não é
             // navegação) no MoreSheet.jsx.
             ...(isGerSup ? [{ key: "switch", icon: Repeat, label: T[c.lang].common.viewAsManagement, onSelect: () => { setMoreSheetOpen(false); c.enterManagement(); } }] : []),
+            // Ainda no navegador (não instalado): atalho para baixar o app.
+            // Com o diálogo nativo (Chrome/Android) instala logo; nos outros
+            // casos abre a página /instalar com o passo a passo.
+            ...(!install.installed ? [{
+              key: "install", icon: Download, label: T[c.lang].common.installApp,
+              onSelect: () => { if (install.canPromptNative) install.promptInstall(); else window.location.assign(`/instalar?lang=${c.lang}`); },
+            }] : []),
             { key: "logout", icon: LogOut, label: T[c.lang].common.logout, logout: true, onSelect: () => c.logout() },
           ];
           // QA (achado do Iago): "em horas o menu em baixo desapare, quero

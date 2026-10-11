@@ -3,7 +3,7 @@ import { Pencil, Eye, EyeOff, Copy, Check, AlertTriangle, Plus } from "lucide-re
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { TODAY, LANG_NAMES } from "../../models/data.js";
-import { getAssignedClientIds, clientById, isStaffActive, linkPartners, isSupervisorRole } from "../../models/utils.js";
+import { getAssignedClientIds, clientById, isStaffActive, linkPartners, isSupervisorRole, isoDateStr } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
 import {
@@ -14,7 +14,7 @@ import { supabase } from "../../models/supabaseClient.js";
 
 const EMPTY_STAFF = {
   name: "", email: "", contact: "", accountType: "fixo", status: "ativo", validUntil: "",
-  iban: "", role: "funcionario", canViewAllClients: false, partnerId: null, documents: [null, null, null, null],
+  iban: "", role: "funcionario", canViewAllClients: false, partnerId: null, startDate: "", documents: [null, null, null, null],
 };
 
 // "YYYY-MM-DD" -> "23/09" (documento, 4.9: "Expirou a 23/09", "até 23/09").
@@ -131,7 +131,7 @@ function StatusBlock({ s, t, c0 }) {
 // `isStaffActive` (Etapa 4j) refletida na lista e na gaveta. `onNavigate`
 // é opcional (liga "Clientes atribuídos" à tela de Agendas, mesmo padrão
 // já usado em ClientesScreen.jsx).
-function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate }) {
+function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate, openPeriodStart }) {
   const t = T[lang].funcionarios;
   const ta = T[lang].acessos;
   const c0 = T[lang].common;
@@ -152,6 +152,9 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
   // Function já ligada em Acessos (`update-staff-password`), chamada daqui
   // só pra não obrigar a gerência a ir a outro ecrã logo a seguir a criar
   // um funcionário novo com email já definido.
+  // Novo funcionário: "Já trabalhava antes de entrar no app?" — só quando Sim
+  // é que a gerência indica a data de início (dentro do período aberto).
+  const [workedBefore, setWorkedBefore] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [createResult, setCreateResult] = useState(null);
@@ -173,7 +176,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
   const drawerOpen = openId !== null;
 
   function openView(s) { setOpenId(s.id); setMode("view"); }
-  function openNew() { setEmailConfirm(""); setDraft(EMPTY_STAFF); setFormErrors({}); setOpenId("new"); setMode("edit"); }
+  function openNew() { setWorkedBefore(false); setEmailConfirm(""); setDraft(EMPTY_STAFF); setFormErrors({}); setOpenId("new"); setMode("edit"); }
   function startEdit() { setDraft({ ...openStaff, documents: openStaff.documents || [null, null, null, null] }); setFormErrors({}); setMode("edit"); }
   function cancelEdit() { if (isNew) setOpenId(null); else setMode("view"); }
   function closeDrawer() {
@@ -182,6 +185,8 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
   }
   function updateDraft(field, value) { setDraft((d) => ({ ...d, [field]: value })); }
 
+  const minStartIso = openPeriodStart || "";
+  const minStartLabel = minStartIso ? minStartIso.split("-").reverse().join("/") : "";
   function validateDraft() {
     const errs = {};
     if (!draft.name.trim()) errs.name = true;
@@ -189,6 +194,15 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
     if (isNew && !draft.email.trim()) errs.email = true;
     else if (isNew && draft.email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) errs.emailConfirm = true;
     if (!draft.accountType) errs.accountType = true;
+    // Data de início: novo + "Sim" => obrigatória; qualquer caso com data =>
+    // dentro do período aberto (ou a que já estava gravada) até hoje.
+    const needsDate = isNew && workedBefore;
+    if (needsDate && !draft.startDate) errs.startDate = t.startDateRequired;
+    else if (draft.startDate) {
+      const todayIso = isoDateStr(TODAY);
+      const keepOld = !isNew && openStaff && openStaff.startDate === draft.startDate;
+      if (!keepOld && ((minStartIso && draft.startDate < minStartIso) || draft.startDate > todayIso)) errs.startDate = t.startDateRange(minStartLabel);
+    }
     return errs;
   }
   function saveDraft() {
@@ -196,7 +210,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
     setFormErrors(errs);
     if (Object.keys(errs).length > 0) return;
     if (isNew) {
-      const created = { ...draft, id: Date.now() };
+      const created = { ...draft, startDate: workedBefore ? draft.startDate : "", id: Date.now() };
       setStaff((prev) => linkPartners([...prev, { ...created, partnerId: null }], created.id, draft.partnerId));
       setOpenId(created.id);
       setCreateResult(null); setCreateError(null);
@@ -378,6 +392,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
               {openStaff.accountType === "replacement" && (
                 <ViewField label={t.fValidUntil}>{openStaff.validUntil || "-"}</ViewField>
               )}
+              <ViewField label={t.fStartDate}>{openStaff.startDate ? openStaff.startDate.split("-").reverse().join("/") : t.startDateNone}</ViewField>
               <ViewField label={t.fPartner}>{(staff.find((s) => s.id === openStaff.partnerId) || {}).name || t.partnerNone}</ViewField>
               <ViewField label={t.fCanViewAllClients}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -489,6 +504,35 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
             </Field>
             {draft.accountType === "replacement" && (
               <Field label={t.fValidUntil}><input type="date" style={styles.input} value={draft.validUntil} onChange={(e) => updateDraft("validUntil", e.target.value)} /></Field>
+            )}
+            {isNew && (
+              <Field label={t.workedBeforeQ} full>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[[false, t.workedBeforeNo], [true, t.workedBeforeYes]].map(([val, label]) => (
+                    <button
+                      key={String(val)} type="button"
+                      onClick={() => { setWorkedBefore(val); if (!val) updateDraft("startDate", ""); }}
+                      style={{
+                        flex: 1, height: 44, borderRadius: 12, cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600,
+                        border: `1.5px solid ${workedBefore === val ? COLORS.primary : COLORS.lineInput}`,
+                        background: workedBefore === val ? COLORS.primaryTint : COLORS.card,
+                        color: workedBefore === val ? COLORS.primaryDark : COLORS.ink2,
+                      }}
+                    >{label}</button>
+                  ))}
+                </div>
+              </Field>
+            )}
+            {(!isNew || workedBefore) && (
+              <Field label={t.fStartDate} full required={isNew && workedBefore} error={formErrors.startDate || undefined}>
+                <input
+                  type="date" style={styles.input} value={draft.startDate || ""}
+                  min={(!isNew && openStaff && openStaff.startDate && openStaff.startDate < minStartIso) ? openStaff.startDate : (minStartIso || undefined)}
+                  max={isoDateStr(TODAY)}
+                  onChange={(e) => updateDraft("startDate", e.target.value)}
+                />
+                {!isNew && <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.startDateHint}</div>}
+              </Field>
             )}
             <Field label={t.fRole}>
               <select style={styles.input} value={draft.role || "funcionario"} onChange={(e) => updateDraft("role", e.target.value)}>

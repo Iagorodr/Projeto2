@@ -40,9 +40,11 @@ create table if not exists staff (
   iban text,
   role text,
   can_view_all_clients boolean not null default false,
-  partner_id bigint
+  partner_id bigint,
+  start_date date
 );
 -- Bancos já existentes: alter table staff add column if not exists partner_id bigint;
+-- Bancos já existentes: alter table staff add column if not exists start_date date;
 
 -- Definições da empresa — uma única linha (id = 1)
 create table if not exists company_settings (

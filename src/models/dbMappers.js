@@ -82,6 +82,7 @@ function toDbStaff(s) {
     role: s.role,
     can_view_all_clients: !!s.canViewAllClients,
     partner_id: s.partnerId || null,
+    start_date: s.startDate || null,
   };
 }
 
@@ -98,6 +99,7 @@ function fromDbStaff(row) {
     role: row.role,
     canViewAllClients: !!row.can_view_all_clients,
     partnerId: row.partner_id || null,
+    startDate: row.start_date || "",
   };
 }
 

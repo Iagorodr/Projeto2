@@ -657,7 +657,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         ) : (
           <>
           <div style={{ flex: 1, minWidth: 0, width: "100%", maxWidth: showTwoColumn ? 620 : undefined, display: "flex", flexDirection: "column", gap: 16 }}>
-            <WeekStrip days={weekStripDays} onSelectDay={setSelectedDateKey} legend={t.weekStripLegend} />
+            <WeekStrip days={weekStripDays} onSelectDay={setSelectedDateKey} legend={t.weekStripLegend} legendItems={t.weekLegend} />
 
             {missingDaysInChunk.length === 1 && (
               <Card variant="alert">

@@ -5,6 +5,7 @@ import { COLORS } from "../styles/colors.js";
 import { RADIUS, SHADOW, FONT } from "../styles/tokens.js";
 import { LangSwitcher, InstallAppButton } from "./shared/Layout.jsx";
 import { Button } from "./shared/ui/index.js";
+import { LogoMark } from "./shared/Logo.jsx";
 import { T } from "../models/i18n.js";
 import { isSupabaseConfigured } from "../models/supabaseClient.js";
 
@@ -24,9 +25,7 @@ function LoginLogo() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <div style={{ width: 34, height: 34, borderRadius: 9, background: COLORS.forest600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M4 13 L9.5 18.5 L20 6" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <LogoMark size={22} tone="reversed" />
       </div>
       <span style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 21, color: COLORS.forest800, lineHeight: 1 }}>
         Servi<span style={{ color: COLORS.clay }}>x</span>
