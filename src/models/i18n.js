@@ -417,6 +417,7 @@ const T = {
       changePasswordSuccess: "Palavra-passe alterada com sucesso.",
       changePasswordTooShort: "A palavra-passe precisa ter pelo menos 6 caracteres.",
       changePasswordFailed: "Não foi possível alterar a palavra-passe. Tente novamente.",
+      emailLockedNote: "É o email de login da conta principal e não se altera aqui. Os logins de gerência criam-se no ecrã Acessos.",
     },
     employeeMenu: {
       hello: "Olá", registerHours: "REGISTAR HORAS", notices: "AVISOS", agenda: "AGENDA",
@@ -1006,6 +1007,7 @@ const T = {
       changePasswordSuccess: "Password changed successfully.",
       changePasswordTooShort: "Password must be at least 6 characters.",
       changePasswordFailed: "Couldn't change the password. Please try again.",
+      emailLockedNote: "This is the main account's login email and can't be changed here. Management logins are created in the Access screen.",
     },
     employeeMenu: {
       hello: "Hello", registerHours: "LOG HOURS", notices: "NOTICES", agenda: "SCHEDULE",
@@ -1563,6 +1565,7 @@ const T = {
       changePasswordSuccess: "Mot de passe changé avec succès.",
       changePasswordTooShort: "Le mot de passe doit contenir au moins 6 caractères.",
       changePasswordFailed: "Impossible de changer le mot de passe. Réessayez.",
+      emailLockedNote: "C'est l'email de connexion du compte principal ; il ne se modifie pas ici. Les accès de gestion se créent dans l'écran Accès.",
     },
     employeeMenu: {
       hello: "Bonjour", registerHours: "ENREGISTRER LES HEURES", notices: "AVIS", agenda: "PLANNING",

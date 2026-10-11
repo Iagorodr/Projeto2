@@ -60,10 +60,9 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
 
   // --- Perfil da empresa (gravado só ao clicar "Guardar alterações") ---
   const [nameDraft, setNameDraft] = useState(company.name);
-  const [emailDraft, setEmailDraft] = useState(company.email);
   const [photoDraft, setPhotoDraft] = useState(company.photoUrl || null);
   const fileInputRef = useRef(null);
-  const profileDirty = nameDraft !== company.name || emailDraft !== company.email || photoDraft !== (company.photoUrl || null);
+  const profileDirty = nameDraft !== company.name || photoDraft !== (company.photoUrl || null);
 
   function handlePhotoPick(e) {
     const file = e.target.files && e.target.files[0];
@@ -74,10 +73,13 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
     e.target.value = "";
   }
   function handleSave() {
-    setCompany((c) => ({ ...c, name: nameDraft, email: emailDraft, photoUrl: photoDraft }));
+    // O email NÃO é gravado daqui: é o email de login da conta principal (o app
+    // compara-o com o login do Supabase), mudá-lo só na tabela deixava todos
+    // sem conseguir entrar.
+    setCompany((c) => ({ ...c, name: nameDraft, photoUrl: photoDraft }));
   }
   function handleDiscard() {
-    setNameDraft(company.name); setEmailDraft(company.email); setPhotoDraft(company.photoUrl || null);
+    setNameDraft(company.name); setPhotoDraft(company.photoUrl || null);
   }
 
   // --- Trocar palavra-passe real da empresa (já ligado à Edge Function) ---
@@ -183,7 +185,8 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                   </div>
                   <div>
                     <div style={styles.defSettingLabel}>{t.email}</div>
-                    <input style={styles.defTextInput} value={emailDraft} onChange={(e) => setEmailDraft(e.target.value)} />
+                    <input style={{ ...styles.defTextInput, color: COLORS.ink2, cursor: "not-allowed" }} value={company.email} readOnly disabled aria-describedby="company-email-note" />
+                    <div id="company-email-note" style={{ ...styles.defSettingHint, marginTop: 4 }}>{t.emailLockedNote}</div>
                   </div>
                   <div>
                     {/* Lote 4, 4.5 (achado da Marta): hint fixo (11.5px)
