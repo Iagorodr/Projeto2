@@ -81,6 +81,7 @@ function InstallPage() {
   const [done, setDone] = useState(false);
   const [qr, setQr] = useState("");
 
+  const showNative = !env.inApp && (canPromptNative || done);
   const isDesktop = !env.isIOS && !env.isAndroid;
   const url = typeof window !== "undefined" ? window.location.origin + "/instalar" : "";
 
@@ -177,7 +178,7 @@ function InstallPage() {
               </div>
             )}
 
-            {!env.inApp && canPromptNative && (
+            {showNative && (
               <div style={S.card}>
                 {done ? (
                   <div style={{ ...S.cardTitle, color: COLORS.okInk }}>{t.installedOk}</div>
@@ -192,7 +193,7 @@ function InstallPage() {
               </div>
             )}
 
-            {!(canPromptNative && !env.inApp) && (
+            {!showNative && (
               <>
                 <div style={S.tabs}>
                   {["ios", "android"].map((k) => (
