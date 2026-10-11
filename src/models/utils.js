@@ -52,9 +52,44 @@ function dayIsCovered(horasEntry, dateKey) {
 // porque a entry adiantada guarda a SUA PRÓPRIA data — só passa a levar
 // `replacesDate` como metadado extra.
 
-function recomputeSharedHours(horasDataObj, clients, date, clientId) {
+// Semana/mês "fechado" de um funcionário para uma data: período já fechado
+// pela gerência, mês finalizado (dentro do período aberto) ou semana
+// trancada pelo próprio funcionário. Fechado NÃO quer dizer definitivo: a
+// gerência continua a poder corrigir (ver `recomputeSharedHours`, abaixo),
+// só os outros funcionários é que não mexem em horas já fechadas.
+function isHorasFrozenOn(h, dateKey, cutoffDay, closedPeriods, today) {
+  if (!h) return false;
+  const cps = closedPeriods || [];
+  if (cps.some((cp) => cp.periodEnd && dateKey <= cp.periodEnd)) return true;
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const open = getOpenPeriod(cps, cutoffDay, today || TODAY);
+  if (date < open.start) return true;
+  if (date <= open.end) {
+    if (h.status === "finalizado") return true;
+    const block = weekBlocksOfPayPeriod(open, cutoffDay).find((b) => date >= b.start && date <= b.end);
+    if (!block) return false;
+    return !!migrateLockedWeeksToBlocks(h.lockedWeeks, open, cutoffDay)[isoDateStr(block.start)];
+  }
+  const chunk = getWeekChunkFor(date, cutoffDay);
+  return !!(h.lockedWeeks && h.lockedWeeks[isoDateStr(chunk.start)]);
+}
+
+// Divide as horas de um cliente, num dia, pelas pessoas que o marcaram.
+//
+// `opts.isFrozen(staffId, horasDoFuncionario)` (opcional): quem a devolve
+// true tem a semana/mês fechado — as horas dessa pessoa ficam EXATAMENTE
+// como estão (um colega que lança depois não reescreve um fecho já feito),
+// mas ela continua a contar como participante para a parte dos outros. Se,
+// por causa disso, o fecho dela ficou desatualizado (nº de pessoas diferente
+// do que ela viu), todas as linhas do dia/cliente ficam com `shareReview`
+// para a gerência rever. As ações da gerência chamam SEM `isFrozen`: a
+// semana fechada continua sujeita a correções dela — redivide tudo e limpa a
+// marca.
+function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) {
   const client = clientById(clients, clientId);
   if (!client) return horasDataObj;
+  const isFrozen = typeof opts.isFrozen === "function" ? opts.isFrozen : null;
   const firstEntry = Object.keys(horasDataObj).map((sid) => (horasDataObj[sid].entries || []).find((e) => e.date === date && e.clientId === clientId && !e.voided)).find(Boolean);
   const baseDuration = clientDurationOn(client, (firstEntry && firstEntry.replacesDate) || date) / 60;
   // Cliente "individual": cada funcionário regista a duração completa, sem divisão.
@@ -63,9 +98,10 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId) {
     Object.keys(horasDataObj).forEach((sid) => {
       const list = horasDataObj[sid].entries || [];
       if (!list.some((e) => e.date === date && e.clientId === clientId && !e.voided)) return;
+      if (isFrozen && isFrozen(sid, horasDataObj[sid])) return;
       nextInd[sid] = { ...horasDataObj[sid], entries: list.map((e) => {
         if (e.date === date && e.clientId === clientId && !e.voided) {
-          const { splitAdjusted, splitHours, ...rest } = e;
+          const { splitAdjusted, splitHours, shareReview, ...rest } = e;
           return { ...rest, hours: baseDuration + (e.extraMinutes || 0) / 60, sharedCount: 1 };
         }
         return e;
@@ -76,7 +112,9 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId) {
   const staffIdsInvolved = Object.keys(horasDataObj).filter((sid) =>
     (horasDataObj[sid].entries || []).some((e) => e.date === date && e.clientId === clientId && !e.voided)
   );
+  const frozenIds = new Set(isFrozen ? staffIdsInvolved.filter((sid) => isFrozen(sid, horasDataObj[sid])) : []);
   const count = staffIdsInvolved.length || 1;
+  const entryOf = (sid) => horasDataObj[sid].entries.find((x) => x.date === date && x.clientId === clientId && !x.voided);
   // Divisão: igual por padrão. Quem ajustou a própria parte (`splitAdjusted`
   // + `splitHours`, base sem extra) fica com o valor escolhido; o restante do
   // total do cliente divide-se por igual entre os que não ajustaram. A soma
@@ -84,7 +122,8 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId) {
   const adjustedBase = {};
   let adjustedSum = 0, adjustedCount = 0;
   staffIdsInvolved.forEach((sid) => {
-    const e = horasDataObj[sid].entries.find((x) => x.date === date && x.clientId === clientId && !x.voided);
+    if (frozenIds.has(sid)) return;
+    const e = entryOf(sid);
     if (count > 1 && e && e.splitAdjusted && typeof e.splitHours === "number") {
       const room = Math.max(0, baseDuration - adjustedSum);
       adjustedBase[sid] = Math.min(e.splitHours, room);
@@ -93,15 +132,21 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId) {
   });
   const restCount = count - adjustedCount;
   const perPerson = restCount > 0 ? Math.max(0, baseDuration - adjustedSum) / restCount : baseDuration / count;
+  // Fecho desatualizado: alguém com a semana fechada que foi gravado com outro
+  // nº de pessoas (ex.: fechou sozinho com 4h e depois um colega marcou o mesmo).
+  const needsReview = [...frozenIds].some((sid) => (entryOf(sid).sharedCount || 1) !== count);
   const next = { ...horasDataObj };
   staffIdsInvolved.forEach((sid) => {
     next[sid] = {
       ...next[sid],
       entries: next[sid].entries.map((e) => {
         if (e.date === date && e.clientId === clientId && !e.voided) {
+          const { shareReview, ...clean } = e;
+          const flag = needsReview ? { shareReview: true } : {};
+          if (frozenIds.has(sid)) return { ...clean, ...flag };
           const extraH = (e.extraMinutes || 0) / 60;
           const base = adjustedBase[sid] !== undefined ? adjustedBase[sid] : perPerson;
-          return { ...e, hours: base + extraH, sharedCount: count };
+          return { ...clean, ...flag, hours: base + extraH, sharedCount: count };
         }
         return e;
       }),
@@ -840,4 +885,4 @@ function pctChange(current, previous) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, isHorasFrozenOn, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

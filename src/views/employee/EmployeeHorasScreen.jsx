@@ -6,7 +6,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   clientById, entryClientName, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
-  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, partnerOf, getOpenPeriod, getCutoffPeriod,
+  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, isHorasFrozenOn, partnerOf, getOpenPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
@@ -180,6 +180,13 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   function updateMyHoras(updater) {
     setHorasData((prev) => ({ ...prev, [staffId]: updater(prev[staffId] || emptyHoras()) }));
   }
+  // Recálculo da divisão de horas feito por um funcionário: quem já tem a
+  // semana/mês fechado fica como está (a gerência corrige depois, ver
+  // `recomputeSharedHours`); o próprio nunca conta como fechado aqui — as
+  // ações já saem cedo se a semana dele estiver trancada.
+  function sharedOpts(dateKey) {
+    return { isFrozen: (sid, h) => String(sid) !== String(staffId) && isHorasFrozenOn(h, dateKey, cutoffDay, closedPeriods, TODAY) };
+  }
   function dayTotalHours(dateKey) { return myHoras.entries.filter((e) => e.date === dateKey && !e.voided).reduce((s, e) => s + e.hours, 0); }
   function goChunk(delta) {
     const next = idx + delta;
@@ -212,7 +219,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           withNew = { ...withNew, [partner.id]: { ...pH, entries: [...pH.entries, pEntry] } };
         }
       }
-      return recomputeSharedHours(withNew, clients, selectedKey, clientId);
+      return recomputeSharedHours(withNew, clients, selectedKey, clientId, sharedOpts(selectedKey));
     });
   }
   // Cliente fora da lista: nome (e cidade) escritos à mão, sem clientId; as
@@ -264,7 +271,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           }),
         },
       };
-      return recomputeSharedHours(withIt, clients, target.date, target.clientId);
+      return recomputeSharedHours(withIt, clients, target.date, target.clientId, sharedOpts(target.date));
     });
     setSplitTarget(null);
   }
@@ -273,7 +280,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     setHorasData((prev) => {
       const current = prev[staffId];
       const withoutIt = { ...prev, [staffId]: { ...current, entries: current.entries.filter((e) => e !== entry) } };
-      return recomputeSharedHours(withoutIt, clients, entry.date, entry.clientId);
+      return recomputeSharedHours(withoutIt, clients, entry.date, entry.clientId, sharedOpts(entry.date));
     });
   }
   function toggleScheduledClient(clientId) {
@@ -298,7 +305,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           }),
         },
       };
-      return recomputeSharedHours(updated, clients, extraTarget.date, extraTarget.clientId);
+      return recomputeSharedHours(updated, clients, extraTarget.date, extraTarget.clientId, sharedOpts(extraTarget.date));
     });
     setExtraTarget(null);
   }

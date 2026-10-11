@@ -6,13 +6,14 @@
 // o estado é carregado de lá ao abrir e cada alteração é gravada de volta. Sem
 // configuração, o app funciona exatamente como antes, só em memória, usando os
 // dados de demonstração de models/data.js / models/seedHistory.js.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   INITIAL_CLIENTS, INITIAL_STAFF, INITIAL_ASSIGNMENTS, INITIAL_HORAS,
   INITIAL_MISSING, INITIAL_SENT,
 } from "../models/data.js";
 import { TODAY } from "../models/data.js";
 import { activeClientsCount } from "../models/utils.js";
+import { diffKeys, mergeRemote, buildPatch, isMissingRpc } from "../models/horasSync.js";
 import { INITIAL_CLOSED_PERIODS } from "../models/seedHistory.js";
 import { supabase, isSupabaseConfigured } from "../models/supabaseClient.js";
 import {
@@ -50,7 +51,29 @@ export function useAppController() {
   const [clients, setClients] = useState(START_EMPTY ? [] : INITIAL_CLIENTS);
   const [staff, setStaff] = useState(START_EMPTY ? [] : INITIAL_STAFF);
   const [assignments, setAssignments] = useState(START_EMPTY ? {} : INITIAL_ASSIGNMENTS);
-  const [horasData, setHorasData] = useState(START_EMPTY ? {} : INITIAL_HORAS);
+  const [horasData, setHorasDataState] = useState(START_EMPTY ? {} : INITIAL_HORAS);
+  // Horas: ver models/horasSync.js. `horasRef` é sempre o valor mais recente
+  // (síncrono); `dirtyRef` são os funcionários com alterações ainda por gravar
+  // — só esses são enviados ao servidor, e só os que NÃO estão aí são
+  // substituídos pelo que vem dos outros dispositivos.
+  const horasRef = useRef(horasData);
+  const dirtyRef = useRef(new Set());
+  const fullWriteRef = useRef(false);   // chave removida (apagar funcionário/formatar): grava o conjunto todo
+  const rpcMissingRef = useRef(false);  // `patch_horas_data` ainda não existe neste projeto Supabase
+  const pushingRef = useRef(false);
+  const pushAgainRef = useRef(false);
+  const pushEpochRef = useRef(0);
+  const refreshingRef = useRef(false);
+  const setHorasData = useCallback((updater) => {
+    const prev = horasRef.current;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    if (next === prev) return;
+    const { changed, removed } = diffKeys(prev, next);
+    changed.forEach((k) => dirtyRef.current.add(k));
+    if (removed) fullWriteRef.current = true;
+    horasRef.current = next;
+    setHorasDataState(next);
+  }, []);
   const [closedPeriods, setClosedPeriods] = useState(START_EMPTY ? [] : INITIAL_CLOSED_PERIODS);
   const [missingItems, setMissingItems] = useState(START_EMPTY ? [] : INITIAL_MISSING);
   const [sentItems, setSentItems] = useState(START_EMPTY ? [] : INITIAL_SENT);
@@ -74,6 +97,77 @@ export function useAppController() {
 
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
+
+  const hasHorasLoadedRef = useRef(false);
+  // Carga inicial: o servidor manda (substitui, como antes, os dados de
+  // demonstração em memória), mas o que este dispositivo já alterou e ainda
+  // não gravou fica.
+  function replaceHorasFromServer(remote) {
+    const next = { ...remote };
+    dirtyRef.current.forEach((k) => { if (k in horasRef.current) next[k] = horasRef.current[k]; });
+    horasRef.current = next;
+    setHorasDataState(next);
+  }
+  // Atualização periódica: adota só o que mudou e não está "por gravar".
+  function adoptRemoteHoras(remote) {
+    const merged = mergeRemote(horasRef.current, remote, dirtyRef.current);
+    if (merged === horasRef.current) return;
+    horasRef.current = merged;
+    setHorasDataState(merged);
+  }
+  // Grava só os funcionários alterados (RPC `patch_horas_data`); se a função
+  // ainda não existir no projeto, cai no modo antigo (conjunto inteiro).
+  async function flushHoras() {
+    if (!isSupabaseConfigured) return;
+    if (pushingRef.current) { pushAgainRef.current = true; return; }
+    const dirty = [...dirtyRef.current];
+    if (dirty.length === 0 && !fullWriteRef.current) return;
+    pushingRef.current = true;
+    pushAgainRef.current = false;
+    const snapshot = horasRef.current;
+    const wasFull = fullWriteRef.current;
+    let ok = false;
+    try {
+      if (!wasFull && !rpcMissingRef.current) {
+        const { error } = await supabase.rpc("patch_horas_data", { patch: buildPatch(snapshot, dirty) });
+        if (!error) ok = true;
+        else if (isMissingRpc(error)) rpcMissingRef.current = true;
+        else console.error("Erro ao gravar horas:", error);
+      }
+      if (!ok && (wasFull || rpcMissingRef.current)) {
+        const { error } = await supabase.from("app_data").update({ horas_data: snapshot }).eq("id", 1);
+        if (error) console.error("Erro ao gravar horas:", error);
+        else ok = true;
+      }
+      if (ok) {
+        pushEpochRef.current += 1;
+        dirty.forEach((k) => { if (horasRef.current[k] === snapshot[k]) dirtyRef.current.delete(k); });
+        if (wasFull && horasRef.current === snapshot) fullWriteRef.current = false;
+      }
+    } catch (err) {
+      console.error("Erro ao gravar horas:", err);
+    } finally {
+      pushingRef.current = false;
+      if (ok && (pushAgainRef.current || dirtyRef.current.size > 0)) flushHoras();
+    }
+  }
+  // Vai buscar as horas dos outros dispositivos (primeiro envia as próprias).
+  async function refreshHoras() {
+    if (!isSupabaseConfigured || refreshingRef.current) return;
+    refreshingRef.current = true;
+    try {
+      await flushHoras();
+      const epoch = pushEpochRef.current;
+      const { data, error } = await supabase.from("app_data").select("horas_data").eq("id", 1).maybeSingle();
+      if (error || !data || !data.horas_data) return;
+      // Se entretanto gravámos algo (ou há gravação a meio), esta leitura pode
+      // ser anterior a essa gravação: deita fora, a próxima volta corrige.
+      if (pushingRef.current || pushEpochRef.current !== epoch) return;
+      adoptRemoteHoras(data.horas_data);
+    } finally {
+      refreshingRef.current = false;
+    }
+  }
 
   // QA pós-auditoria: devolve `ok` (false se qualquer uma das 4 leituras
   // falhou, incluindo exceção) além de `companyEmail`/`staffList` — antes
@@ -143,7 +237,9 @@ export function useAppController() {
       else if (appDataRes.data) {
         const row = appDataRes.data;
         if (row.assignments && Object.keys(row.assignments).length > 0) setAssignments(row.assignments);
-        if (row.horas_data && Object.keys(row.horas_data).length > 0) setHorasData(row.horas_data);
+        if (row.horas_data && Object.keys(row.horas_data).length > 0) replaceHorasFromServer(row.horas_data);
+        else if (!hasHorasLoadedRef.current) Object.keys(horasRef.current).forEach((k) => dirtyRef.current.add(k)); // banco novo: grava o que está em memória (como antes)
+        hasHorasLoadedRef.current = true;
         if (row.missing_items && row.missing_items.length > 0) setMissingItems(row.missing_items);
         if (row.sent_items && row.sent_items.length > 0) setSentItems(row.sent_items);
         if (row.closed_periods && row.closed_periods.length > 0) setClosedPeriods(row.closed_periods);
@@ -342,10 +438,28 @@ export function useAppController() {
 
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk) return;
-    supabase.from("app_data").update({ horas_data: horasData }).eq("id", 1).then(({ error }) => {
-      if (error) console.error("Erro ao gravar horas:", error);
-    });
+    flushHoras();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, horasData]);
+
+  // Mantém as horas em dia com os outros dispositivos: ao voltar ao app, ao
+  // voltar a ter internet e a cada ~45 s enquanto está aberto. É isto que
+  // permite cruzar "mesmo cliente, mesmo dia" com o que um colega lançou
+  // depois de este telemóvel abrir o app.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !hydrated || !readOk || perspective === "login") return;
+    const tick = () => { if (document.visibilityState !== "hidden") refreshHoras(); };
+    const timer = setInterval(tick, 45000);
+    window.addEventListener("online", tick);
+    document.addEventListener("visibilitychange", tick);
+    tick();
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("online", tick);
+      document.removeEventListener("visibilitychange", tick);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, readOk, perspective]);
 
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk) return;

@@ -6,7 +6,7 @@ import { RADIUS, FONT } from "../../styles/tokens.js";
 import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { TODAY } from "../../models/data.js";
 import {
-  clientById, entryClientName, isPendingClientEntry, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
+  clientById, entryClientName, isPendingClientEntry, recomputeSharedHours, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
   weekBlocksOfPayPeriod, calPeriodLabel, boardStaff,
@@ -221,16 +221,58 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   function revertApproval(staffId, i) {
     updateHoras(staffId, (h) => ({ ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, approved: false } : e)) }));
   }
+  // Correções da gerência mexem na divisão de horas de quem partilha o mesmo
+  // cliente no mesmo dia (anular/repor uma linha muda o nº de pessoas). Aqui
+  // NÃO se usa `isFrozen`: semana fechada continua sujeita a correção da
+  // gerência, só deixa de estar sujeita a mudanças vindas dos colegas.
   function toggleVoid(staffId, i) {
-    updateHoras(staffId, (h) => ({ ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, voided: !e.voided } : e)) }));
+    setHorasData((prev) => {
+      const h = prev[staffId];
+      const target = h && h.entries[i];
+      if (!target) return prev;
+      const next = { ...prev, [staffId]: { ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, voided: !e.voided } : e)) } };
+      return target.clientId ? recomputeSharedHours(next, clients, target.date, target.clientId) : next;
+    });
+  }
+  // Redividir à mão (linha marcada "rever divisão"): volta à divisão igual
+  // entre todos os que fizeram esse cliente nesse dia e limpa a marca.
+  function resplitEntry(entry) {
+    if (!entry || !entry.clientId) return;
+    setHorasData((prev) => recomputeSharedHours(prev, clients, entry.date, entry.clientId));
   }
   function startEditRow(i, entry) { setEditingIndex(i); setRowDraft({ clientId: entry.clientId || "", hours: entry.hours }); }
   function cancelEditRow() { setEditingIndex(null); }
+  // Ao confirmar o cliente de uma linha "fora da lista" (ou trocar o cliente),
+  // cruza com quem fez o mesmo cliente nesse dia e divide as horas — só se
+  // houver mais alguém; sozinho, ficam as horas escritas. Só corrigir as horas
+  // de uma linha que já tinha cliente NÃO redivide (o valor da gerência fica).
   function saveEditRow(staffId, i) {
-    updateHoras(staffId, (h) => ({
-      ...h,
-      entries: h.entries.map((e, idx) => (idx === i ? { ...e, clientId: rowDraft.clientId || e.clientId, custom: rowDraft.clientId ? undefined : e.custom, hours: Number(rowDraft.hours) || 0, approved: e.extra ? false : e.approved } : e)),
-    }));
+    setHorasData((prev) => {
+      const h = prev[staffId];
+      const old = h && h.entries[i];
+      if (!old) return prev;
+      const newClientId = rowDraft.clientId || old.clientId;
+      const clientChanged = !!newClientId && newClientId !== old.clientId;
+      let next = {
+        ...prev,
+        [staffId]: {
+          ...h,
+          entries: h.entries.map((e, idx) => {
+            if (idx !== i) return e;
+            const { splitAdjusted, splitHours, shareReview, sharedCount, ...base } = e;
+            const kept = clientChanged ? base : e;
+            return { ...kept, clientId: newClientId, custom: rowDraft.clientId ? undefined : e.custom, hours: Number(rowDraft.hours) || 0, approved: e.extra ? false : e.approved };
+          }),
+        },
+      };
+      if (clientChanged && !old.voided) {
+        if (old.clientId) next = recomputeSharedHours(next, clients, old.date, old.clientId);
+        const othersSameClient = Object.keys(next).some((sid) => String(sid) !== String(staffId)
+          && (next[sid].entries || []).some((e) => e.date === old.date && e.clientId === newClientId && !e.voided));
+        if (othersSameClient) next = recomputeSharedHours(next, clients, old.date, newClientId);
+      }
+      return next;
+    });
     setEditingIndex(null);
   }
 
@@ -262,7 +304,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       key: "extras", label: t.miniExtrasLabel, width: 1,
       render: (s) => {
         const h = horasData[s.id] || { entries: [] };
-        const n = h.entries.filter((e) => (e.extra && !e.approved && !e.voided) || isPendingClientEntry(e)).length;
+        const n = h.entries.filter((e) => (e.extra && !e.approved && !e.voided) || isPendingClientEntry(e) || (e.shareReview && !e.voided)).length;
         return n > 0 ? <Pill variant="pending">{n}</Pill> : <span style={{ color: COLORS.ink3 }}>–</span>;
       },
     },
@@ -421,7 +463,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                             key={i}
                             style={{
                               borderRadius: RADIUS.chip, border: `1px solid ${COLORS.line}`, padding: "10px 12px",
-                              background: e.voided ? COLORS.lineSoft : ((e.extra && !e.approved) || pendingClient) ? COLORS.amberBg
+                              background: e.voided ? COLORS.lineSoft : ((e.extra && !e.approved) || pendingClient || e.shareReview) ? COLORS.amberBg
                                 : (e.extra && e.approved) ? COLORS.okTint : (e.splitAdjusted && e.sharedCount > 1) ? "#E4ECFA" : COLORS.card,
                               opacity: e.voided ? 0.6 : 1,
                             }}
@@ -450,6 +492,12 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                   ) : (
                                     <>
                                       {pendingClient && <Pill variant="pending">{t.clientPendingTag}</Pill>}
+                                      {e.shareReview && (
+                                        <>
+                                          <Pill variant="pending">{t.shareReviewTag}</Pill>
+                                          {!locked && <Button variant="secondary" onClick={() => resplitEntry(e)}>{t.resplit}</Button>}
+                                        </>
+                                      )}
                                       {e.autoFrom && (
                                         <span style={{ background: "#E4ECFA", color: "#1E3A6E", fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "2px 9px" }}>
                                           {t.autoRowTag(((staff.find((x) => x.id === e.autoFrom) || {}).name || "").split(" ")[0])}
