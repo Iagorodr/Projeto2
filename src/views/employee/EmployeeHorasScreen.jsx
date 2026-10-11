@@ -10,7 +10,7 @@ import {
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
-  staffStartedOn,
+  staffStartedOn, absenceOn,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -43,7 +43,7 @@ function emptyHoras() {
 // (5.2.8/5.2.9, fora do período ou já finalizado) continuam de coluna
 // única em qualquer tamanho — o documento só descreve as duas colunas
 // para a vista normal/editável.
-function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems }) {
+function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [] }) {
   const t = T[lang].employeeHoras;
   const pdfT = T[lang].pdf;
   const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang];
@@ -433,6 +433,24 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       scheduledIfActive(d).forEach((c) => {
         const alreadyDone = myHoras.entries.some((e) => !e.voided && e.clientId === c.id && (e.date === dKey || e.replacesDate === dKey));
         if (!alreadyDone) results.push({ client: c, date: d, dateKey: dKey });
+      });
+    });
+    return results;
+  }
+  // Clientes de dias ANTERIORES (dentro do período aberto, em semanas ainda
+  // não trancadas) que ficaram por fazer — o funcionário pode fazê-los hoje.
+  function missedClientsEarlier() {
+    const results = [];
+    chunks.list.forEach((ch) => {
+      if (myHoras.lockedWeeks && myHoras.lockedWeeks[isoDateStr(ch.start)]) return;
+      calPeriodDays(ch).forEach((d) => {
+        if (d >= selectedDate || d < payPeriod.start) return;
+        const dKey = isoDateStr(d);
+        if (absenceOn(absences, staffId, dKey) || (myHoras.noClientDays || []).includes(dKey)) return;
+        scheduledIfActive(d).forEach((c) => {
+          const alreadyDone = myHoras.entries.some((e) => !e.voided && e.clientId === c.id && (e.date === dKey || e.replacesDate === dKey));
+          if (!alreadyDone) results.push({ client: c, date: d, dateKey: dKey });
+        });
       });
     });
     return results;
@@ -940,22 +958,30 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
 
       {/* Folha: "Fiz o cliente de outro dia" (adiantar) */}
       <Drawer open={advanceOpen} onClose={() => setAdvanceOpen(false)} title={t.advanceSheetTitle} width={420}>
-        {upcomingClientsThisWeek().length === 0 ? (
-          <div style={{ fontSize: 13.5, color: COLORS.ink2, padding: "12px 0" }}>{t.advanceSheetEmpty}</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {upcomingClientsThisWeek().map(({ client, date, dateKey }) => (
-              <button
-                key={`${client.id}-${dateKey}`} type="button"
-                onClick={() => { addClientEntry(client.id, dateKey); setAdvanceOpen(false); }}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 14px", borderRadius: RADIUS.control, border: `1px solid ${COLORS.line}`, background: COLORS.card, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
-              >
-                <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{client.name}</span>
-                <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{weekdayFull[date.getDay()]} · {fmtMinutes(client.duration)}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        {(() => {
+          const earlier = missedClientsEarlier();
+          const later = upcomingClientsThisWeek();
+          if (earlier.length === 0 && later.length === 0) return <div style={{ fontSize: 13.5, color: COLORS.ink2, padding: "12px 0" }}>{t.advanceSheetEmpty}</div>;
+          const renderList = (list) => list.map(({ client, date, dateKey }) => (
+            <button
+              key={`${client.id}-${dateKey}`} type="button"
+              onClick={() => { addClientEntry(client.id, dateKey); setAdvanceOpen(false); }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 14px", borderRadius: RADIUS.control, border: `1px solid ${COLORS.line}`, background: COLORS.card, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{client.name}</span>
+              <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{weekdayFull[date.getDay()]} {String(date.getDate()).padStart(2, "0")}/{String(date.getMonth() + 1).padStart(2, "0")} · {fmtMinutes(client.duration)}</span>
+            </button>
+          ));
+          const heading = (txt) => <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: COLORS.ink3, margin: "6px 0 -2px" }}>{txt}</div>;
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {earlier.length > 0 && heading(t.advanceSectionEarlier)}
+              {renderList(earlier)}
+              {later.length > 0 && heading(t.advanceSectionLater)}
+              {renderList(later)}
+            </div>
+          );
+        })()}
       </Drawer>
 
       {/* Folha: horas extra ("Fiz mais tempo") */}
