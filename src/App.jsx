@@ -11,7 +11,7 @@ import { useBreakpoint } from "./hooks/useBreakpoint.js";
 import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
 import { CloseDeadlineBanner, CloseLockPanel } from "./views/shared/CloseDeadlineBanner.jsx";
 import { formatPeriodLabel, closeDeadlineInfo, isoDateStr } from "./models/utils.js";
-import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, isSolicitationStale } from "./models/utils.js";
+import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, unseenAvisosCount } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
 import LoginScreen from "./views/LoginScreen.jsx";
@@ -115,15 +115,13 @@ export default function App() {
         Object.values(c.horasData).forEach((data) => {
           data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; });
         });
-        // QA (achado do Iago — pedidos de período já fechado "saindo das
-        // pendências"): mesma exclusão de AvisosScreen.jsx (`isSolicitationStale`),
-        // pra o selo da barra lateral bater com a contagem que a própria
-        // tela de Avisos mostra por padrão (sem isto, o selo continuaria
-        // contando pedidos antigos escondidos por padrão na tela).
+        // Selo de Avisos = só o que a gerência ainda não viu (ver
+        // `unseenAvisosCount`, utils.js) — desaparece ao abrir a tela de
+        // Avisos, em vez de contar sempre os pedidos por resolver.
         const avisosOpenPeriod = getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY);
         const openPeriodNow = avisosOpenPeriod;
         const closeInfo = closeDeadlineInfo(openPeriodNow, TODAY, c.closeDeadlineDays);
-        const pendingRequests = c.missingItems.filter((m) => !m.resolved && !isSolicitationStale(m, avisosOpenPeriod)).length;
+        const pendingRequests = unseenAvisosCount(c.missingItems, c.sentItems, avisosOpenPeriod);
         const managementItems = MENU_ITEMS.map((item) => ({
           key: item.key, icon: item.icon, label: tSidebar[item.key],
           badge: item.key === "horas" ? (overtimePending || undefined)

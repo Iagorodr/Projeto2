@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -172,6 +172,18 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   const staleMissingItems = missingItems.filter((m) => isSolicitationStale(m, openPeriod));
   const visibleMissingItems = showStale ? missingItems : missingItems.filter((m) => !isSolicitationStale(m, openPeriod));
   const pendingSolicitations = visibleMissingItems.filter((m) => !m.resolved).length;
+
+  // Abrir o separador "Pedidos" (o que abre por omissão) marca como vistos os
+  // pedidos por tratar que estão à vista — é isso que faz o selo do menu e a
+  // pendência do Dashboard desaparecerem. Não mexe em nada que já esteja visto
+  // (sem gravação à toa) nem nos pedidos de períodos já fechados.
+  useEffect(() => {
+    if (tab !== "pedidos") return;
+    const needsSeen = (m) => !m.resolved && !m.seenByManagement && !isSolicitationStale(m, openPeriod);
+    if (!missingItems.some(needsSeen)) return;
+    setMissingItems((prev) => prev.map((m) => (needsSeen(m) ? { ...m, seenByManagement: true } : m)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, missingItems]);
 
   // Documento, 4.7, literal: "Funcionário (seletor com pesquisa; em
   // 'Aviso' pode ser 'Todos')" — a opção "Todos" só faz sentido pro tipo

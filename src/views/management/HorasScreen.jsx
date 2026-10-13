@@ -15,7 +15,7 @@ import { formatTodayLabel, T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js
 import { exportStaffHorasPdf, exportPeriodSummaryPdf } from "../../models/pdfExport.js";
 import {
   PageHeader, Card, SegmentedBar, FilterChip, SearchField, Button, Pill,
-  Avatar, DataTable, Drawer, ConfirmDialog, Toast,
+  Avatar, DataTable, Drawer, ConfirmDialog, Toast, SharedWithBadge,
 } from "../shared/ui/index.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
@@ -276,6 +276,19 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     setEditingIndex(null);
   }
 
+  // Quem mais fez o mesmo cliente no mesmo dia (para o selo "partilhado" das
+  // linhas do detalhe). Devolve [] se só esta pessoa o fez; senão a lista de
+  // todos (incluindo a pessoa aberta), com a parte de cada um.
+  function peopleOnEntry(e) {
+    if (!e.clientId || e.voided) return [];
+    const list = [];
+    staff.forEach((s) => {
+      const other = ((horasData[s.id] && horasData[s.id].entries) || []).find((x) => x.date === e.date && x.clientId === e.clientId && !x.voided);
+      if (other) list.push({ id: s.id, name: s.name, self: openStaff && s.id === openStaff.id, hoursLabel: fmtHoursScreen(other.hours) });
+    });
+    return list.length > 1 ? list : [];
+  }
+
   const columns = [
     {
       key: "staff", label: t.colStaff, width: 2,
@@ -491,6 +504,18 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                     </>
                                   ) : (
                                     <>
+                                      {(() => {
+                                        const people = peopleOnEntry(e);
+                                        if (people.length === 0) return null;
+                                        return (
+                                          <SharedWithBadge
+                                            people={people}
+                                            title={t.sharedBadgeTitle(people.length)}
+                                            heading={t.sharedBadgeHeading}
+                                            note={client && client.hoursMode === "individual" ? t.sharedIndividualNote : undefined}
+                                          />
+                                        );
+                                      })()}
                                       {pendingClient && <Pill variant="pending">{t.clientPendingTag}</Pill>}
                                       {e.shareReview && (
                                         <>

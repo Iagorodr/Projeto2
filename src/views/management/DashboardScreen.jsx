@@ -5,7 +5,7 @@ import { RADIUS, FONT } from "../../styles/tokens.js";
 import { useBreakpoint, useControlSize } from "../../hooks/useBreakpoint.js";
 import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
-  clientById, parseDMY, getOpenPeriod, formatPeriodLabel, staffTotalHours, staffTotalPay,
+  clientById, parseDMY, getOpenPeriod, unseenAvisosCount, formatPeriodLabel, staffTotalHours, staffTotalPay,
   recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
   monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM,
 } from "../../models/utils.js";
@@ -146,13 +146,11 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     if (data.reopened) reopenedCount += 1;
     data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; if (!e.voided && !e.clientId && e.custom) customClientPending += 1; if (!e.voided && e.shareReview) shareReviewPending += 1; });
   });
-  // "Avisos e pedidos por ler" (documento, 4.1): não existe, em lado
-  // nenhum do modelo de dados, um sinal de "a gerência ainda não viu esta
-  // solicitação nova" — `.read` em `sentItems` é só do lado do
-  // funcionário (se ele já viu a RESPOSTA da gerência). O próprio ecrã de
-  // Avisos (gerência) já usa esta mesma contagem para o selo de
-  // "Solicitações" — reaproveitada aqui tal e qual.
-  const pendingRequests = missingItems.filter((m) => !m.resolved).length;
+  // "Avisos e pedidos por ler" (documento, 4.1): só o que a gerência ainda
+  // não abriu (`seenByManagement`, marcado ao abrir a tela de Avisos) — a
+  // mesma contagem do selo do menu. Pedidos já vistos mas ainda por resolver
+  // não contam aqui (continuam visíveis na própria tela de Avisos).
+  const pendingRequests = unseenAvisosCount(missingItems, sentItems, getOpenPeriod(closedPeriods, cutoffDay, TODAY));
 
   const contractsNearExpiry = clients.filter((c) => {
     const end = parseDMY(c.contractEnd);
