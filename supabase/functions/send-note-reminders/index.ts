@@ -1,9 +1,16 @@
 import webpush from "npm:web-push@3.6.7";
 
+// Lembretes de notas pessoais (push). Chamada todos os dias pelo agendador do
+// banco (pg_cron, ver supabase/cron_secret.sql), que envia o cabeçalho
+// `x-cron-secret`. Sem ele (ou com outro valor) a função recusa: o endereço
+// desta função não é segredo e ela corre com a chave de serviço.
+
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// "Hoje" conta no fuso da empresa (e não em UTC). Pode ser mudado com o segredo REMINDER_TZ.
+const REMINDER_TZ = Deno.env.get("REMINDER_TZ") || "Europe/Brussels";
 
 webpush.setVapidDetails("mailto:contato@servix.example", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
@@ -11,8 +18,38 @@ function sbHeaders() {
   return { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
 }
 
-Deno.serve(async () => {
-  const today = new Date().toISOString().slice(0, 10);
+// "YYYY-MM-DD" do dia de hoje no fuso da empresa.
+function todayInTz(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: REMINDER_TZ, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+}
+
+async function readCronSecret(): Promise<string | null> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/cron_secret?id=eq.1&select=value`, { headers: sbHeaders() });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return (rows && rows[0] && rows[0].value) || null;
+  } catch {
+    return null;
+  }
+}
+
+// Comparação em tempo constante.
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+Deno.serve(async (req) => {
+  const given = req.headers.get("x-cron-secret") || "";
+  const expected = await readCronSecret();
+  if (!expected || !safeEqual(given, expected)) return new Response("unauthorized", { status: 401 });
+
+  const today = todayInTz();
 
   const appDataRes = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.1&select=personal_notes`, {
     headers: sbHeaders(),
@@ -44,12 +81,23 @@ Deno.serve(async () => {
     }
   }
 
-  const updatedNotes = notes.map((n) => (n.date === today && !n.notified ? { ...n, notified: true } : n));
-  await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.1`, {
-    method: "PATCH",
-    headers: { ...sbHeaders(), "Content-Type": "application/json", Prefer: "return=minimal" },
-    body: JSON.stringify({ personal_notes: updatedNotes }),
+  // Marca como enviadas SÓ estas notas (RPC atómica), em vez de reescrever a
+  // lista inteira — uma nota criada/apagada enquanto os envios decorriam não se perde.
+  const notified = dueNotes.map((n) => ({ ...n, notified: true }));
+  const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/patch_app_list`, {
+    method: "POST",
+    headers: { ...sbHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ slice: "personal_notes", upserts: notified, removed: [], prepend: false }),
   });
+  if (!rpcRes.ok) {
+    // Função ainda inexistente neste projeto: modo antigo (lista inteira).
+    const updatedNotes = notes.map((n) => (n.date === today && !n.notified ? { ...n, notified: true } : n));
+    await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.1`, {
+      method: "PATCH",
+      headers: { ...sbHeaders(), "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ personal_notes: updatedNotes }),
+    });
+  }
 
   return new Response(`enviado para ${dueNotes.length} lembrete(s)`, { status: 200 });
 });

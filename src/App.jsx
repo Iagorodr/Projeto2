@@ -181,8 +181,8 @@ export default function App() {
             {c.screen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />
             )}
-            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} openPeriodStart={isoDateStr(openPeriodNow.start)} />}
-            {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} />}
+            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} openPeriodStart={isoDateStr(openPeriodNow.start)} companyEmail={c.company.email} />}
+            {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} companyEmail={c.company.email} />}
             {c.screen === "definicoes" && (
               <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} closeDeadlineDays={c.closeDeadlineDays} setCloseDeadlineDays={c.setCloseDeadlineDays} highlightsMonths={c.highlightsMonths} setHighlightsMonths={c.setHighlightsMonths} highlightsRealtime={c.highlightsRealtime} setHighlightsRealtime={c.setHighlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
             )}

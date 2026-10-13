@@ -10,6 +10,7 @@ import {
   PageHeader, SearchField, DataTable, Avatar, Pill, SupervisorTag, Drawer, Button, ConfirmDialog,
 } from "../shared/ui/index.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
+import { emailInUse } from "../../models/utils.js";
 import { supabase } from "../../models/supabaseClient.js";
 
 // Etiqueta de papel (documento, 4.10, linha da tabela): "Funcionário"
@@ -92,7 +93,7 @@ function ResetDialog({ open, staffMember, t, c0, onClose, onConfirm, busy, error
 // (a criação de conta, com email novo, passou pra Funcionários — 4.9),
 // ação "Redefinir" por linha com o seu próprio diálogo, e confirmação
 // escrita ao escolher o papel "Gerência".
-function AcessosScreen({ lang, setLang, staff, setStaff }) {
+function AcessosScreen({ lang, setLang, staff, setStaff, companyEmail }) {
   const t = T[lang].acessos;
   const c0 = T[lang].common;
   const isMobile = useIsMobile();
@@ -103,6 +104,7 @@ function AcessosScreen({ lang, setLang, staff, setStaff }) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(null);
   const [pendingGerencia, setPendingGerencia] = useState(false);
+  const [emailError, setEmailError] = useState(null);
 
   // Diálogo de redefinir/criar acesso — independente da gaveta de edição.
   const [resetTargetId, setResetTargetId] = useState(null);
@@ -117,6 +119,7 @@ function AcessosScreen({ lang, setLang, staff, setStaff }) {
   });
 
   function openEdit(s) {
+    setEmailError(null);
     setEditingId(s.id);
     setDraft({ email: s.email || "", role: s.role || "funcionario" });
     setPendingGerencia(false);
@@ -124,7 +127,7 @@ function AcessosScreen({ lang, setLang, staff, setStaff }) {
   function closeEdit() {
     setEditingId(null); setDraft(null); setPendingGerencia(false);
   }
-  function updateDraft(field, value) { setDraft((d) => ({ ...d, [field]: value })); }
+  function updateDraft(field, value) { if (field === "email") setEmailError(null); setDraft((d) => ({ ...d, [field]: value })); }
   function onRoleChange(value) {
     // "Escolher Gerência abre confirmação escrita" (4.10): a troca só
     // entra no rascunho depois de confirmada; cancelar deixa o <select>
@@ -133,6 +136,8 @@ function AcessosScreen({ lang, setLang, staff, setStaff }) {
     updateDraft("role", value);
   }
   function saveDraft() {
+    // Dois acessos nunca podem partilhar o mesmo email de login.
+    if (emailInUse(staff, companyEmail, draft.email, editingId)) { setEmailError(c0.emailTaken); return; }
     setStaff((prev) => prev.map((s) => (s.id === editingId ? { ...s, ...draft } : s)));
     closeEdit();
   }
@@ -247,7 +252,7 @@ function AcessosScreen({ lang, setLang, staff, setStaff }) {
       >
         {editingStaff && draft && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Field label={t.fEmail} full>
+            <Field label={t.fEmail} full error={emailError || undefined}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <Mail size={14} color={COLORS.ink3} />
                 <input style={styles.input} type="email" value={draft.email} onChange={(e) => updateDraft("email", e.target.value)} />

@@ -12,8 +12,9 @@ import {
   INITIAL_MISSING, INITIAL_SENT,
 } from "../models/data.js";
 import { TODAY } from "../models/data.js";
-import { activeClientsCount } from "../models/utils.js";
+import { activeClientsCount, isStaffActive } from "../models/utils.js";
 import { diffKeys, mergeRemote, buildPatch, isMissingRpc } from "../models/horasSync.js";
+import { listDiff, listMerge, mapDiff, mapMerge, isEmptyDiff } from "../models/appDataSync.js";
 import { INITIAL_CLOSED_PERIODS } from "../models/seedHistory.js";
 import { supabase, isSupabaseConfigured } from "../models/supabaseClient.js";
 import {
@@ -24,6 +25,17 @@ import {
 // Empresas novas (deploy com VITE_START_EMPTY=true na Vercel) começam SEM os
 // dados de demonstração embutidos no código; as já existentes ficam como estão.
 const START_EMPTY = import.meta.env.VITE_START_EMPTY === "true";
+
+function dayKeyOf(d) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
+// O dia em que esta app foi carregada (ver `reloadIfNewDay`).
+const DAY_AT_LOAD = dayKeyOf(TODAY);
+
+// `isStaffActive` compara a validade com um dia à meia-noite local (a validade é
+// inclusiva); por isso nunca lhe passamos `new Date()` com horas.
+function startOfLocalToday() {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+}
 
 export function useAppController() {
   const [perspective, setPerspective] = useState("login"); // 'login' | 'management' | 'employee'
@@ -64,6 +76,12 @@ export function useAppController() {
   const pushAgainRef = useRef(false);
   const pushEpochRef = useRef(0);
   const refreshingRef = useRef(false);
+  // Restantes fatias de app_data (ver `SLICES` mais abaixo).
+  const sliceValRef = useRef({});          // valor atual de cada fatia (atualizado a cada render)
+  const sliceBaseRef = useRef({});         // última versão vista do servidor (undefined = ainda não lida)
+  const slicePushingRef = useRef({});
+  const slicePushAgainRef = useRef({});
+  const rpcMissingSliceRef = useRef({});   // RPC ainda inexistente neste projeto Supabase
   const setHorasData = useCallback((updater) => {
     const prev = horasRef.current;
     const next = typeof updater === "function" ? updater(prev) : updater;
@@ -98,6 +116,10 @@ export function useAppController() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
+  const loggedInStaffIdRef = useRef(null);
+  loggedInStaffIdRef.current = loggedInStaffId;
+  const activeCheckRef = useRef(false);
+  const reloadingRef = useRef(false);
   const hasHorasLoadedRef = useRef(false);
   // Carga inicial: o servidor manda (substitui, como antes, os dados de
   // demonstração em memória), mas o que este dispositivo já alterou e ainda
@@ -151,21 +173,175 @@ export function useAppController() {
       if (ok && (pushAgainRef.current || dirtyRef.current.size > 0)) flushHoras();
     }
   }
-  // Vai buscar as horas dos outros dispositivos (primeiro envia as próprias).
-  async function refreshHoras() {
+  // ---- Restantes fatias de app_data (ver models/appDataSync.js) ----
+  // `sliceBaseRef[col]` é a última versão que este dispositivo viu do servidor;
+  // só a diferença entre ela e o estado atual é enviada (RPC atómica), e o que
+  // os outros fizeram é juntado por baixo das alterações ainda por gravar.
+  const SLICES = {
+    assignments:    { kind: "map" },
+    missing_items:  { kind: "list", prepend: true },
+    sent_items:     { kind: "list", prepend: true },
+    closed_periods: { kind: "list", prepend: true },
+    personal_notes: { kind: "list", prepend: false },
+    absences:       { kind: "list", prepend: false },
+  };
+  const SLICE_COLS = Object.keys(SLICES);
+  const sliceSetters = {
+    assignments: setAssignments, missing_items: setMissingItems, sent_items: setSentItems,
+    closed_periods: setClosedPeriods, personal_notes: setPersonalNotes, absences: setAbsences,
+  };
+  sliceValRef.current = {
+    assignments, missing_items: missingItems, sent_items: sentItems,
+    closed_periods: closedPeriods, personal_notes: personalNotes, absences,
+  };
+
+  function emptySlice(col) { return SLICES[col].kind === "map" ? {} : []; }
+  function sliceIsEmpty(col, v) { return SLICES[col].kind === "map" ? Object.keys(v || {}).length === 0 : (v || []).length === 0; }
+  function remoteSliceUsable(col, v) {
+    if (v == null) return false;
+    return SLICES[col].kind === "map" ? (typeof v === "object" && !Array.isArray(v)) : (Array.isArray(v) && listDiff(v, v) !== null);
+  }
+
+  // Junta o que veio do servidor ao estado local desta fatia.
+  function mergeSlice(col, remote) {
+    const cfg = SLICES[col];
+    const baseSnap = sliceBaseRef.current[col];
+    if (baseSnap === undefined || !remoteSliceUsable(col, remote)) return;
+    sliceBaseRef.current[col] = remote;
+    // Forma funcional: junta contra o estado MAIS RECENTE (incluindo alterações
+    // que o React ainda não renderizou), nunca contra uma cópia antiga.
+    sliceSetters[col]((cur) => {
+      const merged = cfg.kind === "map" ? mapMerge(cur, remote, baseSnap) : listMerge(cur, remote, baseSnap, cfg.prepend);
+      return merged === null ? cur : merged;
+    });
+  }
+
+  // Carga (inicial ou repetida) de uma fatia lida do servidor.
+  function absorbSlice(col, remote) {
+    const value = remote == null ? emptySlice(col) : remote;
+    if (sliceBaseRef.current[col] === undefined) {
+      sliceBaseRef.current[col] = value;
+      if (!sliceIsEmpty(col, value)) sliceSetters[col](value);
+    } else {
+      mergeSlice(col, value);
+    }
+  }
+
+  // Grava a diferença de uma fatia (ou, se a função ainda não existir no
+  // projeto / a lista não tem ids, a fatia inteira como antes).
+  async function flushSlice(col) {
+    if (!isSupabaseConfigured) return;
+    const cfg = SLICES[col];
+    const base = sliceBaseRef.current[col];
+    if (base === undefined) return; // ainda não lida
+    if (slicePushingRef.current[col]) { slicePushAgainRef.current[col] = true; return; }
+    const snapshot = sliceValRef.current[col];
+    if (snapshot === base) return;
+    const d = cfg.kind === "map" ? mapDiff(base, snapshot) : listDiff(base, snapshot);
+    if (d && isEmptyDiff(d)) { sliceBaseRef.current[col] = snapshot; return; }
+    const rpcName = cfg.kind === "map" ? "patch_assignments" : "patch_app_list";
+    slicePushingRef.current[col] = true;
+    slicePushAgainRef.current[col] = false;
+    let ok = false;
+    try {
+      if (d && !rpcMissingSliceRef.current[rpcName]) {
+        const args = cfg.kind === "map"
+          ? { upserts: d.upserts, removed: d.removed }
+          : { slice: col, upserts: d.upserts, removed: d.removed, prepend: cfg.prepend };
+        const { error } = await supabase.rpc(rpcName, args);
+        if (!error) ok = true;
+        else if (isMissingRpc(error)) rpcMissingSliceRef.current[rpcName] = true;
+        else console.error(`Erro ao gravar ${col}:`, error);
+      }
+      if (!ok && (!d || rpcMissingSliceRef.current[rpcName])) {
+        const { error } = await supabase.from("app_data").update({ [col]: snapshot }).eq("id", 1);
+        if (error) console.error(`Erro ao gravar ${col}:`, error);
+        else ok = true;
+      }
+      if (ok) {
+        pushEpochRef.current += 1;
+        sliceBaseRef.current[col] = snapshot;
+      }
+    } catch (err) {
+      console.error(`Erro ao gravar ${col}:`, err);
+    } finally {
+      slicePushingRef.current[col] = false;
+      if (ok && (slicePushAgainRef.current[col] || sliceValRef.current[col] !== sliceBaseRef.current[col])) flushSlice(col);
+    }
+  }
+  function anySlicePushing() { return SLICE_COLS.some((c) => slicePushingRef.current[c]); }
+
+  // Há alterações deste dispositivo ainda por gravar?
+  function hasUnsavedWrites() {
+    if (dirtyRef.current.size > 0 || fullWriteRef.current || pushingRef.current || anySlicePushing()) return true;
+    return SLICE_COLS.some((c) => {
+      const base = sliceBaseRef.current[c];
+      const cur = sliceValRef.current[c];
+      if (base === undefined || cur === base) return false;
+      const d = SLICES[c].kind === "map" ? mapDiff(base, cur) : listDiff(base, cur);
+      return d === null || !isEmptyDiff(d);
+    });
+  }
+
+  // "Hoje" é calculado uma vez, quando a app abre. Se ficou aberta (ou em
+  // segundo plano) de um dia para o outro, o dia que o ecrã mostra e as regras
+  // que dependem dele (semanas fechadas, horas de hoje, atrasos) ficariam no dia
+  // anterior. Quando o dia vira, grava o que falta e recarrega a app uma vez.
+  // Nunca recarrega sem rede, com alterações por gravar, nem a meio de uma escrita.
+  async function reloadIfNewDay() {
+    if (typeof window === "undefined" || dayKeyOf(new Date()) === DAY_AT_LOAD) return;
+    if (navigator.onLine === false || reloadingRef.current) return;
+    const ae = document.activeElement;
+    if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.value) return; // a escrever: espera
+    reloadingRef.current = true;
+    try {
+      for (let i = 0; i < 15; i += 1) {
+        await Promise.all([flushHoras(), ...SLICE_COLS.map((c) => flushSlice(c))]);
+        if (!hasUnsavedWrites()) { window.location.reload(); return; }
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    } finally {
+      reloadingRef.current = false;
+    }
+  }
+
+  // Vai buscar o que os outros dispositivos fizeram (primeiro envia o próprio).
+  // `closed_periods` é pesado e quase nunca muda: só vem em refrescos "completos".
+  async function refreshHoras(full = false) {
     if (!isSupabaseConfigured || refreshingRef.current) return;
     refreshingRef.current = true;
     try {
-      await flushHoras();
+      await Promise.all([flushHoras(), ...SLICE_COLS.map((c) => flushSlice(c))]);
       const epoch = pushEpochRef.current;
-      const { data, error } = await supabase.from("app_data").select("horas_data").eq("id", 1).maybeSingle();
-      if (error || !data || !data.horas_data) return;
+      const cols = ["horas_data", ...SLICE_COLS.filter((c) => full || c !== "closed_periods")];
+      const { data, error } = await supabase.from("app_data").select(cols.join(",")).eq("id", 1).maybeSingle();
+      if (error || !data) return;
       // Se entretanto gravámos algo (ou há gravação a meio), esta leitura pode
       // ser anterior a essa gravação: deita fora, a próxima volta corrige.
-      if (pushingRef.current || pushEpochRef.current !== epoch) return;
-      adoptRemoteHoras(data.horas_data);
+      if (pushingRef.current || anySlicePushing() || pushEpochRef.current !== epoch) return;
+      if (data.horas_data) adoptRemoteHoras(data.horas_data);
+      SLICE_COLS.forEach((c) => { if (c in data) mergeSlice(c, data[c]); });
     } finally {
       refreshingRef.current = false;
+    }
+  }
+
+  // Quem já está dentro (telemóvel com a app aberta) e é desativado pela gerência,
+  // ou cuja validade acaba, é desligado na próxima verificação. Só age perante
+  // uma resposta clara do banco; um erro de rede nunca termina a sessão.
+  async function checkStillActive() {
+    const myId = loggedInStaffIdRef.current;
+    if (!isSupabaseConfigured || myId == null || activeCheckRef.current) return;
+    activeCheckRef.current = true;
+    try {
+      const { data, error } = await supabase.from("staff").select("id,status,account_type,valid_until").eq("id", myId).maybeSingle();
+      if (error || !data) return;
+      const me = fromDbStaff(data);
+      if (isStaffActive(me, startOfLocalToday())) return;
+      await logout();
+      setAuthError("inactive_account");
+    } finally {
+      activeCheckRef.current = false;
     }
   }
 
@@ -233,18 +409,14 @@ export function useAppController() {
         // omissão vazios do schema).
         const { error: insErr } = await supabase.from("app_data").insert({ id: 1 });
         if (insErr) { console.error("Erro ao criar linha de dados do app:", insErr); ok = false; }
+        else SLICE_COLS.forEach((c) => absorbSlice(c, null)); // linha nova e vazia: o que está em memória é gravado a seguir
       }
       else if (appDataRes.data) {
         const row = appDataRes.data;
-        if (row.assignments && Object.keys(row.assignments).length > 0) setAssignments(row.assignments);
+        SLICE_COLS.forEach((c) => absorbSlice(c, row[c]));
         if (row.horas_data && Object.keys(row.horas_data).length > 0) replaceHorasFromServer(row.horas_data);
         else if (!hasHorasLoadedRef.current) Object.keys(horasRef.current).forEach((k) => dirtyRef.current.add(k)); // banco novo: grava o que está em memória (como antes)
         hasHorasLoadedRef.current = true;
-        if (row.missing_items && row.missing_items.length > 0) setMissingItems(row.missing_items);
-        if (row.sent_items && row.sent_items.length > 0) setSentItems(row.sent_items);
-        if (row.closed_periods && row.closed_periods.length > 0) setClosedPeriods(row.closed_periods);
-        if (row.personal_notes && row.personal_notes.length > 0) setPersonalNotes(row.personal_notes);
-        if (row.absences && row.absences.length > 0) setAbsences(row.absences);
       }
     } catch (err) {
       console.error("Erro ao carregar dados do Supabase:", err);
@@ -261,6 +433,9 @@ export function useAppController() {
     }
     const matchedStaff = staffList.find((s) => (s.email || "").toLowerCase() === email);
     if (matchedStaff) {
+      // Conta inativa, ou Replacement com a validade já passada: não entra.
+      // (A conta de login existe no Auth, mas a gerência já a desativou.)
+      if (!isStaffActive(matchedStaff, startOfLocalToday())) return "inactive";
       // Um segundo (ou terceiro...) login de gerência é só um "funcionário"
       // com role "gerencia" — mesma tabela/tela de Acessos, mas cai direto
       // na perspectiva de gerência completa, igual ao login principal.
@@ -296,7 +471,11 @@ export function useAppController() {
           if (cancelled) return;
           if (ok) setReadOk(true);
           const routed = await resolveSessionAndRoute(session.user.email, companyEmail, staffList);
-          if (routed && session.user.user_metadata?.must_change_password) setPasswordGate("temporary");
+          if (routed === "inactive") {
+            setReadOk(false);
+            setAuthError("inactive_account");
+            await supabase.auth.signOut();
+          } else if (routed && session.user.user_metadata?.must_change_password) setPasswordGate("temporary");
           if (!routed) {
             console.error("Sessão sem correspondência em funcionários/empresa — a terminar sessão.");
             await supabase.auth.signOut();
@@ -348,7 +527,11 @@ export function useAppController() {
       const { companyEmail, staffList, ok } = await loadAllData();
       if (ok) setReadOk(true);
       const routed = await resolveSessionAndRoute(data.user.email, companyEmail, staffList);
-      if (routed && data.user.user_metadata?.must_change_password) setPasswordGate("temporary");
+      if (routed === "inactive") {
+        setReadOk(false);
+        setAuthError("inactive_account");
+        await supabase.auth.signOut();
+      } else if (routed && data.user.user_metadata?.must_change_password) setPasswordGate("temporary");
       if (!routed) {
         setAuthError("no_account");
         await supabase.auth.signOut();
@@ -390,6 +573,7 @@ export function useAppController() {
     setPerspective("login");
     setReadOk(false);
     setLoadError(false);
+    sliceBaseRef.current = {}; // o próximo início de sessão volta a ler tudo do servidor
   }
 
   // QA pós-auditoria ("Gravar só depois de ler"): `clients`, `staff` e
@@ -429,11 +613,12 @@ export function useAppController() {
   // `app_data` continua gravado por todas as sessões (gerência, supervisor
   // e funcionário escrevem horas/avisos/notas aqui) — só ganha o novo
   // guard de `readOk`.
+  // Cada fatia grava só a diferença para o que este dispositivo viu do servidor
+  // (ver `flushSlice`): já não apaga o que outro dispositivo fez entretanto.
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk) return;
-    supabase.from("app_data").update({ assignments }).eq("id", 1).then(({ error }) => {
-      if (error) console.error("Erro ao gravar atribuições:", error);
-    });
+    flushSlice("assignments");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, assignments]);
 
   useEffect(() => {
@@ -442,58 +627,63 @@ export function useAppController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, horasData]);
 
-  // Mantém as horas em dia com os outros dispositivos: ao voltar ao app, ao
+  // Mantém tudo em dia com os outros dispositivos: ao voltar ao app, ao
   // voltar a ter internet e a cada ~45 s enquanto está aberto. É isto que
   // permite cruzar "mesmo cliente, mesmo dia" com o que um colega lançou
-  // depois de este telemóvel abrir o app.
+  // depois de este telemóvel abrir o app, e que os pedidos/avisos novos
+  // apareçam sem recarregar. O histórico (pesado) só vem em refrescos completos.
   useEffect(() => {
     if (!isSupabaseConfigured || !hydrated || !readOk || perspective === "login") return;
-    const tick = () => { if (document.visibilityState !== "hidden") refreshHoras(); };
-    const timer = setInterval(tick, 45000);
-    window.addEventListener("online", tick);
-    document.addEventListener("visibilitychange", tick);
-    tick();
+    let n = 0;
+    const tick = (full) => {
+      if (document.visibilityState === "hidden") return;
+      reloadIfNewDay();
+      checkStillActive();
+      refreshHoras(full === true || n % 8 === 0);
+      n += 1;
+    };
+    const onTimer = () => tick(false);
+    const onBack = () => tick(true);
+    const timer = setInterval(onTimer, 45000);
+    window.addEventListener("online", onBack);
+    document.addEventListener("visibilitychange", onBack);
+    tick(true);
     return () => {
       clearInterval(timer);
-      window.removeEventListener("online", tick);
-      document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("online", onBack);
+      document.removeEventListener("visibilitychange", onBack);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, perspective]);
 
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk) return;
-    supabase.from("app_data").update({ missing_items: missingItems }).eq("id", 1).then(({ error }) => {
-      if (error) console.error("Erro ao gravar solicitações:", error);
-    });
+    flushSlice("missing_items");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, missingItems]);
 
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk) return;
-    supabase.from("app_data").update({ sent_items: sentItems }).eq("id", 1).then(({ error }) => {
-      if (error) console.error("Erro ao gravar avisos:", error);
-    });
+    flushSlice("sent_items");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, sentItems]);
 
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk) return;
-    supabase.from("app_data").update({ closed_periods: closedPeriods }).eq("id", 1).then(({ error }) => {
-      if (error) console.error("Erro ao gravar histórico:", error);
-    });
+    flushSlice("closed_periods");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, closedPeriods]);
 
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk) return;
-    supabase.from("app_data").update({ personal_notes: personalNotes }).eq("id", 1).then(({ error }) => {
-      if (error) console.error("Erro ao gravar notas:", error);
-    });
+    flushSlice("personal_notes");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, personalNotes]);
 
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk) return;
-    supabase.from("app_data").update({ absences }).eq("id", 1).then(({ error }) => {
-      if (error) console.error("Erro ao gravar ausências:", error);
-    });
+    flushSlice("absences");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, absences]);
 
   function enterManagement() { setPerspective("management"); setScreen("dashboard"); }
@@ -552,6 +742,8 @@ export function useAppController() {
     setMissingItems([]);
     setSentItems([]);
     setClosedPeriods([]);
+    // A gravação abaixo já limpa estas fatias no servidor: a base passa a vazia.
+    ["assignments", "missing_items", "sent_items", "closed_periods"].forEach((c) => { sliceBaseRef.current[c] = emptySlice(c); });
     if (isSupabaseConfigured) {
       const results = await Promise.all([
         supabase.from("clients").delete().neq("id", -1),

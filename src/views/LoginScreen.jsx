@@ -12,6 +12,7 @@ import { isSupabaseConfigured } from "../models/supabaseClient.js";
 const ERROR_KEY_BY_CODE = {
   invalid_credentials: "errorInvalidCredentials",
   no_account: "errorNoAccount",
+  inactive_account: "errorInactiveAccount",
   generic: "errorGeneric",
 };
 

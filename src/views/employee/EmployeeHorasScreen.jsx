@@ -10,7 +10,7 @@ import {
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
-  staffStartedOn, absenceOn, clientDurationOn,
+  staffStartedOn, absenceOn, clientDurationOn, findByName,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -225,7 +225,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // Cliente fora da lista: nome (e cidade) escritos à mão, sem clientId; as
   // horas entram como pendentes e a gerência confirma o cliente certo.
   function addCustomEntry() {
-    if (weekLockedFlag || !customName.trim()) return;
+    if (weekLockedFlag || !customName.trim() || findByName(clients, customName)) return;
     const entry = {
       date: selectedKey, clientId: null, custom: { name: customName.trim(), city: customCity.trim() },
       hours: (parseHoursInput(customHours) ?? 60) / 60 || 1, extra: false, extraMinutes: 0, approved: false, voided: false,
@@ -954,7 +954,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       {/* Folha: cliente fora da lista (nome escrito à mão) */}
       <Drawer
         open={customOpen} onClose={() => setCustomOpen(false)} title={t.customClientTitle} width={420}
-        footer={<><Button variant="secondary" onClick={() => setCustomOpen(false)}>{t.confirmNo}</Button><Button variant="primary" onClick={addCustomEntry} disabled={!customName.trim()}>{t.customClientAdd}</Button></>}
+        footer={<><Button variant="secondary" onClick={() => setCustomOpen(false)}>{t.confirmNo}</Button><Button variant="primary" onClick={addCustomEntry} disabled={!customName.trim() || !!findByName(clients, customName)}>{t.customClientAdd}</Button></>}
       >
         <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 14 }}>{t.customClientHint}</div>
         {[["customClientName", customName, setCustomName, "text"], ["customClientCity", customCity, setCustomCity, "text"], ["customClientHours", customHours, setCustomHours, "text"]].map(([k, v, set, type]) => (
@@ -965,6 +965,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               value={v} onChange={(ev) => set(ev.target.value)}
               style={{ width: "100%", boxSizing: "border-box", height: 48, borderRadius: RADIUS.control, border: `1px solid ${COLORS.line}`, padding: "0 12px", fontSize: 16, fontFamily: "inherit" }}
             />
+            {k === "customClientName" && findByName(clients, customName) && (
+              <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: 4 }}>{T[lang].common.customClientExists}</div>
+            )}
           </label>
         ))}
       </Drawer>

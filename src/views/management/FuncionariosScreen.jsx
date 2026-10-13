@@ -3,7 +3,7 @@ import { Pencil, Eye, EyeOff, Copy, Check, AlertTriangle, Plus } from "lucide-re
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { TODAY, LANG_NAMES } from "../../models/data.js";
-import { getAssignedClientIds, clientById, isStaffActive, linkPartners, isSupervisorRole, isoDateStr } from "../../models/utils.js";
+import { getAssignedClientIds, clientById, isStaffActive, linkPartners, isSupervisorRole, isoDateStr, findByName, emailInUse } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
 import { Toggle } from "../shared/ui/Toggle.jsx";
@@ -123,7 +123,7 @@ function StatusBlock({ s, t, c0 }) {
 // `isStaffActive` (Etapa 4j) refletida na lista e na gaveta. `onNavigate`
 // é opcional (liga "Clientes atribuídos" à tela de Agendas, mesmo padrão
 // já usado em ClientesScreen.jsx).
-function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate, openPeriodStart }) {
+function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate, openPeriodStart, companyEmail }) {
   const t = T[lang].funcionarios;
   const ta = T[lang].acessos;
   const c0 = T[lang].common;
@@ -182,8 +182,10 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
   function validateDraft() {
     const errs = {};
     if (!draft.name.trim()) errs.name = true;
+    else if (findByName(staff, draft.name, isNew ? null : openStaff?.id)) errs.name = c0.nameTakenStaff; // nome repetido
     if (!draft.contact.trim()) errs.contact = true;
     if (isNew && !draft.email.trim()) errs.email = true;
+    else if (isNew && emailInUse(staff, companyEmail, draft.email)) errs.email = c0.emailTaken; // login repetido
     else if (isNew && draft.email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) errs.emailConfirm = true;
     if (!draft.accountType) errs.accountType = true;
     // Data de início: novo + "Sim" => obrigatória; qualquer caso com data =>
@@ -465,11 +467,11 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
 
         {mode === "edit" && (
           <div style={isMobile ? { ...styles.formGrid, gridTemplateColumns: "1fr" } : styles.formGrid}>
-            <Field label={t.fName} full required error={formErrors.name ? c0.requiredField : undefined}>
+            <Field label={t.fName} full required error={formErrors.name ? (formErrors.name === true ? c0.requiredField : formErrors.name) : undefined}>
               <input style={styles.input} value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} />
             </Field>
             {isNew && (
-              <Field label={t.fEmailNewOnly} full required error={formErrors.email ? c0.requiredField : undefined}>
+              <Field label={t.fEmailNewOnly} full required error={formErrors.email ? (formErrors.email === true ? c0.requiredField : formErrors.email) : undefined}>
                 <input
                   type="email" style={styles.input} value={draft.email} placeholder="nome@exemplo.com"
                   onChange={(e) => updateDraft("email", e.target.value)}

@@ -8,6 +8,7 @@ import { TYPE_ICONS, AGENDA_DAYS, TODAY, LANG_NAMES, EMPTY_CLIENT } from "../../
 import {
   startOfISOWeek, addDays, isoDateStr, clientAppliesThisWeek, weekLabelPT,
   parseDMY, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
+  findByName,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
@@ -196,6 +197,7 @@ function ClientesScreen({
     const errs = {};
     // Obrigatórios: nome, cidade, endereço, valor e duração da visita.
     if (!draft.name.trim()) errs.name = true;
+    else if (findByName(clients, draft.name, isNew ? null : openClient?.id)) errs.name = c0.nameTakenClient; // nome repetido
     if (!(draft.city || "").trim()) errs.city = true;
     if (!draft.address.trim()) errs.address = true;
     if (!String(draft.valueHour).trim()) errs.valueHour = true;
@@ -581,7 +583,7 @@ function ClientesScreen({
 
         {mode === "edit" && (
           <div style={isMobile ? { ...styles.formGrid, gridTemplateColumns: "1fr" } : styles.formGrid}>
-            <Field label={t.formName} full required error={formErrors.name ? c0.requiredField : undefined}>
+            <Field label={t.formName} full required error={formErrors.name ? (formErrors.name === true ? c0.requiredField : formErrors.name) : undefined}>
               <input style={styles.input} value={draft.name} onChange={(e) => updateDraft("name", e.target.value)} />
             </Field>
             <Field label={t.formType}>
