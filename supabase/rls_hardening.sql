@@ -1,8 +1,9 @@
 -- Servix — endurecimento de segurança do banco (RLS + funções + guarda de role).
 --
--- ESTADO: escrito, AINDA NÃO TESTADO nem aplicado em nenhum projeto Supabase.
--- Testar primeiro no projeto de teste (funcionário, supervisor, gerência,
--- gerência-supervisor, service_role) antes de correr na produção.
+-- ESTADO: aplicado e testado em 2026-10-14 no projeto de teste (funcionário,
+-- supervisor, gerência por email e por role, gerência-supervisor, desconhecido,
+-- anónimo, service_role — ver rls_hardening_test.sql) e aplicado na produção
+-- (L & A), onde foi verificado com um teste de fumo desfeito no fim.
 --
 -- Substitui `rls_staff_role_guard.sql` (agora incluído aqui) e refina as
 -- políticas de `enable_auth_rls.sql`, onde QUALQUER conta autenticada tinha
@@ -189,6 +190,10 @@ begin
   return new;
 end;
 $$;
+
+-- Funções de trigger: ninguém as chama pela API (só o próprio trigger).
+revoke all on function public.staff_guard_role_email_update() from public, anon, authenticated;
+revoke all on function public.staff_guard_insert_role() from public, anon, authenticated;
 
 drop trigger if exists staff_guard_role_email_update_trigger on public.staff;
 create trigger staff_guard_role_email_update_trigger

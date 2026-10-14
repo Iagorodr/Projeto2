@@ -10,7 +10,7 @@
 -- PRÉ-REQUISITOS (confirmar todos antes de rodar):
 --   1. Backup exportado de `staff` e `company_settings` (CSV via SQL Editor) — feito.
 --   2. Edge Function update-staff-password já testada e funcionando — feito.
---   3. Trigger RLS de staff (rls_staff_role_guard.sql) já aplicado e testado — feito.
+--   3. Trigger RLS de staff (rls_hardening.sql) já aplicado e testado — feito.
 --   4. UI de Acessos/Definições já ligada à Edge Function e testada — feito.
 --   5. dbMappers.js já não envia/lê mais o campo `password` nos saves de
 --      staff/company_settings — corrigido nesta mesma leva de mudanças.
