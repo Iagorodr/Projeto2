@@ -6,7 +6,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   clientById, entryClientName, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
-  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, isHorasFrozenOn, partnerOf, getOpenPeriod, getCutoffPeriod,
+  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, isHorasFrozenOn, partnerOf, shouldAutoMarkPartner, getOpenPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
@@ -201,6 +201,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // apaga a do outro.
   const partner = partnerOf(staff, staffId, TODAY);
   const pairOn = !!partner && !pairOffDays[selectedKey];
+  // O parceiro só vem junto se tem este cliente na agenda do dia (ver
+  // `shouldAutoMarkPartner`): "Sebamafe" de Iago + Jadson não marca a Talia.
   function addClientEntry(clientId, replacesDate) {
     if (weekLockedFlag) return;
     const client = clientById(clients, clientId);
@@ -210,7 +212,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       const entry = { date: selectedKey, clientId, hours: (clientDurationOn(client, replacesDate || selectedKey) || 60) / 60, extra: false, extraMinutes: 0, approved: false, voided: false };
       if (replacesDate) entry.replacesDate = replacesDate;
       let withNew = { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
-      if (pairOn && !replacesDate) {
+      if (pairOn && !replacesDate && shouldAutoMarkPartner(clients, assignments, staffId, partner, selectedDate, clientId)) {
         const pH = prev[partner.id] || emptyHoras();
         const pLocked = pH.status === "finalizado" || !!(pH.lockedWeeks && pH.lockedWeeks[chunkKey]);
         const pHas = pH.entries.some((e) => !e.voided && e.date === selectedKey && e.clientId === clientId);
