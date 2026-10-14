@@ -21,10 +21,26 @@ import {
   toDbClient, fromDbClient, toDbStaff, fromDbStaff,
   toDbCompanySettings, fromDbCompanySettings,
 } from "../models/dbMappers.js";
+import {
+  consumeUrlCompanyCode, getStoredCompanyCode, storeCompanyCode, clearStoredCompanyCode,
+  lookupCompany, fetchCompanyStatus, isBlockedState, companyNotice,
+  normalizeCompanyCode, isValidCompanyCode, isManagerRole, sessionRole,
+  markActive, idleExceeded, clearActivity, setFlash, takeFlash, forceLocalSignOut,
+} from "../models/companyContext.js";
 
-// Empresas novas (deploy com VITE_START_EMPTY=true na Vercel) começam SEM os
-// dados de demonstração embutidos no código; as já existentes ficam como estão.
-const START_EMPTY = import.meta.env.VITE_START_EMPTY === "true";
+// Com o Supabase ligado, cada empresa começa SEM os dados de demonstração
+// embutidos no código (várias empresas no mesmo banco: nada de uma pode
+// aparecer, nem ser gravado, noutra). Sem Supabase (modo demonstração) ou com
+// VITE_START_EMPTY=true, o comportamento é o de sempre.
+const START_EMPTY = isSupabaseConfigured || import.meta.env.VITE_START_EMPTY === "true";
+
+// Feito uma única vez, ao carregar a página: um link com `?e=codigo` guarda o
+// código da empresa; e a mensagem deixada pela saída anterior (inatividade,
+// assinatura vencida…) é lida aqui e apagada.
+const URL_COMPANY_CODE = isSupabaseConfigured ? consumeUrlCompanyCode() : null;
+const FLASH = isSupabaseConfigured ? takeFlash() : null;
+const FLASH_AUTH_ERROR = { idle: "idle_logout", inactive: "inactive_account", no_account: "no_account", generic: "generic" };
+const BLOCK_FROM_STATUS = (st) => ({ type: "blocked", state: st.state, name: st.name || "", validUntil: st.validUntil || null, code: st.code || "" });
 
 function dayKeyOf(d) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
 // O dia em que esta app foi carregada (ver `reloadIfNewDay`).
@@ -114,7 +130,17 @@ export function useAppController() {
   const [loadError, setLoadError] = useState(false);
 
   const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState(null);
+  const [authError, setAuthError] = useState(FLASH ? (FLASH_AUTH_ERROR[FLASH.type] || null) : null);
+
+  // Várias empresas: código escolhido neste aparelho, estado da assinatura da
+  // empresa de quem está dentro, e (se a assinatura acabou) o ecrã de bloqueio.
+  const [companyCode, setCompanyCode] = useState(() => (isSupabaseConfigured ? (URL_COMPANY_CODE || getStoredCompanyCode()) : null));
+  const [companyStatus, setCompanyStatus] = useState(null);
+  const [companyBlock, setCompanyBlock] = useState(FLASH && FLASH.type === "blocked" ? FLASH : null);
+  // Id desta empresa nas tabelas company_settings/app_data (vem de my_company_status;
+  // 1 enquanto o banco ainda não tem o SQL de várias empresas).
+  const companyIdRef = useRef(1);
+  const statusCheckRef = useRef(false);
 
   const loggedInStaffIdRef = useRef(null);
   loggedInStaffIdRef.current = loggedInStaffId;
@@ -157,7 +183,7 @@ export function useAppController() {
         else console.error("Erro ao gravar horas:", error);
       }
       if (!ok && (wasFull || rpcMissingRef.current)) {
-        const { error } = await supabase.from("app_data").update({ horas_data: snapshot }).eq("id", 1);
+        const { error } = await supabase.from("app_data").update({ horas_data: snapshot }).eq("id", companyIdRef.current);
         if (error) console.error("Erro ao gravar horas:", error);
         else ok = true;
       }
@@ -254,7 +280,7 @@ export function useAppController() {
         else console.error(`Erro ao gravar ${col}:`, error);
       }
       if (!ok && (!d || rpcMissingSliceRef.current[rpcName])) {
-        const { error } = await supabase.from("app_data").update({ [col]: snapshot }).eq("id", 1);
+        const { error } = await supabase.from("app_data").update({ [col]: snapshot }).eq("id", companyIdRef.current);
         if (error) console.error(`Erro ao gravar ${col}:`, error);
         else ok = true;
       }
@@ -314,7 +340,7 @@ export function useAppController() {
       await Promise.all([flushHoras(), ...SLICE_COLS.map((c) => flushSlice(c))]);
       const epoch = pushEpochRef.current;
       const cols = ["horas_data", ...SLICE_COLS.filter((c) => full || c !== "closed_periods")];
-      const { data, error } = await supabase.from("app_data").select(cols.join(",")).eq("id", 1).maybeSingle();
+      const { data, error } = await supabase.from("app_data").select(cols.join(",")).eq("id", companyIdRef.current).maybeSingle();
       if (error || !data) return;
       // Se entretanto gravámos algo (ou há gravação a meio), esta leitura pode
       // ser anterior a essa gravação: deita fora, a próxima volta corrige.
@@ -338,8 +364,7 @@ export function useAppController() {
       if (error || !data) return;
       const me = fromDbStaff(data);
       if (isStaffActive(me, startOfLocalToday())) return;
-      await logout();
-      setAuthError("inactive_account");
+      await doLogout({ type: "inactive" });
     } finally {
       activeCheckRef.current = false;
     }
@@ -373,15 +398,15 @@ export function useAppController() {
       const [clientsRes, staffRes, settingsRes, appDataRes] = await Promise.all([
         supabase.from("clients").select("*"),
         supabase.from("staff").select("*"),
-        supabase.from("company_settings").select("*").eq("id", 1).maybeSingle(),
-        supabase.from("app_data").select("*").eq("id", 1).maybeSingle(),
+        supabase.from("company_settings").select("*").eq("id", companyIdRef.current).maybeSingle(),
+        supabase.from("app_data").select("*").eq("id", companyIdRef.current).maybeSingle(),
       ]);
 
       if (clientsRes.error) { console.error("Erro ao carregar clientes:", clientsRes.error); ok = false; }
-      else if (clientsRes.data && clientsRes.data.length > 0) setClients(clientsRes.data.map(fromDbClient));
+      else if (clientsRes.data && (START_EMPTY || clientsRes.data.length > 0)) setClients(clientsRes.data.map(fromDbClient));
 
       if (staffRes.error) { console.error("Erro ao carregar funcionários:", staffRes.error); ok = false; }
-      else if (staffRes.data && staffRes.data.length > 0) {
+      else if (staffRes.data && (START_EMPTY || staffRes.data.length > 0)) {
         staffList = staffRes.data.map(fromDbStaff);
         setStaff(staffList);
       }
@@ -403,11 +428,11 @@ export function useAppController() {
 
       if (appDataRes.error) { console.error("Erro ao carregar dados do app:", appDataRes.error); ok = false; }
       else if (!appDataRes.data) {
-        // Banco novo sem a linha id=1 de app_data: sem ela, todas as gravações
-        // (`update ... eq("id", 1)`) ficam a "gravar" zero linhas em silêncio —
+        // Banco novo sem a linha de app_data desta empresa: sem ela, todas as gravações
+        // (`update ... eq("id", <empresa>)`) ficam a "gravar" zero linhas em silêncio —
         // agenda, horas e avisos perdiam-se ao recarregar. Cria-a (valores por
         // omissão vazios do schema).
-        const { error: insErr } = await supabase.from("app_data").insert({ id: 1 });
+        const { error: insErr } = await supabase.from("app_data").insert({ id: companyIdRef.current });
         if (insErr) { console.error("Erro ao criar linha de dados do app:", insErr); ok = false; }
         else SLICE_COLS.forEach((c) => absorbSlice(c, null)); // linha nova e vazia: o que está em memória é gravado a seguir
       }
@@ -467,19 +492,35 @@ export function useAppController() {
         const { data: { session } } = await supabase.auth.getSession();
         if (cancelled) return;
         if (session) {
+          // Primeiro a empresa: assinatura em dia? (quem já tinha sessão não passa
+          // pelo ecrã do código; o código fica guardado a partir daqui.)
+          const gate = await admitToCompany(null);
+          if (cancelled) return;
+          if (!gate.ok) {
+            await endSessionLocally();
+            if (gate.reason === "blocked") setCompanyBlock(BLOCK_FROM_STATUS(gate.status));
+            else setAuthError(gate.reason === "no_account" ? "no_account" : "generic");
+            return;
+          }
           const { companyEmail, staffList, ok } = await loadAllData();
           if (cancelled) return;
           if (ok) setReadOk(true);
+          // A gerência que ficou mais de IDLE_MINUTES sem usar o app volta a escrever a palavra-passe.
+          if (ok && isManagerRole(sessionRole(session.user.email, companyEmail, staffList)) && idleExceeded()) {
+            await doLogout({ type: "idle" });
+            return;
+          }
           const routed = await resolveSessionAndRoute(session.user.email, companyEmail, staffList);
           if (routed === "inactive") {
-            setReadOk(false);
-            setAuthError("inactive_account");
-            await supabase.auth.signOut();
+            await doLogout({ type: "inactive" });
+            return;
           } else if (routed && session.user.user_metadata?.must_change_password) setPasswordGate("temporary");
           if (!routed) {
             console.error("Sessão sem correspondência em funcionários/empresa — a terminar sessão.");
-            await supabase.auth.signOut();
+            await doLogout({ type: ok ? "no_account" : "generic" });
+            return;
           }
+          markActive();
         }
       } finally {
         if (!cancelled) setHydrated(true);
@@ -524,17 +565,25 @@ export function useAppController() {
         setAuthError(error.message === "Invalid login credentials" ? "invalid_credentials" : "generic");
         return;
       }
+      markActive(); // começa a contar a inatividade daqui (não do último uso, de ontem)
+      // A conta tem de ser da empresa escolhida no ecrã do código, e a assinatura estar em dia.
+      const gate = await admitToCompany(companyCode);
+      if (!gate.ok) {
+        await endSessionLocally();
+        if (gate.reason === "blocked") setCompanyBlock(BLOCK_FROM_STATUS(gate.status));
+        else setAuthError(gate.reason === "wrong_company" ? "wrong_company" : gate.reason === "no_account" ? "no_account" : "generic");
+        return;
+      }
       const { companyEmail, staffList, ok } = await loadAllData();
       if (ok) setReadOk(true);
       const routed = await resolveSessionAndRoute(data.user.email, companyEmail, staffList);
       if (routed === "inactive") {
-        setReadOk(false);
-        setAuthError("inactive_account");
-        await supabase.auth.signOut();
+        await doLogout({ type: "inactive" });
+        return;
       } else if (routed && data.user.user_metadata?.must_change_password) setPasswordGate("temporary");
       if (!routed) {
-        setAuthError("no_account");
-        await supabase.auth.signOut();
+        await doLogout({ type: ok ? "no_account" : "generic" });
+        return;
       }
     } finally {
       setAuthLoading(false);
@@ -563,10 +612,18 @@ export function useAppController() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  async function logout() {
+  // Sai e RECARREGA a página: com várias empresas no mesmo banco, nada da
+  // empresa anterior pode ficar na memória (nem ser gravado na seguinte).
+  // `flash` = razão a mostrar no ecrã seguinte (inatividade, assinatura
+  // vencida…); com razão, só termina a sessão deste aparelho.
+  async function doLogout(flash) {
     setPasswordGate(null);
     if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
+      await flushAllBestEffort();
+      await endSessionLocally(flash ? "local" : "global");
+      if (flash) setFlash(flash);
+      window.location.reload();
+      return;
     }
     setLoggedInStaffId(null);
     setAuthError(null);
@@ -575,6 +632,87 @@ export function useAppController() {
     setLoadError(false);
     sliceBaseRef.current = {}; // o próximo início de sessão volta a ler tudo do servidor
   }
+  // (sem argumentos: serve de `onClick` direto, que recebe o evento)
+  function logout() { return doLogout(null); }
+
+  // Termina a sessão; se o pedido ao servidor falhar (sem rede) apaga-a à força do aparelho.
+  async function endSessionLocally(scope = "local") {
+    clearActivity();
+    try {
+      const { error } = await supabase.auth.signOut({ scope });
+      if (error) forceLocalSignOut();
+    } catch { forceLocalSignOut(); }
+  }
+
+  // Antes de sair, grava o que ainda estiver por gravar (no máximo ~2,5 s).
+  async function flushAllBestEffort() {
+    try {
+      await Promise.race([
+        Promise.all([flushHoras(), ...SLICE_COLS.map((c) => flushSlice(c))]),
+        new Promise((r) => setTimeout(r, 2500)),
+      ]);
+    } catch { /* sair não pode falhar por causa disto */ }
+  }
+
+  // Confirma a empresa e a assinatura de quem acabou de entrar (antes de ler
+  // qualquer dado). `expectCode`: o código escolhido no ecrã do código — a conta
+  // tem de ser dessa empresa. Devolve { ok:true } ou { ok:false, reason, status }.
+  async function admitToCompany(expectCode) {
+    let res = { kind: "error" };
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      res = await fetchCompanyStatus(supabase);
+      if (res.kind !== "error") break;
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    }
+    if (res.kind === "legacy") { // banco ainda sem o SQL de várias empresas: uma só empresa, como antes
+      companyIdRef.current = 1;
+      setCompanyStatus(null);
+      return { ok: true };
+    }
+    if (res.kind === "error") return { ok: false, reason: "generic" };
+    const st = res.status;
+    if (st.state === "none") return { ok: false, reason: "no_account" };
+    if (expectCode && String(st.code || "").toLowerCase() !== expectCode) return { ok: false, reason: "wrong_company", status: st };
+    if (isBlockedState(st.state)) return { ok: false, reason: "blocked", status: st };
+    companyIdRef.current = st.companyId;
+    setCompanyStatus(st);
+    if (st.code) { storeCompanyCode(st.code); setCompanyCode(st.code); }
+    return { ok: true, status: st };
+  }
+
+  // Com a app aberta: a assinatura pode vencer (ou ser suspensa) a qualquer momento.
+  async function refreshCompanyStatus() {
+    if (!isSupabaseConfigured || statusCheckRef.current) return;
+    statusCheckRef.current = true;
+    try {
+      const res = await fetchCompanyStatus(supabase);
+      if (res.kind !== "status") return;
+      const st = res.status;
+      if (isBlockedState(st.state)) { await doLogout(BLOCK_FROM_STATUS(st)); return; }
+      if (st.state !== "none") setCompanyStatus(st);
+    } finally {
+      statusCheckRef.current = false;
+    }
+  }
+
+  // Ecrã do código da empresa. Devolve "ok" | "invalid" | "not_found" | "error".
+  async function submitCompanyCode(raw) {
+    const code = normalizeCompanyCode(raw);
+    if (!isValidCompanyCode(code)) return "invalid";
+    const res = await lookupCompany(supabase, code);
+    if (res.kind === "error") return "error";
+    if (!res.found) return "not_found";
+    storeCompanyCode(code);
+    setCompanyCode(code);
+    setAuthError(null);
+    return "ok";
+  }
+  function changeCompany() {
+    clearStoredCompanyCode();
+    setCompanyCode(null);
+    setAuthError(null);
+  }
+  function dismissCompanyBlock() { setCompanyBlock(null); setAuthError(null); }
 
   // QA pós-auditoria ("Gravar só depois de ler"): `clients`, `staff` e
   // `company_settings` só são gravados na sessão de GERÊNCIA — nenhuma
@@ -605,7 +743,7 @@ export function useAppController() {
       company, cutoffDay, contractAlertDays, closeDeadlineDays, highlightsMonths, highlightsRealtime,
       reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount,
     });
-    supabase.from("company_settings").update(payload).eq("id", 1).then(({ error }) => {
+    supabase.from("company_settings").update(payload).eq("id", companyIdRef.current).then(({ error }) => {
       if (error) console.error("Erro ao gravar definições:", error);
     });
   }, [hydrated, readOk, perspective, company, cutoffDay, contractAlertDays, closeDeadlineDays, highlightsMonths, highlightsRealtime, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount]);
@@ -639,6 +777,7 @@ export function useAppController() {
       if (document.visibilityState === "hidden") return;
       reloadIfNewDay();
       checkStillActive();
+      refreshCompanyStatus();
       refreshHoras(full === true || n % 8 === 0);
       n += 1;
     };
@@ -750,7 +889,7 @@ export function useAppController() {
         supabase.from("staff").delete().neq("id", -1),
         supabase.from("app_data").update({
           assignments: {}, horas_data: {}, missing_items: [], sent_items: [], closed_periods: [],
-        }).eq("id", 1),
+        }).eq("id", companyIdRef.current),
       ]);
       results.forEach(({ error }) => { if (error) console.error("Erro ao formatar dados:", error); });
     }
@@ -759,6 +898,44 @@ export function useAppController() {
   const me = staff.find((s) => s.id === loggedInStaffId);
   const myReceived = sentItems.filter((i) => i.staffId === loggedInStaffId);
   const myUnreadBadge = myReceived.filter((i) => !i.read).length;
+
+  // Gerência = a conta da empresa (login direto, sem ficha de funcionário), a
+  // gerência e a gerência-supervisor (mesmo quando está na vista de funcionário).
+  const isManagerSession = perspective === "management" || (perspective === "employee" && isManagerRole(me?.role));
+
+  // A gerência volta a pedir a palavra-passe depois de IDLE_MINUTES sem usar o
+  // app (qualquer toque, tecla ou rolagem conta como uso, em qualquer separador
+  // do mesmo aparelho). Funcionários e supervisores continuam entrados.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !isManagerSession) return;
+    let lastWrite = 0;
+    let leaving = false;
+    const bump = () => {
+      const now = Date.now();
+      if (now - lastWrite > 5000) { lastWrite = now; markActive(now); }
+    };
+    const check = () => {
+      if (leaving || !idleExceeded()) return;
+      leaving = true;
+      doLogout({ type: "idle" });
+    };
+    markActive();
+    lastWrite = Date.now();
+    const events = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart", "scroll"];
+    events.forEach((ev) => window.addEventListener(ev, bump, { passive: true, capture: true }));
+    const onVisible = () => { if (document.visibilityState === "visible") check(); };
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(check, 15000);
+    return () => {
+      events.forEach((ev) => window.removeEventListener(ev, bump, { capture: true }));
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isManagerSession]);
+
+  // Aviso de assinatura (a acabar / em tolerância); a gerência vê mais do que os outros.
+  const companyNoticeValue = isSupabaseConfigured && perspective !== "login" ? companyNotice(companyStatus, isManagerSession) : null;
 
   return {
     perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen,
@@ -776,5 +953,9 @@ export function useAppController() {
     formatAllData, verifyPassword,
     authLoading, authError, loginWithPassword, logout, passwordGate, requestPasswordReset, setNewPassword,
     me, myUnreadBadge, loadError,
+    // Várias empresas
+    companyCode, submitCompanyCode, changeCompany,
+    companyBlock, dismissCompanyBlock,
+    companyNotice: companyNoticeValue,
   };
 }

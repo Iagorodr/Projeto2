@@ -104,8 +104,8 @@ function fromDbStaff(row) {
 }
 
 function toDbCompanySettings({ company, cutoffDay, contractAlertDays, closeDeadlineDays, highlightsMonths, highlightsRealtime, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount }) {
+  // Sem `id`: a linha da empresa é escolhida por quem grava (`.eq("id", <empresa>)`).
   return {
-    id: 1,
     name: company.name,
     email: company.email,
     photo_url: company.photoUrl || null,

@@ -1,8 +1,10 @@
 -- Servix — várias empresas no mesmo banco (multi-empresa) + validade da assinatura.
 --
--- ESTADO: escrito e validado num Postgres local; ainda NÃO aplicado em nenhum
--- projeto Supabase. Ordem de aplicação: projeto de teste → testes
--- (multi_empresa_test.sql) → produção (L & A).
+-- ESTADO: aplicado e testado no projeto de TESTE (multi_empresa_test.sql:
+-- 92 OK, 0 FALHOU). Produção (L & A): ainda NÃO aplicado.
+-- Ordem: projeto de teste → testes → produção. Em produção aplique ANTES de
+-- publicar a versão nova do app (o app também aguenta um banco sem este SQL,
+-- mas aí não há separação entre empresas).
 --
 -- PRÉ-REQUISITO: `rls_hardening.sql` já aplicado.
 --

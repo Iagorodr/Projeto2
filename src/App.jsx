@@ -14,7 +14,11 @@ import { formatPeriodLabel, closeDeadlineInfo, isoDateStr } from "./models/utils
 import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, unseenAvisosCount } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
+import { isSupabaseConfigured } from "./models/supabaseClient.js";
 import LoginScreen from "./views/LoginScreen.jsx";
+import CompanyGateScreen from "./views/CompanyGateScreen.jsx";
+import CompanyBlockedScreen from "./views/CompanyBlockedScreen.jsx";
+import CompanyNotice from "./views/shared/CompanyNotice.jsx";
 import SetNewPasswordScreen from "./views/SetNewPasswordScreen.jsx";
 import DashboardScreen from "./views/management/DashboardScreen.jsx";
 import ClientesScreen from "./views/management/ClientesScreen.jsx";
@@ -89,12 +93,20 @@ export default function App() {
           {T[c.lang].common.loadErrorBanner}
         </div>
       )}
-      {c.perspective === "login" && (
+      {c.perspective === "login" && c.companyBlock && (
+        // Assinatura vencida (depois da tolerância) ou empresa suspensa.
+        <CompanyBlockedScreen lang={c.lang} setLang={c.setLang} block={c.companyBlock} onBack={c.dismissCompanyBlock} />
+      )}
+      {c.perspective === "login" && !c.companyBlock && isSupabaseConfigured && !c.companyCode && (
+        // Várias empresas: antes do login, o código da empresa (uma vez por aparelho).
+        <CompanyGateScreen lang={c.lang} setLang={c.setLang} onSubmit={c.submitCompanyCode} />
+      )}
+      {c.perspective === "login" && !c.companyBlock && (!isSupabaseConfigured || c.companyCode) && (
         <LoginScreen
           lang={c.lang} setLang={c.setLang}
           onEnterManagement={c.enterManagement} onEnterEmployee={c.enterEmployee}
           onLoginWithPassword={c.loginWithPassword} onRequestPasswordReset={c.requestPasswordReset} authLoading={c.authLoading} authError={c.authError}
-          company={c.company} staff={c.staff}
+          company={c.company} staff={c.staff} companyCode={c.companyCode} onChangeCompany={c.changeCompany}
         />
       )}
 
@@ -159,6 +171,11 @@ export default function App() {
             user={managementUser} onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
           />
           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+            {c.companyNotice && (
+              <div style={{ padding: "16px 24px 0" }}>
+                <CompanyNotice lang={c.lang} notice={c.companyNotice} audience="management" companyName={c.company.name} companyCode={c.companyCode} />
+              </div>
+            )}
             {c.screen === "dashboard" && closeInfo.overdue && (
               <CloseLockPanel lang={c.lang} periodLabel={formatPeriodLabel(openPeriodNow, c.lang)} onGoHours={() => c.setScreen("horas")} />
             )}
@@ -217,6 +234,11 @@ export default function App() {
           ...(isGerSup ? [{ key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsManagement }] : []),
         ];
 
+        // Aviso de assinatura: fica FORA de `body` (que no PC/tablet é uma linha
+        // de colunas) — em cima de tudo, em qualquer tamanho de ecrã.
+        const noticeEl = c.companyNotice
+          ? <CompanyNotice lang={c.lang} notice={c.companyNotice} audience={isGerSup ? "management" : "employee"} companyName={c.company.name} companyCode={c.companyCode} />
+          : null;
         const empCloseInfo = closeDeadlineInfo(getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY), TODAY, c.closeDeadlineDays);
         const body = (
           <>
@@ -324,6 +346,7 @@ export default function App() {
           return (
             <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
               <div style={{ flex: 1, paddingBottom: 8 }}>
+                {noticeEl && <div style={{ marginBottom: 12 }}>{noticeEl}</div>}
                 {body}
               </div>
               <MobileBottomBar
@@ -346,8 +369,11 @@ export default function App() {
               user={{ name: c.me.name, subtitle: isSupervisor ? T[c.lang].acessos.roleSupervisor : undefined }}
               onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
             />
-            <div style={{ flex: 1, overflowY: "auto", display: "flex", justifyContent: "center", padding: "24px 24px 40px" }}>
-              {body}
+            <div style={{ flex: 1, minWidth: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+              {noticeEl && <div style={{ padding: "16px 24px 0" }}>{noticeEl}</div>}
+              <div style={{ flex: 1, display: "flex", justifyContent: "center", padding: "24px 24px 40px" }}>
+                {body}
+              </div>
             </div>
           </div>
         );
