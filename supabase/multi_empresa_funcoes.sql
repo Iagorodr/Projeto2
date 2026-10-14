@@ -1,7 +1,7 @@
 -- Servix — funções de apoio às Edge Functions no modo multi-empresa.
 --
--- ESTADO: escrito e validado num Postgres local (multi_empresa_funcoes_test.sql);
--- ainda não aplicado em nenhum projeto Supabase.
+-- ESTADO: validado num Postgres local e aplicado no projeto de TESTE em 2026-10-14
+-- (multi_empresa_funcoes_test.sql: 17 OK). Ainda não aplicado na produção (L & A).
 --
 -- PRÉ-REQUISITO: `multi_empresa.sql` já aplicado. Seguro rodar mais de uma vez.
 --

@@ -18,6 +18,16 @@ que é desfeita): `multi_empresa_test.sql` (92 OK), `multi_empresa_funcoes_test.
 `multi_empresa_admin_test.sql` (55 OK). Cada um termina com um ERRO "RESULT" cheio de
 linhas "OK"; não pode aparecer "FALHOU" nem "ERRO NO TESTE".
 
+## Estado (2026-10-14)
+| Passo | TESTE (`svtqldpfljvznetuscri`) | Produção L & A (`zoizwdungwtioppvupcl`) |
+|-------|-------------------------------|------------------------------------------|
+| 1 `multi_empresa.sql` | feito (92 OK) | **por fazer** |
+| 2 `multi_empresa_funcoes.sql` | feito (17 OK) | por fazer |
+| 3 `multi_empresa_admin.sql` | feito (55 OK) | por fazer |
+| 4 código da empresa 1 | `demo` | por fazer (`lea`) |
+| 5 Edge Functions | publicadas (update-staff-password v2, send-note-reminders v5, admin-company-login v1) | por fazer |
+| 6 conta de administração | por fazer (falta o e-mail) | por fazer |
+
 ## Pontos de atenção
 - Faça o passo 5 **antes** de existir uma segunda empresa: as versões antigas das funções
   não conhecem empresas.
