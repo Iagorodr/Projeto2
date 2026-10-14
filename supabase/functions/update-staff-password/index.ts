@@ -3,14 +3,13 @@
 // do que scripts/setup-auth.mjs já faz à mão, com uma verificação a mais
 // que o script não precisava: confirmar QUEM está a chamar.
 //
-// Segurança (spec 4.10): não existe claim "é gerência" no token — a
-// identidade "gerência" vive em duas tabelas, exatamente como
-// resolveSessionAndRoute() decide no app: o email da sessão é igual a
-// company_settings.email, OU corresponde a uma linha de staff com
-// role === "gerencia". Esta função replica as DUAS vias, usando o email
-// verificado do PRÓPRIO chamador (via auth.getUser() com o JWT recebido —
-// nunca confiando em nada que venha no corpo do pedido para decidir
-// permissão). Só depois de confirmar isso é que usa a chave de serviço.
+// Segurança (spec 4.10 + multi-empresa): não existe claim "é gerência" no
+// token — a identidade "gerência" e a empresa vivem nas tabelas do banco. A
+// permissão é decidida pela função SQL can_manage_login(email), chamada com o
+// JWT de quem pediu (a identidade vem de auth.getUser(), nunca do corpo do
+// pedido): só passa quem é gerência da empresa do email alvo, com a assinatura
+// da empresa em dia. Só depois disso se usa a chave de serviço.
+// Requer multi_empresa.sql + multi_empresa_funcoes.sql aplicados.
 //
 // Body esperado: { email: string, newPassword?: string }
 //   - email: a conta a criar/redefinir (pode ser a do próprio chamador).
@@ -70,30 +69,21 @@ Deno.serve(async (req) => {
   });
   const { data: callerData, error: callerErr } = await callerClient.auth.getUser();
   if (callerErr || !callerData?.user?.email) return json({ error: "invalid_session" }, 401);
-  const callerEmail = callerData.user.email.toLowerCase();
 
-  // 2) É gerência? As duas vias de resolveSessionAndRoute(), replicadas.
-  // Usa a chave de serviço só pra LER (ainda não mudou nada), o suficiente
-  // pra decidir a permissão sem depender de RLS estar afinado certinho pra
-  // este caso específico.
+  // 2) Pode mexer neste login? A decisão vive no banco (função can_manage_login,
+  // chamada com o token de quem pediu): é gerência da sua empresa (email das
+  // definições, role 'gerencia' ou 'gerencia_supervisor' — a mesma definição das
+  // políticas de RLS), a assinatura da empresa está em dia, e o email alvo
+  // pertence a alguém DA MESMA empresa. Contas fora das empresas (ex.: a do
+  // administrador da plataforma) e logins de outras empresas ficam de fora.
+  const { data: allowed, error: permErr } = await callerClient.rpc("can_manage_login", { p_email: targetEmail });
+  if (permErr) return json({ error: "lookup_failed", detail: permErr.message }, 500);
+  if (allowed !== true) return json({ error: "forbidden" }, 403);
+
+  // A chave de serviço só entra depois da autorização, para criar/atualizar a conta no Auth.
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-
-  const { data: settings, error: settingsErr } = await admin
-    .from("company_settings").select("email").eq("id", 1).maybeSingle();
-  if (settingsErr) return json({ error: "lookup_failed", detail: settingsErr.message }, 500);
-
-  let isGerencia = !!settings?.email && settings.email.toLowerCase() === callerEmail;
-
-  if (!isGerencia) {
-    const { data: callerStaff, error: staffErr } = await admin
-      .from("staff").select("role").ilike("email", callerEmail).maybeSingle();
-    if (staffErr) return json({ error: "lookup_failed", detail: staffErr.message }, 500);
-    isGerencia = callerStaff?.role === "gerencia";
-  }
-
-  if (!isGerencia) return json({ error: "forbidden" }, 403);
 
   // 3) Autorizado. Gera (ou usa) a senha e aplica no Auth — cria a conta se
   // ainda não existir, senão atualiza a senha da que já existe. Mesma
@@ -116,9 +106,15 @@ Deno.serve(async (req) => {
     return json({ error: "create_failed", detail: createErr.message }, 500);
   }
 
-  const { data: list, error: listErr } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  if (listErr) return json({ error: "lookup_failed", detail: listErr.message }, 500);
-  const existing = list.users.find((u) => (u.email || "").toLowerCase() === targetEmail);
+  // Procura a conta pelo email, página a página (com várias empresas a lista
+  // já pode passar de 1000 contas).
+  let existing: { id: string; email?: string; user_metadata?: Record<string, unknown> } | undefined;
+  for (let page = 1; page <= 50 && !existing; page += 1) {
+    const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (listErr) return json({ error: "lookup_failed", detail: listErr.message }, 500);
+    existing = list.users.find((u) => (u.email || "").toLowerCase() === targetEmail);
+    if (list.users.length < 1000) break;
+  }
   if (!existing) return json({ error: "account_not_found" }, 404);
 
   const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, {
