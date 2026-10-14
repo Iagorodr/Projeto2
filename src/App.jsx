@@ -97,16 +97,19 @@ export default function App() {
         // Assinatura vencida (depois da tolerância) ou empresa suspensa.
         <CompanyBlockedScreen lang={c.lang} setLang={c.setLang} block={c.companyBlock} onBack={c.dismissCompanyBlock} />
       )}
-      {c.perspective === "login" && !c.companyBlock && isSupabaseConfigured && !c.companyCode && (
+      {c.perspective === "login" && !c.companyBlock && isSupabaseConfigured && !c.companyCode && !c.legacyDb && (
         // Várias empresas: antes do login, o código da empresa (uma vez por aparelho).
-        <CompanyGateScreen lang={c.lang} setLang={c.setLang} onSubmit={c.submitCompanyCode} />
+        // Enquanto se descobre se o banco já tem várias empresas, só o fundo (sem piscar o ecrã errado).
+        c.companyGateReady
+          ? <CompanyGateScreen lang={c.lang} setLang={c.setLang} onSubmit={c.submitCompanyCode} />
+          : <div style={{ minHeight: "100dvh", flex: 1, background: "linear-gradient(155deg, #E3F2EA 0%, #A9D9C2 45%, #4D9D7E 85%, #2E8570 100%)" }} />
       )}
-      {c.perspective === "login" && !c.companyBlock && (!isSupabaseConfigured || c.companyCode) && (
+      {c.perspective === "login" && !c.companyBlock && (!isSupabaseConfigured || c.companyCode || c.legacyDb) && (
         <LoginScreen
           lang={c.lang} setLang={c.setLang}
           onEnterManagement={c.enterManagement} onEnterEmployee={c.enterEmployee}
           onLoginWithPassword={c.loginWithPassword} onRequestPasswordReset={c.requestPasswordReset} authLoading={c.authLoading} authError={c.authError}
-          company={c.company} staff={c.staff} companyCode={c.companyCode} onChangeCompany={c.changeCompany}
+          company={c.company} staff={c.staff} companyCode={c.legacyDb ? null : c.companyCode} onChangeCompany={c.changeCompany}
         />
       )}
 

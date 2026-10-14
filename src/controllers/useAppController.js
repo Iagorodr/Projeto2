@@ -141,6 +141,22 @@ export function useAppController() {
   // 1 enquanto o banco ainda não tem o SQL de várias empresas).
   const companyIdRef = useRef(1);
   const statusCheckRef = useRef(false);
+  // Banco que ainda não tem o SQL de várias empresas (uma só empresa, como antes):
+  // não há código a pedir. Sem código guardado, uma consulta de teste descobre-o
+  // antes de decidir o primeiro ecrã (`companyGateReady`).
+  const [legacyDb, setLegacyDb] = useState(false);
+  const [companyGateReady, setCompanyGateReady] = useState(() => !isSupabaseConfigured || Boolean(URL_COMPANY_CODE || getStoredCompanyCode()));
+  useEffect(() => {
+    if (!isSupabaseConfigured || companyGateReady) return;
+    let cancelled = false;
+    lookupCompany(supabase, "servix-probe").then((r) => {
+      if (cancelled) return;
+      if (r.kind === "ok" && r.legacy) setLegacyDb(true);
+      setCompanyGateReady(true);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loggedInStaffIdRef = useRef(null);
   loggedInStaffIdRef.current = loggedInStaffId;
@@ -954,7 +970,7 @@ export function useAppController() {
     authLoading, authError, loginWithPassword, logout, passwordGate, requestPasswordReset, setNewPassword,
     me, myUnreadBadge, loadError,
     // Várias empresas
-    companyCode, submitCompanyCode, changeCompany,
+    companyCode, submitCompanyCode, changeCompany, legacyDb, companyGateReady,
     companyBlock, dismissCompanyBlock,
     companyNotice: companyNoticeValue,
   };
