@@ -1,4 +1,5 @@
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
+import { MapTrigger } from "../shared/MapPicker.jsx";
 import { useState } from "react";
 import { Plus, Pencil, MapPin, Phone, Calendar, Euro, ChevronDown, Users, Megaphone } from "lucide-react";
 import { styles } from "../../styles/styles.js";
@@ -449,14 +450,22 @@ function ClientesScreen({
                 {openClient.contact ? <a href={`tel:${openClient.contact}`} style={{ color: COLORS.primary, textDecoration: "underline" }}>{openClient.contact}</a> : "—"}
               </ViewField>
               <ViewField icon={MapPin} label={t.fAddress} full>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                  <span>{openClient.address || "—"}</span>
-                  {openClient.address && (
-                    <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(openClient.address)}`} target="_blank" rel="noopener noreferrer" style={{ color: COLORS.primary, textDecoration: "underline", fontSize: 12.5, whiteSpace: "nowrap" }}>
-                      {t.openMap}
-                    </a>
-                  )}
-                </div>
+                <MapTrigger client={openClient} lang={lang} render={({ onOpen }) => (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                    {onOpen ? (
+                      <button type="button" onClick={onOpen} style={{ padding: 0, border: "none", background: "transparent", fontFamily: "inherit", fontSize: "inherit", textAlign: "left", color: COLORS.primary, textDecoration: "underline", cursor: "pointer" }}>
+                        {openClient.address}
+                      </button>
+                    ) : (
+                      <span>{openClient.address || "—"}</span>
+                    )}
+                    {onOpen && (
+                      <button type="button" onClick={onOpen} style={{ padding: 0, border: "none", background: "transparent", fontFamily: "inherit", color: COLORS.primary, textDecoration: "underline", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer" }}>
+                        {t.openMap}
+                      </button>
+                    )}
+                  </div>
+                )} />
               </ViewField>
             </div>
 

@@ -8,6 +8,7 @@ import { TYPE_ICONS, LANG_NAMES } from "../../models/data.js";
 import { fmtMinutes, getAssignedClientIds } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { PageHeader, SearchField, Card, MobileHeader } from "../shared/ui/index.js";
+import { MapTrigger } from "../shared/MapPicker.jsx";
 
 // Mesma divisão de nome usada em ClientesScreen.jsx (gerência, Etapa 4f) —
 // duplicada aqui de propósito (não há módulo de utilidades "só de ecrã"
@@ -24,27 +25,43 @@ function splitClientName(name) {
 // Descrição, Prioridades (cartão clay) e Observação — sem contacto, sem €
 // (só a gerência vê isso, 4.2). Partilhado entre o acordeão (telemóvel) e o
 // painel de detalhe (PC/tablet).
-function ClientDetail({ client, t }) {
+function ClientDetail({ client, t, lang }) {
   const hasExtra = client.description || client.priorities || client.note;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
         <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.ink2, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>{t.address}</div>
-        <div style={{ fontSize: 13.5, color: COLORS.ink, marginBottom: 10 }}>{client.address || "—"}</div>
-        {client.address && (
-          <button
-            type="button"
-            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.address)}`, "_blank", "noopener,noreferrer")}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 8, height: 48, padding: "0 18px",
-              borderRadius: RADIUS.control, border: `2px solid ${COLORS.vivo}`, background: COLORS.card,
-              color: COLORS.vivo, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-            }}
-          >
-            <MapPin size={15} strokeWidth={1.8} />
-            {t.openMap}
-          </button>
-        )}
+        <MapTrigger client={client} lang={lang} render={({ onOpen }) => (
+          <>
+            {onOpen ? (
+              <button
+                type="button" onClick={onOpen}
+                style={{
+                  display: "block", width: "100%", textAlign: "left", padding: 0, marginBottom: 10, border: "none", background: "transparent",
+                  fontFamily: "inherit", fontSize: 13.5, color: COLORS.vivo, textDecoration: "underline", textUnderlineOffset: 2, cursor: "pointer",
+                }}
+              >
+                {client.address}
+              </button>
+            ) : (
+              <div style={{ fontSize: 13.5, color: COLORS.ink, marginBottom: 10 }}>{client.address || "—"}</div>
+            )}
+            {onOpen && (
+              <button
+                type="button"
+                onClick={onOpen}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8, height: 48, padding: "0 18px",
+                  borderRadius: RADIUS.control, border: `2px solid ${COLORS.vivo}`, background: COLORS.card,
+                  color: COLORS.vivo, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                <MapPin size={15} strokeWidth={1.8} />
+                {t.openMap}
+              </button>
+            )}
+          </>
+        )} />
       </div>
       {client.description && (
         <div>
@@ -173,7 +190,7 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "10px 0 16px" }}>
                   <AvailabilityChip text={selected.availability} />
                 </div>
-                <ClientDetail client={selected} t={t} />
+                <ClientDetail client={selected} t={t} lang={lang} />
               </Card>
             )}
           </div>
@@ -231,7 +248,7 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
                 </button>
                 {isExpanded && (
                   <div style={mobStyles.clientBody}>
-                    <ClientDetail client={c} t={t} />
+                    <ClientDetail client={c} t={t} lang={lang} />
                   </div>
                 )}
               </div>
