@@ -26,7 +26,7 @@ linhas "OK"; não pode aparecer "FALHOU" nem "ERRO NO TESTE".
 | 3 `multi_empresa_admin.sql` | feito (55 OK) | por fazer |
 | 4 código da empresa 1 | `demo` | por fazer (`lea`) |
 | 5 Edge Functions | publicadas (update-staff-password v2, send-note-reminders v5, admin-company-login v1) | por fazer |
-| 6 conta de administração | por fazer (falta o e-mail) | por fazer |
+| 6 conta de administração | feito em 2026-10-15 (login criado + linha em `platform_admins`; funções de admin testadas no banco). Falta só o clique-a-clique em `/admin` com a senha | por fazer |
 
 ## Pontos de atenção
 - Faça o passo 5 **antes** de existir uma segunda empresa: as versões antigas das funções
