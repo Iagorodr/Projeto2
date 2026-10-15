@@ -25,7 +25,7 @@ linhas "OK"; não pode aparecer "FALHOU" nem "ERRO NO TESTE".
 | 1 `multi_empresa.sql` | feito (92 OK) | feito em 2026-10-15 (dados idênticos ao backup) |
 | 2 `multi_empresa_funcoes.sql` | feito (17 OK) | feito em 2026-10-15 |
 | 3 `multi_empresa_admin.sql` | feito (55 OK) | feito em 2026-10-15 |
-| 3b `multi_empresa_arquivo.sql` | feito em 2026-10-15 (38 OK) | **ainda não aplicado** (só depois do OK do dono) |
+| 3b `multi_empresa_arquivo.sql` | feito em 2026-10-15 (38 OK) | feito em 2026-10-15 (conferido: 3 funções, gatilho, proteção da empresa 1) |
 | 4 código da empresa 1 | `demo` | `lea` (sem validade) |
 | 5 Edge Functions | publicadas (update-staff-password v2, send-note-reminders v5, admin-company-login v1) | publicadas (update-staff-password v4, send-note-reminders v4, admin-company-login v1) |
 | 6 conta de administração | feito; fluxo completo testado em `/admin` (criar empresa, senha da gerência, 1.º login e troca de senha) | feito em 2026-10-15 (`admin@servix.com` em `platform_admins`; permissões conferidas no banco). Falta o teste em `/admin` com a senha |

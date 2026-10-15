@@ -1,6 +1,6 @@
 -- Servix — arquivar, restaurar e excluir empresas (página /admin).
 --
--- ESTADO: aplicado no projeto de TESTE em 2026-10-15 (multi_empresa_arquivo_test.sql: 38 OK, também num Postgres local). Produção: ainda NÃO aplicado.
+-- ESTADO: aplicado no projeto de TESTE e na produção (L & A) em 2026-10-15 (multi_empresa_arquivo_test.sql: 38 OK, também num Postgres local).
 --
 -- PRÉ-REQUISITO: `multi_empresa.sql`, `multi_empresa_funcoes.sql` e
 -- `multi_empresa_admin.sql` já aplicados. Seguro rodar mais de uma vez.
