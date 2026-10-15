@@ -37,8 +37,8 @@ begin
     (9100004, 'F4 com o e-mail do admin', adm, 'funcionario', cid);
   insert into public.clients (id, name, company_id) values (9100001, 'Cli 1', cid), (9100002, 'Cli 2', cid);
   insert into public.push_subscriptions (owner_id, endpoint, p256dh, auth, company_id) values ('9100001', 'https://push.test/1', 'k', 'a', cid);
-  insert into auth.users (email) values ('dono@lixo.test'), ('f1@lixo.test'), (adm), ('outro@fora.test'), (intruso);
-  insert into auth.identities (user_id, provider) select id, 'email' from auth.users where email in ('dono@lixo.test', 'f1@lixo.test');
+  insert into auth.users (id, email) select gen_random_uuid(), e from unnest(array['dono@lixo.test', 'f1@lixo.test', adm, 'outro@fora.test', intruso]) e;
+  insert into auth.identities (user_id, provider, provider_id, identity_data) select id, 'email', id::text, '{}'::jsonb from auth.users where email in ('dono@lixo.test', 'f1@lixo.test');
   select count(*) into users_before from auth.users;
 
   -- ── arquivar: só suspensa; a empresa 1 nunca ──
