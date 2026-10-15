@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Link2, KeyRound, Pencil, PauseCircle, PlayCircle, CalendarPlus, Users, Building2 } from "lucide-react";
+import { Link2, KeyRound, Pencil, PauseCircle, PlayCircle, CalendarPlus, Users, Building2, Trash2, ArchiveRestore } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW, FONT } from "../../styles/tokens.js";
 import { Badge } from "./AdminUi.jsx";
-import { stateInfo, renewedUntil, todayIso, formatIsoDate } from "../../models/adminCompanies.js";
+import { stateInfo, renewedUntil, todayIso, formatIsoDate, isArchived, canArchive } from "../../models/adminCompanies.js";
 
 const RENEW_OPTIONS = [1, 3, 6, 12];
+
+const dangerBtn = { color: COLORS.dangerInk, borderColor: "#E9B8AD" };
 
 const actionBtn = {
   display: "inline-flex", alignItems: "center", gap: 6, height: 38, padding: "0 12px", borderRadius: RADIUS.control,
@@ -14,9 +16,10 @@ const actionBtn = {
 };
 
 // Um cartão por empresa. Todas as ações sobem para a página (`on...`).
-export default function CompanyCard({ company: c, busy, onRenew, onEdit, onCopyLink, onResetLogin, onToggleSuspend }) {
+export default function CompanyCard({ company: c, busy, onRenew, onEdit, onCopyLink, onResetLogin, onToggleSuspend, onArchive, onRestore, onDeleteForever }) {
   const [renewOpen, setRenewOpen] = useState(false);
   const info = stateInfo(c);
+  const archived = isArchived(c);
   const today = todayIso(c.timezone);
   const validText = c.validUntil == null
     ? "Sem prazo"
@@ -39,35 +42,50 @@ export default function CompanyCard({ company: c, busy, onRenew, onEdit, onCopyL
       </div>
       {c.notes && <div style={{ fontSize: 12.5, color: COLORS.ink2, background: COLORS.headerTint, borderRadius: 8, padding: "7px 10px", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{c.notes}</div>}
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4, position: "relative" }}>
-        <div style={{ position: "relative" }}>
-          <button type="button" style={{ ...actionBtn, background: COLORS.mintBg }} onClick={() => setRenewOpen((v) => !v)} disabled={busy} aria-haspopup="menu" aria-expanded={renewOpen}>
-            <CalendarPlus size={15} /> Renovar
+      {archived ? (
+        <>
+          <div style={{ fontSize: 12.5, color: COLORS.ink2, background: COLORS.headerTint, borderRadius: 8, padding: "7px 10px", lineHeight: 1.45 }}>
+            Na lixeira desde {formatIsoDate(String(c.archivedAt).slice(0, 10))}. Sem acesso; os dados continuam guardados até excluir definitivamente.
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+            <button type="button" style={{ ...actionBtn, background: COLORS.mintBg }} onClick={() => onRestore(c)} disabled={busy}><ArchiveRestore size={15} /> Restaurar</button>
+            <button type="button" style={{ ...actionBtn, ...dangerBtn }} onClick={() => onDeleteForever(c)} disabled={busy}><Trash2 size={15} /> Excluir definitivamente</button>
+          </div>
+        </>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4, position: "relative" }}>
+          <div style={{ position: "relative" }}>
+            <button type="button" style={{ ...actionBtn, background: COLORS.mintBg }} onClick={() => setRenewOpen((v) => !v)} disabled={busy} aria-haspopup="menu" aria-expanded={renewOpen}>
+              <CalendarPlus size={15} /> Renovar
+            </button>
+            {renewOpen && (
+              <>
+                <div onClick={() => setRenewOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
+                <div role="menu" style={{ position: "absolute", top: 42, left: 0, zIndex: 21, minWidth: 230, background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, boxShadow: SHADOW.sh2, padding: 6 }}>
+                  {RENEW_OPTIONS.map((m) => {
+                    const to = renewedUntil(c.validUntil, today, m);
+                    return (
+                      <button key={m} type="button" role="menuitem" onClick={() => { setRenewOpen(false); onRenew(c, m, to); }}
+                        style={{ display: "flex", justifyContent: "space-between", gap: 14, width: "100%", border: "none", background: "transparent", padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13.5, color: COLORS.ink, fontFamily: "inherit", textAlign: "left" }}>
+                        <span>+{m} {m === 1 ? "mês" : "meses"}</span><span style={{ color: COLORS.ink3 }}>até {formatIsoDate(to)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+          <button type="button" style={actionBtn} onClick={() => onEdit(c)} disabled={busy}><Pencil size={15} /> Editar</button>
+          <button type="button" style={actionBtn} onClick={() => onCopyLink(c)}><Link2 size={15} /> Link</button>
+          <button type="button" style={actionBtn} onClick={() => onResetLogin(c)} disabled={busy || !c.managerEmail}><KeyRound size={15} /> Nova senha</button>
+          <button type="button" style={{ ...actionBtn, color: c.suspended ? COLORS.vivoInk : COLORS.dangerInk, borderColor: c.suspended ? COLORS.iconBorder : "#E9B8AD" }} onClick={() => onToggleSuspend(c)} disabled={busy}>
+            {c.suspended ? <><PlayCircle size={15} /> Reativar</> : <><PauseCircle size={15} /> Suspender</>}
           </button>
-          {renewOpen && (
-            <>
-              <div onClick={() => setRenewOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-              <div role="menu" style={{ position: "absolute", top: 42, left: 0, zIndex: 21, minWidth: 230, background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, boxShadow: SHADOW.sh2, padding: 6 }}>
-                {RENEW_OPTIONS.map((m) => {
-                  const to = renewedUntil(c.validUntil, today, m);
-                  return (
-                    <button key={m} type="button" role="menuitem" onClick={() => { setRenewOpen(false); onRenew(c, m, to); }}
-                      style={{ display: "flex", justifyContent: "space-between", gap: 14, width: "100%", border: "none", background: "transparent", padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13.5, color: COLORS.ink, fontFamily: "inherit", textAlign: "left" }}>
-                      <span>+{m} {m === 1 ? "mês" : "meses"}</span><span style={{ color: COLORS.ink3 }}>até {formatIsoDate(to)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
+          {canArchive(c) && (
+            <button type="button" style={{ ...actionBtn, ...dangerBtn }} onClick={() => onArchive(c)} disabled={busy}><Trash2 size={15} /> Excluir</button>
           )}
         </div>
-        <button type="button" style={actionBtn} onClick={() => onEdit(c)} disabled={busy}><Pencil size={15} /> Editar</button>
-        <button type="button" style={actionBtn} onClick={() => onCopyLink(c)}><Link2 size={15} /> Link</button>
-        <button type="button" style={actionBtn} onClick={() => onResetLogin(c)} disabled={busy || !c.managerEmail}><KeyRound size={15} /> Nova senha</button>
-        <button type="button" style={{ ...actionBtn, color: c.suspended ? COLORS.vivoInk : COLORS.dangerInk, borderColor: c.suspended ? COLORS.iconBorder : "#E9B8AD" }} onClick={() => onToggleSuspend(c)} disabled={busy}>
-          {c.suspended ? <><PlayCircle size={15} /> Reativar</> : <><PauseCircle size={15} /> Suspender</>}
-        </button>
-      </div>
+      )}
     </div>
   );
 }

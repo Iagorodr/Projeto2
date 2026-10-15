@@ -54,10 +54,23 @@ export function renewedUntil(validUntil, today, months) {
   return addMonths(base, months);
 }
 
+// Arquivada = na lixeira (multi_empresa_arquivo.sql). Um banco sem esse SQL não
+// traz `archivedAt`, e então nenhuma empresa conta como arquivada.
+export function isArchived(c) {
+  return c != null && c.archivedAt != null;
+}
+// Só uma empresa suspensa pode ir para as arquivadas, e a primeira empresa (id 1)
+// nunca (o banco também recusa).
+export const PROTECTED_COMPANY_ID = 1;
+export function canArchive(c) {
+  return c != null && c.suspended === true && !isArchived(c) && c.id !== PROTECTED_COMPANY_ID;
+}
+
 // Estado → rótulo e tom (cores) para o cartão.
 //   tone: "ok" | "warn" | "bad" | "off"
 export function stateInfo(c) {
   const dl = c.daysLeft;
+  if (isArchived(c)) return { label: "Arquivada", tone: "off", rank: 7 };
   if (c.state === "suspended") return { label: "Suspensa", tone: "off", rank: 5 };
   if (c.state === "expired") return { label: "Vencida", tone: "bad", rank: 4 };
   if (c.state === "grace") return { label: `Em tolerância (venceu há ${Math.abs(dl ?? 0)} d)`, tone: "bad", rank: 3 };
@@ -77,6 +90,7 @@ export function sortCompanies(list) {
     if (c.state === "grace") return 0;
     if (c.state === "expired") return 1;
     if (i.tone === "warn") return 2;
+    if (isArchived(c)) return 6;
     if (c.state === "suspended") return 5;
     return c.validUntil == null ? 4 : 3;
   };
@@ -85,12 +99,13 @@ export function sortCompanies(list) {
 
 // Filtros da lista.
 export const FILTERS = [
-  { key: "all", label: "Todas", test: () => true },
-  { key: "active", label: "Ativas", test: (c) => c.state === "active" },
-  { key: "soon", label: "A acabar", test: (c) => c.state === "active" && c.validUntil != null && c.daysLeft != null && c.daysLeft <= SOON_DAYS },
-  { key: "grace", label: "Em tolerância", test: (c) => c.state === "grace" },
-  { key: "expired", label: "Vencidas", test: (c) => c.state === "expired" },
-  { key: "suspended", label: "Suspensas", test: (c) => c.state === "suspended" },
+  { key: "all", label: "Todas", test: (c) => !isArchived(c) },
+  { key: "active", label: "Ativas", test: (c) => !isArchived(c) && c.state === "active" },
+  { key: "soon", label: "A acabar", test: (c) => !isArchived(c) && c.state === "active" && c.validUntil != null && c.daysLeft != null && c.daysLeft <= SOON_DAYS },
+  { key: "grace", label: "Em tolerância", test: (c) => !isArchived(c) && c.state === "grace" },
+  { key: "expired", label: "Vencidas", test: (c) => !isArchived(c) && c.state === "expired" },
+  { key: "suspended", label: "Suspensas", test: (c) => !isArchived(c) && c.state === "suspended" },
+  { key: "archived", label: "Arquivadas", test: (c) => isArchived(c) },
 ];
 
 export function filterCompanies(list, filterKey, query) {
@@ -109,6 +124,12 @@ const ERRORS = {
   invalid_timezone: "Fuso horário inválido.",
   invalid_date: "Data de validade inválida.",
   not_found: "Empresa não encontrada.",
+  not_suspended: "Só uma empresa suspensa pode ser excluída. Suspenda-a primeiro.",
+  not_archived: "A empresa não está nas arquivadas.",
+  protected_company: "Esta empresa está protegida e não pode ser excluída.",
+  confirm_mismatch: "O código digitado não é o da empresa.",
+  archived: "A empresa está arquivada: restaure-a antes de a alterar.",
+  sql_arquivo_em_falta: "O SQL de arquivar empresas (multi_empresa_arquivo.sql) ainda não foi aplicado neste projeto.",
   forbidden: "Esta conta não pode fazer isto.",
   "sem permissão": "Esta conta não tem acesso à administração.",
 };

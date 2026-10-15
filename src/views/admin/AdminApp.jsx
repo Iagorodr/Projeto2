@@ -1,5 +1,5 @@
-// Página de administração da plataforma (/admin): ver, criar, renovar e
-// suspender as empresas (clientes do Servix). Só para o dono da plataforma —
+// Página de administração da plataforma (/admin): ver, criar, renovar,
+// suspender, arquivar e excluir as empresas (clientes do Servix). Só para o dono da plataforma —
 // por isso é só em português e não passa pelo código de empresa do app.
 // Tudo o que importa é decidido no banco (multi_empresa_admin.sql): esta página
 // só mostra o que as funções devolvem a uma conta de administração.
@@ -13,9 +13,10 @@ import { Dialog } from "./AdminUi.jsx";
 import CompanyCard from "./CompanyCard.jsx";
 import CompanyFormDialog from "./CompanyFormDialog.jsx";
 import DeliveryDialog from "./DeliveryDialog.jsx";
+import DeleteForeverDialog from "./DeleteForeverDialog.jsx";
 import { adminClient, adminConfigured } from "../../models/adminClient.js";
 import { isMissingRpc } from "../../models/horasSync.js";
-import { FILTERS, filterCompanies, sortCompanies, errorMessage, accessLink, formatIsoDate } from "../../models/adminCompanies.js";
+import { FILTERS, filterCompanies, sortCompanies, errorMessage, accessLink, formatIsoDate, isArchived } from "../../models/adminCompanies.js";
 
 // Pede à Edge Function a palavra-passe temporária da gerência de uma empresa.
 async function fetchManagerLogin(email) {
@@ -61,6 +62,7 @@ export default function AdminApp() {
   const [form, setForm] = useState(null);         // null | { mode: "create" } | { mode: "edit", company }
   const [delivery, setDelivery] = useState(null); // null | { company, email, password?, error? }
   const [confirm, setConfirm] = useState(null);   // null | { title, text, label, danger, onConfirm }
+  const [deleting, setDeleting] = useState(null); // null | empresa arquivada a excluir para sempre
 
   const notify = useCallback((msg) => {
     setToast(msg);
@@ -169,6 +171,40 @@ export default function AdminApp() {
     ? { title: `Reativar ${c.name}?`, text: "A equipa volta a poder entrar (conforme a validade).", label: "Reativar", onConfirm: () => run(async () => { await updateCompany(c.id, { suspended: false }); notify(`${c.name} reativada.`); }) }
     : { title: `Suspender ${c.name}?`, text: "Ninguém da empresa consegue entrar até a reativar. Os dados ficam guardados.", label: "Suspender", danger: true, onConfirm: () => run(async () => { await updateCompany(c.id, { suspended: true }); notify(`${c.name} suspensa.`); }) });
 
+  // Arquivar / restaurar / excluir de vez (multi_empresa_arquivo.sql). Num banco
+  // sem esse SQL a função não existe: a mensagem diz o que falta aplicar.
+  async function archiveRpc(name, args) {
+    const { data, error } = await adminClient.rpc(name, args);
+    if (error) throw isMissingRpc(error) ? new Error("sql_arquivo_em_falta") : error;
+    return data;
+  }
+
+  const archive = (c) => setConfirm({
+    title: `Excluir ${c.name}?`,
+    text: "A empresa vai para as Arquivadas (lixeira): continua sem acesso e os dados ficam guardados. Em Arquivadas você pode restaurá-la ou, só aí, excluí-la de vez.",
+    label: "Mover para Arquivadas",
+    danger: true,
+    onConfirm: () => run(async () => {
+      replaceCompany(await archiveRpc("admin_archive_company", { p_id: c.id }));
+      notify(`${c.name} foi para as Arquivadas.`);
+    }),
+  });
+
+  const restore = (c) => run(async () => {
+    replaceCompany(await archiveRpc("admin_restore_company", { p_id: c.id }));
+    notify(`${c.name} restaurada (continua suspensa — use Reativar quando quiser).`);
+  });
+
+  async function deleteForever(c, typedCode) {
+    try {
+      const res = await archiveRpc("admin_delete_company", { p_id: c.id, p_confirm_code: typedCode });
+      setCompanies((list) => list.filter((x) => x.id !== c.id));
+      setDeleting(null);
+      notify(`${c.name} excluída para sempre${res?.logins != null ? ` (${res.logins} ${res.logins === 1 ? "login apagado" : "logins apagados"})` : ""}.`);
+      return null;
+    } catch (err) { return errorMessage(err); }
+  }
+
   const resetLogin = (c) => setConfirm({
     title: `Nova senha para ${c.name}?`,
     text: `Gera uma palavra-passe temporária para ${c.managerEmail}. A atual deixa de funcionar e a gerência terá de escolher outra no próximo login.`,
@@ -207,7 +243,7 @@ export default function AdminApp() {
 
       <main style={{ maxWidth: 1180, margin: "0 auto", padding: "20px 16px 60px", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
-          <div style={{ fontFamily: FONT.heading, fontSize: 24, fontWeight: 600 }}>Empresas <span style={{ color: COLORS.ink3, fontWeight: 500, fontSize: 18 }}>({companies.length})</span></div>
+          <div style={{ fontFamily: FONT.heading, fontSize: 24, fontWeight: 600 }}>Empresas <span style={{ color: COLORS.ink3, fontWeight: 500, fontSize: 18 }}>({companies.filter((c) => !isArchived(c)).length})</span></div>
           <Button type="button" variant="primary" onClick={() => setForm({ mode: "create" })} icon={Plus}>Nova empresa</Button>
         </div>
 
@@ -231,12 +267,12 @@ export default function AdminApp() {
 
         {visible.length === 0 ? (
           <div style={{ background: COLORS.card, border: `1px dashed ${COLORS.line}`, borderRadius: RADIUS.card, padding: 32, textAlign: "center", color: COLORS.ink3, fontSize: 14 }}>
-            {companies.length === 0 ? "Ainda não há empresas. Crie a primeira em “Nova empresa”." : "Nenhuma empresa neste filtro."}
+            {companies.length === 0 ? "Ainda não há empresas. Crie a primeira em “Nova empresa”." : filter === "archived" ? "Nenhuma empresa arquivada. Uma empresa suspensa vai para aqui quando você usa “Excluir”." : "Nenhuma empresa neste filtro."}
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 360px), 1fr))", gap: 14 }}>
             {visible.map((c) => (
-              <CompanyCard key={c.id} company={c} busy={busy} onRenew={renew} onEdit={(co) => setForm({ mode: "edit", company: co })} onCopyLink={copyLink} onResetLogin={resetLogin} onToggleSuspend={toggleSuspend} />
+              <CompanyCard key={c.id} company={c} busy={busy} onRenew={renew} onEdit={(co) => setForm({ mode: "edit", company: co })} onCopyLink={copyLink} onResetLogin={resetLogin} onToggleSuspend={toggleSuspend} onArchive={archive} onRestore={restore} onDeleteForever={setDeleting} />
             ))}
           </div>
         )}
@@ -249,6 +285,7 @@ export default function AdminApp() {
         />
       )}
       {delivery && <DeliveryDialog delivery={delivery} onClose={() => setDelivery(null)} notify={notify} />}
+      {deleting && <DeleteForeverDialog company={deleting} onClose={() => setDeleting(null)} onConfirm={(code) => deleteForever(deleting, code)} />}
       {confirm && (
         <Dialog title={confirm.title} onClose={() => setConfirm(null)} width={440}>
           <div style={{ fontSize: 14, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 18 }}>{confirm.text}</div>

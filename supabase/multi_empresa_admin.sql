@@ -79,6 +79,7 @@ as $$
     'timezone', c.timezone,
     'notes', c.notes,
     'createdAt', c.created_at,
+    'archivedAt', to_jsonb(c) -> 'archived_at',   -- coluna criada por multi_empresa_arquivo.sql
     'state', private.company_state(c.id),
     'daysLeft', case when c.valid_until is null then null
                      else c.valid_until - (now() at time zone c.timezone)::date end,
