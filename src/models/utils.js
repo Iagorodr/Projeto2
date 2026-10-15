@@ -167,20 +167,6 @@ function partnerOf(staffList, staffId, date) {
   if (!p || p.partnerId !== me.id) return null;
   return isStaffActive(p, date || new Date()) ? p : null;
 }
-// Dupla: ao marcar um cliente, a linha do parceiro só vem junto quando faz
-// sentido. Se o cliente está na AGENDA de quem marca nesse dia, o parceiro
-// também tem de o ter na agenda dele — a gerência pode ter deixado a dupla de
-// fora desse cliente (ex.: o cliente é de "eu + outra colega") e, nesse caso,
-// o parceiro não trabalhou lá e as horas não podem ser divididas com ele. Se o
-// cliente não está na agenda de quem marca (cliente avulso), mantém-se o
-// comportamento da dupla (o parceiro vem junto; o dia pode ser desligado).
-function shouldAutoMarkPartner(clients, assignments, staffId, partner, date, clientId) {
-  if (!partner) return false;
-  const inMyAgenda = dayScheduledClients(clients, assignments, staffId, date).some((c) => c.id === clientId);
-  if (!inMyAgenda) return true;
-  return dayScheduledClients(clients, assignments, partner.id, date).some((c) => c.id === clientId)
-    && isStaffActive(partner, date) && staffStartedOn(partner, date);
-}
 // Liga `staffId` a `partnerId` (ou desliga com null), mantendo a ligação
 // mútua e limpando qualquer parceiro antigo de qualquer um dos dois.
 function linkPartners(staffList, staffId, partnerId) {
@@ -935,4 +921,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, shouldAutoMarkPartner, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, isHorasFrozenOn, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, isHorasFrozenOn, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

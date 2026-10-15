@@ -18,7 +18,7 @@ import { Pill } from "../Pill.jsx";
 
 function ClientCheckCard({
   name, subtitle, checked, onToggle, onExtraTime, extraTimeLabel = "Fiz mais tempo",
-  extraPill, readOnly, dimmed, dimmedNote, onAdjustSplit, adjustSplitLabel, autoTag,
+  extraPill, readOnly, dimmed, dimmedNote, onAdjustSplit, adjustSplitLabel, autoTag, onSolo, soloLabel,
 }) {
   return (
     <div
@@ -58,6 +58,15 @@ function ClientCheckCard({
           </div>
         )}
         {extraPill && <div style={{ marginTop: 6 }}><Pill variant="pending">{extraPill}</Pill></div>}
+        {!readOnly && !dimmed && onSolo && (
+          // "Fiz sem <dupla>": desfaz a linha automática que ficou na dupla.
+          <button
+            type="button" onClick={onSolo}
+            style={{ display: "block", marginTop: 8, minHeight: 36, padding: "0 12px", border: `1px solid ${COLORS.vivo}`, borderRadius: RADIUS.control, background: COLORS.card, color: COLORS.vivo, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            {soloLabel}
+          </button>
+        )}
         {!readOnly && !dimmed && onAdjustSplit && (
           <button
             type="button" onClick={onAdjustSplit}
