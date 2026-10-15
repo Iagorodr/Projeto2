@@ -2,7 +2,7 @@
 -- suspender e consultar empresas. Alimenta a página /admin do app.
 --
 -- ESTADO: validado num Postgres local e aplicado no projeto de TESTE em 2026-10-14
--- (multi_empresa_admin_test.sql: 55 OK). Ainda não aplicado na produção (L & A).
+-- (multi_empresa_admin_test.sql: 55 OK). Aplicado na produção (L & A) em 2026-10-15.
 --
 -- PRÉ-REQUISITO: `multi_empresa.sql` já aplicado. Seguro rodar mais de uma vez.
 --

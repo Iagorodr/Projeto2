@@ -18,15 +18,19 @@ que é desfeita): `multi_empresa_test.sql` (92 OK), `multi_empresa_funcoes_test.
 `multi_empresa_admin_test.sql` (55 OK). Cada um termina com um ERRO "RESULT" cheio de
 linhas "OK"; não pode aparecer "FALHOU" nem "ERRO NO TESTE".
 
-## Estado (2026-10-14)
+## Estado (2026-10-15)
 | Passo | TESTE (`svtqldpfljvznetuscri`) | Produção L & A (`zoizwdungwtioppvupcl`) |
 |-------|-------------------------------|------------------------------------------|
-| 1 `multi_empresa.sql` | feito (92 OK) | **por fazer** |
-| 2 `multi_empresa_funcoes.sql` | feito (17 OK) | por fazer |
-| 3 `multi_empresa_admin.sql` | feito (55 OK) | por fazer |
-| 4 código da empresa 1 | `demo` | por fazer (`lea`) |
-| 5 Edge Functions | publicadas (update-staff-password v2, send-note-reminders v5, admin-company-login v1) | por fazer |
-| 6 conta de administração | feito em 2026-10-15 (login criado + linha em `platform_admins`; funções de admin testadas no banco). Falta só o clique-a-clique em `/admin` com a senha | por fazer |
+| 1 `multi_empresa.sql` | feito (92 OK) | feito em 2026-10-15 (dados idênticos ao backup) |
+| 2 `multi_empresa_funcoes.sql` | feito (17 OK) | feito em 2026-10-15 |
+| 3 `multi_empresa_admin.sql` | feito (55 OK) | feito em 2026-10-15 |
+| 4 código da empresa 1 | `demo` | `lea` (sem validade) |
+| 5 Edge Functions | publicadas (update-staff-password v2, send-note-reminders v5, admin-company-login v1) | publicadas (update-staff-password v4, send-note-reminders v4, admin-company-login v1) |
+| 6 conta de administração | feito; fluxo completo testado em `/admin` (criar empresa, senha da gerência, 1.º login e troca de senha) | feito em 2026-10-15 (`admin@servix.com` em `platform_admins`; permissões conferidas no banco). Falta o teste em `/admin` com a senha |
+
+Backup anterior à migração da produção: schema fechado `backup_pre_multi_20261015` no banco da
+L & A (tabelas + definições antigas de funções, políticas e índices). Pode ser apagado quando
+a produção estiver estável: `drop schema backup_pre_multi_20261015 cascade;`.
 
 ## Pontos de atenção
 - Faça o passo 5 **antes** de existir uma segunda empresa: as versões antigas das funções

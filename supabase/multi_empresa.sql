@@ -1,7 +1,7 @@
 -- Servix — várias empresas no mesmo banco (multi-empresa) + validade da assinatura.
 --
 -- ESTADO: aplicado e testado no projeto de TESTE (multi_empresa_test.sql:
--- 92 OK, 0 FALHOU). Produção (L & A): ainda NÃO aplicado.
+-- 92 OK, 0 FALHOU). Produção (L & A): aplicado em 2026-10-15 (código 'lea').
 -- Ordem: projeto de teste → testes → produção. Em produção aplique ANTES de
 -- publicar a versão nova do app (o app também aguenta um banco sem este SQL,
 -- mas aí não há separação entre empresas).
