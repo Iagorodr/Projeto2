@@ -140,13 +140,15 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   // A divisão das horas conta também com quem a AGENDA diz que faz o cliente
   // (staff, agenda, coberturas, faltas) — ver `expectedTeamIds` em utils.js.
   const ctx = useMemo(() => ({ staff, assignments, covers, absences }), [staff, assignments, covers, absences]);
-  // Revisões em aberto: conflitos ("trabalhei sozinho" vs. colega) e dias com
-  // horas soltas por confirmar. Só no período aberto.
+  // Revisões em aberto: o que não bate certo entre as visitas previstas pela
+  // agenda e as registadas pela equipa (ver `reconcileVisits` em utils.js).
+  // Só no período aberto. O botão "Revisões" fica sempre; o aviso no painel e
+  // no menu só aparece na última semana do período (`inReviewWindow`).
   const reviews = useMemo(
-    () => (monthOffset === 0 ? countReviews(horasData, clients, period, ctx, isoDateStr(TODAY)) : { conflicts: 0, leftovers: 0 }),
+    () => (monthOffset === 0 ? countReviews(horasData, clients, period, ctx, isoDateStr(TODAY)) : { total: 0 }),
     [monthOffset, horasData, clients, period, ctx],
   );
-  const reviewCount = reviews.conflicts + reviews.leftovers;
+  const reviewCount = reviews.total;
 
   const CHIP_FILTERS = {
     todos: () => true,
@@ -580,7 +582,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       <ConfirmDialog
         open={closeConfirmOpen}
         title={t.closeConfirmTitle}
-        body={t.closeConfirmBody(periodLabel, fmtHoursScreen(periodTotalHours), fmtEuro(periodTotalEuros)) + (reviewCount > 0 ? ` ${t.reviewCloseWarn(reviews.conflicts, reviews.leftovers)}` : "")}
+        body={t.closeConfirmBody(periodLabel, fmtHoursScreen(periodTotalHours), fmtEuro(periodTotalEuros)) + (reviewCount > 0 ? ` ${t.reviewCloseWarn(reviewCount)}` : "")}
         cancelLabel={c0.cancel}
         confirmLabel={t.confirmClose}
         onCancel={() => setCloseConfirmOpen(false)}
@@ -616,7 +618,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
           setRecalcToast(msg);
           setTimeout(() => setRecalcToast(null), 5000);
         }}
-        horasData={horasData} clients={clients} staff={staff} period={period} ctx={ctx} t={t}
+        horasData={horasData} clients={clients} staff={staff} period={period} ctx={ctx} lang={lang} t={t}
       />
       {closedToast && <Toast message={t.closedToast} onDismiss={() => setClosedToast(false)} closeLabel={c0.close} />}
       {recalcToast && <Toast message={recalcToast} onDismiss={() => setRecalcToast(null)} closeLabel={c0.close} />}

@@ -300,7 +300,7 @@ function applyLeftovers(horasData, clients, items, ctx) {
 // (`fromDate`): passa a contar como a mesma visita partilhada (a data em que
 // trabalhou não muda; só fica a substituir `toDate`, como em "Fiz o cliente de
 // outro dia"). Redivide as duas visitas afetadas.
-function joinVisit(horasData, clients, staffId, fromDate, clientId, toDate, ctx) {
+function joinVisit(horasData, clients, staffId, fromDate, clientId, toDate, ctx, opts = {}) {
   const h = horasData[staffId];
   if (!h) return horasData;
   let oldVisit = null;
@@ -314,8 +314,8 @@ function joinVisit(horasData, clients, staffId, fromDate, clientId, toDate, ctx)
   });
   if (oldVisit === null) return horasData;
   let next = { ...horasData, [staffId]: { ...h, entries } };
-  next = recomputeSharedHours(next, clients, oldVisit, clientId, { ctx });
-  return recomputeSharedHours(next, clients, toDate, clientId, { ctx });
+  next = recomputeSharedHours(next, clients, oldVisit, clientId, { ctx, ...opts });
+  return recomputeSharedHours(next, clients, toDate, clientId, { ctx, ...opts });
 }
 
 // CONFLITOS: alguém marcou "trabalhei sozinho" e outro colega também marcou o
@@ -349,9 +349,439 @@ function resolveConflict(horasData, clients, date, clientId, action, winnerId, c
   });
   return recomputeSharedHours(next, clients, date, clientId, { ctx });
 }
-// Números para os avisos: conflitos em aberto e dias com horas soltas.
+// ===========================================================================
+// CONFERÊNCIA DE VISITAS (previstas × registadas), por cliente e semana
+// ===========================================================================
+// Para cada cliente e semana ISO (segunda a domingo) do período compara as
+// visitas que a AGENDA previa (`expectedTeamIds`) com as que a equipa REGISTOU,
+// agrupadas por visita (`visitDateOf`). Assim, uma visita que passou de quinta
+// para sexta continua a contar na mesma semana, e somar o que cada um registou
+// tem de dar as visitas previstas ("o Bolinha tem 5 visitas este mês: 5
+// registadas, tudo certo").
+//
+// O que não bate certo vira um PROBLEMA com as provas (quem registou, em que
+// dia, quantas horas, o que a agenda previa) e uma sugestão. NADA muda sozinho:
+// a gerência aplica (ou não) cada sugestão.
+//
+// Tipos (`kind`):
+//   conflict — "trabalhei sozinho" contra um colega que também foi
+//   join     — registo num dia sem visita prevista que parece a MESMA visita
+//              feita noutro dia (a Talia na quinta, o Iago na sexta): juntar
+//   extra    — registo num dia sem visita prevista e sem visita a que juntar
+//   missing  — visita prevista, semana já terminada, e ninguém registou
+//   leftover — a agenda esperava mais gente do que a que registou (sobra)
+//   pending  — cliente escrito à mão (fora da lista) por confirmar
+// Limite: a agenda usada é a de HOJE (se mudou a meio do mês, o "previsto" das
+// semanas antigas segue a agenda atual).
+function daysBetweenIso(a, b) { return Math.round((dateFromIso(a) - dateFromIso(b)) / 86400000); }
+
+// Semanas ISO que tocam o período, com os dias cortados ao período. Uma semana
+// está `complete` quando o último dia dela dentro do período já passou.
+function weeksOfPeriod(period, todayIso) {
+  if (!period || !period.start || !period.end) return [];
+  const startIso = isoDateStr(period.start), endIso = isoDateStr(period.end);
+  const weeks = [];
+  let cursor = startOfISOWeek(dateFromIso(startIso));
+  while (isoDateStr(cursor) <= endIso) {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const iso = isoDateStr(addDays(cursor, i));
+      if (iso >= startIso && iso <= endIso) days.push(iso);
+    }
+    if (days.length > 0) weeks.push({ start: isoDateStr(cursor), days, complete: days[days.length - 1] < todayIso });
+    cursor = addDays(cursor, 7);
+  }
+  return weeks;
+}
+
+// Último mês/período: o aviso só aparece na última semana do período (ou depois
+// dela, no fecho atrasado). A lista de Revisões abre sempre.
+function inReviewWindow(period, today) {
+  if (!period || !period.end) return false;
+  const todayIso = typeof today === "string" ? today : isoDateStr(today || new Date());
+  return todayIso >= isoDateStr(addDays(period.end, -6));
+}
+
+// Analisa UMA semana de UM cliente. `days` = datas ISO (já cortadas ao período).
+// Devolve { expected, visits, issues } com issues join/extra/missing (os
+// conflitos e as sobras vêm de `listConflicts`/`planLeftovers`).
+function analyseClientWeek(horasData, client, days, ctx, opts = {}) {
+  const cid = client.id;
+  const expected = [];
+  days.forEach((d) => { const ids = expectedTeamIds(ctx, client, d); if (ids.length > 0) expected.push({ date: d, teamIds: ids }); });
+  const edMap = new Map(expected.map((x) => [x.date, x]));
+  const daySet = new Set(days);
+  const groups = new Map();
+  Object.keys(horasData || {}).forEach((sid) => {
+    ((horasData[sid] && horasData[sid].entries) || []).forEach((e, idx) => {
+      if (e.voided || e.clientId !== cid || !daySet.has(e.date)) return;
+      const v = visitDateOf(e);
+      if (!groups.has(v)) groups.set(v, []);
+      groups.get(v).push({ staffId: sid, idx, workDate: e.date, hours: e.hours || 0, entry: e });
+    });
+  });
+  const isResolved = (marks) => marks.every((m) => m.entry.reviewOk);
+  const saidNo = (marks) => marks.some((m) => m.entry.sameAnswer === "no");
+  const issues = [];
+  const usedE = new Set();
+  const matchedDates = [...groups.keys()].filter((d) => edMap.has(d)).sort();
+  const strayDates = [...groups.keys()].filter((d) => !edMap.has(d)).sort();
+  strayDates.forEach((g) => {
+    const marks = groups.get(g);
+    if (isResolved(marks)) return;
+    const staffSet = new Set(marks.map((m) => String(m.staffId)));
+    let join = null;
+    if (!saidNo(marks)) {
+      // (1) visita prevista em que NINGUÉM registou e em que alguém deste grupo era esperado
+      let best = null;
+      expected.forEach((x) => {
+        if (groups.has(x.date) || usedE.has(x.date)) return;
+        const overlap = x.teamIds.filter((id) => staffSet.has(String(id))).length;
+        if (overlap === 0) return;
+        const dist = Math.abs(daysBetweenIso(x.date, g));
+        if (!best || overlap > best.overlap || (overlap === best.overlap && dist < best.dist)) best = { x, overlap, dist };
+      });
+      if (best) {
+        usedE.add(best.x.date);
+        join = { target: best.x.date, reason: "moved", marks, teamIds: best.x.teamIds, targetMarks: [] };
+      }
+      // (2) visita já registada em que alguém deste grupo era esperado e não registou
+      if (!join) {
+        for (const v of matchedDates) {
+          const ed = edMap.get(v);
+          const vMarks = groups.get(v);
+          const vStaff = new Set(vMarks.map((m) => String(m.staffId)));
+          const team = ed.teamIds.map(String);
+          const qualify = marks.filter((m) => team.includes(String(m.staffId)) && !vStaff.has(String(m.staffId)));
+          if (qualify.length > 0) { join = { target: v, reason: "partner", marks: qualify, teamIds: ed.teamIds, targetMarks: vMarks }; break; }
+        }
+      }
+    }
+    if (join) {
+      issues.push({ kind: "join", key: `join|${cid}|${g}|${join.target}`, clientId: cid, date: join.target, fromDate: g, reason: join.reason, marks: join.marks, targetMarks: join.targetMarks, teamIds: join.teamIds });
+      const rest = marks.filter((m) => !join.marks.includes(m));
+      if (rest.length > 0) issues.push({ kind: "extra", key: `extra|${cid}|${g}|rest`, clientId: cid, date: g, marks: rest, answered: false });
+    } else {
+      issues.push({ kind: "extra", key: `extra|${cid}|${g}`, clientId: cid, date: g, marks, answered: saidNo(marks) });
+    }
+  });
+  const noneDates = new Set();
+  expected.forEach((x) => {
+    if (groups.has(x.date) || usedE.has(x.date)) return;
+    const ackKey = `${x.date}|${cid}`;
+    const acked = x.teamIds.some((id) => horasData[id] && horasData[id].visitChecks && horasData[id].visitChecks[ackKey] === "none");
+    const allNoClient = x.teamIds.every((id) => horasData[id] && (horasData[id].noClientDays || []).includes(x.date));
+    if (acked || allNoClient) { noneDates.add(x.date); return; }
+    if (opts.reportMissing) issues.push({ kind: "missing", key: `missing|${cid}|${x.date}`, clientId: cid, date: x.date, teamIds: x.teamIds, marks: [] });
+  });
+  const visits = [
+    ...expected.map((x) => ({ date: x.date, expected: true, teamIds: x.teamIds, marks: groups.get(x.date) || [] })),
+    ...strayDates.map((g) => ({ date: g, expected: false, teamIds: [], marks: groups.get(g) })),
+  ].sort((a, b) => a.date.localeCompare(b.date));
+  return { expected, visits, issues, noneDates };
+}
+
+// Nomes parecidos (cliente escrito à mão ↔ cliente da lista): palavras iguais.
+function normName(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+}
+function nameCandidates(name, clients, limit = 3) {
+  const n = normName(name);
+  if (!n) return [];
+  const toks = new Set(n.split(" ").filter(Boolean));
+  return (clients || []).map((c) => {
+    const ct = new Set(normName(c.name).split(" ").filter(Boolean));
+    if (ct.size === 0) return { id: c.id, score: 0 };
+    let inter = 0;
+    toks.forEach((t) => { if (ct.has(t)) inter += 1; });
+    let score = inter / new Set([...toks, ...ct]).size;
+    const subset = (a, b) => [...a].every((t) => b.has(t));
+    if (subset(toks, ct) || subset(ct, toks)) score = Math.max(score, 0.8);
+    return { id: c.id, score };
+  }).filter((x) => x.score >= 0.5).sort((a, b) => b.score - a.score).slice(0, limit).map((x) => x.id);
+}
+
+// Conferência completa do período. Devolve
+//   { issues, clients, totals, byKind }
+//   issues  — problemas abertos (ordenados por cliente e data)
+//   clients — [{ clientId, name, expected, checked, weeks:[{ start, complete, visits:[{ date, expected, teamIds, marks, state }] }] }]
+//             (`expected`/`checked` só contam semanas já terminadas)
+//   totals  — { expected, checked, clientsOk, clientsTotal, checkedUntil }
+function reconcileVisits(horasData, clients, period, ctx, today) {
+  const todayIso = typeof today === "string" ? today : isoDateStr(today || new Date());
+  const weeks = weeksOfPeriod(period, todayIso);
+  const issues = [];
+  const rows = [];
+  const joinTargets = new Set();
+  const missingByClient = new Map();
+  // Primeiro registo de cada cliente no período (ajuda a perceber "este cliente só começou a 12/10").
+  const firstRecord = new Map();
+  Object.keys(horasData || {}).forEach((sid) => ((horasData[sid] && horasData[sid].entries) || []).forEach((e) => {
+    if (e.voided || !e.clientId || (period && !dateStrInPeriod(e.date, period))) return;
+    const d = visitDateOf(e) < e.date ? visitDateOf(e) : e.date;
+    if (!firstRecord.has(e.clientId) || d < firstRecord.get(e.clientId)) firstRecord.set(e.clientId, d);
+  }));
+  (clients || []).forEach((client) => {
+    const row = { clientId: client.id, name: client.name, expected: 0, checked: 0, weeks: [] };
+    weeks.forEach((week) => {
+      const a = analyseClientWeek(horasData, client, week.days, ctx, { reportMissing: week.complete });
+      a.issues.forEach((i) => {
+        i.weekStart = week.start;
+        if (i.kind === "missing") {
+          if (!missingByClient.has(i.clientId)) missingByClient.set(i.clientId, []);
+          missingByClient.get(i.clientId).push({ date: i.date, teamIds: i.teamIds, weekStart: week.start });
+          return;
+        }
+        issues.push(i);
+        if (i.kind === "join") joinTargets.add(`${i.date}|${i.clientId}`);
+      });
+      row.weeks.push({ start: week.start, complete: week.complete, visits: a.visits, noneDates: a.noneDates });
+    });
+    rows.push(row);
+  });
+  // "Sem registo": um cartão por cliente com todas as datas (a agenda usada é a de
+  // hoje, por isso um cliente novo aparece com as semanas em que ainda não existia).
+  missingByClient.forEach((list, cid) => {
+    list.sort((x, y) => x.date.localeCompare(y.date));
+    issues.push({
+      kind: "missing", key: `missing|${cid}`, clientId: cid, date: list[0].date, weekStart: list[0].weekStart, dates: list, marks: [],
+      teamIds: [...new Set(list.flatMap((x) => x.teamIds.map(String)))].map((id) => (list.flatMap((x) => x.teamIds).find((t) => String(t) === id))),
+      firstRecord: firstRecord.get(cid) || null,
+    });
+  });
+  // Sobras: as que esperam por um "juntar" ficam de fora (depois de juntar, recalculam-se).
+  planLeftovers(horasData, clients, period, ctx, todayIso).forEach((it) => {
+    if (joinTargets.has(it.key)) return;
+    issues.push({
+      kind: "leftover", key: `leftover|${it.key}`, clientId: it.clientId, date: it.date, weekStart: isoDateStr(startOfISOWeek(dateFromIso(it.date))),
+      markerIds: it.markerIds, missingIds: it.missingIds, leftoverHours: it.leftoverHours,
+      marks: markersOf(horasData, it.date, it.clientId).map((m) => ({ staffId: m.staffId, workDate: m.entry.date, hours: m.entry.hours || 0 })),
+    });
+  });
+  listConflicts(horasData).filter((c) => !period || dateStrInPeriod(c.date, period)).forEach((c) => {
+    issues.push({
+      kind: "conflict", key: `conflict|${c.key}`, clientId: c.clientId, date: c.date, weekStart: isoDateStr(startOfISOWeek(dateFromIso(c.date))),
+      marks: c.marks.map((m) => ({ ...m, workDate: c.date })),
+    });
+  });
+  Object.keys(horasData || {}).forEach((sid) => {
+    ((horasData[sid] && horasData[sid].entries) || []).forEach((e, idx) => {
+      if (!isPendingClientEntry(e) || (period && !dateStrInPeriod(e.date, period))) return;
+      issues.push({
+        kind: "pending", key: `pending|${sid}|${e.date}|${e.custom.name}`, clientId: null, staffId: sid, idx, date: e.date,
+        weekStart: isoDateStr(startOfISOWeek(dateFromIso(e.date))),
+        name: e.custom.name, city: e.custom.city || "", hours: e.hours || 0, candidates: nameCandidates(e.custom.name, clients),
+        marks: [{ staffId: sid, workDate: e.date, hours: e.hours || 0 }],
+      });
+    });
+  });
+  // Pago: não se mexe nas horas de quem já recebeu.
+  issues.forEach((i) => {
+    const staffIds = [...(i.marks || []), ...(i.targetMarks || [])].map((m) => m.staffId);
+    i.paid = staffIds.some((sid) => horasData[sid] && horasData[sid].paid);
+  });
+  // Estado de cada visita + contagens.
+  const touched = new Map();
+  issues.forEach((i) => {
+    if (i.clientId == null || i.kind === "pending") return;
+    if (!touched.has(i.clientId)) touched.set(i.clientId, new Set());
+    const set = touched.get(i.clientId);
+    if (i.kind === "missing") i.dates.forEach((x) => set.add(x.date)); else set.add(i.date);
+  });
+  // Cliente que não está na agenda de ninguém neste período: os registos dele são "extra" por definição.
+  const hasExpected = new Set(rows.filter((r) => r.weeks.some((w) => w.visits.some((v) => v.expected))).map((r) => r.clientId));
+  issues.forEach((i) => { if (i.kind === "extra") i.notInAgenda = !hasExpected.has(i.clientId); });
+  let expectedTotal = 0, checkedTotal = 0, clientsOk = 0, clientsTotal = 0;
+  const outRows = [];
+  rows.forEach((row) => {
+    const t = touched.get(row.clientId) || new Set();
+    let any = false;
+    row.weeks.forEach((w) => {
+      w.visits.forEach((v) => {
+        any = true;
+        if (t.has(v.date)) v.state = "issue";
+        else if (!v.expected) v.state = "ok";
+        else if (v.marks.length > 0) v.state = "ok";
+        else if (w.noneDates.has(v.date)) v.state = "none";
+        else v.state = w.complete ? "issue" : "open";
+        if (v.expected && w.complete) {
+          row.expected += 1;
+          if (v.state === "ok" || v.state === "none") row.checked += 1;
+        }
+      });
+    });
+    if (any) {
+      outRows.push(row);
+      if (row.expected > 0) { clientsTotal += 1; if (row.checked === row.expected && !t.size) clientsOk += 1; }
+      expectedTotal += row.expected; checkedTotal += row.checked;
+    }
+  });
+  const lastComplete = [...weeks].reverse().find((w) => w.complete);
+  const nameOf = (id) => { const c = clientById(clients, id); return c ? c.name : ""; };
+  issues.sort((a, b) => (nameOf(a.clientId) || a.name || "").localeCompare(nameOf(b.clientId) || b.name || "") || a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind));
+  outRows.sort((a, b) => a.name.localeCompare(b.name));
+  const byKind = {};
+  issues.forEach((i) => { byKind[i.kind] = (byKind[i.kind] || 0) + 1; });
+  return {
+    issues, clients: outRows, byKind,
+    totals: { expected: expectedTotal, checked: checkedTotal, clientsOk, clientsTotal, checkedUntil: lastComplete ? lastComplete.days[lastComplete.days.length - 1] : null },
+  };
+}
+
+// Números para os avisos (selo do menu, cartão do Dashboard, botão "Revisões").
+// `total` inclui tudo o que está na lista; `attention` exclui os clientes fora da
+// lista (o Dashboard já tem uma linha só para esses).
 function countReviews(horasData, clients, period, ctx, today) {
-  return { conflicts: listConflicts(horasData).length, leftovers: planLeftovers(horasData, clients, period, ctx, today).length };
+  const r = reconcileVisits(horasData, clients, period, ctx, today);
+  const k = r.byKind;
+  const total = r.issues.length;
+  return {
+    conflicts: k.conflict || 0, leftovers: k.leftover || 0, joins: k.join || 0, extras: k.extra || 0, missing: k.missing || 0, pending: k.pending || 0,
+    total, attention: total - (k.pending || 0),
+  };
+}
+
+// Efeito de uma alteração em horas e euros por pessoa (para mostrar na lista).
+function hoursImpact(before, after, clients, period) {
+  const out = [];
+  Object.keys(after || {}).forEach((sid) => {
+    const b = (before && before[sid]) || { entries: [] };
+    const a = after[sid] || { entries: [] };
+    const dh = staffTotalHours(a, period) - staffTotalHours(b, period);
+    const de = staffTotalPay(a, clients, period) - staffTotalPay(b, clients, period);
+    if (Math.abs(dh) > 1e-9 || Math.abs(de) > 1e-9) out.push({ staffId: sid, hours: dh, euros: de });
+  });
+  return out;
+}
+
+const matchesMark = (e, m, clientId) => !e.voided && e.clientId === clientId && e.date === m.workDate;
+
+// Junta as marcas do problema `join` à visita prevista (`issue.date`). Com
+// `opts.isFrozen`, as linhas de quem já fechou a semana ficam como estão (a
+// gerência junta-as depois na lista).
+function applyJoinIssue(horasData, clients, issue, ctx, opts = {}) {
+  if (issue.paid && !opts.force) return horasData;
+  let next = horasData;
+  issue.marks.forEach((m) => {
+    const h = next[m.staffId];
+    if (opts.isFrozen && h) {
+      const line = (h.entries || []).find((e) => matchesMark(e, m, issue.clientId));
+      if (line && opts.isFrozen(m.staffId, h, line) && String(m.staffId) !== String(opts.selfId)) return;
+    }
+    next = joinVisit(next, clients, m.staffId, m.workDate, issue.clientId, issue.date, ctx, opts.isFrozen ? { isFrozen: opts.isFrozen } : {});
+  });
+  return next;
+}
+// "São visitas diferentes" / "Aceitar como visita extra": as linhas ficam como
+// estão e deixam de aparecer na lista.
+function acceptExtra(horasData, issue) {
+  const next = { ...horasData };
+  (issue.marks || []).forEach((m) => {
+    const h = next[m.staffId];
+    if (!h) return;
+    next[m.staffId] = { ...h, entries: h.entries.map((e) => (matchesMark(e, m, issue.clientId) ? { ...e, reviewOk: true } : e)) };
+  });
+  return next;
+}
+// "São visitas diferentes" (em vez de juntar): o registo fica como visita
+// separada e a visita prevista volta a contar com quem a agenda esperava (a
+// sobra de quem não registou aparece, como sempre, para confirmar).
+function keepSeparate(horasData, clients, issue, ctx) {
+  const next = acceptExtra(horasData, issue);
+  return issue.kind === "join" ? recomputeSharedHours(next, clients, issue.date, issue.clientId, { ctx }) : next;
+}
+// "Anular horas": reversível (a linha anulada repõe-se em Horas).
+function voidExtra(horasData, clients, issue, ctx) {
+  if (issue.paid) return horasData;
+  let next = { ...horasData };
+  (issue.marks || []).forEach((m) => {
+    const h = next[m.staffId];
+    if (!h) return;
+    next[m.staffId] = { ...h, entries: h.entries.map((e) => (matchesMark(e, m, issue.clientId) ? { ...e, voided: true } : e)) };
+  });
+  return recomputeSharedHours(next, clients, issue.date, issue.clientId, { ctx });
+}
+// "Não houve visita": guarda em cada pessoa da equipa esperada que a gerência
+// confirmou que essa visita não aconteceu.
+function ackMissing(horasData, issue) {
+  const next = { ...horasData };
+  const dates = issue.dates && issue.dates.length ? issue.dates : [{ date: issue.date, teamIds: issue.teamIds || [] }];
+  dates.forEach((x) => {
+    (x.teamIds || []).forEach((id) => {
+      const h = next[id] || { status: "pendente", paid: false, entries: [], lockedWeeks: {}, noClientDays: [], reopened: false };
+      next[id] = { ...h, visitChecks: { ...(h.visitChecks || {}), [`${x.date}|${issue.clientId}`]: "none" } };
+    });
+  });
+  return next;
+}
+// Cliente escrito à mão → cliente da lista (mesma regra do botão de editar a
+// linha em Horas: só redivide se houver mais alguém nessa visita).
+function assignPendingEntry(horasData, clients, issue, clientId, ctx) {
+  if (issue.paid) return horasData;
+  const staffId = issue.staffId;
+  const h = horasData[staffId];
+  if (!h) return horasData;
+  const idx = h.entries.findIndex((e) => isPendingClientEntry(e) && e.date === issue.date && e.custom.name === issue.name);
+  if (idx < 0) return horasData;
+  const old = h.entries[idx];
+  const { splitAdjusted, splitHours, shareReview, sharedCount, teamConfirmed, conflict, solo, soloCheck, custom, ...base } = old;
+  let next = { ...horasData, [staffId]: { ...h, entries: h.entries.map((e, i) => (i === idx ? { ...base, clientId } : e)) } };
+  const v = visitDateOf(old);
+  const others = Object.keys(next).some((sid) => String(sid) !== String(staffId)
+    && (next[sid].entries || []).some((e) => visitDateOf(e) === v && e.clientId === clientId && !e.voided));
+  if (others) next = recomputeSharedHours(next, clients, v, clientId, { ctx });
+  return next;
+}
+
+// Aplica a SUGESTÃO de um problema (a ação que vem pré-escolhida na lista).
+//   join → juntar · extra → aceitar · missing → "não houve visita" · leftover → passar a sobra
+// Conflitos e clientes fora da lista pedem uma escolha própria (não têm sugestão).
+function applySuggestion(horasData, clients, issue, ctx) {
+  if (issue.kind === "join") return applyJoinIssue(horasData, clients, issue, ctx);
+  if (issue.kind === "extra") return acceptExtra(horasData, issue);
+  if (issue.kind === "missing") return ackMissing(horasData, issue);
+  if (issue.kind === "leftover") return applyLeftovers(horasData, clients, [{ date: issue.date, clientId: issue.clientId, markerIds: issue.markerIds }], ctx);
+  return horasData;
+}
+
+// --- Desencontro na hora de marcar (app do funcionário) --------------------
+// Ao marcar `clientId` em `workDate`, há um colega que marcou o mesmo cliente
+// noutro dia da mesma semana e o sistema acha que é a MESMA visita? Devolve
+// { issue, colleagueIds, dates } ou null. Só para clientes "dividida", e só
+// quando há marcação de um colega envolvida (sem colega não há desencontro).
+function findSameVisit(state, client, ctx, staffId, workDate) {
+  const week = startOfISOWeek(dateFromIso(workDate));
+  const days = [];
+  for (let i = 0; i < 7; i++) days.push(isoDateStr(addDays(week, i)));
+  const a = analyseClientWeek(state, client, days, ctx, {});
+  const sid = String(staffId);
+  const mine = (m) => String(m.staffId) === sid && m.workDate === workDate;
+  const j = a.issues.find((i) => i.kind === "join" && (i.marks.some(mine) || i.targetMarks.some(mine)));
+  if (!j) return null;
+  const colleagues = [...j.marks, ...j.targetMarks].filter((m) => String(m.staffId) !== sid);
+  if (colleagues.length === 0) return null;
+  const colleagueIds = [...new Set(colleagues.map((m) => String(m.staffId)))];
+  const dates = [...new Set(colleagues.map((m) => m.workDate))].sort();
+  return { issue: j, colleagueIds, dates, target: j.date };
+}
+function addHypotheticalEntry(horasData, staffId, entry) {
+  const own = horasData[staffId] || { status: "pendente", paid: false, entries: [], lockedWeeks: {}, noClientDays: [], reopened: false };
+  return { ...horasData, [staffId]: { ...own, entries: [...(own.entries || []), entry] } };
+}
+function suggestSameVisit(horasData, clients, ctx, staffId, clientId, workDate, replacesDate) {
+  const client = clientById(clients, clientId);
+  if (!client || client.hoursMode === "individual" || replacesDate) return null;
+  const state = addHypotheticalEntry(horasData, staffId, { date: workDate, clientId, hours: 0, voided: false });
+  return findSameVisit(state, client, ctx, staffId, workDate);
+}
+// "Sim, é a mesma visita": liga as marcas à visita prevista (as linhas de colegas
+// com a semana fechada não se mexem; a gerência junta-as depois).
+function linkSameVisit(horasData, clients, ctx, staffId, clientId, workDate, opts = {}) {
+  const client = clientById(clients, clientId);
+  if (!client) return horasData;
+  const sug = findSameVisit(horasData, client, ctx, staffId, workDate);
+  if (!sug) return horasData;
+  return applyJoinIssue(horasData, clients, { ...sug.issue, paid: false }, ctx, { ...opts, selfId: staffId });
 }
 
 // Recalcula as horas JÁ LANÇADAS de um período com a duração ATUAL dos clientes
@@ -1215,4 +1645,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

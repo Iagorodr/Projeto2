@@ -11,7 +11,7 @@ import { useBreakpoint } from "./hooks/useBreakpoint.js";
 import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
 import { CloseDeadlineBanner, CloseLockPanel } from "./views/shared/CloseDeadlineBanner.jsx";
 import { formatPeriodLabel, closeDeadlineInfo, isoDateStr } from "./models/utils.js";
-import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, unseenAvisosCount, countReviews } from "./models/utils.js";
+import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, unseenAvisosCount, countReviews, inReviewWindow } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
 import { isSupabaseConfigured } from "./models/supabaseClient.js";
@@ -137,11 +137,11 @@ export default function App() {
         const openPeriodNow = avisosOpenPeriod;
         const closeInfo = closeDeadlineInfo(openPeriodNow, TODAY, c.closeDeadlineDays);
         const pendingRequests = unseenAvisosCount(c.missingItems, c.sentItems, avisosOpenPeriod);
-        // Horas por rever (conflitos "trabalhei sozinho" e horas soltas) somam ao selo de Horas.
+        // Visitas por conferir somam ao selo de Horas, mas só na última semana do período.
         const hoursReviews = countReviews(c.horasData, c.clients, openPeriodNow, { staff: c.staff, assignments: c.assignments, covers: c.covers, absences: c.absences }, isoDateStr(TODAY));
         const managementItems = MENU_ITEMS.map((item) => ({
           key: item.key, icon: item.icon, label: tSidebar[item.key],
-          badge: item.key === "horas" ? ((overtimePending + hoursReviews.conflicts + hoursReviews.leftovers) || undefined)
+          badge: item.key === "horas" ? ((overtimePending + (inReviewWindow(openPeriodNow, TODAY) ? hoursReviews.attention : 0)) || undefined)
             : item.key === "avisos" ? (pendingRequests || undefined)
             : undefined,
         }));

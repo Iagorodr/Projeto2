@@ -1,36 +1,48 @@
-import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { X, ChevronDown, ChevronRight, Check } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { TODAY } from "../../models/data.js";
+import { DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
-  applyLeftovers, clientById, fmtEuro, fmtHoursScreen, fmtNoteDate, isoDateStr, joinVisit, listConflicts, planLeftovers, resolveConflict,
+  acceptExtra, ackMissing, applySuggestion, assignPendingEntry, clientById, fmtEuro, fmtHoursScreen, hoursImpact, isoDateStr,
+  keepSeparate, reconcileVisits, resolveConflict, voidExtra, weekLabelPT,
 } from "../../models/utils.js";
 import { Button, Pill } from "../shared/ui/index.js";
 
-// "Revisões de horas" (gerência): duas listas, ambas decididas à mão.
-//  1) CONFLITOS — um funcionário marcou "trabalhei sozinho" e outro marcou o
-//     mesmo cliente no mesmo dia: a gerência escolhe quem fez (só um, dividiram
-//     ou os dois fizeram tudo). Entretanto cada um fica com a sua parte dividida.
-//  2) HORAS SOLTAS — a agenda esperava mais gente do que a que marcou; a
-//     sobra só passa para quem marcou quando a gerência confirma (o colega
-//     provavelmente não foi). Pode confirmar um a um ou vários de uma vez.
+// "Revisões de horas" (gerência): UMA lista, por cliente, do que não bate certo
+// entre as visitas que a agenda previa e as que a equipa registou (ver
+// `reconcileVisits` em utils.js). Cada ponto mostra as provas (quem marcou, em
+// que dia, quantas horas, o que a agenda previa), o efeito nas horas e uma
+// sugestão. Nada muda sem a gerência aplicar.
 // `onChange(nextHorasData, toastMsg)` recebe o novo horasData.
-export default function HoursReviewDialog({ open, onClose, onChange, horasData, clients, staff, period, ctx, t }) {
+const SUGGESTED = new Set(["join", "extra", "missing", "leftover"]); // têm caixa de seleção
+const PRESELECT = new Set(["join"]); // vêm marcados à partida (provas claras); o resto marca-se à mão
+
+function isoToDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
+
+export default function HoursReviewDialog({ open, onClose, onChange, horasData, clients, staff, period, ctx, lang, t }) {
   const isMobile = useIsMobile();
   const todayIso = isoDateStr(TODAY);
-  const conflicts = useMemo(() => (open ? listConflicts(horasData) : []), [open, horasData]);
-  const leftovers = useMemo(() => (open ? planLeftovers(horasData, clients, period, ctx, todayIso) : []), [open, horasData, clients, period, ctx, todayIso]);
+  const rec = useMemo(() => (open ? reconcileVisits(horasData, clients, period, ctx, todayIso) : null), [open, horasData, clients, period, ctx, todayIso]);
+  const issues = useMemo(() => (rec ? rec.issues : []), [rec]);
   const [selected, setSelected] = useState(() => new Set());
-  // Mantém só os dias que ainda existem na lista (depois de aplicar alguns).
+  const [showClients, setShowClients] = useState(false);
+  const [openClient, setOpenClient] = useState(null);
+  const [pick, setPick] = useState({});
+  const seen = useRef(new Set());
+
+  // Marca à partida os "juntar" (a primeira vez que aparecem) e limpa o que já não existe.
   useEffect(() => {
+    const keys = new Set(issues.map((i) => i.key));
     setSelected((prev) => {
-      const keys = new Set(leftovers.map((x) => x.key));
       const next = new Set([...prev].filter((k) => keys.has(k)));
-      return next.size === prev.size ? prev : next;
+      issues.forEach((i) => { if (PRESELECT.has(i.kind) && !i.paid && !seen.current.has(i.key)) next.add(i.key); });
+      return next.size === prev.size && [...next].every((k) => prev.has(k)) ? prev : next;
     });
-  }, [leftovers]);
+    issues.forEach((i) => seen.current.add(i.key));
+  }, [issues]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -39,37 +51,219 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
-
+  const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang] || DAY_ABBR_SUN0_BY_LANG.pt;
+  const dayLabel = (iso) => { const d = isoToDate(iso); return `${dayAbbr[d.getDay()]} ${iso.slice(8, 10)}/${iso.slice(5, 7)}`; };
+  const dm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
   const nameOf = (sid) => { const s = staff.find((x) => String(x.id) === String(sid)); return s ? s.name : "—"; };
   const firstOf = (sid) => nameOf(sid).split(" ")[0];
+  const namesOf = (ids) => [...new Set(ids.map(String))].map(firstOf).join(", ");
   const clientName = (id) => { const c = clientById(clients, id); return c ? c.name : "—"; };
-  const isPaid = (sid) => !!(horasData[sid] && horasData[sid].paid);
+  const markText = (m) => `${firstOf(m.staffId)} ${dayLabel(m.workDate)} ${fmtHoursScreen(m.hours)}`;
+  const signed = (v, f) => `${v < 0 ? "−" : "+"}${f(Math.abs(v))}`;
 
-  const chosen = leftovers.filter((x) => selected.has(x.key));
-  const gain = (x) => { const c = clientById(clients, x.clientId); return x.leftoverHours * (c ? c.valueHour || 0 : 0); };
-  const chosenHours = chosen.reduce((s, x) => s + x.leftoverHours, 0);
-  const chosenEuros = chosen.reduce((s, x) => s + gain(x), 0);
+  // Efeito (horas e euros por pessoa) de aplicar a sugestão de cada ponto.
+  const effects = useMemo(() => {
+    const map = new Map();
+    if (!open) return map;
+    issues.forEach((i) => {
+      if (i.kind !== "join" && i.kind !== "leftover") return;
+      map.set(i.key, hoursImpact(horasData, applySuggestion(horasData, clients, i, ctx), clients, period));
+    });
+    return map;
+  }, [open, issues, horasData, clients, ctx, period]);
+  const effectText = (key) => {
+    const list = effects.get(key) || [];
+    if (list.length === 0) return "";
+    return list.map((x) => `${firstOf(x.staffId)} ${signed(x.hours, fmtHoursScreen)} (${signed(x.euros, fmtEuro)})`).join(" · ");
+  };
 
-  function toggle(key) {
-    setSelected((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
-  }
-  function decide(c, action, winnerId) {
-    onChange(resolveConflict(horasData, clients, c.date, c.clientId, action, winnerId, ctx), t.reviewDoneConflict);
-  }
-  function join(x, o) {
-    onChange(joinVisit(horasData, clients, o.staffId, o.date, x.clientId, x.date, ctx), t.reviewDoneJoin);
-  }
-  function applyChosen() {
+  const chosen = issues.filter((i) => selected.has(i.key) && SUGGESTED.has(i.kind) && !(i.kind === "join" && i.paid));
+  const totalEffect = useMemo(() => {
+    if (!open || chosen.length === 0) return null;
+    let next = horasData;
+    chosen.forEach((i) => { next = applySuggestion(next, clients, i, ctx); });
+    const list = hoursImpact(horasData, next, clients, period);
+    return { hours: list.reduce((s, x) => s + x.hours, 0), euros: list.reduce((s, x) => s + x.euros, 0) };
+  }, [open, chosen, horasData, clients, ctx, period]);
+
+  if (!open || !rec) return null;
+
+  const selectable = issues.filter((i) => SUGGESTED.has(i.kind) && !(i.kind === "join" && i.paid));
+  const allSelected = selectable.length > 0 && selectable.every((i) => selected.has(i.key));
+  const toggle = (key) => setSelected((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+  const applyChosen = () => {
     if (chosen.length === 0) return;
-    onChange(applyLeftovers(horasData, clients, chosen, ctx), t.reviewDoneLeftovers(chosen.length));
+    let next = horasData;
+    chosen.forEach((i) => { next = applySuggestion(next, clients, i, ctx); });
+    onChange(next, t.reviewDoneApplied(chosen.length));
     setSelected(new Set());
+  };
+  const act = (fn, msg) => onChange(fn(), msg);
+
+  const sectionTitle = { fontSize: 14, fontWeight: 700, color: COLORS.ink, margin: "0 0 8px" };
+  const card = { border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, padding: "10px 12px", background: COLORS.card };
+  const line = { fontSize: 12.5, color: COLORS.ink2, lineHeight: 1.45 };
+  const rowOf = (cid) => rec.clients.find((c) => c.clientId === cid);
+  const pct = rec.totals.expected > 0 ? Math.round((rec.totals.checked / rec.totals.expected) * 100) : 0;
+
+  const kindPill = (i) => {
+    const map = { join: ["pending", t.reviewKindJoin], extra: ["neutral", t.reviewKindExtra], missing: ["missing", t.reviewKindMissing], leftover: ["pending", t.reviewKindLeftover], conflict: ["missing", t.reviewKindConflict], pending: ["reopened", t.reviewKindPending] };
+    const [variant, label] = map[i.kind];
+    return <Pill variant={variant}>{label}</Pill>;
+  };
+  const weekTag = (i) => (i.weekStart ? t.reviewWeekOf(weekLabelPT(isoToDate(i.weekStart), lang)) : "");
+
+  function suggestRow(i, label, disabled) {
+    return (
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 8, cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.55 : 1 }}>
+        <input type="checkbox" checked={selected.has(i.key) && !disabled} disabled={disabled} onChange={() => toggle(i.key)} style={{ marginTop: 3 }} aria-label={label} data-testid={`review-check-${i.kind}`} />
+        <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{label}</span>
+      </label>
+    );
+  }
+  const effectLine = (i) => (effectText(i.key) ? <div style={{ ...line, marginTop: 4, fontVariantNumeric: "tabular-nums" }} data-testid="review-effect">{t.reviewEffect(effectText(i.key))}</div> : null);
+
+  function renderIssue(i) {
+    const paidPill = i.paid ? <Pill variant="neutral">{t.reviewPaidShort}</Pill> : null;
+    const head = (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+        {kindPill(i)}
+        <span style={{ ...line, color: COLORS.ink3 }}>{weekTag(i)}</span>
+        {paidPill}
+      </div>
+    );
+    if (i.kind === "join") {
+      const nobody = i.targetMarks.length === 0;
+      return (
+        <div key={i.key} style={card} data-testid="review-issue" data-kind="join">
+          {head}
+          <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{dayLabel(i.date)}</div>
+          <div style={line}>{t.reviewAgenda(dayLabel(i.date), namesOf(i.teamIds))}</div>
+          <div style={line}>{t.reviewMarksLabel}: {[...i.targetMarks, ...i.marks].map(markText).join(" · ")}</div>
+          <div style={{ ...line, marginTop: 6, color: COLORS.amberInk, background: COLORS.amberBg, borderRadius: RADIUS.control, padding: "6px 10px" }}>
+            {t.reviewJoinWhy(namesOf(i.marks.map((m) => m.staffId)), dayLabel(i.fromDate), dayLabel(i.date), nobody)}
+          </div>
+          {i.paid ? <div style={{ ...line, marginTop: 6 }}>{t.reviewPaidNote}</div> : (
+            <>
+              {suggestRow(i, t.reviewJoinSuggest(dayLabel(i.date)), false)}
+              {effectLine(i)}
+              <div style={{ marginTop: 8 }}>
+                <Button variant="ghost" onClick={() => act(() => keepSeparate(horasData, clients, i, ctx), t.reviewDoneKeep)}>{t.reviewKeepSeparate}</Button>
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+    if (i.kind === "extra") {
+      return (
+        <div key={i.key} style={card} data-testid="review-issue" data-kind="extra">
+          {head}
+          <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{dayLabel(i.date)}</div>
+          <div style={line}>{t.reviewMarksLabel}: {i.marks.map(markText).join(" · ")}</div>
+          <div style={line}>{i.notInAgenda ? t.reviewNotInAgenda : t.reviewAgendaNobody}</div>
+          {i.answered && <div style={{ ...line, color: COLORS.amberInk }}>{t.reviewExtraAnswered}</div>}
+          {suggestRow(i, t.reviewExtraAccept, false)}
+          <div style={{ marginTop: 8 }}>
+            <Button variant="ghost" disabled={i.paid} onClick={() => act(() => voidExtra(horasData, clients, i, ctx), t.reviewDoneVoid)}>{t.reviewExtraVoid}</Button>
+          </div>
+          {i.paid && <div style={{ ...line, marginTop: 4 }}>{t.reviewPaidNote}</div>}
+        </div>
+      );
+    }
+    if (i.kind === "missing") {
+      return (
+        <div key={i.key} style={card} data-testid="review-issue" data-kind="missing">
+          {head}
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{t.reviewMissingWhy(i.dates.length)}</div>
+          <ul style={{ margin: "4px 0 6px", paddingLeft: 18 }}>
+            {i.dates.map((x) => <li key={x.date} style={line}>{dayLabel(x.date)} · {namesOf(x.teamIds)}</li>)}
+          </ul>
+          <div style={line}>{i.firstRecord ? t.reviewMissingFirst(dayLabel(i.firstRecord)) : t.reviewMissingNone}</div>
+          <div style={line}>{t.reviewMissingHint}</div>
+          {suggestRow(i, t.reviewMissingAck, false)}
+        </div>
+      );
+    }
+    if (i.kind === "leftover") {
+      return (
+        <div key={i.key} style={card} data-testid="review-issue" data-kind="leftover">
+          {head}
+          <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{dayLabel(i.date)}</div>
+          <div style={line}>{t.reviewMarked}: {i.markerIds.map(firstOf).join(", ")} · {t.reviewNotMarked}: {i.missingIds.map(firstOf).join(", ")}</div>
+          <div style={{ ...line, fontVariantNumeric: "tabular-nums" }}>{t.reviewLeftoverGain(fmtHoursScreen(i.leftoverHours), fmtEuro(i.leftoverHours * (clientById(clients, i.clientId)?.valueHour || 0)))}</div>
+          <div style={{ ...line, marginTop: 4 }}>{t.reviewLeftoverHint}</div>
+          {suggestRow(i, t.reviewLeftoverSuggest, false)}
+        </div>
+      );
+    }
+    if (i.kind === "conflict") {
+      return (
+        <div key={i.key} style={card} data-testid="review-issue" data-kind="conflict">
+          {head}
+          <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{dayLabel(i.date)}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, margin: "4px 0 6px" }}>
+            {i.marks.map((m) => (
+              <div key={m.staffId} style={line}><b style={{ color: COLORS.ink }}>{nameOf(m.staffId)}</b> {m.solo ? t.reviewSoloSays : t.reviewWentSays}</div>
+            ))}
+          </div>
+          <div style={line}>{t.reviewConflictHint}</div>
+          {i.paid ? <div style={{ ...line, marginTop: 6 }}>{t.reviewPaidNote}</div> : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+              {i.marks.map((m) => (
+                <Button key={m.staffId} variant="secondary" onClick={() => act(() => resolveConflict(horasData, clients, i.date, i.clientId, "only", m.staffId, ctx), t.reviewDoneConflict)}>{t.reviewOnlyBtn(firstOf(m.staffId))}</Button>
+              ))}
+              <Button variant="secondary" onClick={() => act(() => resolveConflict(horasData, clients, i.date, i.clientId, "split", undefined, ctx), t.reviewDoneConflict)}>{t.reviewSplitBtn}</Button>
+              <Button variant="secondary" onClick={() => act(() => resolveConflict(horasData, clients, i.date, i.clientId, "both", undefined, ctx), t.reviewDoneConflict)}>{t.reviewBothBtn}</Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+    // pending: cliente escrito à mão
+    const choice = pick[i.key] !== undefined ? pick[i.key] : "";
+    const cand = i.candidates.map((id) => clientById(clients, id)).filter(Boolean);
+    const assign = (cid) => act(() => assignPendingEntry(horasData, clients, i, cid, ctx), t.reviewDonePending);
+    return (
+      <div key={i.key} style={card} data-testid="review-issue" data-kind="pending">
+        {head}
+        <div style={line}>{t.reviewPendingWhy(nameOf(i.staffId), i.name, i.city, dayLabel(i.date), fmtHoursScreen(i.hours))}</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+          {!i.paid && cand.map((c) => <Button key={c.id} variant="secondary" onClick={() => assign(c.id)}>{t.reviewPendingSuggest(c.name)}</Button>)}
+          {!i.paid && (
+            <>
+              <select
+                value={choice} onChange={(e) => setPick((p) => ({ ...p, [i.key]: e.target.value }))} aria-label={t.reviewPendingPick}
+                style={{ height: 40, borderRadius: RADIUS.control, border: `1px solid ${COLORS.lineInput}`, padding: "0 10px", fontFamily: "inherit", fontSize: 13, background: COLORS.card, color: COLORS.ink, maxWidth: "100%" }}
+              >
+                <option value="">{t.reviewPendingPick}</option>
+                {clients.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+              </select>
+              <Button variant="secondary" disabled={!choice} onClick={() => { const c = clients.find((x) => String(x.id) === String(choice)); if (c) assign(c.id); }}>{t.reviewPendingAssign}</Button>
+            </>
+          )}
+        </div>
+        <div style={{ ...line, marginTop: 6 }}>{i.paid ? t.reviewPaidNote : t.reviewPendingHint}</div>
+      </div>
+    );
   }
 
-  const empty = conflicts.length === 0 && leftovers.length === 0;
-  const sectionTitle = { fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 4 };
-  const hint = { fontSize: 12.5, color: COLORS.ink2, lineHeight: 1.45, marginBottom: 10 };
-  const card = { border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, padding: "10px 12px" };
+  // Grupos por cliente (clientes fora da lista ficam juntos no fim).
+  const groups = [];
+  issues.forEach((i) => {
+    const key = i.clientId == null ? "__pending" : String(i.clientId);
+    let g = groups.find((x) => x.key === key);
+    if (!g) { g = { key, clientId: i.clientId, items: [] }; groups.push(g); }
+    g.items.push(i);
+  });
+  groups.sort((a, b) => (a.clientId == null) - (b.clientId == null));
+
+  const visitLine = (v) => {
+    const marks = v.marks.map((m) => `${firstOf(m.staffId)} ${fmtHoursScreen(m.hours)}${m.workDate !== v.date ? ` (${dayLabel(m.workDate)})` : ""}`).join(" · ");
+    const state = v.marks.length > 0 ? marks : (v.state === "open" ? t.reviewVisitOpen : v.state === "none" ? t.reviewVisitNone : t.reviewVisitNoRecord);
+    const exp = v.expected ? ` · ${t.reviewVisitExpectedBy(namesOf(v.teamIds))}` : "";
+    return `${dayLabel(v.date)}${exp} → ${state}`;
+  };
 
   return (
     <div
@@ -83,12 +277,12 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: COLORS.card, width: isMobile ? "100%" : 600, maxHeight: "88vh", overflowY: "auto",
+          background: COLORS.card, width: isMobile ? "100%" : 640, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden",
           borderRadius: isMobile ? `${RADIUS.sheetMobile}px ${RADIUS.sheetMobile}px 0 0` : RADIUS.card,
-          boxShadow: SHADOW.sh2, padding: 24, boxSizing: "border-box",
+          boxShadow: SHADOW.sh2, boxSizing: "border-box",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, padding: isMobile ? "18px 18px 10px" : "24px 24px 10px", flexShrink: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.ink }}>{t.reviewTitle}</div>
           <button
             type="button" onClick={onClose} aria-label={t.reviewClose}
@@ -97,42 +291,49 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
             <X size={16} />
           </button>
         </div>
-        <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 16 }}>{t.reviewIntro}</div>
+        <div style={{ overflowY: "auto", flex: 1, minHeight: 0, padding: isMobile ? "0 18px 14px" : "0 24px 14px" }} data-testid="review-body">
+        <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 14 }}>{t.reviewIntro}</div>
 
-        {empty && (
-          <div style={{ fontSize: 13.5, color: COLORS.ink, background: COLORS.lineSoft, borderRadius: RADIUS.control, padding: "12px 14px", marginBottom: 14 }}>
-            {t.reviewNothing}
+        {/* Resumo: visitas previstas × conferidas */}
+        <div style={{ ...card, marginBottom: 16, background: COLORS.lineSoft, border: "none" }} data-testid="review-summary">
+          {rec.totals.expected > 0 ? (
+            <>
+              <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{t.reviewSummary(rec.totals.checked, rec.totals.expected)}</div>
+              <div style={{ height: 8, borderRadius: 999, background: COLORS.line, margin: "8px 0", overflow: "hidden" }} aria-hidden="true">
+                <div style={{ width: `${pct}%`, height: "100%", background: COLORS.ok }} />
+              </div>
+              <div style={line}>{t.reviewClientsOk(rec.totals.clientsOk, rec.totals.clientsTotal)}{rec.totals.checkedUntil ? ` · ${t.reviewCheckedUntil(dm(rec.totals.checkedUntil))}` : ""}</div>
+            </>
+          ) : <div style={{ fontSize: 13.5, color: COLORS.ink }}>{t.reviewSummaryNone}</div>}
+        </div>
+
+        {issues.length === 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: COLORS.okInk, background: COLORS.okTint, borderRadius: RADIUS.control, padding: "12px 14px", marginBottom: 16 }} data-testid="review-allgood">
+            <Check size={16} /> {t.reviewAllGood}
           </div>
-        )}
-
-        {conflicts.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={sectionTitle}>{t.reviewConflictsTitle(conflicts.length)}</div>
-            <div style={hint}>{t.reviewConflictHint}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {conflicts.map((c) => {
-                const anyPaid = c.marks.some((m) => isPaid(m.staffId));
+        ) : (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+              <div style={{ ...sectionTitle, margin: 0 }}>{t.reviewToReviewTitle(issues.length)}</div>
+              {selectable.length > 0 && (
+                <button
+                  type="button" onClick={() => setSelected(allSelected ? new Set() : new Set(selectable.map((x) => x.key)))}
+                  style={{ border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+                >
+                  {allSelected ? t.reviewSelectNone : t.reviewSelectAll}
+                </button>
+              )}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {groups.map((g) => {
+                const row = g.clientId == null ? null : rowOf(g.clientId);
                 return (
-                  <div key={c.key} style={card} data-testid="review-conflict">
-                    <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{fmtNoteDate(c.date)} · {clientName(c.clientId)}</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2, margin: "6px 0 10px" }}>
-                      {c.marks.map((m) => (
-                        <div key={m.staffId} style={{ fontSize: 12.5, color: COLORS.ink2 }}>
-                          <b style={{ color: COLORS.ink }}>{nameOf(m.staffId)}</b> {m.solo ? t.reviewSoloSays : t.reviewWentSays}
-                        </div>
-                      ))}
+                  <div key={g.key} data-testid="review-group">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                      <div style={{ fontSize: 14.5, fontWeight: 700, color: COLORS.ink }}>{g.clientId == null ? t.reviewKindPending : clientName(g.clientId)}</div>
+                      {row && row.expected > 0 && <div style={{ ...line, fontVariantNumeric: "tabular-nums" }}>{t.reviewClientTally(row.checked, row.expected)}</div>}
                     </div>
-                    {anyPaid ? (
-                      <Pill variant="pending">{t.reviewPaidNote}</Pill>
-                    ) : (
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {c.marks.map((m) => (
-                          <Button key={m.staffId} variant="secondary" onClick={() => decide(c, "only", m.staffId)}>{t.reviewOnlyBtn(firstOf(m.staffId))}</Button>
-                        ))}
-                        <Button variant="secondary" onClick={() => decide(c, "split")}>{t.reviewSplitBtn}</Button>
-                        <Button variant="secondary" onClick={() => decide(c, "both")}>{t.reviewBothBtn}</Button>
-                      </div>
-                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{g.items.map(renderIssue)}</div>
                   </div>
                 );
               })}
@@ -140,52 +341,67 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
           </div>
         )}
 
-        {leftovers.length > 0 && (
+        {/* Todos os clientes: previstas × conferidas, semana a semana */}
+        {rec.clients.length > 0 && (
           <div style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-              <div style={sectionTitle}>{t.reviewLeftoversTitle(leftovers.length)}</div>
-              <button
-                type="button"
-                onClick={() => setSelected(selected.size === leftovers.length ? new Set() : new Set(leftovers.map((x) => x.key)))}
-                style={{ border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
-              >
-                {selected.size === leftovers.length ? t.reviewSelectNone : t.reviewSelectAll}
-              </button>
-            </div>
-            <div style={hint}>{t.reviewLeftoverHint}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {leftovers.map((x) => (
-                <label key={x.key} style={{ ...card, display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }} data-testid="review-leftover">
-                  <input type="checkbox" checked={selected.has(x.key)} onChange={() => toggle(x.key)} style={{ marginTop: 3 }} aria-label={`${fmtNoteDate(x.date)} ${clientName(x.clientId)}`} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "block", fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{fmtNoteDate(x.date)} · {clientName(x.clientId)}</span>
-                    <span style={{ display: "block", fontSize: 12.5, color: COLORS.ink2 }}>
-                      {t.reviewMarked}: {x.markerIds.map(firstOf).join(", ")} · {t.reviewNotMarked}: {x.missingIds.map(firstOf).join(", ")}
-                    </span>
-                    <span style={{ display: "block", fontSize: 12.5, color: COLORS.ink2, fontVariantNumeric: "tabular-nums" }}>
-                      {t.reviewLeftoverGain(fmtHoursScreen(x.leftoverHours), fmtEuro(gain(x)))}
-                    </span>
-                    {(x.otherDay || []).map((o) => (
-                      <span key={`${o.staffId}-${o.date}`} style={{ display: "block", marginTop: 6, fontSize: 12.5, color: COLORS.amberInk, background: COLORS.amberBg, borderRadius: RADIUS.control, padding: "6px 10px" }}>
-                        {t.reviewOtherDay(firstOf(o.staffId), fmtNoteDate(o.date), fmtHoursScreen(o.hours))}
-                        <span style={{ display: "block", marginTop: 6 }}>
-                          <Button variant="secondary" onClick={(ev) => { ev.preventDefault(); join(x, o); }}>{t.reviewJoinBtn(firstOf(o.staffId), fmtNoteDate(x.date))}</Button>
+            <button
+              type="button" onClick={() => setShowClients((v) => !v)} data-testid="review-clients-toggle"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+            >
+              {showClients ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+              {showClients ? t.reviewByClientHide : t.reviewByClient(rec.clients.length)}
+            </button>
+            {showClients && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }} data-testid="review-clients">
+                {rec.clients.map((c) => {
+                  const isOpen = openClient === c.clientId;
+                  const ok = c.expected > 0 && c.checked === c.expected;
+                  return (
+                    <div key={c.clientId} style={{ ...card, padding: "8px 12px" }}>
+                      <button
+                        type="button" onClick={() => setOpenClient(isOpen ? null : c.clientId)}
+                        style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", padding: 0, textAlign: "left" }}
+                      >
+                        <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{c.name}</span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, ...line, fontVariantNumeric: "tabular-nums" }}>
+                          {c.expected > 0 ? t.reviewClientTally(c.checked, c.expected) : ""}
+                          {ok && <Check size={14} color={COLORS.ok} />}
                         </span>
-                      </span>
-                    ))}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, margin: "12px 0" }}>
-              {chosen.length === 0 ? t.reviewApplyNone : t.reviewTotal(chosen.length, fmtHoursScreen(chosenHours), fmtEuro(chosenEuros))}
-            </div>
-            <Button variant="primary" onClick={applyChosen} disabled={chosen.length === 0}>{t.reviewApply(chosen.length)}</Button>
+                      </button>
+                      {isOpen && (
+                        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+                          {c.weeks.filter((w) => w.visits.length > 0).map((w) => (
+                            <div key={w.start}>
+                              <div style={{ ...line, fontWeight: 600, color: COLORS.ink3 }}>{t.reviewWeekOf(weekLabelPT(isoToDate(w.start), lang))}</div>
+                              {w.visits.map((v) => (
+                                <div key={v.date} style={{ ...line, color: v.state === "issue" ? COLORS.amberInk : COLORS.ink2 }}>{visitLine(v)}</div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <Button variant="secondary" onClick={onClose}>{t.reviewClose}</Button>
+        </div>
+
+        {/* Rodapé fixo: efeito total das sugestões marcadas + aplicar */}
+        <div style={{ flexShrink: 0, borderTop: `1px solid ${COLORS.line}`, padding: isMobile ? "12px 18px 16px" : "14px 24px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", background: COLORS.card }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums", flex: "1 1 180px" }} data-testid="review-total">
+            {issues.length === 0 ? "" : chosen.length === 0 ? t.reviewApplyNone
+              : totalEffect && (Math.abs(totalEffect.hours) > 1e-9 || Math.abs(totalEffect.euros) > 1e-9)
+                ? t.reviewTotalEffect(signed(totalEffect.hours, fmtHoursScreen), signed(totalEffect.euros, fmtEuro))
+                : t.reviewApplyN(chosen.length)}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button variant="secondary" onClick={onClose}>{t.reviewClose}</Button>
+            {issues.length > 0 && <Button variant="primary" onClick={applyChosen} disabled={chosen.length === 0}>{t.reviewApplyN(chosen.length)}</Button>}
+          </div>
         </div>
       </div>
     </div>

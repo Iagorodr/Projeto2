@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lock, Plus } from "lucide-react";
+import { Lock, Plus, X } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
@@ -10,7 +10,7 @@ import {
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
-  staffStartedOn, absenceOn, clientDurationOn, findByName, expectedShare,
+  staffStartedOn, absenceOn, clientDurationOn, findByName, expectedShare, suggestSameVisit, linkSameVisit,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -119,6 +119,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionText, setCorrectionText] = useState("");
   const [toastMsg, setToastMsg] = useState(null);
+  // "É a mesma visita?": pergunta só quando um colega marcou este cliente noutro dia da mesma semana.
+  const [sameAsk, setSameAsk] = useState(null);
 
   function showToast(msg) { setToastMsg(msg); setTimeout(() => setToastMsg(null), 5000); }
 
@@ -237,19 +239,36 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // com metade). A dupla só é automática na montagem da agenda. As linhas
   // "automáticas" de antes aparecem como as outras (sem etiqueta nem botão
   // "Fiz sem <nome>" — decisão de 16/10/2026).
-  function addClientEntry(clientId, replacesDate) {
+  function addClientEntry(clientId, replacesDate, answer) {
     if (weekLockedFlag) return;
     const client = clientById(clients, clientId);
     if (!client) return;
+    // Um colega marcou este cliente noutro dia da mesma semana e as duas marcas
+    // ainda não estão ligadas: pergunta se é a mesma visita (ver `suggestSameVisit`).
+    if (!answer && !replacesDate) {
+      const sug = suggestSameVisit(horasData, clients, sharedCtx, staffId, clientId, selectedKey, replacesDate);
+      if (sug) { setSameAsk({ clientId, ...sug }); return; }
+    }
     const soloOthers = otherMarkers(replacesDate || selectedKey, clientId).filter((o) => o.entry.solo && !o.entry.soloCheck);
     if (soloOthers.length > 0) showToast(t.conflictToastOther(namesOf(soloOthers), soloOthers.length));
     setHorasData((prev) => {
       const current = prev[staffId] || emptyHoras();
       const entry = { date: selectedKey, clientId, hours: (clientDurationOn(client, replacesDate || selectedKey) || 60) / 60, extra: false, extraMinutes: 0, approved: false, voided: false };
       if (replacesDate) entry.replacesDate = replacesDate;
+      if (answer === "no") entry.sameAnswer = "no";
       const withNew = { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
+      if (answer === "yes") {
+        const linked = linkSameVisit(withNew, clients, sharedCtx, staffId, clientId, selectedKey, sharedOpts(selectedKey));
+        if (linked !== withNew) return linked;
+      }
       return recomputeSharedHours(withNew, clients, replacesDate || selectedKey, clientId, sharedOpts(selectedKey));
     });
+    if (answer === "yes") showToast(t.sameVisitToast);
+  }
+  function answerSameVisit(answer) {
+    const ask = sameAsk;
+    setSameAsk(null);
+    if (ask) addClientEntry(ask.clientId, undefined, answer);
   }
   // Cliente fora da lista: nome (e cidade) escritos à mão, sem clientId; as
   // horas entram como pendentes e a gerência confirma o cliente certo.
@@ -1064,6 +1083,39 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         cancelLabel={t.confirmNo} confirmLabel={t.confirmYes} destructive
         onCancel={() => setFinalizeMonthConfirmOpen(false)} onConfirm={finalizeMonth}
       />
+
+      {sameAsk && (
+        <div
+          role="dialog" aria-modal="true" aria-label={t.sameVisitTitle}
+          onClick={() => setSameAsk(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(15,49,41,.45)", zIndex: 90, display: "flex", alignItems: tier === "mobile" ? "flex-end" : "center", justifyContent: "center", padding: tier === "mobile" ? 0 : 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: COLORS.card, width: tier === "mobile" ? "100%" : 420, borderRadius: tier === "mobile" ? `${RADIUS.sheetMobile}px ${RADIUS.sheetMobile}px 0 0` : RADIUS.card, padding: 24, boxSizing: "border-box" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.ink }}>{t.sameVisitTitle}</div>
+              <button type="button" onClick={() => setSameAsk(null)} aria-label={t.close} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink3, flexShrink: 0 }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 8 }}>
+              <b style={{ color: COLORS.ink }}>{clientById(clients, sameAsk.clientId)?.name}</b>
+              {" · "}
+              {t.sameVisitBody(
+                namesOf(sameAsk.colleagueIds.map((sid) => ({ sid }))), sameAsk.colleagueIds.length,
+                sameAsk.dates.map((d) => { const dt = new Date(`${d}T12:00:00`); return `${dayAbbr[dt.getDay()]} ${d.slice(8, 10)}/${d.slice(5, 7)}`; }).join(", "),
+              )}
+            </div>
+            <div style={{ fontSize: 12.5, color: COLORS.ink3, lineHeight: 1.45, marginBottom: 18 }}>{t.sameVisitHint}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <Button variant="primary" onClick={() => answerSameVisit("yes")}>{t.sameVisitYes}</Button>
+              <Button variant="secondary" onClick={() => answerSameVisit("no")}>{t.sameVisitNo}</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toastMsg && <Toast message={toastMsg} onDismiss={() => setToastMsg(null)} closeLabel={t.close} />}
     </div>
