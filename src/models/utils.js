@@ -41,16 +41,23 @@ function dayIsCovered(horasEntry, dateKey) {
   return hasEntry || markedNoClient || coveredByAdvance;
 }
 
+// A VISITA a que um lançamento pertence: a data agendada que ele substitui
+// (`replacesDate`, "Fiz o cliente de outro dia") ou, sem isso, a sua própria
+// data. A divisão das horas agrupa por (visita, cliente) — assim a Talia
+// (quinta) e o Iago (sexta, a substituir a quinta) contam como UMA visita
+// partilhada, e não como duas visitas inteiras.
+function visitDateOf(e) { return (e && (e.replacesDate || e.date)) || ""; }
+
 // "Adiantar" (spec 6.3): uma entry pode ter `replacesDate` (ISO) — a data
 // originalmente agendada que ela substitui, feita mais cedo. No dia
 // original, o cliente deve aparecer como "já feito" (a UI que implementa
 // isto lê `replacesDate` das entries do funcionário — Etapa 4a,
 // `EmployeeHorasScreen.jsx`) e o dia original conta como coberto, não em
 // falta (`dayIsCovered`, acima). Regra: nunca duas entries não-anuladas
-// do mesmo cliente na mesma semana. `recomputeSharedHours` (abaixo) não
-// precisa de mudar: continua a operar por (date, clientId) normalmente,
-// porque a entry adiantada guarda a SUA PRÓPRIA data — só passa a levar
-// `replacesDate` como metadado extra.
+// do mesmo cliente na mesma semana. `recomputeSharedHours` (abaixo) agrupa
+// por (visita, cliente), onde a visita é `replacesDate` se existir (ver
+// `visitDateOf`); a entry adiantada guarda a SUA PRÓPRIA data (o dia em que
+// trabalhou) mas conta para a visita que substitui.
 
 // Semana/mês "fechado" de um funcionário para uma data: período já fechado
 // pela gerência, mês finalizado (dentro do período aberto) ou semana
@@ -75,9 +82,11 @@ function isHorasFrozenOn(h, dateKey, cutoffDay, closedPeriods, today) {
   return !!(h.lockedWeeks && h.lockedWeeks[isoDateStr(chunk.start)]);
 }
 
-// Divide as horas de um cliente, num dia, pelas pessoas que o marcaram.
+// Divide as horas de um cliente, numa VISITA (a data agendada — `date` aqui é
+// `visitDateOf` das linhas: a data da linha, ou `replacesDate` se foi feita
+// noutro dia), pelas pessoas que a fizeram.
 //
-// `opts.isFrozen(staffId, horasDoFuncionario)` (opcional): quem a devolve
+// `opts.isFrozen(staffId, horasDoFuncionario, linha)` (opcional): quem a devolve
 // true tem a semana/mês fechado — as horas dessa pessoa ficam EXATAMENTE
 // como estão (um colega que lança depois não reescreve um fecho já feito),
 // mas ela continua a contar como participante para a parte dos outros. Se,
@@ -90,17 +99,20 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
   const client = clientById(clients, clientId);
   if (!client) return horasDataObj;
   const isFrozen = typeof opts.isFrozen === "function" ? opts.isFrozen : null;
-  const firstEntry = Object.keys(horasDataObj).map((sid) => (horasDataObj[sid].entries || []).find((e) => e.date === date && e.clientId === clientId && !e.voided)).find(Boolean);
-  const baseDuration = clientDurationOn(client, (firstEntry && firstEntry.replacesDate) || date) / 60;
+  // `date` = a data da VISITA (ver `visitDateOf`): agrupa quem a fez nesse dia e
+  // quem a fez noutro dia a substituí-la.
+  const inVisit = (e) => e.clientId === clientId && !e.voided && visitDateOf(e) === date;
+  const baseDuration = clientDurationOn(client, date) / 60;
   // Cliente "individual": cada funcionário regista a duração completa, sem divisão.
   if (client.hoursMode === "individual") {
     const nextInd = { ...horasDataObj };
     Object.keys(horasDataObj).forEach((sid) => {
       const list = horasDataObj[sid].entries || [];
-      if (!list.some((e) => e.date === date && e.clientId === clientId && !e.voided)) return;
-      if (isFrozen && isFrozen(sid, horasDataObj[sid])) return;
+      const mine = list.find(inVisit);
+      if (!mine) return;
+      if (isFrozen && isFrozen(sid, horasDataObj[sid], mine)) return;
       nextInd[sid] = { ...horasDataObj[sid], entries: list.map((e) => {
-        if (e.date === date && e.clientId === clientId && !e.voided) {
+        if (inVisit(e)) {
           const { splitAdjusted, splitHours, shareReview, conflict, ...rest } = e;
           return { ...rest, hours: baseDuration + (e.extraMinutes || 0) / 60, sharedCount: 1 };
         }
@@ -110,10 +122,10 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
     return nextInd;
   }
   const staffIdsInvolved = Object.keys(horasDataObj).filter((sid) =>
-    (horasDataObj[sid].entries || []).some((e) => e.date === date && e.clientId === clientId && !e.voided)
+    (horasDataObj[sid].entries || []).some(inVisit)
   );
-  const frozenIds = new Set(isFrozen ? staffIdsInvolved.filter((sid) => isFrozen(sid, horasDataObj[sid])) : []);
-  const entryOf = (sid) => horasDataObj[sid].entries.find((x) => x.date === date && x.clientId === clientId && !x.voided);
+  const entryOf = (sid) => horasDataObj[sid].entries.find(inVisit);
+  const frozenIds = new Set(isFrozen ? staffIdsInvolved.filter((sid) => isFrozen(sid, horasDataObj[sid], entryOf(sid))) : []);
   // "Trabalhei sozinho" (`solo`): vale logo (horas inteiras) quando mais
   // ninguém marcou esse cliente nesse dia. Se outro colega também marcou, é um
   // CONFLITO: ninguém ganha até a gerência rever (`soloCheck`), e entretanto
@@ -127,9 +139,8 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
   // e ainda não marcou conta na divisão — assim a parte de cada um fica estável
   // mesmo que o colega se esqueça de marcar. A sobra só passa para quem marcou
   // quando a gerência confirma (`teamConfirmed`, ver `planLeftovers`).
-  // Lançamento adiantado (`replacesDate`) não cruza com a agenda desse dia.
-  const advance = staffIdsInvolved.some((sid) => entryOf(sid).replacesDate);
-  const expectedIds = opts.ctx && !advance && sharers.length > 0 ? expectedTeamIds(opts.ctx, client, date) : [];
+  // Um lançamento adiantado conta para a visita que substitui (`date` já é essa).
+  const expectedIds = opts.ctx && sharers.length > 0 ? expectedTeamIds(opts.ctx, client, date) : [];
   const sharerSet = new Set(sharers.map(String));
   const missing = expectedIds.filter((id) => !sharerSet.has(String(id)) && !honored.has(String(id)));
   const confirmedTeam = sharers.length > 0 && sharers.every((sid) => entryOf(sid).teamConfirmed);
@@ -159,7 +170,7 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
     next[sid] = {
       ...next[sid],
       entries: next[sid].entries.map((e) => {
-        if (e.date === date && e.clientId === clientId && !e.voided) {
+        if (inVisit(e)) {
           const { shareReview, conflict: wasConflict, ...clean } = e;
           const flag = { ...(needsReview ? { shareReview: true } : {}), ...(conflict ? { conflict: true } : {}) };
           if (frozenIds.has(sid)) return { ...clean, ...flag };
@@ -206,32 +217,41 @@ function expectedShare(ctx, client, isoDate, staffId) {
   return { minutes: Math.round(dur / team), team };
 }
 
-// Pares (dia|cliente) com linhas não anuladas dentro do período (ou em todo o horasData).
+// Pares (visita|cliente) com linhas não anuladas dentro do período (ou em todo o
+// horasData). `date` é a data da VISITA (ver `visitDateOf`); o filtro do período
+// usa o dia em que se trabalhou.
 function entryPairs(horasData, period, only) {
   const pairs = new Map();
   Object.keys(horasData || {}).forEach((sid) => ((horasData[sid] && horasData[sid].entries) || []).forEach((e) => {
     if (e.voided || !e.clientId) return;
     if (period && !dateStrInPeriod(e.date, period)) return;
     if (only && !only.has(e.clientId)) return;
-    pairs.set(`${e.date}|${e.clientId}`, { date: e.date, clientId: e.clientId });
+    const v = visitDateOf(e);
+    pairs.set(`${v}|${e.clientId}`, { date: v, clientId: e.clientId });
   }));
   return [...pairs.values()];
 }
 function markersOf(horasData, date, clientId) {
   const out = [];
   Object.keys(horasData || {}).forEach((sid) => {
-    const e = ((horasData[sid] && horasData[sid].entries) || []).find((x) => x.date === date && x.clientId === clientId && !x.voided);
+    const e = ((horasData[sid] && horasData[sid].entries) || []).find((x) => visitDateOf(x) === date && x.clientId === clientId && !x.voided);
     if (e) out.push({ staffId: sid, entry: e });
   });
   return out;
 }
+// Mesma semana ISO (segunda a domingo) para duas datas ISO.
+function sameIsoWeek(a, b) { return isoDateStr(startOfISOWeek(dateFromIso(a))) === isoDateStr(startOfISOWeek(dateFromIso(b))); }
 
 // HORAS SOLTAS: dias em que a agenda esperava mais gente do que a que marcou
 // e por isso sobra parte da duração do cliente (o colega não marcou, provavelmente
 // não foi). A gerência decide se essa sobra passa para quem marcou.
-// Devolve [{ key, date, clientId, markerIds, missingIds, leftoverHours }]; só
+// Devolve [{ key, date, clientId, markerIds, missingIds, leftoverHours, otherDay }]; só
 // dias já passados (≤ `today`, ISO), cliente "dividida", sem conflito/solo e
 // sem ninguém já pago. Aplicar = `applyLeftovers`.
+// `otherDay`: quem "não marcou" mas marcou ESTE cliente noutro dia da mesma
+// semana ([{ staffId, date, hours }]) — pode ser a mesma visita feita noutro dia
+// (a agenda mudou nessa semana): a gerência pode juntá-las (`joinVisit`) em vez
+// de passar a sobra.
 function planLeftovers(horasData, clients, period, ctx, today) {
   const todayIso = typeof today === "string" ? today : isoDateStr(today || new Date());
   const items = [];
@@ -241,7 +261,7 @@ function planLeftovers(horasData, clients, period, ctx, today) {
     if (!client || client.hoursMode === "individual") return;
     const marks = markersOf(horasData, date, clientId);
     if (marks.length === 0) return;
-    if (marks.some((m) => m.entry.replacesDate || m.entry.solo || m.entry.conflict)) return;
+    if (marks.some((m) => m.entry.solo || m.entry.conflict)) return;
     if (marks.every((m) => m.entry.teamConfirmed)) return;
     if (marks.some((m) => horasData[m.staffId] && horasData[m.staffId].paid)) return;
     const markerSet = new Set(marks.map((m) => String(m.staffId)));
@@ -251,7 +271,14 @@ function planLeftovers(horasData, clients, period, ctx, today) {
     const given = marks.reduce((sum, m) => sum + (m.entry.hours || 0) - (m.entry.extraMinutes || 0) / 60, 0);
     const leftoverHours = total - given;
     if (leftoverHours <= 1e-6) return;
-    items.push({ key: `${date}|${clientId}`, date, clientId, markerIds: marks.map((m) => m.staffId), missingIds, leftoverHours });
+    const otherDay = [];
+    missingIds.forEach((mid) => {
+      const he = horasData[mid];
+      ((he && he.entries) || []).forEach((e) => {
+        if (!e.voided && e.clientId === clientId && visitDateOf(e) !== date && sameIsoWeek(e.date, date)) otherDay.push({ staffId: mid, date: e.date, hours: e.hours || 0 });
+      });
+    });
+    items.push({ key: `${date}|${clientId}`, date, clientId, markerIds: marks.map((m) => m.staffId), missingIds, leftoverHours, otherDay });
   });
   return items.sort((a, b) => a.date.localeCompare(b.date) || String(a.clientId).localeCompare(String(b.clientId)));
 }
@@ -262,12 +289,33 @@ function applyLeftovers(horasData, clients, items, ctx) {
     const marked = { ...next };
     it.markerIds.forEach((sid) => {
       marked[sid] = { ...marked[sid], entries: (marked[sid].entries || []).map((e) => (
-        e.date === it.date && e.clientId === it.clientId && !e.voided ? { ...e, teamConfirmed: true } : e
+        visitDateOf(e) === it.date && e.clientId === it.clientId && !e.voided ? { ...e, teamConfirmed: true } : e
       )) };
     });
     next = recomputeSharedHours(marked, clients, it.date, it.clientId, { ctx });
   });
   return next;
+}
+// Junta à visita de `toDate` o lançamento que `staffId` fez do cliente noutro dia
+// (`fromDate`): passa a contar como a mesma visita partilhada (a data em que
+// trabalhou não muda; só fica a substituir `toDate`, como em "Fiz o cliente de
+// outro dia"). Redivide as duas visitas afetadas.
+function joinVisit(horasData, clients, staffId, fromDate, clientId, toDate, ctx) {
+  const h = horasData[staffId];
+  if (!h) return horasData;
+  let oldVisit = null;
+  const entries = (h.entries || []).map((e) => {
+    if (oldVisit === null && !e.voided && e.clientId === clientId && e.date === fromDate && visitDateOf(e) !== toDate) {
+      oldVisit = visitDateOf(e);
+      const { shareReview, conflict, teamConfirmed, solo, soloCheck, splitAdjusted, splitHours, ...rest } = e;
+      return { ...rest, replacesDate: toDate };
+    }
+    return e;
+  });
+  if (oldVisit === null) return horasData;
+  let next = { ...horasData, [staffId]: { ...h, entries } };
+  next = recomputeSharedHours(next, clients, oldVisit, clientId, { ctx });
+  return recomputeSharedHours(next, clients, toDate, clientId, { ctx });
 }
 
 // CONFLITOS: alguém marcou "trabalhei sozinho" e outro colega também marcou o
@@ -321,14 +369,8 @@ function countReviews(horasData, clients, period, ctx, today) {
 function planHoursRecalc(horasData, clients, period, opts = {}) {
   const skip = new Set((opts.skipStaffIds || []).map(String));
   const only = opts.clientIds ? new Set(opts.clientIds) : null;
-  const pairs = new Map();
-  Object.keys(horasData || {}).forEach((sid) => (horasData[sid].entries || []).forEach((e) => {
-    if (e.voided || !e.clientId || !dateStrInPeriod(e.date, period)) return;
-    if (only && !only.has(e.clientId)) return;
-    pairs.set(`${e.date}|${e.clientId}`, [e.date, e.clientId]);
-  }));
   let next = horasData;
-  pairs.forEach(([date, clientId]) => {
+  entryPairs(horasData, period, only).forEach(({ date, clientId }) => {
     next = recomputeSharedHours(next, clients, date, clientId, opts.ctx ? { ctx: opts.ctx } : {});
   });
   // Quem está em `skipStaffIds` volta exatamente ao que era (sem marcas de
@@ -1173,4 +1215,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

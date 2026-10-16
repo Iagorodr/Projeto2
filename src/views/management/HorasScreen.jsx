@@ -6,7 +6,7 @@ import { RADIUS, FONT } from "../../styles/tokens.js";
 import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { TODAY } from "../../models/data.js";
 import {
-  clientById, entryClientName, isPendingClientEntry, recomputeSharedHours, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
+  clientById, entryClientName, isPendingClientEntry, recomputeSharedHours, visitDateOf, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
   weekBlocksOfPayPeriod, calPeriodLabel, boardStaff, countReviews,
@@ -246,14 +246,14 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       const target = h && h.entries[i];
       if (!target) return prev;
       const next = { ...prev, [staffId]: { ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, voided: !e.voided } : e)) } };
-      return target.clientId ? recomputeSharedHours(next, clients, target.date, target.clientId, { ctx }) : next;
+      return target.clientId ? recomputeSharedHours(next, clients, visitDateOf(target), target.clientId, { ctx }) : next;
     });
   }
   // Redividir à mão (linha marcada "rever divisão"): volta à divisão igual
   // entre todos os que fizeram esse cliente nesse dia e limpa a marca.
   function resplitEntry(entry) {
     if (!entry || !entry.clientId) return;
-    setHorasData((prev) => recomputeSharedHours(prev, clients, entry.date, entry.clientId, { ctx }));
+    setHorasData((prev) => recomputeSharedHours(prev, clients, visitDateOf(entry), entry.clientId, { ctx }));
   }
   function startEditRow(i, entry) { setEditingIndex(i); setRowDraft({ clientId: entry.clientId || "", hours: entry.hours }); }
   function cancelEditRow() { setEditingIndex(null); }
@@ -281,10 +281,10 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         },
       };
       if (clientChanged && !old.voided) {
-        if (old.clientId) next = recomputeSharedHours(next, clients, old.date, old.clientId, { ctx });
+        if (old.clientId) next = recomputeSharedHours(next, clients, visitDateOf(old), old.clientId, { ctx });
         const othersSameClient = Object.keys(next).some((sid) => String(sid) !== String(staffId)
-          && (next[sid].entries || []).some((e) => e.date === old.date && e.clientId === newClientId && !e.voided));
-        if (othersSameClient) next = recomputeSharedHours(next, clients, old.date, newClientId, { ctx });
+          && (next[sid].entries || []).some((e) => visitDateOf(e) === visitDateOf(old) && e.clientId === newClientId && !e.voided));
+        if (othersSameClient) next = recomputeSharedHours(next, clients, visitDateOf(old), newClientId, { ctx });
       }
       return next;
     });
@@ -298,7 +298,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     if (!e.clientId || e.voided) return [];
     const list = [];
     staff.forEach((s) => {
-      const other = ((horasData[s.id] && horasData[s.id].entries) || []).find((x) => x.date === e.date && x.clientId === e.clientId && !x.voided);
+      const other = ((horasData[s.id] && horasData[s.id].entries) || []).find((x) => visitDateOf(x) === visitDateOf(e) && x.clientId === e.clientId && !x.voided);
       if (other) list.push({ id: s.id, name: s.name, self: openStaff && s.id === openStaff.id, hoursLabel: fmtHoursScreen(other.hours) });
     });
     return list.length > 1 ? list : [];

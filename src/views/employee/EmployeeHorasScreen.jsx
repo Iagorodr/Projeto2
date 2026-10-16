@@ -6,7 +6,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   clientById, entryClientName, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
-  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, isHorasFrozenOn, getOpenPeriod, getCutoffPeriod,
+  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, visitDateOf, isHorasFrozenOn, getOpenPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
@@ -187,13 +187,14 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // cliente nesse dia (a parte de cada um não depende de o colega marcar).
   const sharedCtx = { staff, assignments, covers, absences };
   function sharedOpts(dateKey) {
-    return { ctx: sharedCtx, isFrozen: (sid, h) => String(sid) !== String(staffId) && isHorasFrozenOn(h, dateKey, cutoffDay, closedPeriods, TODAY) };
+    // Fechado conta pelo dia em que CADA pessoa trabalhou (a sua linha), não pela data da visita.
+    return { ctx: sharedCtx, isFrozen: (sid, h, line) => String(sid) !== String(staffId) && isHorasFrozenOn(h, (line && line.date) || dateKey, cutoffDay, closedPeriods, TODAY) };
   }
-  // Outros que marcaram este cliente neste dia (linhas não anuladas).
+  // Outros que fizeram esta VISITA do cliente (a data agendada; linhas não anuladas).
   function otherMarkers(date, clientId) {
     return Object.keys(horasData).filter((sid) => String(sid) !== String(staffId)
-      && (horasData[sid].entries || []).some((x) => x.date === date && x.clientId === clientId && !x.voided))
-      .map((sid) => ({ sid, entry: horasData[sid].entries.find((x) => x.date === date && x.clientId === clientId && !x.voided) }));
+      && (horasData[sid].entries || []).some((x) => visitDateOf(x) === date && x.clientId === clientId && !x.voided))
+      .map((sid) => ({ sid, entry: horasData[sid].entries.find((x) => visitDateOf(x) === date && x.clientId === clientId && !x.voided) }));
   }
   function namesOf(list) {
     const names = list.map(({ sid }) => ((staff.find((m) => String(m.id) === String(sid)) || {}).name || "").split(" ")[0]).filter(Boolean);
@@ -202,15 +203,15 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // "Trabalhei sozinho": vale logo quando mais ninguém marcou o cliente nesse
   // dia; se alguém marcou, fica em conflito e a gerência decide.
   function soloAllowedFor(entry) {
-    if (!entry || weekLockedFlag || entry.soloCheck || entry.replacesDate || !entry.clientId) return false;
+    if (!entry || weekLockedFlag || entry.soloCheck || !entry.clientId) return false;
     const client = clientById(clients, entry.clientId);
     if (!client || client.hoursMode === "individual") return false;
-    return !!entry.solo || entry.sharedCount > 1 || expectedShare(sharedCtx, client, entry.date, staffId).team > 1;
+    return !!entry.solo || entry.sharedCount > 1 || expectedShare(sharedCtx, client, visitDateOf(entry), staffId).team > 1;
   }
   function toggleSolo(entry) {
     if (weekLockedFlag || !entry) return;
     const turningOn = !entry.solo;
-    const others = turningOn ? otherMarkers(entry.date, entry.clientId) : [];
+    const others = turningOn ? otherMarkers(visitDateOf(entry), entry.clientId) : [];
     setHorasData((prev) => {
       const current = prev[staffId];
       const updated = { ...prev, [staffId]: { ...current, entries: current.entries.map((e) => {
@@ -218,7 +219,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         const { solo, soloCheck, ...rest } = e;
         return turningOn ? { ...rest, solo: true } : rest;
       }) } };
-      return recomputeSharedHours(updated, clients, entry.date, entry.clientId, sharedOpts(entry.date));
+      return recomputeSharedHours(updated, clients, visitDateOf(entry), entry.clientId, sharedOpts(entry.date));
     });
     if (others.length > 0) showToast(t.conflictToastSolo(namesOf(others), others.length));
   }
@@ -240,14 +241,14 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     if (weekLockedFlag) return;
     const client = clientById(clients, clientId);
     if (!client) return;
-    const soloOthers = replacesDate ? [] : otherMarkers(selectedKey, clientId).filter((o) => o.entry.solo && !o.entry.soloCheck);
+    const soloOthers = otherMarkers(replacesDate || selectedKey, clientId).filter((o) => o.entry.solo && !o.entry.soloCheck);
     if (soloOthers.length > 0) showToast(t.conflictToastOther(namesOf(soloOthers), soloOthers.length));
     setHorasData((prev) => {
       const current = prev[staffId] || emptyHoras();
       const entry = { date: selectedKey, clientId, hours: (clientDurationOn(client, replacesDate || selectedKey) || 60) / 60, extra: false, extraMinutes: 0, approved: false, voided: false };
       if (replacesDate) entry.replacesDate = replacesDate;
       const withNew = { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
-      return recomputeSharedHours(withNew, clients, selectedKey, clientId, sharedOpts(selectedKey));
+      return recomputeSharedHours(withNew, clients, replacesDate || selectedKey, clientId, sharedOpts(selectedKey));
     });
   }
   // Cliente fora da lista: nome (e cidade) escritos à mão, sem clientId; as
@@ -272,7 +273,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     const total = client ? clientDurationOn(client, entry.replacesDate || entry.date) / 60 : 0;
     const othersAdjusted = Object.keys(horasData).reduce((sum, sid) => {
       if (String(sid) === String(staffId)) return sum;
-      const o = (horasData[sid].entries || []).find((x) => x.date === entry.date && x.clientId === entry.clientId && !x.voided && x.splitAdjusted);
+      const o = (horasData[sid].entries || []).find((x) => visitDateOf(x) === visitDateOf(entry) && x.clientId === entry.clientId && !x.voided && x.splitAdjusted);
       return sum + (o ? o.splitHours || 0 : 0);
     }, 0);
     return { total, max: Math.max(0, total - othersAdjusted) };
@@ -299,7 +300,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           }),
         },
       };
-      return recomputeSharedHours(withIt, clients, target.date, target.clientId, sharedOpts(target.date));
+      return recomputeSharedHours(withIt, clients, visitDateOf(target), target.clientId, sharedOpts(target.date));
     });
     setSplitTarget(null);
   }
@@ -308,7 +309,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     setHorasData((prev) => {
       const current = prev[staffId];
       const withoutIt = { ...prev, [staffId]: { ...current, entries: current.entries.filter((e) => e !== entry) } };
-      return recomputeSharedHours(withoutIt, clients, entry.date, entry.clientId, sharedOpts(entry.date));
+      return recomputeSharedHours(withoutIt, clients, visitDateOf(entry), entry.clientId, sharedOpts(entry.date));
     });
   }
   function toggleScheduledClient(clientId) {
@@ -333,7 +334,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           }),
         },
       };
-      return recomputeSharedHours(updated, clients, extraTarget.date, extraTarget.clientId, sharedOpts(extraTarget.date));
+      return recomputeSharedHours(updated, clients, visitDateOf(extraTarget), extraTarget.clientId, sharedOpts(extraTarget.date));
     });
     setExtraTarget(null);
   }

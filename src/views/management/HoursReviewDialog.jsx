@@ -5,7 +5,7 @@ import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { TODAY } from "../../models/data.js";
 import {
-  applyLeftovers, clientById, fmtEuro, fmtHoursScreen, fmtNoteDate, isoDateStr, listConflicts, planLeftovers, resolveConflict,
+  applyLeftovers, clientById, fmtEuro, fmtHoursScreen, fmtNoteDate, isoDateStr, joinVisit, listConflicts, planLeftovers, resolveConflict,
 } from "../../models/utils.js";
 import { Button, Pill } from "../shared/ui/index.js";
 
@@ -56,6 +56,9 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
   }
   function decide(c, action, winnerId) {
     onChange(resolveConflict(horasData, clients, c.date, c.clientId, action, winnerId, ctx), t.reviewDoneConflict);
+  }
+  function join(x, o) {
+    onChange(joinVisit(horasData, clients, o.staffId, o.date, x.clientId, x.date, ctx), t.reviewDoneJoin);
   }
   function applyChosen() {
     if (chosen.length === 0) return;
@@ -162,6 +165,14 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
                     <span style={{ display: "block", fontSize: 12.5, color: COLORS.ink2, fontVariantNumeric: "tabular-nums" }}>
                       {t.reviewLeftoverGain(fmtHoursScreen(x.leftoverHours), fmtEuro(gain(x)))}
                     </span>
+                    {(x.otherDay || []).map((o) => (
+                      <span key={`${o.staffId}-${o.date}`} style={{ display: "block", marginTop: 6, fontSize: 12.5, color: COLORS.amberInk, background: COLORS.amberBg, borderRadius: RADIUS.control, padding: "6px 10px" }}>
+                        {t.reviewOtherDay(firstOf(o.staffId), fmtNoteDate(o.date), fmtHoursScreen(o.hours))}
+                        <span style={{ display: "block", marginTop: 6 }}>
+                          <Button variant="secondary" onClick={(ev) => { ev.preventDefault(); join(x, o); }}>{t.reviewJoinBtn(firstOf(o.staffId), fmtNoteDate(x.date))}</Button>
+                        </span>
+                      </span>
+                    ))}
                   </span>
                 </label>
               ))}
