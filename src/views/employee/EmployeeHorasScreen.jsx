@@ -396,10 +396,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const scheduledIds = new Set(scheduledToday.map((c) => c.id));
   function autoTagFor(entry) {
     if (!entry) return undefined;
-    if (entry.autoFrom) {
-      const by = staff.find((x) => x.id === entry.autoFrom);
-      return t.autoByTag(((by && by.name) || "").split(" ")[0]);
-    }
+    // Sem etiqueta "Automático · por X": a dupla só é automática na montagem da
+    // agenda (decisão de 16/10/2026). As linhas antigas com `autoFrom` aparecem
+    // como qualquer outra.
     if (partnerAutoEntry(entry)) return t.alsoMarkedTag(partner.name.split(" ")[0]);
     return undefined;
   }
