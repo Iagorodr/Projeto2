@@ -10,7 +10,7 @@ import {
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
-  staffStartedOn, absenceOn, clientDurationOn, findByName,
+  staffStartedOn, absenceOn, clientDurationOn, findByName, expectedShare,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -183,8 +183,44 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // semana/mês fechado fica como está (a gerência corrige depois, ver
   // `recomputeSharedHours`); o próprio nunca conta como fechado aqui — as
   // ações já saem cedo se a semana dele estiver trancada.
+  // `ctx` = a agenda: a divisão conta também com quem a agenda diz que faz o
+  // cliente nesse dia (a parte de cada um não depende de o colega marcar).
+  const sharedCtx = { staff, assignments, covers, absences };
   function sharedOpts(dateKey) {
-    return { isFrozen: (sid, h) => String(sid) !== String(staffId) && isHorasFrozenOn(h, dateKey, cutoffDay, closedPeriods, TODAY) };
+    return { ctx: sharedCtx, isFrozen: (sid, h) => String(sid) !== String(staffId) && isHorasFrozenOn(h, dateKey, cutoffDay, closedPeriods, TODAY) };
+  }
+  // Outros que marcaram este cliente neste dia (linhas não anuladas).
+  function otherMarkers(date, clientId) {
+    return Object.keys(horasData).filter((sid) => String(sid) !== String(staffId)
+      && (horasData[sid].entries || []).some((x) => x.date === date && x.clientId === clientId && !x.voided))
+      .map((sid) => ({ sid, entry: horasData[sid].entries.find((x) => x.date === date && x.clientId === clientId && !x.voided) }));
+  }
+  function namesOf(list) {
+    const names = list.map(({ sid }) => ((staff.find((m) => String(m.id) === String(sid)) || {}).name || "").split(" ")[0]).filter(Boolean);
+    return names.length > 1 ? `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}` : (names[0] || "");
+  }
+  // "Trabalhei sozinho": vale logo quando mais ninguém marcou o cliente nesse
+  // dia; se alguém marcou, fica em conflito e a gerência decide.
+  function soloAllowedFor(entry) {
+    if (!entry || weekLockedFlag || entry.soloCheck || entry.replacesDate || !entry.clientId) return false;
+    const client = clientById(clients, entry.clientId);
+    if (!client || client.hoursMode === "individual") return false;
+    return !!entry.solo || entry.sharedCount > 1 || expectedShare(sharedCtx, client, entry.date, staffId).team > 1;
+  }
+  function toggleSolo(entry) {
+    if (weekLockedFlag || !entry) return;
+    const turningOn = !entry.solo;
+    const others = turningOn ? otherMarkers(entry.date, entry.clientId) : [];
+    setHorasData((prev) => {
+      const current = prev[staffId];
+      const updated = { ...prev, [staffId]: { ...current, entries: current.entries.map((e) => {
+        if (e !== entry) return e;
+        const { solo, soloCheck, ...rest } = e;
+        return turningOn ? { ...rest, solo: true } : rest;
+      }) } };
+      return recomputeSharedHours(updated, clients, entry.date, entry.clientId, sharedOpts(entry.date));
+    });
+    if (others.length > 0) showToast(t.conflictToastSolo(namesOf(others), others.length));
   }
   function dayTotalHours(dateKey) { return myHoras.entries.filter((e) => e.date === dateKey && !e.voided).reduce((s, e) => s + e.hours, 0); }
   function goChunk(delta) {
@@ -204,6 +240,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     if (weekLockedFlag) return;
     const client = clientById(clients, clientId);
     if (!client) return;
+    const soloOthers = replacesDate ? [] : otherMarkers(selectedKey, clientId).filter((o) => o.entry.solo && !o.entry.soloCheck);
+    if (soloOthers.length > 0) showToast(t.conflictToastOther(namesOf(soloOthers), soloOthers.length));
     setHorasData((prev) => {
       const current = prev[staffId] || emptyHoras();
       const entry = { date: selectedKey, clientId, hours: (clientDurationOn(client, replacesDate || selectedKey) || 60) / 60, extra: false, extraMinutes: 0, approved: false, voided: false };
@@ -361,6 +399,11 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // cartão por lançamento manual (adicionado à parte ou adiantado PARA
   // este dia) que não faz parte da agenda do dia.
   const scheduledIds = new Set(scheduledToday.map((c) => c.id));
+  // Cartão ainda por marcar: a MINHA parte prevista (duração ÷ equipa da agenda).
+  function expectedSubtitle(client) {
+    const sh = expectedShare(sharedCtx, client, selectedKey, staffId);
+    return fmtMinutes(sh.minutes) + (sh.team > 1 ? ` · ${t.sharedWith(sh.team - 1)}` : "");
+  }
   const scheduledCards = scheduledToday.map((client) => {
     const advancedAway = myHoras.entries.find((e) => !e.voided && e.clientId === client.id && e.replacesDate === selectedKey);
     if (advancedAway) {
@@ -382,9 +425,10 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     const entry = entriesForDay.find((e) => e.clientId === client.id);
     return {
       id: `sched-${client.id}`, clientId: client.id, name: client.name,
-      subtitle: entry ? subtitleFor(entry) : fmtMinutes(client.duration),
+      subtitle: entry ? subtitleFor(entry) : expectedSubtitle(client),
       checked: !!entry, entry,
       extraPill: entry && entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
+      soloAllowed: soloAllowedFor(entry), soloActive: !!(entry && entry.solo), conflict: !!(entry && entry.conflict),
     };
   });
   const adHocCards = entriesForDay.filter((e) => !scheduledIds.has(e.clientId)).map((entry, ai) => {
@@ -393,6 +437,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       id: `adhoc-${entry.clientId}-${entry.date}-${ai}`, clientId: entry.clientId, name: entryClientName(clients, entry), isCustom,
       subtitle: isCustom ? `${subtitleFor(entry)} · ${t.customClientPending}` : subtitleFor(entry), checked: true, entry,
       extraPill: entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
+      soloAllowed: soloAllowedFor(entry), soloActive: !!entry.solo, conflict: !!entry.conflict,
     };
   });
   const dayCards = [...scheduledCards, ...adHocCards];
@@ -670,7 +715,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
 
             <DayPanel
               title={`${weekdayFull[selectedDate.getDay()]}, ${dmOf(selectedDate)}`}
-              forecastLabel={hasAgendaToday && !weekLockedFlag ? t.forecast(fmtHoursScreen(scheduledToday.reduce((s, c) => s + c.duration / 60, 0))) : undefined}
+              forecastLabel={hasAgendaToday && !weekLockedFlag ? t.forecast(fmtHoursScreen(scheduledToday.reduce((s, c) => s + expectedShare(sharedCtx, c, selectedKey, staffId).minutes / 60, 0))) : undefined}
               lockBadge={weekLockedFlag ? `🔒 ${t.weekDoneTag}` : undefined}
               emptyState={
                 markedNoClient ? (
@@ -707,6 +752,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                   onExtraTime={card.checked && card.entry ? () => openExtra(card.entry) : undefined}
                   onAdjustSplit={card.checked && card.entry && card.entry.sharedCount > 1 ? () => openSplit(card.entry) : undefined}
                   adjustSplitLabel={t.adjustSplit}
+                  onSolo={card.checked && card.soloAllowed ? () => toggleSolo(card.entry) : undefined}
+                  soloLabel={t.soloButton} soloUndoLabel={t.soloUndo} soloActive={card.soloActive} soloTag={t.soloTag}
+                  conflictTag={card.conflict ? t.conflictTag : undefined}
                   extraTimeLabel={t.extraTimeButton}
                 />
               ))}

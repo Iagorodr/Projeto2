@@ -4,7 +4,7 @@ import { FONT, RADIUS, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint, useControlSize } from "../../hooks/useBreakpoint.js";
 import {
-  dayScheduledClients, thisWeekSummary, periodMissingDays, staffWithGapsCount, isStaffActive,
+  dayScheduledClients, thisWeekSummary, periodMissingDays, staffWithGapsCount, isStaffActive, expectedShare,
   fmtHoursScreen, pad2, isoDateStr, notesForOwner, fmtNoteDate,
   getOpenPeriod, weekBlocksOfPayPeriod, staffTotalPay, staffTotalHours, fmtEuro, calPeriodLabel,
   isSupervisorRole,
@@ -60,7 +60,10 @@ function EmployeeInicioScreen({
   // Etapa 4j (4.9): um dia já fora da validade de uma conta Replacement
   // mostra-se como "sem clientes", mesmo que a atribuição ainda exista.
   const todayClients = isStaffActive(me, TODAY) ? dayScheduledClients(clients, assignments, me.id, TODAY, covers) : [];
-  const totalTodayHours = todayClients.reduce((s, c) => s + (c.duration || 0) / 60, 0);
+  // A minha parte prevista (duração ÷ equipa da agenda), não a duração inteira do cliente.
+  const shareCtx = { staff, assignments, covers, absences };
+  const shareMinutes = (c) => expectedShare(shareCtx, c, todayKey, me.id).minutes;
+  const totalTodayHours = todayClients.reduce((s, c) => s + shareMinutes(c) / 60, 0);
   function isClientCheckedToday(clientId) {
     return (horasEntry.entries || []).some(
       (e) => !e.voided && e.clientId === clientId && (e.date === todayKey || e.replacesDate === todayKey)
@@ -68,7 +71,7 @@ function EmployeeInicioScreen({
   }
 
   // --- "Esta semana" ---
-  const week = thisWeekSummary(clients, assignments, me.id, horasEntry, TODAY, me, covers);
+  const week = thisWeekSummary(clients, assignments, me.id, horasEntry, TODAY, me, covers, { staff, assignments, covers, absences });
 
   // --- "Precisa da sua atenção" ---
   const payPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
@@ -146,7 +149,7 @@ function EmployeeInicioScreen({
               <ClientCheckCard
                 key={cl.id}
                 name={cl.name}
-                subtitle={tHoras.forecast(fmtHoursScreen((cl.duration || 0) / 60))}
+                subtitle={tHoras.forecast(fmtHoursScreen(shareMinutes(cl) / 60))}
                 checked={isClientCheckedToday(cl.id)}
                 readOnly
               />

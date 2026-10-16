@@ -19,6 +19,7 @@ import { Pill } from "../Pill.jsx";
 function ClientCheckCard({
   name, subtitle, checked, onToggle, onExtraTime, extraTimeLabel = "Fiz mais tempo",
   extraPill, readOnly, dimmed, dimmedNote, onAdjustSplit, adjustSplitLabel,
+  onSolo, soloLabel, soloActive, soloTag, soloUndoLabel, conflictTag,
 }) {
   return (
     <div
@@ -51,12 +52,22 @@ function ClientCheckCard({
           {dimmed && dimmedNote ? dimmedNote : subtitle}
         </div>
         {extraPill && <div style={{ marginTop: 6 }}><Pill variant="pending">{extraPill}</Pill></div>}
+        {conflictTag && <div style={{ marginTop: 6 }}><Pill variant="pending">{conflictTag}</Pill></div>}
+        {soloActive && soloTag && <div style={{ marginTop: 6 }}><Pill variant="paid">{soloTag}</Pill></div>}
         {!readOnly && !dimmed && onAdjustSplit && (
           <button
             type="button" onClick={onAdjustSplit}
             style={{ marginTop: 6, padding: 0, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
           >
             {adjustSplitLabel}
+          </button>
+        )}
+        {!readOnly && !dimmed && onSolo && (
+          <button
+            type="button" onClick={onSolo}
+            style={{ marginTop: 6, marginRight: 14, padding: 0, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
+          >
+            {soloActive ? soloUndoLabel : soloLabel}
           </button>
         )}
       </div>

@@ -7,7 +7,7 @@ import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, parseDMY, getOpenPeriod, unseenAvisosCount, formatPeriodLabel, staffTotalHours, staffTotalPay,
   recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
-  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM,
+  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
 import {
@@ -99,7 +99,7 @@ function PendingRow({ icon: Icon, label, count, amber, onClick, okLabel, last })
 // cartão de Notas (o documento pede explicitamente que o duplicado
 // desapareça) e os dois gráficos de 6 períodos (2.14) no lugar dos SVGs
 // antigos.
-function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, highlightsMonths = 3, highlightsRealtime = false, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, absences, onNavigate }) {
+function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, highlightsMonths = 3, highlightsRealtime = false, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, absences, assignments, covers, onNavigate }) {
   const t = T[lang].dashboard;
   const tAbs = T[lang].absences;
   const absencesPending = (absences || []).filter((a) => !a.handled && a.date >= isoDateStr(TODAY)).length;
@@ -141,6 +141,8 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     return acc;
   }, { pending: 0, paid: 0, unpaid: 0 });
 
+  // Conflitos ("trabalhei sozinho" vs. colega) e horas soltas por confirmar — ver Horas > Revisões.
+  const hoursReviews = countReviews(horasData, clients, currentPeriod, { staff, assignments, covers, absences }, isoDateStr(TODAY));
   let overtimePending = 0, reopenedCount = 0, customClientPending = 0, shareReviewPending = 0;
   Object.values(horasData).forEach((data) => {
     if (data.reopened) reopenedCount += 1;
@@ -327,6 +329,8 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           <PendingRow icon={Clock} label={t.pendingOvertime} count={overtimePending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
           <PendingRow icon={Clock} label={t.pendingCustomClient} count={customClientPending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
           <PendingRow icon={Clock} label={t.pendingShareReview} count={shareReviewPending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
+          <PendingRow icon={Clock} label={t.pendingHoursConflicts} count={hoursReviews.conflicts} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
+          <PendingRow icon={Clock} label={t.pendingLeftovers} count={hoursReviews.leftovers} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
           <PendingRow icon={Undo2} label={t.pendingReopened} count={reopenedCount} onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
           <PendingRow icon={Bell} label={t.pendingUnread} count={pendingRequests} onClick={() => onNavigate("avisos")} okLabel={t.pendingAllOk} />
           {/* "Contratos a vencer -> Clientes (filtro)": a navegação ainda não

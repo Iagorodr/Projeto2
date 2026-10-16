@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, Pencil, X, RotateCcw } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -9,7 +9,7 @@ import {
   clientById, entryClientName, isPendingClientEntry, recomputeSharedHours, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
-  weekBlocksOfPayPeriod, calPeriodLabel, boardStaff,
+  weekBlocksOfPayPeriod, calPeriodLabel, boardStaff, countReviews,
 } from "../../models/utils.js";
 import { formatTodayLabel, T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf, exportPeriodSummaryPdf } from "../../models/pdfExport.js";
@@ -20,6 +20,7 @@ import {
 import { LANG_NAMES } from "../../models/data.js";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
 import RecalcHoursDialog from "./RecalcHoursDialog.jsx";
+import HoursReviewDialog from "./HoursReviewDialog.jsx";
 
 // "2026-09-20" -> Date local (meia-noite), igual ao resto do app faz com
 // datas ISO vindas de `horasData`.
@@ -66,7 +67,7 @@ function groupEntriesByBlock(entries, payPeriodChunks, lang) {
 // filtro, `DataTable`, gaveta de 640 (em vez do modal centrado) com os
 // lançamentos agrupados por bloco do período, e confirmação escrita para
 // "Reabrir" (que antes agia direto, sem perguntar nada).
-function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHorasData, cutoffDay, closedPeriods, setClosedPeriods, sentItems, missingItems, setSentItems, setMissingItems }) {
+function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHorasData, cutoffDay, closedPeriods, setClosedPeriods, sentItems, missingItems, setSentItems, setMissingItems, assignments = {}, covers = [], absences = [] }) {
   const t = T[lang].horas;
   const c0 = T[lang].common;
   const pdfT = T[lang].pdf;
@@ -82,6 +83,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const [closedToast, setClosedToast] = useState(false);
   const [recalcOpen, setRecalcOpen] = useState(false);
   const [recalcToast, setRecalcToast] = useState(null); // mensagem do aviso após recalcular
+  const [reviewOpen, setReviewOpen] = useState(false);
   // Lote 4, 4.4 (achado da Marta: "Como conferir" pede setas, Exportar PDF,
   // Fechar período, idioma e Pago com a MESMA altura e raio 12 a 1366px).
   // As setas do navegador de período eram círculos (raio "50%") de 40×40
@@ -135,6 +137,16 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   // conta de teste com 0h no período não trava mais o fecho.
   const unpaidForClose = board.filter((s) => staffTotalHours(horasData[s.id] || { entries: [] }, period) > 0 && !horasData[s.id]?.paid).length;
   const canClosePeriod = board.length > 0 && unpaidForClose === 0;
+  // A divisão das horas conta também com quem a AGENDA diz que faz o cliente
+  // (staff, agenda, coberturas, faltas) — ver `expectedTeamIds` em utils.js.
+  const ctx = useMemo(() => ({ staff, assignments, covers, absences }), [staff, assignments, covers, absences]);
+  // Revisões em aberto: conflitos ("trabalhei sozinho" vs. colega) e dias com
+  // horas soltas por confirmar. Só no período aberto.
+  const reviews = useMemo(
+    () => (monthOffset === 0 ? countReviews(horasData, clients, period, ctx, isoDateStr(TODAY)) : { conflicts: 0, leftovers: 0 }),
+    [monthOffset, horasData, clients, period, ctx],
+  );
+  const reviewCount = reviews.conflicts + reviews.leftovers;
 
   const CHIP_FILTERS = {
     todos: () => true,
@@ -234,14 +246,14 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       const target = h && h.entries[i];
       if (!target) return prev;
       const next = { ...prev, [staffId]: { ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, voided: !e.voided } : e)) } };
-      return target.clientId ? recomputeSharedHours(next, clients, target.date, target.clientId) : next;
+      return target.clientId ? recomputeSharedHours(next, clients, target.date, target.clientId, { ctx }) : next;
     });
   }
   // Redividir à mão (linha marcada "rever divisão"): volta à divisão igual
   // entre todos os que fizeram esse cliente nesse dia e limpa a marca.
   function resplitEntry(entry) {
     if (!entry || !entry.clientId) return;
-    setHorasData((prev) => recomputeSharedHours(prev, clients, entry.date, entry.clientId));
+    setHorasData((prev) => recomputeSharedHours(prev, clients, entry.date, entry.clientId, { ctx }));
   }
   function startEditRow(i, entry) { setEditingIndex(i); setRowDraft({ clientId: entry.clientId || "", hours: entry.hours }); }
   function cancelEditRow() { setEditingIndex(null); }
@@ -262,17 +274,17 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
           ...h,
           entries: h.entries.map((e, idx) => {
             if (idx !== i) return e;
-            const { splitAdjusted, splitHours, shareReview, sharedCount, ...base } = e;
+            const { splitAdjusted, splitHours, shareReview, sharedCount, teamConfirmed, conflict, solo, soloCheck, ...base } = e;
             const kept = clientChanged ? base : e;
             return { ...kept, clientId: newClientId, custom: rowDraft.clientId ? undefined : e.custom, hours: Number(rowDraft.hours) || 0, approved: e.extra ? false : e.approved };
           }),
         },
       };
       if (clientChanged && !old.voided) {
-        if (old.clientId) next = recomputeSharedHours(next, clients, old.date, old.clientId);
+        if (old.clientId) next = recomputeSharedHours(next, clients, old.date, old.clientId, { ctx });
         const othersSameClient = Object.keys(next).some((sid) => String(sid) !== String(staffId)
           && (next[sid].entries || []).some((e) => e.date === old.date && e.clientId === newClientId && !e.voided));
-        if (othersSameClient) next = recomputeSharedHours(next, clients, old.date, newClientId);
+        if (othersSameClient) next = recomputeSharedHours(next, clients, old.date, newClientId, { ctx });
       }
       return next;
     });
@@ -404,6 +416,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
           <FilterChip active={activeChip === "pagos"} onClick={() => setActiveChip("pagos")} count={kpiCounts.paid}>{t.kpiPaid}</FilterChip>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {monthOffset === 0 && <Button variant={reviewCount > 0 ? "primary" : "secondary"} onClick={() => setReviewOpen(true)}>{t.reviewButton(reviewCount)}</Button>}
           {monthOffset === 0 && <Button variant="secondary" onClick={() => setRecalcOpen(true)}>{t.recalcButton}</Button>}
           <SearchField value={staffSearch} onChange={setStaffSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
         </div>
@@ -482,7 +495,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                             key={i}
                             style={{
                               borderRadius: RADIUS.chip, border: `1px solid ${COLORS.line}`, padding: "10px 12px",
-                              background: e.voided ? COLORS.lineSoft : ((e.extra && !e.approved) || pendingClient || e.shareReview) ? COLORS.amberBg
+                              background: e.voided ? COLORS.lineSoft : ((e.extra && !e.approved) || pendingClient || e.shareReview || e.conflict) ? COLORS.amberBg
                                 : (e.extra && e.approved) ? COLORS.okTint : (e.splitAdjusted && e.sharedCount > 1) ? "#E4ECFA" : COLORS.card,
                               opacity: e.voided ? 0.6 : 1,
                             }}
@@ -523,6 +536,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                         );
                                       })()}
                                       {pendingClient && <Pill variant="pending">{t.clientPendingTag}</Pill>}
+                                      {e.conflict && <Pill variant="pending">{t.conflictTag}</Pill>}
+                                      {e.solo && !e.conflict && <Pill variant="paid">{t.soloRowTag}</Pill>}
                                       {e.shareReview && (
                                         <>
                                           <Pill variant="pending">{t.shareReviewTag}</Pill>
@@ -565,7 +580,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       <ConfirmDialog
         open={closeConfirmOpen}
         title={t.closeConfirmTitle}
-        body={t.closeConfirmBody(periodLabel, fmtHoursScreen(periodTotalHours), fmtEuro(periodTotalEuros))}
+        body={t.closeConfirmBody(periodLabel, fmtHoursScreen(periodTotalHours), fmtEuro(periodTotalEuros)) + (reviewCount > 0 ? ` ${t.reviewCloseWarn(reviews.conflicts, reviews.leftovers)}` : "")}
         cancelLabel={c0.cancel}
         confirmLabel={t.confirmClose}
         onCancel={() => setCloseConfirmOpen(false)}
@@ -591,7 +606,17 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
           setRecalcToast(t.recalcDone(n));
           setTimeout(() => setRecalcToast(null), 5000);
         }}
-        horasData={horasData} clients={clients} staff={staff} period={period} t={t}
+        horasData={horasData} clients={clients} staff={staff} period={period} t={t} ctx={ctx}
+      />
+      <HoursReviewDialog
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        onChange={(next, msg) => {
+          setHorasData(next);
+          setRecalcToast(msg);
+          setTimeout(() => setRecalcToast(null), 5000);
+        }}
+        horasData={horasData} clients={clients} staff={staff} period={period} ctx={ctx} t={t}
       />
       {closedToast && <Toast message={t.closedToast} onDismiss={() => setClosedToast(false)} closeLabel={c0.close} />}
       {recalcToast && <Toast message={recalcToast} onDismiss={() => setRecalcToast(null)} closeLabel={c0.close} />}

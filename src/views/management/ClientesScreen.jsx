@@ -133,7 +133,7 @@ function FeedbackHistory({ t, items }) {
 function ClientesScreen({
   lang, setLang, clients, setClients, onDeleteClient,
   staff = [], assignments = {}, horasData = {}, setHorasData, cutoffDay = 25, closedPeriods = [], contractAlertDays = 30,
-  onNavigate, sentItems = [], navIntent = null,
+  onNavigate, sentItems = [], navIntent = null, covers = [], absences = [],
 }) {
   const t = T[lang].clientes;
   const c0 = T[lang].common;
@@ -167,10 +167,12 @@ function ClientesScreen({
   const [recalcClientId, setRecalcClientId] = useState(null);
 
   const period = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
+  // A divisão das horas conta também com quem a agenda diz que faz o cliente (ver `expectedTeamIds`).
+  const hoursCtx = { staff, assignments, covers, absences };
   const paidStaffIds = Object.keys(horasData).filter((sid) => horasData[sid] && horasData[sid].paid);
   const recalcClient = recalcClientId ? clients.find((c) => c.id === recalcClientId) : null;
   const recalcPlan = recalcClient && setHorasData
-    ? planHoursRecalc(horasData, clients, period, { skipStaffIds: paidStaffIds, clientIds: [recalcClient.id] })
+    ? planHoursRecalc(horasData, clients, period, { skipStaffIds: paidStaffIds, clientIds: [recalcClient.id], ctx: hoursCtx })
     : null;
   const recalcLines = recalcPlan ? recalcPlan.changes.length : 0;
   const recalcDeltaH = recalcPlan ? recalcPlan.changes.reduce((s, c) => s + (c.newHours - c.oldHours), 0) : 0;
@@ -238,7 +240,7 @@ function ClientesScreen({
         || (updated.hoursMode || "dividida") !== (openClient.hoursMode || "dividida");
       if (durationChanged && setHorasData) {
         const nextClients = clients.map((c) => (c.id === openClient.id ? updated : c));
-        const plan = planHoursRecalc(horasData, nextClients, period, { skipStaffIds: paidStaffIds, clientIds: [openClient.id] });
+        const plan = planHoursRecalc(horasData, nextClients, period, { skipStaffIds: paidStaffIds, clientIds: [openClient.id], ctx: hoursCtx });
         if (plan.changes.length > 0) setRecalcClientId(openClient.id);
       }
     }

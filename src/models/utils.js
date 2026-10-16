@@ -101,7 +101,7 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
       if (isFrozen && isFrozen(sid, horasDataObj[sid])) return;
       nextInd[sid] = { ...horasDataObj[sid], entries: list.map((e) => {
         if (e.date === date && e.clientId === clientId && !e.voided) {
-          const { splitAdjusted, splitHours, shareReview, ...rest } = e;
+          const { splitAdjusted, splitHours, shareReview, conflict, ...rest } = e;
           return { ...rest, hours: baseDuration + (e.extraMinutes || 0) / 60, sharedCount: 1 };
         }
         return e;
@@ -113,15 +113,34 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
     (horasDataObj[sid].entries || []).some((e) => e.date === date && e.clientId === clientId && !e.voided)
   );
   const frozenIds = new Set(isFrozen ? staffIdsInvolved.filter((sid) => isFrozen(sid, horasDataObj[sid])) : []);
-  const count = staffIdsInvolved.length || 1;
   const entryOf = (sid) => horasDataObj[sid].entries.find((x) => x.date === date && x.clientId === clientId && !x.voided);
+  // "Trabalhei sozinho" (`solo`): vale logo (horas inteiras) quando mais
+  // ninguém marcou esse cliente nesse dia. Se outro colega também marcou, é um
+  // CONFLITO: ninguém ganha até a gerência rever (`soloCheck`), e entretanto
+  // cada um fica com a parte dividida (o total nunca passa do que o cliente
+  // tem). `soloCheck:"ok"` = a gerência confirmou que o `solo` vale.
+  const markersCount = staffIdsInvolved.length;
+  const conflict = markersCount > 1 && staffIdsInvolved.some((sid) => entryOf(sid).solo && !entryOf(sid).soloCheck);
+  const honored = new Set(staffIdsInvolved.filter((sid) => entryOf(sid).solo && (markersCount === 1 || entryOf(sid).soloCheck === "ok")));
+  const sharers = staffIdsInvolved.filter((sid) => !honored.has(sid));
+  // Equipa ESPERADA (agenda): quem a agenda diz que faz este cliente neste dia
+  // e ainda não marcou conta na divisão — assim a parte de cada um fica estável
+  // mesmo que o colega se esqueça de marcar. A sobra só passa para quem marcou
+  // quando a gerência confirma (`teamConfirmed`, ver `planLeftovers`).
+  // Lançamento adiantado (`replacesDate`) não cruza com a agenda desse dia.
+  const advance = staffIdsInvolved.some((sid) => entryOf(sid).replacesDate);
+  const expectedIds = opts.ctx && !advance && sharers.length > 0 ? expectedTeamIds(opts.ctx, client, date) : [];
+  const sharerSet = new Set(sharers.map(String));
+  const missing = expectedIds.filter((id) => !sharerSet.has(String(id)) && !honored.has(String(id)));
+  const confirmedTeam = sharers.length > 0 && sharers.every((sid) => entryOf(sid).teamConfirmed);
+  const count = Math.max(1, sharers.length + (confirmedTeam ? 0 : missing.length));
   // Divisão: igual por padrão. Quem ajustou a própria parte (`splitAdjusted`
   // + `splitHours`, base sem extra) fica com o valor escolhido; o restante do
   // total do cliente divide-se por igual entre os que não ajustaram. A soma
   // das partes ajustadas nunca passa do total do cliente.
   const adjustedBase = {};
   let adjustedSum = 0, adjustedCount = 0;
-  staffIdsInvolved.forEach((sid) => {
+  sharers.forEach((sid) => {
     if (frozenIds.has(sid)) return;
     const e = entryOf(sid);
     if (count > 1 && e && e.splitAdjusted && typeof e.splitHours === "number") {
@@ -134,17 +153,21 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
   const perPerson = restCount > 0 ? Math.max(0, baseDuration - adjustedSum) / restCount : baseDuration / count;
   // Fecho desatualizado: alguém com a semana fechada que foi gravado com outro
   // nº de pessoas (ex.: fechou sozinho com 4h e depois um colega marcou o mesmo).
-  const needsReview = [...frozenIds].some((sid) => (entryOf(sid).sharedCount || 1) !== count);
+  const needsReview = [...frozenIds].some((sid) => (entryOf(sid).sharedCount || 1) !== (honored.has(sid) ? 1 : count));
   const next = { ...horasDataObj };
   staffIdsInvolved.forEach((sid) => {
     next[sid] = {
       ...next[sid],
       entries: next[sid].entries.map((e) => {
         if (e.date === date && e.clientId === clientId && !e.voided) {
-          const { shareReview, ...clean } = e;
-          const flag = needsReview ? { shareReview: true } : {};
+          const { shareReview, conflict: wasConflict, ...clean } = e;
+          const flag = { ...(needsReview ? { shareReview: true } : {}), ...(conflict ? { conflict: true } : {}) };
           if (frozenIds.has(sid)) return { ...clean, ...flag };
           const extraH = (e.extraMinutes || 0) / 60;
+          if (honored.has(sid)) {
+            const { splitAdjusted, splitHours, ...full } = clean;
+            return { ...full, ...flag, hours: baseDuration + extraH, sharedCount: 1 };
+          }
           const base = adjustedBase[sid] !== undefined ? adjustedBase[sid] : perPerson;
           return { ...clean, ...flag, hours: base + extraH, sharedCount: count };
         }
@@ -153,6 +176,134 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
     };
   });
   return next;
+}
+
+// --- Equipa esperada, horas soltas e conflitos ------------------------------
+function dateFromIso(iso) { const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); }
+
+// Quem a AGENDA diz que faz `client` na data ISO: tem o cliente na agenda
+// efetiva do dia (semana-tipo + coberturas), está ativo e já começou, não
+// avisou falta e o cliente tem visita nesse dia (frequência).
+// `ctx` = { staff, assignments, covers, absences }.
+function expectedTeamIds(ctx, client, isoDate) {
+  if (!ctx || !client || !Array.isArray(ctx.staff)) return [];
+  const d = dateFromIso(isoDate);
+  if (!clientAppliesOnDate(client, d)) return [];
+  return ctx.staff
+    .filter((s) => isStaffActive(s, d) && staffStartedOn(s, d)
+      && !absenceOn(ctx.absences, s.id, isoDate)
+      && agendaClientIdsOn(ctx.assignments, ctx.covers, s.id, isoDate).includes(client.id))
+    .map((s) => s.id);
+}
+
+// Parte PREVISTA de `staffId` num cliente/dia pela agenda: duração ÷ equipa
+// esperada (cliente "individual" = duração inteira). { minutes, team }.
+function expectedShare(ctx, client, isoDate, staffId) {
+  const dur = clientDurationOn(client, isoDate);
+  if (!client || client.hoursMode === "individual") return { minutes: dur, team: 1 };
+  const ids = expectedTeamIds(ctx, client, isoDate).map(String);
+  const team = Math.max(1, ids.includes(String(staffId)) ? ids.length : ids.length + 1);
+  return { minutes: Math.round(dur / team), team };
+}
+
+// Pares (dia|cliente) com linhas não anuladas dentro do período (ou em todo o horasData).
+function entryPairs(horasData, period, only) {
+  const pairs = new Map();
+  Object.keys(horasData || {}).forEach((sid) => ((horasData[sid] && horasData[sid].entries) || []).forEach((e) => {
+    if (e.voided || !e.clientId) return;
+    if (period && !dateStrInPeriod(e.date, period)) return;
+    if (only && !only.has(e.clientId)) return;
+    pairs.set(`${e.date}|${e.clientId}`, { date: e.date, clientId: e.clientId });
+  }));
+  return [...pairs.values()];
+}
+function markersOf(horasData, date, clientId) {
+  const out = [];
+  Object.keys(horasData || {}).forEach((sid) => {
+    const e = ((horasData[sid] && horasData[sid].entries) || []).find((x) => x.date === date && x.clientId === clientId && !x.voided);
+    if (e) out.push({ staffId: sid, entry: e });
+  });
+  return out;
+}
+
+// HORAS SOLTAS: dias em que a agenda esperava mais gente do que a que marcou
+// e por isso sobra parte da duração do cliente (o colega não marcou, provavelmente
+// não foi). A gerência decide se essa sobra passa para quem marcou.
+// Devolve [{ key, date, clientId, markerIds, missingIds, leftoverHours }]; só
+// dias já passados (≤ `today`, ISO), cliente "dividida", sem conflito/solo e
+// sem ninguém já pago. Aplicar = `applyLeftovers`.
+function planLeftovers(horasData, clients, period, ctx, today) {
+  const todayIso = typeof today === "string" ? today : isoDateStr(today || new Date());
+  const items = [];
+  entryPairs(horasData, period).forEach(({ date, clientId }) => {
+    if (date > todayIso) return;
+    const client = clientById(clients, clientId);
+    if (!client || client.hoursMode === "individual") return;
+    const marks = markersOf(horasData, date, clientId);
+    if (marks.length === 0) return;
+    if (marks.some((m) => m.entry.replacesDate || m.entry.solo || m.entry.conflict)) return;
+    if (marks.every((m) => m.entry.teamConfirmed)) return;
+    if (marks.some((m) => horasData[m.staffId] && horasData[m.staffId].paid)) return;
+    const markerSet = new Set(marks.map((m) => String(m.staffId)));
+    const missingIds = expectedTeamIds(ctx, client, date).filter((id) => !markerSet.has(String(id)));
+    if (missingIds.length === 0) return;
+    const total = clientDurationOn(client, date) / 60;
+    const given = marks.reduce((sum, m) => sum + (m.entry.hours || 0) - (m.entry.extraMinutes || 0) / 60, 0);
+    const leftoverHours = total - given;
+    if (leftoverHours <= 1e-6) return;
+    items.push({ key: `${date}|${clientId}`, date, clientId, markerIds: marks.map((m) => m.staffId), missingIds, leftoverHours });
+  });
+  return items.sort((a, b) => a.date.localeCompare(b.date) || String(a.clientId).localeCompare(String(b.clientId)));
+}
+// Confirma que, nesses dias, a equipa foi só quem marcou: a sobra passa para eles.
+function applyLeftovers(horasData, clients, items, ctx) {
+  let next = horasData;
+  items.forEach((it) => {
+    const marked = { ...next };
+    it.markerIds.forEach((sid) => {
+      marked[sid] = { ...marked[sid], entries: (marked[sid].entries || []).map((e) => (
+        e.date === it.date && e.clientId === it.clientId && !e.voided ? { ...e, teamConfirmed: true } : e
+      )) };
+    });
+    next = recomputeSharedHours(marked, clients, it.date, it.clientId, { ctx });
+  });
+  return next;
+}
+
+// CONFLITOS: alguém marcou "trabalhei sozinho" e outro colega também marcou o
+// mesmo cliente no mesmo dia. [{ key, date, clientId, marks:[{staffId, solo, hours}] }].
+function listConflicts(horasData) {
+  const out = [];
+  entryPairs(horasData).forEach(({ date, clientId }) => {
+    const marks = markersOf(horasData, date, clientId);
+    if (marks.length > 1 && marks.some((m) => m.entry.conflict)) {
+      out.push({ key: `${date}|${clientId}`, date, clientId, marks: marks.map((m) => ({ staffId: m.staffId, solo: !!m.entry.solo, hours: m.entry.hours || 0 })) });
+    }
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+// Decisão da gerência sobre um conflito:
+//   action "only"  (+ winnerId) — só essa pessoa fez: as outras linhas ficam anuladas;
+//   action "split" — dividiram: o "sozinho" cai e fica a divisão normal;
+//   action "both"  — todos fizeram a duração completa.
+function resolveConflict(horasData, clients, date, clientId, action, winnerId, ctx) {
+  const marks = markersOf(horasData, date, clientId);
+  const next = { ...horasData };
+  marks.forEach(({ staffId, entry }) => {
+    const win = String(staffId) === String(winnerId);
+    next[staffId] = { ...next[staffId], entries: next[staffId].entries.map((e) => {
+      if (e !== entry) return e;
+      const { conflict, ...rest } = e;
+      if (action === "only") return win ? { ...rest, solo: true, soloCheck: "ok" } : { ...rest, solo: false, voided: true };
+      if (action === "both") return { ...rest, solo: true, soloCheck: "ok" };
+      return { ...rest, solo: false, soloCheck: "split" };
+    }) };
+  });
+  return recomputeSharedHours(next, clients, date, clientId, { ctx });
+}
+// Números para os avisos: conflitos em aberto e dias com horas soltas.
+function countReviews(horasData, clients, period, ctx, today) {
+  return { conflicts: listConflicts(horasData).length, leftovers: planLeftovers(horasData, clients, period, ctx, today).length };
 }
 
 // Recalcula as horas JÁ LANÇADAS de um período com a duração ATUAL dos clientes
@@ -166,6 +317,7 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
 //   opts.skipStaffIds — funcionários cujas linhas NÃO se mexem (ex.: já pagos);
 //                       continuam a contar como participantes para a parte dos outros.
 //   opts.clientIds    — se dado, só estes clientes.
+//   opts.ctx          — { staff, assignments, covers, absences }: a divisão conta também com quem a agenda esperava (ver `expectedTeamIds`).
 function planHoursRecalc(horasData, clients, period, opts = {}) {
   const skip = new Set((opts.skipStaffIds || []).map(String));
   const only = opts.clientIds ? new Set(opts.clientIds) : null;
@@ -177,7 +329,7 @@ function planHoursRecalc(horasData, clients, period, opts = {}) {
   }));
   let next = horasData;
   pairs.forEach(([date, clientId]) => {
-    next = recomputeSharedHours(next, clients, date, clientId);
+    next = recomputeSharedHours(next, clients, date, clientId, opts.ctx ? { ctx: opts.ctx } : {});
   });
   // Quem está em `skipStaffIds` volta exatamente ao que era (sem marcas de
   // "rever divisão"); os colegas ficam com a parte já calculada com ele a contar.
@@ -769,7 +921,7 @@ function dayScheduledClients(clients, assignments, staffId, date, covers) {
 // vezes) e horas previstas pela agenda, dia a dia, mais o estado de cada
 // um dos 7 pontos do cartão (verde registado · contorno alert em falta ·
 // vazio futuro · tracejado sem clientes).
-function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staffMember, covers) {
+function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staffMember, covers, ctx) {
   const weekStart = startOfISOWeek(today);
   const days = [];
   let registeredHours = 0;
@@ -784,7 +936,8 @@ function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staff
     const activeOnDay = !staffMember || (isStaffActive(staffMember, d) && staffStartedOn(staffMember, d));
     const scheduled = activeOnDay ? dayScheduledClients(clients, assignments, staffId, d, covers) : [];
     const hasAgenda = scheduled.length > 0;
-    scheduledHours += scheduled.reduce((s, c) => s + (c.duration || 0) / 60, 0);
+    // Com `ctx` (agenda da equipa) conta a MINHA parte prevista, não a duração inteira do cliente.
+    scheduledHours += scheduled.reduce((s, c) => s + (ctx ? expectedShare(ctx, c, dateKey, staffId).minutes : (c.duration || 0)) / 60, 0);
     const covered = dayIsCovered(horasEntry, dateKey);
     if (covered) {
       registeredHours += (horasEntry.entries || [])
@@ -1020,4 +1173,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

@@ -15,15 +15,15 @@ function signed(n, fmt) {
   return `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmt(Math.abs(v))}`;
 }
 
-export default function RecalcHoursDialog({ open, onClose, onApply, horasData, clients, staff, period, t }) {
+export default function RecalcHoursDialog({ open, onClose, onApply, horasData, clients, staff, period, t, ctx }) {
   const isMobile = useIsMobile();
   const paidIds = useMemo(() => Object.keys(horasData || {}).filter((sid) => horasData[sid] && horasData[sid].paid), [horasData]);
-  const plan = useMemo(() => (open ? planHoursRecalc(horasData, clients, period, { skipStaffIds: paidIds }) : null), [open, horasData, clients, period, paidIds]);
+  const plan = useMemo(() => (open ? planHoursRecalc(horasData, clients, period, { skipStaffIds: paidIds, ctx }) : null), [open, horasData, clients, period, paidIds, ctx]);
   const skippedPaid = useMemo(() => {
     if (!open || paidIds.length === 0) return 0;
-    const all = planHoursRecalc(horasData, clients, period);
+    const all = planHoursRecalc(horasData, clients, period, { ctx });
     return all.changes.filter((c) => paidIds.includes(String(c.staffId))).length;
-  }, [open, horasData, clients, period, paidIds]);
+  }, [open, horasData, clients, period, paidIds, ctx]);
 
   // Agrupa por cliente.
   const groups = useMemo(() => {
@@ -66,7 +66,7 @@ export default function RecalcHoursDialog({ open, onClose, onApply, horasData, c
   }
   function apply() {
     if (nLines === 0) return;
-    const { next } = planHoursRecalc(horasData, clients, period, { skipStaffIds: paidIds, clientIds: chosen.map((g) => g.clientId) });
+    const { next } = planHoursRecalc(horasData, clients, period, { skipStaffIds: paidIds, clientIds: chosen.map((g) => g.clientId), ctx });
     onApply(next, nLines);
   }
 

@@ -11,7 +11,7 @@ import { useBreakpoint } from "./hooks/useBreakpoint.js";
 import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
 import { CloseDeadlineBanner, CloseLockPanel } from "./views/shared/CloseDeadlineBanner.jsx";
 import { formatPeriodLabel, closeDeadlineInfo, isoDateStr } from "./models/utils.js";
-import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, unseenAvisosCount } from "./models/utils.js";
+import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, unseenAvisosCount, countReviews } from "./models/utils.js";
 import { T } from "./models/i18n.js";
 
 import { isSupabaseConfigured } from "./models/supabaseClient.js";
@@ -137,9 +137,11 @@ export default function App() {
         const openPeriodNow = avisosOpenPeriod;
         const closeInfo = closeDeadlineInfo(openPeriodNow, TODAY, c.closeDeadlineDays);
         const pendingRequests = unseenAvisosCount(c.missingItems, c.sentItems, avisosOpenPeriod);
+        // Horas por rever (conflitos "trabalhei sozinho" e horas soltas) somam ao selo de Horas.
+        const hoursReviews = countReviews(c.horasData, c.clients, openPeriodNow, { staff: c.staff, assignments: c.assignments, covers: c.covers, absences: c.absences }, isoDateStr(TODAY));
         const managementItems = MENU_ITEMS.map((item) => ({
           key: item.key, icon: item.icon, label: tSidebar[item.key],
-          badge: item.key === "horas" ? (overtimePending || undefined)
+          badge: item.key === "horas" ? ((overtimePending + hoursReviews.conflicts + hoursReviews.leftovers) || undefined)
             : item.key === "avisos" ? (pendingRequests || undefined)
             : undefined,
         }));
@@ -186,11 +188,11 @@ export default function App() {
               <div style={{ padding: "16px 24px 0" }}><CloseDeadlineBanner lang={c.lang} info={closeInfo} role="management" onGoHours={c.screen === "horas" ? undefined : () => c.setScreen("horas")} /></div>
             )}
             {c.screen === "dashboard" && !closeInfo.overdue && (
-              <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} highlightsMonths={c.highlightsMonths} highlightsRealtime={c.highlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} onNavigate={c.goTo} />
+              <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} highlightsMonths={c.highlightsMonths} highlightsRealtime={c.highlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} assignments={c.assignments} covers={c.covers} onNavigate={c.goTo} />
             )}
-            {c.screen === "clientes" && <ClientesScreen lang={c.lang} setLang={c.setLang} clients={c.clients} setClients={c.setClients} onDeleteClient={c.deleteClient} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} contractAlertDays={c.contractAlertDays} onNavigate={c.setScreen} sentItems={c.sentItems} navIntent={c.navIntent} />}
+            {c.screen === "clientes" && <ClientesScreen lang={c.lang} setLang={c.setLang} clients={c.clients} setClients={c.setClients} onDeleteClient={c.deleteClient} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} contractAlertDays={c.contractAlertDays} onNavigate={c.setScreen} sentItems={c.sentItems} navIntent={c.navIntent} covers={c.covers} absences={c.absences} />}
             {c.screen === "agendas" && <AgendasScreen lang={c.lang} setLang={c.setLang} absences={c.absences} setAbsences={c.setAbsences} covers={c.covers} setCovers={c.setCovers} clients={c.clients} setClients={c.setClients} staff={c.staff} assignments={c.assignments} setAssignments={c.setAssignments} />}
-            {c.screen === "horas" && <HorasScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setClosedPeriods={c.setClosedPeriods} sentItems={c.sentItems} missingItems={c.missingItems} setSentItems={c.setSentItems} setMissingItems={c.setMissingItems} />}
+            {c.screen === "horas" && <HorasScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setClosedPeriods={c.setClosedPeriods} sentItems={c.sentItems} missingItems={c.missingItems} setSentItems={c.setSentItems} setMissingItems={c.setMissingItems} assignments={c.assignments} covers={c.covers} absences={c.absences} />}
             {c.screen === "monitoramento" && <MonitoramentoScreen lang={c.lang} setLang={c.setLang} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} covers={c.covers} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} absences={c.absences} sentItems={c.sentItems} setSentItems={c.setSentItems} />}
             {c.screen === "historico" && (
               <HistoricoScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} closedPeriods={c.closedPeriods} onDeletePeriods={(ids) => c.setClosedPeriods((prev) => prev.filter((p) => !ids.includes(p.id)))} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} />
