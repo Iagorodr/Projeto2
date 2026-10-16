@@ -43,8 +43,12 @@ export default function RecalcHoursDialog({ open, onClose, onApply, horasData, c
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [plan, clients]);
 
-  const [selected, setSelected] = useState(() => new Set());
-  useEffect(() => { if (open) setSelected(new Set(groups.map((g) => g.clientId))); }, [open, groups]);
+  // Guarda os clientes que o utilizador DESMARCOU (por defeito vêm todos marcados).
+  // Antes guardava os marcados e voltava a marcar tudo sempre que a lista era
+  // recalculada (qualquer atualização do ecrã) — por isso o que ele desmarcava
+  // voltava a ficar marcado sozinho. Só volta ao "tudo marcado" ao abrir.
+  const [unchecked, setUnchecked] = useState(() => new Set());
+  useEffect(() => { if (open) setUnchecked(new Set()); }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -55,14 +59,14 @@ export default function RecalcHoursDialog({ open, onClose, onApply, horasData, c
 
   if (!open || !plan) return null;
 
-  const chosen = groups.filter((g) => selected.has(g.clientId));
+  const chosen = groups.filter((g) => !unchecked.has(g.clientId));
   const nLines = chosen.reduce((s, g) => s + g.items.length, 0);
   const dH = chosen.reduce((s, g) => s + g.deltaHours, 0);
   const dE = chosen.reduce((s, g) => s + g.deltaEuros, 0);
   const staffName = (sid) => { const s = staff.find((x) => String(x.id) === String(sid)); return s ? s.name : "—"; };
 
   function toggle(id) {
-    setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+    setUnchecked((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   }
   function apply() {
     if (nLines === 0) return;
@@ -107,7 +111,7 @@ export default function RecalcHoursDialog({ open, onClose, onApply, horasData, c
             {groups.map((g) => (
               <div key={g.clientId} style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, padding: "10px 12px" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                  <input type="checkbox" checked={selected.has(g.clientId)} onChange={() => toggle(g.clientId)} aria-label={g.name} />
+                  <input type="checkbox" checked={!unchecked.has(g.clientId)} onChange={() => toggle(g.clientId)} aria-label={g.name} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "block", fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{g.name}</span>
                     <span style={{ display: "block", fontSize: 12.5, color: COLORS.ink2 }}>
