@@ -155,6 +155,50 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
   return next;
 }
 
+// Recalcula as horas JÁ LANÇADAS de um período com a duração ATUAL dos clientes
+// (quando a gerência corrige a duração/modo de um cliente depois de a equipa já
+// ter registado: as linhas guardam as horas do momento do registo, por isso o
+// valor a pagar não mexia). Pura: devolve `next` (horasData novo) e `changes`
+// (uma por linha cujas horas mudam). Usa `recomputeSharedHours` por (dia,
+// cliente), logo respeita a divisão entre colegas, as partes ajustadas à mão
+// (`splitAdjusted`) e os minutos extra. Linhas anuladas e as sem cliente
+// (`clientId` vazio) ficam como estão.
+//   opts.skipStaffIds — funcionários cujas linhas NÃO se mexem (ex.: já pagos);
+//                       continuam a contar como participantes para a parte dos outros.
+//   opts.clientIds    — se dado, só estes clientes.
+function planHoursRecalc(horasData, clients, period, opts = {}) {
+  const skip = new Set((opts.skipStaffIds || []).map(String));
+  const only = opts.clientIds ? new Set(opts.clientIds) : null;
+  const pairs = new Map();
+  Object.keys(horasData || {}).forEach((sid) => (horasData[sid].entries || []).forEach((e) => {
+    if (e.voided || !e.clientId || !dateStrInPeriod(e.date, period)) return;
+    if (only && !only.has(e.clientId)) return;
+    pairs.set(`${e.date}|${e.clientId}`, [e.date, e.clientId]);
+  }));
+  let next = horasData;
+  pairs.forEach(([date, clientId]) => {
+    next = recomputeSharedHours(next, clients, date, clientId);
+  });
+  // Quem está em `skipStaffIds` volta exatamente ao que era (sem marcas de
+  // "rever divisão"); os colegas ficam com a parte já calculada com ele a contar.
+  if (skip.size > 0) {
+    next = { ...next };
+    Object.keys(horasData || {}).forEach((sid) => { if (skip.has(String(sid))) next[sid] = horasData[sid]; });
+  }
+  const changes = [];
+  Object.keys(horasData || {}).forEach((sid) => {
+    const before = horasData[sid].entries || [];
+    const after = (next[sid] && next[sid].entries) || [];
+    before.forEach((e, idx) => {
+      const a = after[idx];
+      if (a && !e.voided && Math.abs((a.hours || 0) - (e.hours || 0)) > 1e-9) {
+        changes.push({ staffId: sid, idx, date: e.date, clientId: e.clientId, oldHours: e.hours || 0, newHours: a.hours || 0 });
+      }
+    });
+  });
+  return { next, changes };
+}
+
 function staffById(staff, id) { return staff.find((s) => s.id === id); }
 
 // Dupla (casal/parceiros habituais): definida pela gerência em Funcionários,
@@ -921,4 +965,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, isHorasFrozenOn, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

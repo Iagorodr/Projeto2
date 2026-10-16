@@ -203,7 +203,11 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     return new Date(c.clientValidUntil) >= TODAY;
   }).length;
 
-  const complaintsCurrent = sentItems.filter((i) => i.type === "reclamacao").length;
+  // Só as reclamações do período ABERTO agora — o cartão diz "este mês". Itens
+  // antigos que ficaram em `sentItems` (de antes de um fecho, por exemplo) não
+  // contam; os do período já fechado vivem no Histórico.
+  const periodComplaints = (sentItems || []).filter((i) => i.type === "reclamacao" && dateStrInPeriod(i.date, currentPeriod));
+  const complaintsCurrent = periodComplaints.length;
   // Limites escalam com o tamanho da carteira de clientes (configurado em
   // Definições como "reclamações a cada N clientes"), em vez de um valor fixo.
   const excelenteThreshold = Math.max(0, Math.round((clients.length / (reclamacaoBaseClients || 10)) * (reclamacaoExcelenteCount ?? 1)));
@@ -215,8 +219,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   // jeito. (QA pós-auditoria: `fmtNoteDate` já entende os dois formatos —
   // deixou de ser o motivo de não o usar aqui; manter em bruto continua
   // sendo o comportamento certo, só não é mais por causa do bug antigo.)
-  const recentComplaints = sentItems
-    .filter((i) => i.type === "reclamacao")
+  const recentComplaints = periodComplaints
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 2)

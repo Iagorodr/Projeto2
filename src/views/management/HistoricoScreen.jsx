@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  ArrowLeft, Clock, Euro, Users, MessageSquare, ThumbsUp, Bell, PackageX, TrendingUp, TrendingDown, Minus,
+  ArrowLeft, Clock, Euro, Users, MessageSquare, ThumbsUp, Bell, PackageX, TrendingUp, TrendingDown, Minus, Trash2,
 } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -10,7 +10,7 @@ import { clientById, entryClientName, fmtEuro, fmtHoursNum, fmtHoursScreen, fmtN
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { exportGenericTablePdf } from "../../models/pdfExport.js";
 import {
-  PageHeader, DataTable, Drawer, Button, Pill, Card, KpiCard, ReclamacoesCard, Avatar,
+  PageHeader, DataTable, Drawer, Button, Pill, Card, KpiCard, ReclamacoesCard, Avatar, ConfirmDialog,
 } from "../shared/ui/index.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 
@@ -149,7 +149,7 @@ function OccurrenceSection({ icon: Icon, title, items, emptyLabel, clients, lang
   );
 }
 
-function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount }) {
+function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDeletePeriods, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount }) {
   const t = T[lang].historico;
   const c0 = T[lang].common;
   const pdfT = T[lang].pdf;
@@ -158,6 +158,8 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, recla
   const avisosT = T[lang].avisos;
   const [openId, setOpenId] = useState(null);
   const [openStaffId, setOpenStaffId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [deleteIds, setDeleteIds] = useState(null); // ids a apagar (diálogo de confirmação aberto)
   const isMobile = useIsMobile();
 
   const openIndex = closedPeriods.findIndex((p) => p.id === openId);
@@ -165,6 +167,50 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, recla
   // closedPeriods vem do mais recente pro mais antigo, então o "anterior"
   // cronologicamente é o próximo índice da lista.
   const previous = openIndex >= 0 ? closedPeriods[openIndex + 1] : null;
+
+  // Apagar períodos do Histórico (só o registo: as horas já foram arquivadas no
+  // fecho). Apagar o MAIS RECENTE muda o período aberto — `getOpenPeriod` parte
+  // do fim do último período fechado —, por isso o aviso é mais forte.
+  const canDelete = typeof onDeletePeriods === "function";
+  const deleting = deleteIds ? closedPeriods.filter((p) => deleteIds.includes(p.id)) : [];
+  const deletingLatest = deleting.some((p) => p.id === closedPeriods[0]?.id);
+  const remainingAfterDelete = closedPeriods.filter((p) => !(deleteIds || []).includes(p.id));
+  function toggleSelect(id) {
+    setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.size === closedPeriods.length ? new Set() : new Set(closedPeriods.map((p) => p.id))));
+  }
+  function confirmDelete() {
+    const ids = deleteIds || [];
+    onDeletePeriods(ids);
+    setDeleteIds(null);
+    setSelectedIds(new Set());
+    if (ids.includes(openId)) { setOpenId(null); setOpenStaffId(null); }
+  }
+  const deleteDialog = canDelete && (
+    <ConfirmDialog
+      open={!!deleteIds && deleting.length > 0}
+      title={t.deleteTitle(deleting.length)}
+      body={(
+        <>
+          <div>{t.deleteBody(deleting.map((p) => p.periodLabel))}</div>
+          {deletingLatest && (
+            <div style={{ marginTop: 10, fontWeight: 600, color: COLORS.alert }}>
+              {remainingAfterDelete.length > 0 ? t.deleteLatestBody : t.deleteLatestBodyNone}
+            </div>
+          )}
+        </>
+      )}
+      cancelLabel={c0.cancel}
+      confirmLabel={t.deleteConfirmBtn}
+      destructive
+      requireTypedWord={t.deleteTyped}
+      typedWordHint={t.deleteTypedHint}
+      onCancel={() => setDeleteIds(null)}
+      onConfirm={confirmDelete}
+    />
+  );
 
   function exportAuditPdf() {
     // fmtHoursNum (não fmtHoursScreen) de propósito aqui: o próprio
@@ -249,7 +295,20 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, recla
     return (
       <div style={styles.content}>
         <PageHeader title={t.title} subtitle={t.subtitle} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
-        <DataTable columns={listColumns} rows={closedPeriods} onRowClick={(p) => setOpenId(p.id)} emptyMessage={t.noResults} />
+        <DataTable
+          columns={listColumns}
+          rows={closedPeriods}
+          onRowClick={(p) => setOpenId(p.id)}
+          emptyMessage={t.noResults}
+          {...(canDelete ? {
+            selectedIds,
+            onToggleSelect: toggleSelect,
+            onToggleSelectAll: toggleSelectAll,
+            batchActions: <Button variant="dangerSolid" onClick={() => setDeleteIds([...selectedIds])}>{t.deleteSelected}</Button>,
+            batchLabel: (n) => t.selectedCount(n),
+          } : {})}
+        />
+        {deleteDialog}
       </div>
     );
   }
@@ -284,7 +343,10 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, recla
           <h1 style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 26, color: COLORS.ink, margin: 0 }}>{open.periodLabel}</h1>
           <Pill variant="neutral">{t.closedAt} {fmtNoteDate(open.closedAt)}</Pill>
         </div>
-        <Button variant="secondary" onClick={exportAuditPdf}>{horasT.exportPdfGeneral}</Button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Button variant="secondary" onClick={exportAuditPdf}>{horasT.exportPdfGeneral}</Button>
+          {canDelete && <Button variant="dangerSoft" icon={Trash2} onClick={() => setDeleteIds([open.id])}>{t.deletePeriod}</Button>}
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
@@ -370,6 +432,7 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, recla
           );
         })()}
       </Drawer>
+      {deleteDialog}
     </div>
   );
 }

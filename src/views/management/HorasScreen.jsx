@@ -19,6 +19,7 @@ import {
 } from "../shared/ui/index.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
+import RecalcHoursDialog from "./RecalcHoursDialog.jsx";
 
 // "2026-09-20" -> Date local (meia-noite), igual ao resto do app faz com
 // datas ISO vindas de `horasData`.
@@ -79,6 +80,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [closedToast, setClosedToast] = useState(false);
+  const [recalcOpen, setRecalcOpen] = useState(false);
+  const [recalcToast, setRecalcToast] = useState(null); // mensagem do aviso após recalcular
   // Lote 4, 4.4 (achado da Marta: "Como conferir" pede setas, Exportar PDF,
   // Fechar período, idioma e Pago com a MESMA altura e raio 12 a 1366px).
   // As setas do navegador de período eram círculos (raio "50%") de 40×40
@@ -400,7 +403,10 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
           <FilterChip active={activeChip === "porPagar"} onClick={() => setActiveChip("porPagar")} count={kpiCounts.unpaid}>{t.kpiUnpaid}</FilterChip>
           <FilterChip active={activeChip === "pagos"} onClick={() => setActiveChip("pagos")} count={kpiCounts.paid}>{t.kpiPaid}</FilterChip>
         </div>
-        <SearchField value={staffSearch} onChange={setStaffSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {monthOffset === 0 && <Button variant="secondary" onClick={() => setRecalcOpen(true)}>{t.recalcButton}</Button>}
+          <SearchField value={staffSearch} onChange={setStaffSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
+        </div>
       </div>
 
       <DataTable columns={columns} rows={visibleStaff} onRowClick={(s) => setOpenStaffId(s.id)} />
@@ -581,7 +587,19 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         onConfirm={() => reopenForCorrection(openStaff.id)}
       />
 
+      <RecalcHoursDialog
+        open={recalcOpen}
+        onClose={() => setRecalcOpen(false)}
+        onApply={(next, n) => {
+          setHorasData(next);
+          setRecalcOpen(false);
+          setRecalcToast(t.recalcDone(n));
+          setTimeout(() => setRecalcToast(null), 5000);
+        }}
+        horasData={horasData} clients={clients} staff={staff} period={period} t={t}
+      />
       {closedToast && <Toast message={t.closedToast} onDismiss={() => setClosedToast(false)} closeLabel={c0.close} />}
+      {recalcToast && <Toast message={recalcToast} onDismiss={() => setRecalcToast(null)} closeLabel={c0.close} />}
     </div>
   );
 }
