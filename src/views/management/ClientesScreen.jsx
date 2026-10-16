@@ -9,7 +9,7 @@ import { TYPE_ICONS, AGENDA_DAYS, TODAY, LANG_NAMES, EMPTY_CLIENT } from "../../
 import {
   startOfISOWeek, addDays, isoDateStr, clientAppliesThisWeek, weekLabelPT,
   parseDMY, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
-  findByName,
+  findByName, planHoursRecalc, fmtEuro,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
@@ -132,7 +132,7 @@ function FeedbackHistory({ t, items }) {
 // pela Dashboard, DashboardScreen.jsx).
 function ClientesScreen({
   lang, setLang, clients, setClients, onDeleteClient,
-  staff = [], assignments = {}, horasData = {}, cutoffDay = 25, closedPeriods = [], contractAlertDays = 30,
+  staff = [], assignments = {}, horasData = {}, setHorasData, cutoffDay = 25, closedPeriods = [], contractAlertDays = 30,
   onNavigate, sentItems = [], navIntent = null,
 }) {
   const t = T[lang].clientes;
@@ -162,8 +162,21 @@ function ClientesScreen({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  // Depois de mudar a duração de um cliente: pergunta se aplica às marcações
+  // já feitas no período aberto (id do cliente; null = sem pergunta).
+  const [recalcClientId, setRecalcClientId] = useState(null);
 
   const period = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
+  const paidStaffIds = Object.keys(horasData).filter((sid) => horasData[sid] && horasData[sid].paid);
+  const recalcClient = recalcClientId ? clients.find((c) => c.id === recalcClientId) : null;
+  const recalcPlan = recalcClient && setHorasData
+    ? planHoursRecalc(horasData, clients, period, { skipStaffIds: paidStaffIds, clientIds: [recalcClient.id] })
+    : null;
+  const recalcLines = recalcPlan ? recalcPlan.changes.length : 0;
+  const recalcDeltaH = recalcPlan ? recalcPlan.changes.reduce((s, c) => s + (c.newHours - c.oldHours), 0) : 0;
+  const recalcDeltaE = recalcClient ? recalcDeltaH * (Number(recalcClient.valueHour) || 0) : 0;
+  const signedH = (h) => `${h > 0 ? "+" : h < 0 ? "−" : ""}${fmtHoursScreen(Math.abs(h))}`;
+  const signedE = (e) => `${e > 0 ? "+" : e < 0 ? "−" : ""}${fmtEuro(Math.abs(e))}`;
   const activeCount = activeClientsCount(clients, TODAY);
   const cities = Array.from(new Set(clients.map((c) => c.city).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
@@ -218,6 +231,16 @@ function ClientesScreen({
       const updated = { ...draft, id: openClient.id };
       setClients((prev) => prev.map((c) => (c.id === openClient.id ? updated : c)));
       setMode("view");
+      // Mudou a duração (ou o modo de contar as horas)? Se há marcações já
+      // feitas neste período com a duração antiga, pergunta se as atualiza.
+      const durationChanged = Number(updated.duration) !== Number(openClient.duration)
+        || JSON.stringify(updated.durationByDay || {}) !== JSON.stringify(openClient.durationByDay || {})
+        || (updated.hoursMode || "dividida") !== (openClient.hoursMode || "dividida");
+      if (durationChanged && setHorasData) {
+        const nextClients = clients.map((c) => (c.id === openClient.id ? updated : c));
+        const plan = planHoursRecalc(horasData, nextClients, period, { skipStaffIds: paidStaffIds, clientIds: [openClient.id] });
+        if (plan.changes.length > 0) setRecalcClientId(openClient.id);
+      }
     }
   }
   function confirmDelete() {
@@ -753,6 +776,16 @@ function ClientesScreen({
         destructive
         onCancel={() => setDeleteConfirmOpen(false)}
         onConfirm={confirmDelete}
+      />
+
+      <ConfirmDialog
+        open={!!recalcClient && recalcLines > 0}
+        title={t.recalcAskTitle}
+        body={recalcClient ? t.recalcAskBody(recalcClient.name, recalcLines, signedH(recalcDeltaH), signedE(recalcDeltaE)) : ""}
+        cancelLabel={t.recalcAskNo}
+        confirmLabel={t.recalcAskYes(recalcLines)}
+        onCancel={() => setRecalcClientId(null)}
+        onConfirm={() => { if (recalcPlan) setHorasData(recalcPlan.next); setRecalcClientId(null); }}
       />
 
       <ConfirmDialog

@@ -171,6 +171,9 @@ const T = {
       confirmDeleteBody: (name) => `Eliminar ${name}? Remove-o também das agendas, incluindo a semana atual. O histórico de períodos já fechados não é afetado.`,
       selectedCount: (n) => `${n} selecionado${n === 1 ? "" : "s"}`,
       deleteSelected: "Eliminar selecionados",
+      recalcAskTitle: "Aplicar às marcações já feitas?",
+      recalcAskBody: (name, n, dh, de) => `Você mudou a duração de ${name}. No período aberto, ${n} marcaç${n === 1 ? "ão ainda tem" : "ões ainda têm"} a duração antiga. Atualizar muda o total em ${dh} (${de}). Quem já foi pago não é mexido.`,
+      recalcAskYes: (n) => `Sim, atualizar ${n} marcaç${n === 1 ? "ão" : "ões"}`, recalcAskNo: "Não, deixar como está",
       confirmDeleteBulkBody: (n) => `${n} cliente${n === 1 ? "" : "s"} ser${n === 1 ? "á" : "ão"} removido${n === 1 ? "" : "s"} para sempre, incluindo a remoção das agendas e as atribuições da semana atual.`,
     },
     agendas: {
@@ -603,7 +606,7 @@ const T = {
       monthFinalizedBanner: "Mês finalizado",
       reopenedPill: "Reaberto para correção",
       periodLockedNote: "Período fechado. Veja no Histórico.",
-      addClientSheetTitle: "Adicionar cliente",  alsoMarkedTag: (n) => `Também marcado para ${n}`, soloButton: (n) => `Fiz sem ${n}`, soloDone: (n) => `Feito: ${n} saiu deste cliente e as horas ficaram todas consigo.`, soloBlocked: (n) => `Não dá para tirar ${n} daqui: a semana já está fechada ou a linha já foi alterada. Peça à gerência para corrigir.`, adjustSplit: "Ajustar a minha parte", adjustSplitTitle: "A minha parte", adjustSplitHint: (total, rest) => `Total do cliente: ${total}. O que sobrar (${rest}) fica para o colega.`, adjustSplitReset: "Voltar à divisão igual", adjustSplitSave: "Guardar", adjustedTag: "parte ajustada", customClientButton: "Cliente fora da lista", customClientTitle: "Cliente fora da lista", customClientHint: "Escreva o nome do cliente. A gerência confirma e corrige depois.", customClientName: "Nome do cliente", customClientCity: "Cidade (opcional)", customClientHours: "Horas (ex.: 1,5 · 1:30 · 45 min)", customClientAdd: "Adicionar", customClientPending: "por confirmar", addClientButton: "Adicionar outro cliente",
+      addClientSheetTitle: "Adicionar cliente",  adjustSplit: "Ajustar a minha parte", adjustSplitTitle: "A minha parte", adjustSplitHint: (total, rest) => `Total do cliente: ${total}. O que sobrar (${rest}) fica para o colega.`, adjustSplitReset: "Voltar à divisão igual", adjustSplitSave: "Guardar", adjustedTag: "parte ajustada", customClientButton: "Cliente fora da lista", customClientTitle: "Cliente fora da lista", customClientHint: "Escreva o nome do cliente. A gerência confirma e corrige depois.", customClientName: "Nome do cliente", customClientCity: "Cidade (opcional)", customClientHours: "Horas (ex.: 1,5 · 1:30 · 45 min)", customClientAdd: "Adicionar", customClientPending: "por confirmar", addClientButton: "Adicionar outro cliente",
       extraTimeButton: "Horas extras", earnedSoFar: "A receber até agora", dayTotalLabel: "Total do dia",
       // Etapa 4a (cont.) — 5.2.10: layout de duas colunas em tablet/PC
       // ("Resumo do dia" + "Fecho do período", à direita do painel do dia).
@@ -834,6 +837,9 @@ const T = {
       confirmDeleteBody: (name) => `Delete ${name}? This also removes it from the schedules, including this week's assignments. History of already-closed periods is not affected.`,
       selectedCount: (n) => `${n} selected`,
       deleteSelected: "Delete selected",
+      recalcAskTitle: "Apply to entries already logged?",
+      recalcAskBody: (name, n, dh, de) => `You changed the duration of ${name}. In the open period, ${n} entr${n === 1 ? "y still keeps" : "ies still keep"} the old duration. Updating ${n === 1 ? "it" : "them"} changes the total by ${dh} (${de}). Staff who were already paid are not touched.`,
+      recalcAskYes: (n) => `Yes, update ${n} entr${n === 1 ? "y" : "ies"}`, recalcAskNo: "No, leave as is",
       confirmDeleteBulkBody: (n) => `${n} client${n === 1 ? "" : "s"} will be permanently removed, including removal from the schedules and this week's assignments.`,
     },
     agendas: {
@@ -1234,7 +1240,7 @@ const T = {
       monthFinalizedBanner: "Month finished",
       reopenedPill: "Reopened for correction",
       periodLockedNote: "Period closed. See it in History.",
-      addClientSheetTitle: "Add client",  alsoMarkedTag: (n) => `Also marked for ${n}`, soloButton: (n) => `Did it without ${n}`, soloDone: (n) => `Done: ${n} was taken off this client and the hours are all yours.`, soloBlocked: (n) => `Cannot take ${n} off here: the week is already closed or the line was changed. Ask management to fix it.`, adjustSplit: "Adjust my share", adjustSplitTitle: "My share", adjustSplitHint: (total, rest) => `Client total: ${total}. The rest (${rest}) goes to your colleague.`, adjustSplitReset: "Back to equal split", adjustSplitSave: "Save", adjustedTag: "adjusted share", customClientButton: "Client not on the list", customClientTitle: "Client not on the list", customClientHint: "Type the client name. Management will confirm and fix it later.", customClientName: "Client name", customClientCity: "City (optional)", customClientHours: "Hours (e.g. 1.5 · 1:30 · 45 min)", customClientAdd: "Add", customClientPending: "to confirm", addClientButton: "Add another client",
+      addClientSheetTitle: "Add client",  adjustSplit: "Adjust my share", adjustSplitTitle: "My share", adjustSplitHint: (total, rest) => `Client total: ${total}. The rest (${rest}) goes to your colleague.`, adjustSplitReset: "Back to equal split", adjustSplitSave: "Save", adjustedTag: "adjusted share", customClientButton: "Client not on the list", customClientTitle: "Client not on the list", customClientHint: "Type the client name. Management will confirm and fix it later.", customClientName: "Client name", customClientCity: "City (optional)", customClientHours: "Hours (e.g. 1.5 · 1:30 · 45 min)", customClientAdd: "Add", customClientPending: "to confirm", addClientButton: "Add another client",
       extraTimeButton: "Overtime", earnedSoFar: "Earned so far", dayTotalLabel: "Day total",
       daySummaryTitle: "Day summary",
       clientsMarkedLabel: (marked, total) => `${marked} of ${total} clients checked`,
@@ -1445,6 +1451,9 @@ const T = {
       confirmDeleteBody: (name) => `Supprimer ${name} ? Il sera aussi retiré des agendas, y compris les affectations de cette semaine. L'historique des périodes déjà clôturées n'est pas affecté.`,
       selectedCount: (n) => `${n} sélectionné${n === 1 ? "" : "s"}`,
       deleteSelected: "Supprimer la sélection",
+      recalcAskTitle: "Appliquer aux saisies déjà faites ?",
+      recalcAskBody: (name, n, dh, de) => `Vous avez changé la durée de ${name}. Dans la période ouverte, ${n} saisie${n > 1 ? "s" : ""} ${n > 1 ? "gardent" : "garde"} l'ancienne durée. Les mettre à jour change le total de ${dh} (${de}). Les employés déjà payés ne sont pas touchés.`,
+      recalcAskYes: (n) => `Oui, mettre à jour ${n} saisie${n > 1 ? "s" : ""}`, recalcAskNo: "Non, laisser tel quel",
       confirmDeleteBulkBody: (n) => `${n} client${n === 1 ? "" : "s"} ser${n === 1 ? "a" : "ont"} supprimé${n === 1 ? "" : "s"} définitivement, y compris le retrait des agendas et les affectations de cette semaine.`,
     },
     agendas: {
@@ -1845,7 +1854,7 @@ const T = {
       monthFinalizedBanner: "Mois terminé",
       reopenedPill: "Rouvert pour correction",
       periodLockedNote: "Période clôturée. Consultez l'historique.",
-      addClientSheetTitle: "Ajouter un client",  alsoMarkedTag: (n) => `Aussi marqué pour ${n}`, soloButton: (n) => `Fait sans ${n}`, soloDone: (n) => `Fait : ${n} a été retiré de ce client et les heures sont toutes pour vous.`, soloBlocked: (n) => `Impossible de retirer ${n} ici : la semaine est déjà clôturée ou la ligne a été modifiée. Demandez à la direction de corriger.`, adjustSplit: "Ajuster ma part", adjustSplitTitle: "Ma part", adjustSplitHint: (total, rest) => `Total du client : ${total}. Le reste (${rest}) revient à votre collègue.`, adjustSplitReset: "Revenir au partage égal", adjustSplitSave: "Enregistrer", adjustedTag: "part ajustée", customClientButton: "Client hors liste", customClientTitle: "Client hors liste", customClientHint: "Saisissez le nom du client. La direction confirmera et corrigera ensuite.", customClientName: "Nom du client", customClientCity: "Ville (facultatif)", customClientHours: "Heures (ex. : 1,5 · 1:30 · 45 min)", customClientAdd: "Ajouter", customClientPending: "à confirmer", addClientButton: "Ajouter un autre client",
+      addClientSheetTitle: "Ajouter un client",  adjustSplit: "Ajuster ma part", adjustSplitTitle: "Ma part", adjustSplitHint: (total, rest) => `Total du client : ${total}. Le reste (${rest}) revient à votre collègue.`, adjustSplitReset: "Revenir au partage égal", adjustSplitSave: "Enregistrer", adjustedTag: "part ajustée", customClientButton: "Client hors liste", customClientTitle: "Client hors liste", customClientHint: "Saisissez le nom du client. La direction confirmera et corrigera ensuite.", customClientName: "Nom du client", customClientCity: "Ville (facultatif)", customClientHours: "Heures (ex. : 1,5 · 1:30 · 45 min)", customClientAdd: "Ajouter", customClientPending: "à confirmer", addClientButton: "Ajouter un autre client",
       extraTimeButton: "Heures supplémentaires", earnedSoFar: "À recevoir jusqu'ici", dayTotalLabel: "Total du jour",
       daySummaryTitle: "Résumé du jour",
       clientsMarkedLabel: (marked, total) => `${marked} sur ${total} clients cochés`,

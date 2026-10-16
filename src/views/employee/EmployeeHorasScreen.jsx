@@ -6,7 +6,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   clientById, entryClientName, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
-  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, isHorasFrozenOn, partnerOf, getOpenPeriod, getCutoffPeriod,
+  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, isHorasFrozenOn, getOpenPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
@@ -197,9 +197,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // Dupla: a gerência define o parceiro, mas as HORAS são sempre marcadas à
   // mão — marcar um cliente NUNCA cria a linha do parceiro (decisão do Iago:
   // automático dá erro, ex.: a Talia fez o Giacomini sozinha e o Iago ficava
-  // com metade). A dupla só serve para o sistema entender os dados; as linhas
-  // "automáticas" que já existiam de antes saem com o botão "Fiz sem <nome>".
-  const partner = partnerOf(staff, staffId, TODAY);
+  // com metade). A dupla só é automática na montagem da agenda. As linhas
+  // "automáticas" de antes aparecem como as outras (sem etiqueta nem botão
+  // "Fiz sem <nome>" — decisão de 16/10/2026).
   function addClientEntry(clientId, replacesDate) {
     if (weekLockedFlag) return;
     const client = clientById(clients, clientId);
@@ -211,39 +211,6 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       const withNew = { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
       return recomputeSharedHours(withNew, clients, selectedKey, clientId, sharedOpts(selectedKey));
     });
-  }
-  // Linha do parceiro criada automaticamente a partir da minha (herança do
-  // modo antigo) para este lançamento, se ainda existir.
-  function partnerAutoEntry(entry) {
-    if (!partner || !entry || entry.autoFrom) return null;
-    return ((horasData[partner.id] && horasData[partner.id].entries) || []).find(
-      (e) => !e.voided && e.date === entry.date && e.clientId === entry.clientId && e.autoFrom === staffId
-    ) || null;
-  }
-  // "Fiz sem <parceiro>": tira a linha automática do parceiro e as horas do
-  // cliente ficam todas comigo (ou repartidas só com quem marcou mesmo). Só
-  // mexe numa linha que o sistema criou e que o parceiro não tocou, com a
-  // semana dele ainda aberta; senão avisa e deixa para a gerência.
-  function removePartnerAuto(entry) {
-    if (weekLockedFlag) return;
-    const pe = partnerAutoEntry(entry);
-    if (!pe) return;
-    const pName = partner.name.split(" ")[0];
-    const touched = pe.extra || (pe.extraMinutes || 0) > 0 || pe.approved || pe.splitAdjusted;
-    if (touched || isHorasFrozenOn(horasData[partner.id], entry.date, cutoffDay, closedPeriods, TODAY)) {
-      showToast(t.soloBlocked(pName));
-      return;
-    }
-    setHorasData((prev) => {
-      const pH = prev[partner.id];
-      if (!pH) return prev;
-      const without = {
-        ...prev,
-        [partner.id]: { ...pH, entries: pH.entries.filter((e) => !(!e.voided && e.autoFrom === staffId && e.date === entry.date && e.clientId === entry.clientId)) },
-      };
-      return recomputeSharedHours(without, clients, entry.date, entry.clientId, sharedOpts(entry.date));
-    });
-    showToast(t.soloDone(pName));
   }
   // Cliente fora da lista: nome (e cidade) escritos à mão, sem clientId; as
   // horas entram como pendentes e a gerência confirma o cliente certo.
@@ -394,14 +361,6 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // cartão por lançamento manual (adicionado à parte ou adiantado PARA
   // este dia) que não faz parte da agenda do dia.
   const scheduledIds = new Set(scheduledToday.map((c) => c.id));
-  function autoTagFor(entry) {
-    if (!entry) return undefined;
-    // Sem etiqueta "Automático · por X": a dupla só é automática na montagem da
-    // agenda (decisão de 16/10/2026). As linhas antigas com `autoFrom` aparecem
-    // como qualquer outra.
-    if (partnerAutoEntry(entry)) return t.alsoMarkedTag(partner.name.split(" ")[0]);
-    return undefined;
-  }
   const scheduledCards = scheduledToday.map((client) => {
     const advancedAway = myHoras.entries.find((e) => !e.voided && e.clientId === client.id && e.replacesDate === selectedKey);
     if (advancedAway) {
@@ -424,7 +383,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     return {
       id: `sched-${client.id}`, clientId: client.id, name: client.name,
       subtitle: entry ? subtitleFor(entry) : fmtMinutes(client.duration),
-      checked: !!entry, entry, autoTag: autoTagFor(entry),
+      checked: !!entry, entry,
       extraPill: entry && entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
     };
   });
@@ -432,7 +391,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     const isCustom = !entry.clientId && !!entry.custom;
     return {
       id: `adhoc-${entry.clientId}-${entry.date}-${ai}`, clientId: entry.clientId, name: entryClientName(clients, entry), isCustom,
-      subtitle: isCustom ? `${subtitleFor(entry)} · ${t.customClientPending}` : subtitleFor(entry), checked: true, entry, autoTag: autoTagFor(entry),
+      subtitle: isCustom ? `${subtitleFor(entry)} · ${t.customClientPending}` : subtitleFor(entry), checked: true, entry,
       extraPill: entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
     };
   });
@@ -743,13 +702,10 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                   dimmedNote={card.dimmedNote}
                   readOnly={weekLockedFlag || card.readOnly}
                   extraPill={card.extraPill}
-                  autoTag={card.autoTag}
                   onToggle={() => (card.isCustom ? removeEntryObj(card.entry) : toggleScheduledClient(card.clientId))}
                   onExtraTime={card.checked && card.entry ? () => openExtra(card.entry) : undefined}
                   onAdjustSplit={card.checked && card.entry && card.entry.sharedCount > 1 ? () => openSplit(card.entry) : undefined}
                   adjustSplitLabel={t.adjustSplit}
-                  onSolo={card.checked && card.entry && partnerAutoEntry(card.entry) ? () => removePartnerAuto(card.entry) : undefined}
-                  soloLabel={partner ? t.soloButton(partner.name.split(" ")[0]) : ""}
                   extraTimeLabel={t.extraTimeButton}
                 />
               ))}
