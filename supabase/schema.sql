@@ -77,6 +77,7 @@ create table if not exists app_data (
   closed_periods jsonb not null default '[]'::jsonb,
   personal_notes jsonb not null default '[]'::jsonb,
   absences jsonb not null default '[]'::jsonb,
+  covers jsonb not null default '[]'::jsonb,
   constraint app_data_singleton check (id = 1)
 );
 
@@ -109,3 +110,4 @@ alter table push_subscriptions disable row level security;
 
 -- Ausências / avisos de falta (uma linha por funcionário e dia).
 -- Para bancos já criados: alter table app_data add column if not exists absences jsonb not null default '[]'::jsonb;
+-- Coberturas de férias: ver supabase/coberturas.sql (coluna `covers` + permissão no patch_app_list).

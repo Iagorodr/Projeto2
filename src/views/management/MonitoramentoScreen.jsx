@@ -7,7 +7,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   getOpenPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, formatPeriodLabel, isoDateStr, pad2,
-  clientById, clientAppliesOnDate, startOfISOWeek, dayIsCovered, isStaffActive, absenceOn,
+  clientById, clientAppliesOnDate, startOfISOWeek, dayIsCovered, isStaffActive, absenceOn, agendaClientIdsOn,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
@@ -26,7 +26,7 @@ import {
 // redesenhar só um deles deixaria o outro com um visual completamente
 // desencontrado (tabela/gaveta novas dum lado, cartões antigos do outro).
 // Optei por redesenhar os dois já nesta leva.
-function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignments, cutoffDay, closedPeriods, absences, sentItems, setSentItems, onHome }) {
+function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignments, covers, cutoffDay, closedPeriods, absences, sentItems, setSentItems, onHome }) {
   const t = T[lang].monitoramento;
   const th = T[lang].horas;
   const c0 = T[lang].common;
@@ -59,7 +59,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   // `staffWithGapsCount`, o que ficou fora do risco aceitável desta leva.
   function hasAgendaOnDay(staffId, d) {
     if (absenceOn(absences, staffId, isoDateStr(d))) return false;
-    const clientIds = assignments[`${staffId}-${isoWeekday(d)}`] || [];
+    const clientIds = agendaClientIdsOn(assignments, covers, staffId, d);
     return clientIds.some((id) => {
       const c = clientById(clients, id);
       return c && clientAppliesOnDate(c, d);

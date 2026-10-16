@@ -8,6 +8,7 @@ import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   staffById, pad2, fmtMinutes, startOfISOWeek, addDays, isoDateStr, clientAppliesOnDate,
   weekLabelPT, isStaffActive, monthAbbr, clientDurationOnDow, clientPartMinutes,
+  agendaClientIdsOn, coveringOn, coveredAwayOn,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { PageHeader, Pill, MobileHeader } from "../shared/ui/index.js";
@@ -43,8 +44,9 @@ function RecurringPill({ label }) {
 // pessoas partilham um cliente num dia certo (`teamSizeFor`, mesma conta de
 // AgendasScreen.jsx, gerência, 4.3) — sem isso não dá pra saber se um
 // cliente é partilhado nem qual é "a parte" do próprio funcionário.
-function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, assignments, desktop }) {
+function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, assignments, covers = [], desktop }) {
   const t = T[lang].employeeAgenda;
+  const tCov = T[lang].coberturas;
   const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
   const me = staffById(staff, staffId);
   const [weekStart, setWeekStart] = useState(() => startOfISOWeek(TODAY));
@@ -54,8 +56,18 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   const weekDates = AGENDA_DAYS.map((_, i) => addDays(weekStart, i));
   const isCurrentWeek = isoDateStr(weekStart) === isoDateStr(startOfISOWeek(TODAY));
 
+  // Inclui as coberturas de férias (quem cobre conta na equipa do dia).
   function teamSizeFor(day, clientId) {
-    return staff.filter((s) => (assignments[`${s.id}-${day}`] || []).includes(clientId)).length;
+    return staff.filter((s) => agendaClientIdsOn(assignments, covers, s.id, weekDates[day - 1]).includes(clientId)).length;
+  }
+  function firstNameOf(id) { const m = staffById(staff, id); return m ? m.name.split(" ")[0] : "—"; }
+  // Clientes que faço neste dia por cobrir um colega, e os meus que um colega cobre.
+  function coveringFor(day) { return coveringOn(assignments, covers, staffId, weekDates[day - 1]); }
+  function awayFor(day) {
+    if (!isStaffActive(me, weekDates[day - 1])) return [];
+    return coveredAwayOn(assignments, covers, staffId, weekDates[day - 1])
+      .map((x) => ({ ...x, client: clients.find((c) => c.id === x.clientId) }))
+      .filter((x) => x.client && clientAppliesOnDate(x.client, weekDates[day - 1]));
   }
 
   // Cliente partilhado: a "parte" do próprio é duração ÷ nº de pessoas
@@ -77,7 +89,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   function getDayOccurrences(day) {
     const date = weekDates[day - 1];
     if (!isStaffActive(me, date)) return [];
-    const clientIds = assignments[`${staffId}-${day}`] || [];
+    const clientIds = agendaClientIdsOn(assignments, covers, staffId, date);
     return clientIds
       .map((id) => clients.find((c) => c.id === id))
       .filter((c) => c && clientAppliesOnDate(c, date));
@@ -124,6 +136,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13.5, fontWeight: 600, color: shared ? COLORS.clayInk : COLORS.ink }}>{client.name}</div>
+            {coverTagOf(day, client.id) && <div style={{ marginTop: 3 }}><Pill variant="neutral">{coverTagOf(day, client.id)}</Pill></div>}
             <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: shared ? COLORS.clayInk : COLORS.ink2, marginTop: 2 }}>
               {shared && <UsersRound size={12} strokeWidth={1.8} style={{ flexShrink: 0 }} />}
               <span>
@@ -140,6 +153,26 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
           </div>
         )}
       </div>
+    );
+  }
+
+  function coverTagOf(day, clientId) {
+    const x = coveringFor(day).find((c) => c.clientId === clientId);
+    return x ? tCov.coveringTag(firstNameOf(x.cover.fromStaffId)) : null;
+  }
+  function AwayNote({ day }) {
+    const items = awayFor(day);
+    if (items.length === 0) return null;
+    return (
+      <>
+        {items.map(({ cover, client }) => (
+          <span key={cover.id} title={`${client.name} · ${tCov.awayTag(firstNameOf(cover.toStaffId))}`}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 28, borderRadius: RADIUS.chip, padding: "0 9px", border: `1.5px dashed ${COLORS.line}`, fontSize: 12.5, color: COLORS.ink2, maxWidth: 260 }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.name}</span>
+            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700 }}>{tCov.awayTag(firstNameOf(cover.toStaffId))}</span>
+          </span>
+        ))}
+      </>
     );
   }
 
@@ -164,6 +197,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
         <span style={{ flexShrink: 0, fontWeight: 600, color: shared ? COLORS.clayInk : COLORS.ink2 }}>
           {fmtMinutes(shared ? perPersonMin : dur)}
         </span>
+        {coverTagOf(day, client.id) && <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "1px 7px", background: COLORS.vivo, color: "#fff" }}>{coverTagOf(day, client.id)}</span>}
         {recurring && <RefreshCw size={10} style={{ flexShrink: 0, color: shared ? COLORS.clayInk : COLORS.ink3 }} />}
       </div>
     );
@@ -219,6 +253,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
                   {occ.length === 0
                     ? <span style={{ fontSize: 13, color: COLORS.ink3 }}>{t.noClientsShort}</span>
                     : occ.map((c) => <ClientChip key={c.id} day={day} client={c} />)}
+                  <AwayNote day={day} />
                 </div>
                 <div style={{ flexShrink: 0, width: 70, textAlign: "right" }}>
                   {isToday && <Pill variant="paid">{t.todayPill}</Pill>}
@@ -293,6 +328,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
                       {occ.map((c) => <ClientCard key={c.id} day={day} client={c} />)}
                     </div>
                   )}
+                  {awayFor(day).length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}><AwayNote day={day} /></div>}
                 </div>
               )}
             </div>

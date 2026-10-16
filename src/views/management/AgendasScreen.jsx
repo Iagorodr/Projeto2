@@ -1,5 +1,5 @@
 import { useState, useEffect, useId } from "react";
-import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, CalendarDays, AlertTriangle } from "lucide-react";
+import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, CalendarDays, AlertTriangle, ArrowLeftRight } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { FREQ_STYLE, isRecurringFreq } from "../../styles/freqColors.js";
 import { COLORS } from "../../styles/colors.js";
@@ -9,13 +9,14 @@ import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, clientDurationOnDow, clientPartMinutes, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
   isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, absenceOn,
-  isSupervisorRole,
+  isSupervisorRole, agendaClientIdsOn, coveredAwayOn, coveringOn,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
+import { CoverDialog, CoverEditDialog, CoversPanel } from "./CoverDialog.jsx";
 import { PeriodNav, RoundArrow } from "../shared/ui/PeriodNav.jsx";
 import {
-  PageHeader, SegmentedControl, SearchField, FilterChip, Avatar, Pill, SupervisorTag, DataTable, Toast, InfoTip,
+  PageHeader, SegmentedControl, SearchField, FilterChip, Avatar, Pill, SupervisorTag, DataTable, Toast, InfoTip, Button, ConfirmDialog,
 } from "../shared/ui/index.js";
 
 // Coluna de "hoje" (documento, 4.3): fundo #F5FAF7 — valor literal do
@@ -293,7 +294,7 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
 // cliente em cada dia da semana". `assignments` é uma semana-tipo (repete
 // todas as semanas), independente de `client.days`/`frequency` — isso já
 // era assim no ecrã antigo e não muda aqui; só a apresentação muda.
-function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClients, staff, assignments, setAssignments }) {
+function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setCovers, clients, setClients, staff, assignments, setAssignments }) {
   const t = T[lang].agendas;
   const c0 = T[lang].common;
   const tc = T[lang].clientes;
@@ -320,6 +321,10 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   const [openTeam, setOpenTeam] = useState(null);
   const [copyFrom, setCopyFrom] = useState(null); // funcionário de origem do "Copiar agenda"
   const tAbs = T[lang].absences;
+  const tCov = T[lang].coberturas;
+  const [coverOpen, setCoverOpen] = useState(false);
+  const [coverEdit, setCoverEdit] = useState(null); // grupo de coberturas cujas datas se alteram
+  const [coverRemove, setCoverRemove] = useState(null); // { ids, group }
   const { height: ctrlHeight, radius: ctrlRadius } = useControlSize();
   // QA (achado do Iago — "Agendas"): antes era `const weekStart =
   // startOfISOWeek(TODAY)`, fixo — só dava pra ver a semana corrente.
@@ -353,12 +358,30 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
   // Só os clientes que realmente têm visita na SEMANA EM EXIBIÇÃO: quinzenal
   // aparece de 15 em 15 dias, mensal a cada 4 semanas (ver
   // `clientAppliesThisWeek`). O molde semanal em `assignments` não muda.
+  // Inclui as coberturas de férias: o que o dono passou a outro some da
+  // célula dele e aparece na de quem cobre (ver `agendaClientIdsOn`).
   function getCellClientIds(staffId, day) {
-    return (assignments[cellKey(staffId, day)] || []).filter((cid) => {
+    return agendaClientIdsOn(assignments, covers, staffId, weekDates[day - 1]).filter((cid) => {
       const c = clientById(clients, cid);
       return !c || clientAppliesOnDate(c, weekDates[day - 1]);
     });
   }
+  // Clientes que `staffId` só faz neste dia por cobertura (não são da agenda
+  // semanal dele): não se tiram daqui, mexe-se na cobertura.
+  function coverInItems(staffId, day) {
+    return coveringOn(assignments, covers, staffId, weekDates[day - 1]).filter(({ clientId }) => {
+      const c = clientById(clients, clientId);
+      return !c || clientAppliesOnDate(c, weekDates[day - 1]);
+    });
+  }
+  // Clientes da agenda semanal de `staffId` que, neste dia, estão cobertos por outro.
+  function coverAwayItems(staffId, day) {
+    return coveredAwayOn(assignments, covers, staffId, weekDates[day - 1]).filter(({ clientId }) => {
+      const c = clientById(clients, clientId);
+      return !c || clientAppliesOnDate(c, weekDates[day - 1]);
+    });
+  }
+  function firstName(staffId) { const m = staffById(staff, staffId); return m ? m.name.split(" ")[0] : "—"; }
   function teamSizeFor(day, clientId) { return staff.filter((s) => getCellClientIds(s.id, day).includes(clientId)).length; }
   // Lote 4, 4.6: mesma lista que `teamSizeFor` conta, mas devolvendo quem
   // são (não só quantos) — pro popover "quem está no cliente".
@@ -418,6 +441,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
     setCellSearch(""); setOpenCell(null);
   }
   function removeClient(staffId, day, clientId) {
+    if (coverInItems(staffId, day).some((x) => x.clientId === clientId)) { showToast(tCov.lockedHere); return; }
     const key = cellKey(staffId, day);
     const client = clientById(clients, clientId);
     const member = staffById(staff, staffId);
@@ -549,12 +573,14 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
           const date = weekDates[i];
           const isToday = isoDateStr(date) === todayIso;
           const clientIds = getCellClientIds(s.id, day);
+          const coverIn = coverInItems(s.id, day);
+          const coverAway = coverAwayItems(s.id, day);
           const absence = absenceFor(s.id, day);
           const key = cellKey(s.id, day);
           const isOpenPopover = openCell === key;
           const isHovered = hoverCell === key;
           const availableClients = clients
-            .filter((c) => c.name.toLowerCase().includes(cellSearch.toLowerCase()) && !clientIds.includes(c.id))
+            .filter((c) => c.name.toLowerCase().includes(cellSearch.toLowerCase()) && !clientIds.includes(c.id) && !coverAway.some((x) => x.clientId === c.id))
             .sort((a, b) => a.name.localeCompare(b.name));
           return (
             <div
@@ -575,6 +601,13 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
               {clientIds.map((cid) => {
                 const client = clientById(clients, cid);
                 if (!client) return null;
+                const coverInfo = coverIn.find((x) => x.clientId === cid);
+                const coverTag = coverInfo ? (
+                  <span title={tCov.coveringTag(firstName(coverInfo.cover.fromStaffId))}
+                    style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "1px 7px", background: COLORS.vivo, color: "#fff" }}>
+                    {tCov.coveringTag(firstName(coverInfo.cover.fromStaffId))}
+                  </span>
+                ) : null;
                 const team = staffOnClient(day, cid);
                 const teamSize = team.length;
                 const shared = teamSize > 1 && client.hoursMode !== "individual";
@@ -613,6 +646,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                         <span style={{ flex: "1 1 64px", minWidth: 0, whiteSpace: "normal", overflowWrap: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.clayInk }}>
                           {client.name}
                         </span>
+                        {coverTag}
                         {getAutoIds(s.id, day).includes(cid) && (
                           <span title={t.autoChipTitle} style={{ flexShrink: 0, width: 8, height: 8, borderRadius: "50%", background: "#2F5FB3" }} />
                         )}
@@ -645,6 +679,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                     <span style={{ flex: "1 1 64px", minWidth: 0, whiteSpace: "normal", overflowWrap: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.ink }}>
                       {client.name}
                     </span>
+                    {coverTag}
                     {getAutoIds(s.id, day).includes(cid) && (
                           <span title={t.autoChipTitle} style={{ flexShrink: 0, width: 8, height: 8, borderRadius: "50%", background: "#2F5FB3" }} />
                         )}
@@ -652,7 +687,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                       {fmtMinutes(perPerson)}
                     </span>
                     {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: freqStyle.ink }} />}
-                    {isHovered && (
+                    {isHovered && !coverInfo && (
                       <button
                         type="button" onClick={() => removeClient(s.id, day, cid)} aria-label={t.remove}
                         style={{ flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, padding: 0, display: "flex" }}
@@ -660,6 +695,21 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
                         <X size={12} />
                       </button>
                     )}
+                  </div>
+                );
+              })}
+
+              {coverAway.map(({ clientId, cover }) => {
+                const client = clientById(clients, clientId);
+                if (!client) return null;
+                const label = tCov.awayTag(firstName(cover.toStaffId));
+                return (
+                  <div
+                    key={`away-${cover.id}`} title={`${client.name} · ${label}`}
+                    style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 30, borderRadius: RADIUS.chip, padding: "4px 8px", border: `1.5px dashed ${COLORS.line}`, background: "transparent", fontSize: 12.5, opacity: 0.8 }}
+                  >
+                    <span style={{ flex: "1 1 64px", minWidth: 0, whiteSpace: "normal", overflowWrap: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.ink2 }}>{client.name}</span>
+                    <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "1px 7px", background: COLORS.mint, color: COLORS.vivo }}>{label}</span>
                   </div>
                 );
               })}
@@ -894,7 +944,16 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
           value={view} onChange={setView}
         />
         <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
+        {setCovers && <Button variant="secondary" icon={ArrowLeftRight} onClick={() => setCoverOpen(true)}>{tCov.btn}</Button>}
       </div>
+
+      {setCovers && (
+        <CoversPanel
+          t={tCov} covers={covers} staff={staff} clients={clients}
+          onEdit={(g) => setCoverEdit(g)}
+          onRemove={(ids, g) => setCoverRemove({ ids, group: g })}
+        />
+      )}
 
       {weekAbsenceRows.length > 0 && (
         <div style={{ border: `1px solid ${COLORS.alert}`, background: "#FFF7F3", borderRadius: RADIUS.card, padding: "10px 14px", marginBottom: 16 }}>
@@ -1073,6 +1132,35 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, clients, setClien
             })}
           </div>
           <DataTable columns={dayColumns} rows={visibleDayRows} getRowId={(r) => r.client.id} emptyMessage={t.noResultsDay} />
+        </>
+      )}
+
+      {setCovers && (
+        <>
+          <CoverDialog
+            open={coverOpen} onClose={() => setCoverOpen(false)} t={tCov} lang={lang}
+            staff={staff} clients={clients} assignments={assignments} covers={covers} setCovers={setCovers}
+            onDone={(msg) => showToast(msg)}
+          />
+          <CoverEditDialog
+            group={coverEdit} onClose={() => setCoverEdit(null)} t={tCov}
+            covers={covers} setCovers={setCovers} onDone={(msg) => showToast(msg)}
+          />
+          <ConfirmDialog
+            open={!!coverRemove} title={tCov.removeTitle}
+            body={coverRemove ? tCov.removeBody(
+              coverRemove.ids.map((id) => { const cv = covers.find((x) => x.id === id); const c = cv && clientById(clients, cv.clientId); return c ? c.name : "—"; }).join(", "),
+              firstName(coverRemove.group.fromStaffId),
+            ) : ""}
+            cancelLabel={tCov.removeKeep} confirmLabel={tCov.removeConfirm} destructive
+            onCancel={() => setCoverRemove(null)}
+            onConfirm={() => {
+              const ids = new Set(coverRemove.ids);
+              setCovers((prev) => (prev || []).filter((cv) => !ids.has(cv.id)));
+              setCoverRemove(null);
+              showToast(tCov.removedToast);
+            }}
+          />
         </>
       )}
 

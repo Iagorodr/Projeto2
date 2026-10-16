@@ -44,7 +44,7 @@ function emptyHoras() {
 // (5.2.8/5.2.9, fora do período ou já finalizado) continuam de coluna
 // única em qualquer tamanho — o documento só descreve as duas colunas
 // para a vista normal/editável.
-function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [] }) {
+function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [], covers = [] }) {
   const t = T[lang].employeeHoras;
   const pdfT = T[lang].pdf;
   const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang];
@@ -56,7 +56,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // mostra-se sem agenda ("sem clientes"), mesmo que a atribuição em si
   // continue guardada (só deixa de se aplicar nesses dias).
   function scheduledIfActive(d) {
-    return (isStaffActive(me, d) && staffStartedOn(me, d)) ? dayScheduledClients(clients, assignments, staffId, d) : [];
+    return (isStaffActive(me, d) && staffStartedOn(me, d)) ? dayScheduledClients(clients, assignments, staffId, d, covers) : [];
   }
   const tier = useBreakpoint();
   const isDesktop = tier === "desktop";
@@ -405,7 +405,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     return s;
   }
 
-  const myClients = clients.filter((c) => c.id && assignments && Object.entries(assignments).some(([k, ids]) => k.startsWith(`${staffId}-`) && ids.includes(c.id)));
+  // Os meus clientes: os da minha agenda semanal e os que cubro (cobertura de férias de um colega).
+  const myClients = clients.filter((c) => c.id && ((assignments && Object.entries(assignments).some(([k, ids]) => k.startsWith(`${staffId}-`) && ids.includes(c.id))) || (covers || []).some((cv) => cv.clientId === c.id && String(cv.toStaffId) === String(staffId))));
   const addClientResults = addClientSearch.trim()
     ? myClients.filter((c) => c.name.toLowerCase().includes(addClientSearch.toLowerCase()) && !entriesForDay.some((e) => e.clientId === c.id))
     : myClients.filter((c) => !entriesForDay.some((e) => e.clientId === c.id));

@@ -114,6 +114,10 @@ export function useAppController() {
   const [personalNotes, setPersonalNotes] = useState([]);
   // Avisos de falta: { id, staffId, date:"YYYY-MM-DD", note, createdAt, handled }
   const [absences, setAbsences] = useState([]);
+  // Coberturas de férias (só a gerência grava): { id, clientId, fromStaffId,
+  // toStaffId, from:"YYYY-MM-DD", to:"YYYY-MM-DD", createdAt } — ver utils.js
+  // (`agendaClientIdsOn`). A agenda semanal não é alterada: a volta é automática.
+  const [covers, setCovers] = useState([]);
 
   const [hydrated, setHydrated] = useState(!isSupabaseConfigured);
   // QA pós-auditoria (Lote 1, "Gravar só depois de ler"): só true quando
@@ -226,15 +230,16 @@ export function useAppController() {
     closed_periods: { kind: "list", prepend: true },
     personal_notes: { kind: "list", prepend: false },
     absences:       { kind: "list", prepend: false },
+    covers:         { kind: "list", prepend: false },
   };
   const SLICE_COLS = Object.keys(SLICES);
   const sliceSetters = {
     assignments: setAssignments, missing_items: setMissingItems, sent_items: setSentItems,
-    closed_periods: setClosedPeriods, personal_notes: setPersonalNotes, absences: setAbsences,
+    closed_periods: setClosedPeriods, personal_notes: setPersonalNotes, absences: setAbsences, covers: setCovers,
   };
   sliceValRef.current = {
     assignments, missing_items: missingItems, sent_items: sentItems,
-    closed_periods: closedPeriods, personal_notes: personalNotes, absences,
+    closed_periods: closedPeriods, personal_notes: personalNotes, absences, covers,
   };
 
   function emptySlice(col) { return SLICES[col].kind === "map" ? {} : []; }
@@ -841,6 +846,12 @@ export function useAppController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, absences]);
 
+  useEffect(() => {
+    if (!hydrated || !isSupabaseConfigured || !readOk) return;
+    flushSlice("covers");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, readOk, covers]);
+
   function enterManagement() { setPerspective("management"); setScreen("dashboard"); }
   function enterEmployee(staffId) { setLoggedInStaffId(staffId); setPerspective("employee"); setEmpScreen("menu"); }
 
@@ -897,14 +908,15 @@ export function useAppController() {
     setMissingItems([]);
     setSentItems([]);
     setClosedPeriods([]);
+    setCovers([]);
     // A gravação abaixo já limpa estas fatias no servidor: a base passa a vazia.
-    ["assignments", "missing_items", "sent_items", "closed_periods"].forEach((c) => { sliceBaseRef.current[c] = emptySlice(c); });
+    ["assignments", "missing_items", "sent_items", "closed_periods", "covers"].forEach((c) => { sliceBaseRef.current[c] = emptySlice(c); });
     if (isSupabaseConfigured) {
       const results = await Promise.all([
         supabase.from("clients").delete().neq("id", -1),
         supabase.from("staff").delete().neq("id", -1),
         supabase.from("app_data").update({
-          assignments: {}, horas_data: {}, missing_items: [], sent_items: [], closed_periods: [],
+          assignments: {}, horas_data: {}, missing_items: [], sent_items: [], closed_periods: [], covers: [],
         }).eq("id", companyIdRef.current),
       ]);
       results.forEach(({ error }) => { if (error) console.error("Erro ao formatar dados:", error); });
@@ -964,7 +976,7 @@ export function useAppController() {
     clients, setClients, staff, setStaff, assignments, setAssignments,
     horasData, setHorasData, closedPeriods, setClosedPeriods,
     missingItems, setMissingItems, sentItems, setSentItems,
-    personalNotes, setPersonalNotes, absences, setAbsences,
+    personalNotes, setPersonalNotes, absences, setAbsences, covers, setCovers,
     enterManagement, enterEmployee, deleteClient, deleteStaff,
     formatAllData, verifyPassword,
     authLoading, authError, loginWithPassword, logout, passwordGate, requestPasswordReset, setNewPassword,

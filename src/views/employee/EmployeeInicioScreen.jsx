@@ -38,7 +38,7 @@ function dotStyle(state) {
 // EmployeeMenuScreen/SupervisorDashboardScreen antes deste ecrã existir).
 function EmployeeInicioScreen({
   lang, setLang, me, onNavigate, avisosBadge,
-  clients, staff, assignments, horasData, cutoffDay, closedPeriods, personalNotes, absences,
+  clients, staff, assignments, horasData, cutoffDay, closedPeriods, personalNotes, absences, covers,
 }) {
   const t = T[lang].employeeInicio;
   const tMenu = T[lang].employeeMenu;
@@ -59,7 +59,7 @@ function EmployeeInicioScreen({
   // --- Hero "Hoje" ---
   // Etapa 4j (4.9): um dia já fora da validade de uma conta Replacement
   // mostra-se como "sem clientes", mesmo que a atribuição ainda exista.
-  const todayClients = isStaffActive(me, TODAY) ? dayScheduledClients(clients, assignments, me.id, TODAY) : [];
+  const todayClients = isStaffActive(me, TODAY) ? dayScheduledClients(clients, assignments, me.id, TODAY, covers) : [];
   const totalTodayHours = todayClients.reduce((s, c) => s + (c.duration || 0) / 60, 0);
   function isClientCheckedToday(clientId) {
     return (horasEntry.entries || []).some(
@@ -68,18 +68,18 @@ function EmployeeInicioScreen({
   }
 
   // --- "Esta semana" ---
-  const week = thisWeekSummary(clients, assignments, me.id, horasEntry, TODAY, me);
+  const week = thisWeekSummary(clients, assignments, me.id, horasEntry, TODAY, me, covers);
 
   // --- "Precisa da sua atenção" ---
   const payPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
   const payPeriodChunks = weekBlocksOfPayPeriod(payPeriod, cutoffDay);
-  const missingDays = periodMissingDays(clients, assignments, me.id, horasEntry, payPeriodChunks, TODAY, me, absences);
+  const missingDays = periodMissingDays(clients, assignments, me.id, horasEntry, payPeriodChunks, TODAY, me, absences, covers);
   // QA pós-auditoria (Lote 2, "dias em falta na equipa" contando dias):
   // `staffWithGapsCount` passou a devolver { staffCount, totalDays } — o
   // cartão mostra `totalDays` (bate com o total do Monitoramento) e usa
   // `staffCount` só na legenda de apoio ("X funcionários").
   const teamGaps = isSupervisor
-    ? staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, TODAY, absences)
+    ? staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, TODAY, absences, covers)
     : { staffCount: 0, totalDays: 0 };
 
   const attentionItems = [];
