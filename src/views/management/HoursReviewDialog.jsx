@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { X, Check } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { TODAY } from "../../models/data.js";
 import { DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
-  acceptExtra, ackMissing, applySuggestion, assignPendingEntry, clientById, fmtEuro, fmtHoursScreen, hoursImpact, isoDateStr,
+  acceptExtra, ackMissing, applyHoursChanges, applySuggestion, assignPendingEntry, clientById, confirmHoursOk, fmtEuro, fmtHoursScreen, hoursImpact, isoDateStr,
   keepSeparate, reconcileVisits, resolveConflict, voidExtra, weekLabelPT,
 } from "../../models/utils.js";
 import { Button, Pill } from "../shared/ui/index.js";
@@ -19,6 +19,7 @@ import { Button, Pill } from "../shared/ui/index.js";
 // `onChange(nextHorasData, toastMsg)` recebe o novo horasData.
 const SUGGESTED = new Set(["join", "extra", "missing", "leftover"]); // têm caixa de seleção
 const PRESELECT = new Set(["join"]); // vêm marcados à partida (provas claras); o resto marca-se à mão
+const TAB_ORDER = ["hours", "join", "extra", "missing", "leftover", "conflict", "pending"]; // separadores (+ "clients")
 
 function isoToDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
 
@@ -28,7 +29,8 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
   const rec = useMemo(() => (open ? reconcileVisits(horasData, clients, period, ctx, todayIso) : null), [open, horasData, clients, period, ctx, todayIso]);
   const issues = useMemo(() => (rec ? rec.issues : []), [rec]);
   const [selected, setSelected] = useState(() => new Set());
-  const [showClients, setShowClients] = useState(false);
+  const [tab, setTab] = useState(null);
+  const [hoursSel, setHoursSel] = useState(() => new Set()); // lançamentos de "Horas diferentes" ("funcionário|posição")
   const [openClient, setOpenClient] = useState(null);
   const [pick, setPick] = useState({});
   const seen = useRef(new Set());
@@ -42,6 +44,11 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
       return next.size === prev.size && [...next].every((k) => prev.has(k)) ? prev : next;
     });
     issues.forEach((i) => seen.current.add(i.key));
+  }, [issues]);
+
+  useEffect(() => {
+    const valid = new Set(issues.filter((i) => i.kind === "hours").flatMap((i) => i.items.filter((x) => !x.paid).map((x) => `${x.staffId}|${x.idx}`)));
+    setHoursSel((prev) => { const next = new Set([...prev].filter((k) => valid.has(k))); return next.size === prev.size ? prev : next; });
   }, [issues]);
 
   useEffect(() => {
@@ -78,25 +85,43 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
   };
 
   const chosen = issues.filter((i) => selected.has(i.key) && SUGGESTED.has(i.kind) && !(i.kind === "join" && i.paid));
-  const totalEffect = useMemo(() => {
-    if (!open || chosen.length === 0) return null;
+  const nChosen = chosen.length + hoursSel.size;
+  // Aplica o que está marcado (primeiro as sugestões, depois os lançamentos de "Horas diferentes").
+  const buildNext = () => {
     let next = horasData;
     chosen.forEach((i) => { next = applySuggestion(next, clients, i, ctx); });
-    const list = hoursImpact(horasData, next, clients, period);
+    if (hoursSel.size > 0) next = applyHoursChanges(next, clients, period, ctx, [...hoursSel]);
+    return next;
+  };
+  const totalEffect = useMemo(() => {
+    if (!open || nChosen === 0) return null;
+    const list = hoursImpact(horasData, buildNext(), clients, period);
     return { hours: list.reduce((s, x) => s + x.hours, 0), euros: list.reduce((s, x) => s + x.euros, 0) };
-  }, [open, chosen, horasData, clients, ctx, period]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, chosen, hoursSel, horasData, clients, ctx, period]);
 
   if (!open || !rec) return null;
 
-  const selectable = issues.filter((i) => SUGGESTED.has(i.kind) && !(i.kind === "join" && i.paid));
-  const allSelected = selectable.length > 0 && selectable.every((i) => selected.has(i.key));
+  const counts = {};
+  issues.forEach((i) => { counts[i.kind] = (counts[i.kind] || 0) + 1; });
+  const tabs = [...TAB_ORDER.filter((k) => counts[k] > 0), "clients"];
+  const curTab = tab && tabs.includes(tab) ? tab : tabs[0];
+  const tabIssues = issues.filter((i) => i.kind === curTab);
+  const selectable = tabIssues.filter((i) => SUGGESTED.has(i.kind) && !(i.kind === "join" && i.paid));
+  const hoursKeysInTab = curTab === "hours" ? tabIssues.flatMap((i) => i.items.filter((x) => !x.paid).map((x) => `${x.staffId}|${x.idx}`)) : [];
+  const allSelected = curTab === "hours"
+    ? hoursKeysInTab.length > 0 && hoursKeysInTab.every((k) => hoursSel.has(k))
+    : selectable.length > 0 && selectable.every((i) => selected.has(i.key));
   const toggle = (key) => setSelected((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+  const toggleHours = (keys, on) => setHoursSel((prev) => { const next = new Set(prev); keys.forEach((k) => (on ? next.delete(k) : next.add(k))); return next; });
+  const toggleAllInTab = () => {
+    if (curTab === "hours") { setHoursSel((prev) => { const next = new Set(prev); hoursKeysInTab.forEach((k) => (allSelected ? next.delete(k) : next.add(k))); return next; }); return; }
+    setSelected((prev) => { const next = new Set(prev); selectable.forEach((x) => (allSelected ? next.delete(x.key) : next.add(x.key))); return next; });
+  };
   const applyChosen = () => {
-    if (chosen.length === 0) return;
-    let next = horasData;
-    chosen.forEach((i) => { next = applySuggestion(next, clients, i, ctx); });
-    onChange(next, t.reviewDoneApplied(chosen.length));
-    setSelected(new Set());
+    if (nChosen === 0) return;
+    onChange(buildNext(), t.reviewDoneApplied(nChosen));
+    setSelected(new Set()); setHoursSel(new Set());
   };
   const act = (fn, msg) => onChange(fn(), msg);
 
@@ -107,7 +132,7 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
   const pct = rec.totals.expected > 0 ? Math.round((rec.totals.checked / rec.totals.expected) * 100) : 0;
 
   const kindPill = (i) => {
-    const map = { join: ["pending", t.reviewKindJoin], extra: ["neutral", t.reviewKindExtra], missing: ["missing", t.reviewKindMissing], leftover: ["pending", t.reviewKindLeftover], conflict: ["missing", t.reviewKindConflict], pending: ["reopened", t.reviewKindPending] };
+    const map = { join: ["pending", t.reviewKindJoin], extra: ["neutral", t.reviewKindExtra], missing: ["missing", t.reviewKindMissing], leftover: ["pending", t.reviewKindLeftover], conflict: ["missing", t.reviewKindConflict], pending: ["reopened", t.reviewKindPending], hours: ["pending", t.reviewKindHours] };
     const [variant, label] = map[i.kind];
     return <Pill variant={variant}>{label}</Pill>;
   };
@@ -132,6 +157,39 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
         {paidPill}
       </div>
     );
+    if (i.kind === "hours") {
+      const keyOf = (x) => `${x.staffId}|${x.idx}`;
+      const open_ = i.items.filter((x) => !x.paid).map(keyOf);
+      const allOn = open_.length > 0 && open_.every((k) => hoursSel.has(k));
+      return (
+        <div key={i.key} style={card} data-testid="review-issue" data-kind="hours">
+          {head}
+          <div style={line}>{t.reviewHoursWhy(i.items.length)}</div>
+          {open_.length > 0 && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={allOn} onChange={() => toggleHours(open_, allOn)} aria-label={t.reviewHoursAll} data-testid="review-hours-all" />
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{t.reviewHoursAll}</span>
+            </label>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
+            {i.items.map((x) => (
+              <div key={keyOf(x)} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "6px 0", borderTop: `1px solid ${COLORS.lineSoft}`, opacity: x.paid ? 0.6 : 1 }} data-testid="review-hours-row">
+                <input type="checkbox" checked={hoursSel.has(keyOf(x)) && !x.paid} disabled={x.paid} onChange={() => toggleHours([keyOf(x)], hoursSel.has(keyOf(x)))} aria-label={`${dayLabel(x.date)} ${nameOf(x.staffId)}`} />
+                <span style={{ ...line, flex: "1 1 120px", color: COLORS.ink }}>{dayLabel(x.date)} · {firstOf(x.staffId)}{x.paid ? ` · ${t.reviewHoursPaid}` : ""}</span>
+                <span style={{ ...line, fontVariantNumeric: "tabular-nums", fontWeight: 600, color: COLORS.ink }}>{fmtHoursScreen(x.oldHours)} → {fmtHoursScreen(x.newHours)}</span>
+                {!x.paid && <Button variant="ghost" onClick={() => act(() => confirmHoursOk(horasData, clients, period, ctx, [keyOf(x)]), t.reviewDoneHoursOk)}>{t.reviewHoursOk}</Button>}
+              </div>
+            ))}
+          </div>
+          {open_.length > 1 && (
+            <div style={{ marginTop: 6 }}>
+              <Button variant="ghost" onClick={() => act(() => confirmHoursOk(horasData, clients, period, ctx, open_), t.reviewDoneHoursOk)}>{t.reviewHoursOkAll}</Button>
+            </div>
+          )}
+          {i.paid && <div style={{ ...line, marginTop: 4 }}>{t.reviewPaidNote}</div>}
+        </div>
+      );
+    }
     if (i.kind === "join") {
       const nobody = i.targetMarks.length === 0;
       return (
@@ -250,7 +308,7 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
 
   // Grupos por cliente (clientes fora da lista ficam juntos no fim).
   const groups = [];
-  issues.forEach((i) => {
+  tabIssues.forEach((i) => {
     const key = i.clientId == null ? "__pending" : String(i.clientId);
     let g = groups.find((x) => x.key === key);
     if (!g) { g = { key, clientId: i.clientId, items: [] }; groups.push(g); }
@@ -291,116 +349,120 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
             <X size={16} />
           </button>
         </div>
-        <div style={{ overflowY: "auto", flex: 1, minHeight: 0, padding: isMobile ? "0 18px 14px" : "0 24px 14px" }} data-testid="review-body">
-        <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 14 }}>{t.reviewIntro}</div>
-
-        {/* Resumo: visitas previstas × conferidas */}
-        <div style={{ ...card, marginBottom: 16, background: COLORS.lineSoft, border: "none" }} data-testid="review-summary">
-          {rec.totals.expected > 0 ? (
-            <>
-              <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{t.reviewSummary(rec.totals.checked, rec.totals.expected)}</div>
-              <div style={{ height: 8, borderRadius: 999, background: COLORS.line, margin: "8px 0", overflow: "hidden" }} aria-hidden="true">
-                <div style={{ width: `${pct}%`, height: "100%", background: COLORS.ok }} />
-              </div>
-              <div style={line}>{t.reviewClientsOk(rec.totals.clientsOk, rec.totals.clientsTotal)}{rec.totals.checkedUntil ? ` · ${t.reviewCheckedUntil(dm(rec.totals.checkedUntil))}` : ""}</div>
-            </>
-          ) : <div style={{ fontSize: 13.5, color: COLORS.ink }}>{t.reviewSummaryNone}</div>}
-        </div>
-
-        {issues.length === 0 ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: COLORS.okInk, background: COLORS.okTint, borderRadius: RADIUS.control, padding: "12px 14px", marginBottom: 16 }} data-testid="review-allgood">
-            <Check size={16} /> {t.reviewAllGood}
+        {/* Resumo + separadores: ficam fixos; só a lista rola */}
+        <div style={{ padding: isMobile ? "0 18px" : "0 24px", flexShrink: 0 }}>
+          <div style={{ ...card, background: COLORS.lineSoft, border: "none", padding: "8px 12px", marginBottom: 10 }} data-testid="review-summary">
+            {rec.totals.expected > 0 ? (
+              <>
+                <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{t.reviewSummary(rec.totals.checked, rec.totals.expected)}</div>
+                <div style={{ height: 6, borderRadius: 999, background: COLORS.line, margin: "6px 0", overflow: "hidden" }} aria-hidden="true">
+                  <div style={{ width: `${pct}%`, height: "100%", background: COLORS.ok }} />
+                </div>
+                <div style={line}>{t.reviewClientsOk(rec.totals.clientsOk, rec.totals.clientsTotal)}{rec.totals.checkedUntil ? ` · ${t.reviewCheckedUntil(dm(rec.totals.checkedUntil))}` : ""}</div>
+              </>
+            ) : <div style={{ fontSize: 13.5, color: COLORS.ink }}>{t.reviewSummaryNone}</div>}
           </div>
-        ) : (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-              <div style={{ ...sectionTitle, margin: 0 }}>{t.reviewToReviewTitle(issues.length)}</div>
-              {selectable.length > 0 && (
+          <div role="tablist" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, WebkitOverflowScrolling: "touch" }} data-testid="review-tabs">
+            {tabs.map((k) => {
+              const on = k === curTab;
+              const label = k === "clients" ? t.reviewTabClients : ({ hours: t.reviewKindHours, join: t.reviewKindJoin, extra: t.reviewKindExtra, missing: t.reviewKindMissing, leftover: t.reviewKindLeftover, conflict: t.reviewKindConflict, pending: t.reviewKindPending })[k];
+              const n = k === "clients" ? rec.clients.length : counts[k];
+              return (
                 <button
-                  type="button" onClick={() => setSelected(allSelected ? new Set() : new Set(selectable.map((x) => x.key)))}
-                  style={{ border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+                  key={k} type="button" role="tab" aria-selected={on} onClick={() => setTab(k)} data-testid={`review-tab-${k}`}
+                  style={{
+                    flexShrink: 0, whiteSpace: "nowrap", height: 34, padding: "0 12px", borderRadius: 999, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    border: `1px solid ${on ? COLORS.vivo : COLORS.line}`, background: on ? COLORS.vivo : COLORS.card, color: on ? "#fff" : COLORS.ink2,
+                  }}
                 >
-                  {allSelected ? t.reviewSelectNone : t.reviewSelectAll}
+                  {label} <span style={{ opacity: on ? 0.9 : 0.7 }}>({n})</span>
                 </button>
-              )}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {groups.map((g) => {
-                const row = g.clientId == null ? null : rowOf(g.clientId);
-                return (
-                  <div key={g.key} data-testid="review-group">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-                      <div style={{ fontSize: 14.5, fontWeight: 700, color: COLORS.ink }}>{g.clientId == null ? t.reviewKindPending : clientName(g.clientId)}</div>
-                      {row && row.expected > 0 && <div style={{ ...line, fontVariantNumeric: "tabular-nums" }}>{t.reviewClientTally(row.checked, row.expected)}</div>}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{g.items.map(renderIssue)}</div>
-                  </div>
-                );
-              })}
-            </div>
+              );
+            })}
           </div>
-        )}
-
-        {/* Todos os clientes: previstas × conferidas, semana a semana */}
-        {rec.clients.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <button
-              type="button" onClick={() => setShowClients((v) => !v)} data-testid="review-clients-toggle"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
-            >
-              {showClients ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-              {showClients ? t.reviewByClientHide : t.reviewByClient(rec.clients.length)}
-            </button>
-            {showClients && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }} data-testid="review-clients">
-                {rec.clients.map((c) => {
-                  const isOpen = openClient === c.clientId;
-                  const ok = c.expected > 0 && c.checked === c.expected;
+        </div>
+        <div style={{ overflowY: "auto", flex: 1, minHeight: 0, padding: isMobile ? "4px 18px 14px" : "4px 24px 14px", borderTop: `1px solid ${COLORS.lineSoft}` }} data-testid="review-body">
+          {issues.length === 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: COLORS.okInk, background: COLORS.okTint, borderRadius: RADIUS.control, padding: "12px 14px", margin: "10px 0" }} data-testid="review-allgood">
+              <Check size={16} /> {t.reviewAllGood}
+            </div>
+          )}
+          {curTab !== "clients" && tabIssues.length > 0 && (
+            <>
+              <div style={{ display: "flex", justifyContent: "flex-end", margin: "6px 0" }}>
+                {(selectable.length > 0 || hoursKeysInTab.length > 0) && (
+                  <button
+                    type="button" onClick={toggleAllInTab}
+                    style={{ border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+                  >
+                    {allSelected ? t.reviewSelectNone : t.reviewSelectAll}
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {groups.map((g) => {
+                  const row = g.clientId == null ? null : rowOf(g.clientId);
                   return (
-                    <div key={c.clientId} style={{ ...card, padding: "8px 12px" }}>
-                      <button
-                        type="button" onClick={() => setOpenClient(isOpen ? null : c.clientId)}
-                        style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", padding: 0, textAlign: "left" }}
-                      >
-                        <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{c.name}</span>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, ...line, fontVariantNumeric: "tabular-nums" }}>
-                          {c.expected > 0 ? t.reviewClientTally(c.checked, c.expected) : ""}
-                          {ok && <Check size={14} color={COLORS.ok} />}
-                        </span>
-                      </button>
-                      {isOpen && (
-                        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
-                          {c.weeks.filter((w) => w.visits.length > 0).map((w) => (
-                            <div key={w.start}>
-                              <div style={{ ...line, fontWeight: 600, color: COLORS.ink3 }}>{t.reviewWeekOf(weekLabelPT(isoToDate(w.start), lang))}</div>
-                              {w.visits.map((v) => (
-                                <div key={v.date} style={{ ...line, color: v.state === "issue" ? COLORS.amberInk : COLORS.ink2 }}>{visitLine(v)}</div>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    <div key={g.key} data-testid="review-group">
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                        <div style={{ fontSize: 14.5, fontWeight: 700, color: COLORS.ink }}>{g.clientId == null ? t.reviewKindPending : clientName(g.clientId)}</div>
+                        {row && row.expected > 0 && <div style={{ ...line, fontVariantNumeric: "tabular-nums" }}>{t.reviewClientTally(row.checked, row.expected)}</div>}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{g.items.map(renderIssue)}</div>
                     </div>
                   );
                 })}
               </div>
-            )}
-          </div>
-        )}
-
+            </>
+          )}
+          {curTab === "clients" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }} data-testid="review-clients">
+              <div style={{ fontSize: 13, color: COLORS.ink2, lineHeight: 1.45, marginBottom: 4 }}>{t.reviewIntro}</div>
+              {rec.clients.map((c) => {
+                const isOpen = openClient === c.clientId;
+                const ok = c.expected > 0 && c.checked === c.expected;
+                return (
+                  <div key={c.clientId} style={{ ...card, padding: "8px 12px" }}>
+                    <button
+                      type="button" onClick={() => setOpenClient(isOpen ? null : c.clientId)}
+                      style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "center", gap: 8, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", padding: 0, textAlign: "left" }}
+                    >
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{c.name}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, ...line, fontVariantNumeric: "tabular-nums" }}>
+                        {c.expected > 0 ? t.reviewClientTally(c.checked, c.expected) : ""}
+                        {ok && <Check size={14} color={COLORS.ok} />}
+                      </span>
+                    </button>
+                    {isOpen && (
+                      <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+                        {c.weeks.filter((w) => w.visits.length > 0).map((w) => (
+                          <div key={w.start}>
+                            <div style={{ ...line, fontWeight: 600, color: COLORS.ink3 }}>{t.reviewWeekOf(weekLabelPT(isoToDate(w.start), lang))}</div>
+                            {w.visits.map((v) => (
+                              <div key={v.date} style={{ ...line, color: v.state === "issue" ? COLORS.amberInk : COLORS.ink2 }}>{visitLine(v)}</div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Rodapé fixo: efeito total das sugestões marcadas + aplicar */}
         <div style={{ flexShrink: 0, borderTop: `1px solid ${COLORS.line}`, padding: isMobile ? "12px 18px 16px" : "14px 24px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", background: COLORS.card }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, fontVariantNumeric: "tabular-nums", flex: "1 1 180px" }} data-testid="review-total">
-            {issues.length === 0 ? "" : chosen.length === 0 ? t.reviewApplyNone
+            {issues.length === 0 ? "" : nChosen === 0 ? t.reviewApplyNone
               : totalEffect && (Math.abs(totalEffect.hours) > 1e-9 || Math.abs(totalEffect.euros) > 1e-9)
                 ? t.reviewTotalEffect(signed(totalEffect.hours, fmtHoursScreen), signed(totalEffect.euros, fmtEuro))
-                : t.reviewApplyN(chosen.length)}
+                : t.reviewApplyN(nChosen)}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <Button variant="secondary" onClick={onClose}>{t.reviewClose}</Button>
-            {issues.length > 0 && <Button variant="primary" onClick={applyChosen} disabled={chosen.length === 0}>{t.reviewApplyN(chosen.length)}</Button>}
+            {issues.length > 0 && <Button variant="primary" onClick={applyChosen} disabled={nChosen === 0}>{t.reviewApplyN(nChosen)}</Button>}
           </div>
         </div>
       </div>

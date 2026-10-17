@@ -575,15 +575,34 @@ function reconcileVisits(horasData, clients, period, ctx, today) {
       });
     });
   });
+  // Horas diferentes da duração ATUAL do cliente (o antigo "Recalcular horas"), por
+  // lançamento. Fora ficam os lançamentos que esperam por um "juntar" (as horas
+  // acertam-se depois de juntar) e os que a gerência marcou "Está certo" (voltam a
+  // aparecer se a proposta mudar).
+  const inJoin = new Set();
+  issues.filter((i) => i.kind === "join").forEach((i) => [...(i.marks || []), ...(i.targetMarks || [])].forEach((m) => inJoin.add(`${m.staffId}|${m.workDate}|${i.clientId}`)));
+  const hoursByClient = new Map();
+  planHoursRecalc(horasData, clients, period, { ctx }).changes.forEach((c) => {
+    const e = horasData[c.staffId].entries[c.idx];
+    if (e.hoursOk != null && Math.abs(e.hoursOk - c.newHours) < 1e-9) return;
+    if (inJoin.has(`${c.staffId}|${c.date}|${c.clientId}`)) return;
+    if (!hoursByClient.has(c.clientId)) hoursByClient.set(c.clientId, []);
+    hoursByClient.get(c.clientId).push({ ...c, paid: !!(horasData[c.staffId] && horasData[c.staffId].paid) });
+  });
+  hoursByClient.forEach((items, cid) => {
+    items.sort((x, y) => x.date.localeCompare(y.date) || String(x.staffId).localeCompare(String(y.staffId)));
+    issues.push({ kind: "hours", key: `hours|${cid}`, clientId: cid, date: items[0].date, weekStart: null, items, marks: [], paid: items.every((x) => x.paid) });
+  });
   // Pago: não se mexe nas horas de quem já recebeu.
   issues.forEach((i) => {
+    if (i.kind === "hours") return;
     const staffIds = [...(i.marks || []), ...(i.targetMarks || [])].map((m) => m.staffId);
     i.paid = staffIds.some((sid) => horasData[sid] && horasData[sid].paid);
   });
   // Estado de cada visita + contagens.
   const touched = new Map();
   issues.forEach((i) => {
-    if (i.clientId == null || i.kind === "pending") return;
+    if (i.clientId == null || i.kind === "pending" || i.kind === "hours") return;
     if (!touched.has(i.clientId)) touched.set(i.clientId, new Set());
     const set = touched.get(i.clientId);
     if (i.kind === "missing") i.dates.forEach((x) => set.add(x.date)); else set.add(i.date);
@@ -636,9 +655,43 @@ function countReviews(horasData, clients, period, ctx, today) {
   const k = r.byKind;
   const total = r.issues.length;
   return {
-    conflicts: k.conflict || 0, leftovers: k.leftover || 0, joins: k.join || 0, extras: k.extra || 0, missing: k.missing || 0, pending: k.pending || 0,
+    conflicts: k.conflict || 0, hours: k.hours || 0, leftovers: k.leftover || 0, joins: k.join || 0, extras: k.extra || 0, missing: k.missing || 0, pending: k.pending || 0,
     total, attention: total - (k.pending || 0),
   };
+}
+
+// "Horas diferentes": aplica a nova duração SÓ aos lançamentos escolhidos
+// (`keys` = "funcionário|posição"). Quem já está pago não se mexe.
+function applyHoursChanges(horasData, clients, period, ctx, keys) {
+  const { next } = planHoursRecalc(horasData, clients, period, { ctx });
+  let out = horasData;
+  new Set(keys).forEach((k) => {
+    const [sid, idxS] = String(k).split("|");
+    const idx = Number(idxS);
+    const cur = out[sid];
+    if (!cur || cur.paid) return;
+    const ne = next[sid] && next[sid].entries && next[sid].entries[idx];
+    if (!ne) return;
+    // eslint-disable-next-line no-unused-vars
+    const { hoursOk, ...rest } = ne;
+    out = { ...out, [sid]: { ...cur, entries: cur.entries.map((e, i) => (i === idx ? rest : e)) } };
+  });
+  return out;
+}
+// "Está certo": o lançamento fica como está e deixa de aparecer enquanto a proposta
+// de horas for a mesma.
+function confirmHoursOk(horasData, clients, period, ctx, keys) {
+  const { changes } = planHoursRecalc(horasData, clients, period, { ctx });
+  let out = horasData;
+  new Set(keys).forEach((k) => {
+    const [sid, idxS] = String(k).split("|");
+    const idx = Number(idxS);
+    const ch = changes.find((c) => String(c.staffId) === sid && c.idx === idx);
+    const cur = out[sid];
+    if (!ch || !cur) return;
+    out = { ...out, [sid]: { ...cur, entries: cur.entries.map((e, i) => (i === idx ? { ...e, hoursOk: ch.newHours } : e)) } };
+  });
+  return out;
 }
 
 // Efeito de uma alteração em horas e euros por pessoa (para mostrar na lista).
@@ -1645,4 +1698,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

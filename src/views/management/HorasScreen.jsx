@@ -19,7 +19,6 @@ import {
 } from "../shared/ui/index.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
-import RecalcHoursDialog from "./RecalcHoursDialog.jsx";
 import HoursReviewDialog from "./HoursReviewDialog.jsx";
 
 // "2026-09-20" -> Date local (meia-noite), igual ao resto do app faz com
@@ -81,7 +80,6 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [closedToast, setClosedToast] = useState(false);
-  const [recalcOpen, setRecalcOpen] = useState(false);
   const [recalcToast, setRecalcToast] = useState(null); // mensagem do aviso após recalcular
   const [reviewOpen, setReviewOpen] = useState(false);
   // Lote 4, 4.4 (achado da Marta: "Como conferir" pede setas, Exportar PDF,
@@ -419,7 +417,6 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {monthOffset === 0 && <Button variant={reviewCount > 0 ? "primary" : "secondary"} onClick={() => setReviewOpen(true)}>{t.reviewButton(reviewCount)}</Button>}
-          {monthOffset === 0 && <Button variant="secondary" onClick={() => setRecalcOpen(true)}>{t.recalcButton}</Button>}
           <SearchField value={staffSearch} onChange={setStaffSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
         </div>
       </div>
@@ -599,17 +596,6 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         onConfirm={() => reopenForCorrection(openStaff.id)}
       />
 
-      <RecalcHoursDialog
-        open={recalcOpen}
-        onClose={() => setRecalcOpen(false)}
-        onApply={(next, n) => {
-          setHorasData(next);
-          setRecalcOpen(false);
-          setRecalcToast(t.recalcDone(n));
-          setTimeout(() => setRecalcToast(null), 5000);
-        }}
-        horasData={horasData} clients={clients} staff={staff} period={period} t={t} ctx={ctx}
-      />
       <HoursReviewDialog
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
