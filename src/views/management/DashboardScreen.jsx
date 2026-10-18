@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { Users, Building2, RotateCcw, Clock, Undo2, Bell, Calendar, CalendarX, Check } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -264,6 +265,57 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     { key: "contracts", icon: Calendar, label: t.pendingContracts, count: contractsNearExpiry, onClick: () => onNavigate("clientes") },
     { key: "expired", icon: Calendar, label: t.pendingContractsExpired, count: contractsExpired, amber: true, onClick: () => onNavigate("clientes") },
   ].filter((r) => r.count > 0);
+  // Notas = cartão flexível: entra na coluna (Pendências+Destaques ou Reclamações+Cidades)
+  // com mais sobra de espaço e cresce para completá-la; se não houver sobra
+  // suficiente (ou as colunas se empilham, em ecrãs estreitos) desce para baixo das duas.
+  const leftRef = useRef(null);
+  const rightRef = useRef(null);
+  const [notesPlace, setNotesPlace] = useState("bottom");
+  const notesEst = 96 + (myNotes.length === 0 ? 0 : Math.min(3, myNotes.length) * 52);
+  useLayoutEffect(() => {
+    const l = leftRef.current, r = rightRef.current;
+    if (!l || !r) return undefined;
+    const measure = () => {
+      const hl = l.offsetHeight, hr = r.offsetHeight;
+      const stacked = r.offsetTop >= l.offsetTop + hl - 2 || l.offsetTop >= r.offsetTop + hr - 2;
+      const gap = Math.abs(hl - hr) - 16;
+      const next = stacked || gap < notesEst - 70 ? "bottom" : (hl < hr ? "left" : "right");
+      setNotesPlace((prev) => (prev === next ? prev : next));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(l); ro.observe(r);
+    return () => ro.disconnect();
+  }, [notesEst]);
+  const notesCard = (
+    <Card variant="warm" style={{ flex: "1 1 auto", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: myNotes.length === 0 ? 0 : 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{tn.widgetTitle}</div>
+            <button
+              type="button" onClick={() => onNavigate("notas")}
+              style={{
+                border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 700, textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4,
+                cursor: "pointer", fontFamily: "inherit", height: seeAllHeight, padding: "0 4px", display: "inline-flex", alignItems: "center",
+              }}
+            >
+              {tn.seeAll} →
+            </button>
+          </div>
+          {myNotes.length === 0 ? (
+            <div style={{ flex: 1, minHeight: 40, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", fontSize: 13, color: COLORS.ink2 }}>{tn.noNotes}</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {myNotes.slice(0, 3).map((n) => (
+                <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <NoteDateTile iso={n.date} lang={lang} />
+                  <div style={{ fontSize: 13, color: COLORS.ink, lineHeight: 1.35 }}>{n.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+  );
   const row = { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 20 };
   // Lote 4, 4.7: herói com 1,5 parte e os três KPIs com 1 parte cada, na
   // mesma linha no desktop; 2 por 2 no tablet; 1 coluna no celular. Grid
@@ -345,6 +397,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
         {/* Coluna esquerda: só o que está pendente (linhas com contagem 0 não
             aparecem) e Destaques (cresce para igualar a altura da coluna ao lado). */}
         <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div ref={leftRef} style={{ display: "flex", flexDirection: "column", gap: 16, flex: "0 0 auto" }}>
           <Card style={{ flex: "0 0 auto" }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink, marginBottom: 4 }}>{t.pendingTitle}</div>
             {pendingRows.length === 0 ? (
@@ -357,7 +410,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
               ))
             )}
           </Card>
-          <Card style={{ flex: "1 1 auto" }}>
+          <Card style={{ flex: "0 0 auto" }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{t.highlightsTitle}</div>
             <div style={{ fontSize: 12, color: COLORS.ink3, margin: "2px 0 10px" }}>{highlightsSubtitle}</div>
             {topStaff.length === 0 ? (
@@ -379,10 +432,13 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
               </div>
             )}
           </Card>
+          </div>
+          {notesPlace === "left" && notesCard}
         </div>
 
-        {/* Coluna direita: medidor enxuto, logo abaixo "Clientes por cidade" em destaque e as Notas. */}
+        {/* Coluna direita: medidor enxuto e "Clientes por cidade" em destaque. As Notas entram na coluna com mais sobra de espaço. */}
         <div style={{ flex: "1.4 1 440px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div ref={rightRef} style={{ display: "flex", flexDirection: "column", gap: 16, flex: "0 0 auto" }}>
           <ReclamacoesCard
             compact
             current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
@@ -396,33 +452,10 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
             onOpenCity={(city) => onNavigate("clientes", { city })}
             onOpenClients={() => onNavigate("clientes", { filter: "nocity" })}
           />
-          <Card variant="warm" style={{ flex: "1 1 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: myNotes.length === 0 ? 0 : 12 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{tn.widgetTitle}</div>
-            <button
-              type="button" onClick={() => onNavigate("notas")}
-              style={{
-                border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 700, textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4,
-                cursor: "pointer", fontFamily: "inherit", height: seeAllHeight, padding: "0 4px", display: "inline-flex", alignItems: "center",
-              }}
-            >
-              {tn.seeAll} →
-            </button>
           </div>
-          {myNotes.length === 0 ? (
-            <div style={{ fontSize: 13, color: COLORS.ink2 }}>{tn.noNotes}</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {myNotes.slice(0, 3).map((n) => (
-                <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <NoteDateTile iso={n.date} lang={lang} />
-                  <div style={{ fontSize: 13, color: COLORS.ink, lineHeight: 1.35 }}>{n.text}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+          {notesPlace === "right" && notesCard}
         </div>
+        {notesPlace === "bottom" && <div style={{ flex: "1 1 100%", minWidth: 0 }}>{notesCard}</div>}
       </div>
 
       {/* Linha 3 — gráficos de 6 períodos (documento 2.14) */}
