@@ -10,7 +10,7 @@ import {
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro,
-  staffStartedOn, absenceOn, clientDurationOn, findByName, expectedShare, suggestSameVisit, linkSameVisit,
+  staffStartedOn, knownClientsOn, absenceOn, clientDurationOn, findByName, expectedShare, suggestSameVisit, linkSameVisit,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -471,7 +471,9 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   }
 
   // Os meus clientes: os da minha agenda semanal e os que cubro (cobertura de férias de um colega).
-  const myClients = clients.filter((c) => c.id && ((assignments && Object.entries(assignments).some(([k, ids]) => k.startsWith(`${staffId}-`) && ids.includes(c.id))) || (covers || []).some((cv) => cv.clientId === c.id && String(cv.toStaffId) === String(staffId))));
+  const myAgendaClients = clients.filter((c) => c.id && ((assignments && Object.entries(assignments).some(([k, ids]) => k.startsWith(`${staffId}-`) && ids.includes(c.id))) || (covers || []).some((cv) => cv.clientId === c.id && String(cv.toStaffId) === String(staffId))));
+  // + os clientes ocasionais/conhecidos que a gerência deu a esta pessoa (válidos NESTA data: depois da data de remoção já não aparecem).
+  const myClients = [...myAgendaClients, ...knownClientsOn(me, clients, selectedKey).filter((c) => !myAgendaClients.some((x) => x.id === c.id))];
   const addClientResults = addClientSearch.trim()
     ? myClients.filter((c) => c.name.toLowerCase().includes(addClientSearch.toLowerCase()) && !entriesForDay.some((e) => e.clientId === c.id))
     : myClients.filter((c) => !entriesForDay.some((e) => e.clientId === c.id));

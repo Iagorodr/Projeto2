@@ -83,6 +83,7 @@ function toDbStaff(s) {
     can_view_all_clients: !!s.canViewAllClients,
     partner_id: s.partnerId || null,
     start_date: s.startDate || null,
+    known_clients: Array.isArray(s.knownClients) ? s.knownClients : [],
   };
 }
 
@@ -100,6 +101,7 @@ function fromDbStaff(row) {
     canViewAllClients: !!row.can_view_all_clients,
     partnerId: row.partner_id || null,
     startDate: row.start_date || "",
+    knownClients: Array.isArray(row.known_clients) ? row.known_clients : [],
   };
 }
 

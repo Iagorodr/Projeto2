@@ -389,7 +389,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
             labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
           />
           <ClientsByCityCard
-            clients={clients} t={t} mobile={tier === "mobile"}
+            clients={clients.filter((c) => c.clientType !== "occasional")} t={t} mobile={tier === "mobile"}
             style={{ flex: "0 0 auto" }}
             onOpenCity={(city) => onNavigate("clientes", { city })}
             onOpenClients={() => onNavigate("clientes", { filter: "nocity" })}

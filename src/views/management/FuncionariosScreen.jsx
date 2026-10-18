@@ -12,6 +12,7 @@ import {
 } from "../shared/ui/index.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { supabase } from "../../models/supabaseClient.js";
+import KnownClientsSection from "./KnownClientsSection.jsx";
 
 const EMPTY_STAFF = {
   name: "", email: "", contact: "", accountType: "fixo", status: "ativo", validUntil: "",
@@ -412,6 +413,9 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
             ) : (
               <div style={styles.assignedNote}>{t.assignedNote}</div>
             )}
+
+            <SectionTitle>{t.knownClientsTitle}</SectionTitle>
+            <KnownClientsSection staffMember={openStaff} clients={clients} setStaff={setStaff} t={t} />
 
             <SectionTitle>{t.documentsTitle}</SectionTitle>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>

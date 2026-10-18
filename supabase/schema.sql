@@ -41,10 +41,13 @@ create table if not exists staff (
   role text,
   can_view_all_clients boolean not null default false,
   partner_id bigint,
-  start_date date
+  start_date date,
+  known_clients jsonb not null default '[]'::jsonb
 );
 -- Bancos já existentes: alter table staff add column if not exists partner_id bigint;
 -- Bancos já existentes: alter table staff add column if not exists start_date date;
+-- Clientes ocasionais/conhecidos por funcionário: [{ clientId, from:"YYYY-MM-DD", to:"YYYY-MM-DD"|null }]
+-- Bancos já existentes: alter table staff add column if not exists known_clients jsonb not null default '[]'::jsonb;
 
 -- Definições da empresa — uma única linha (id = 1)
 create table if not exists company_settings (

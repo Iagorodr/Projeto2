@@ -8,7 +8,7 @@ import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { TYPE_ICONS, AGENDA_DAYS, TODAY, LANG_NAMES, EMPTY_CLIENT } from "../../models/data.js";
 import {
   startOfISOWeek, addDays, isoDateStr, clientAppliesThisWeek, weekLabelPT,
-  parseDMY, parseClientDate, clientValidityRange, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
+  parseDMY, parseClientDate, isOccasionalClient, clientValidityRange, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
   findByName, planHoursRecalc, fmtEuro,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -36,7 +36,7 @@ function splitClientName(name) {
 }
 
 function contractStatus(client, contractAlertDays) {
-  if (!client.contractEnd) return null;
+  if (!client.contractEnd || client.clientType === "occasional") return null;
   const end = parseDMY(client.contractEnd);
   const diffDays = Math.ceil((end - TODAY) / (24 * 60 * 60 * 1000));
   if (diffDays < 0) return { kind: "expired", diffDays: Math.abs(diffDays) };
@@ -155,6 +155,7 @@ function ClientesScreen({
   // distingue (ver função acima) mas não tinha chip nenhum pra filtrar.
   const [expiredFilterOn, setExpiredFilterOn] = useState(false);
   const [replacementFilterOn, setReplacementFilterOn] = useState(() => navIntent?.filter === "replacement");
+  const [occasionalFilterOn, setOccasionalFilterOn] = useState(false);
   const [noCityFilterOn, setNoCityFilterOn] = useState(() => navIntent?.filter === "nocity"); // clientes cuja cidade não é reconhecida
 
   const [openClientId, setOpenClientId] = useState(null); // id | "new" | null
@@ -185,6 +186,7 @@ function ClientesScreen({
   const activeCount = activeClientsCount(clients, TODAY);
   // Nome canónico da cidade ("nivelles" e "Nivelles" contam como uma só).
   const cityOf = (c) => resolveCity(c.city)?.name || c.city;
+  const occasionalCount = clients.filter(isOccasionalClient).length;
   const noCityCount = clients.filter((c) => !resolveCity(c.city)).length;
   const cities = Array.from(new Set(clients.map(cityOf).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
@@ -198,6 +200,7 @@ function ClientesScreen({
       if (!st || st.kind !== "ending") return false;
     }
     if (replacementFilterOn && c.clientType !== "replacement") return false;
+    if (occasionalFilterOn && c.clientType !== "occasional") return false;
     if (expiredFilterOn) {
       const st = contractStatus(c, contractAlertDays);
       if (!st || st.kind !== "expired") return false;
@@ -252,11 +255,14 @@ function ClientesScreen({
     // Replacement: o antigo "Válido até" acompanha o fim do contrato (o
     // Dashboard e outros ecrãs ainda leem esse campo).
     const canonCity = resolveCity(draft.city)?.name || draft.city;
+    // Ocasional/conhecido: sem contrato, frequência, dias nem horas/mês (não tem agenda).
     const toSave = draft.clientType === "replacement"
       ? { ...draft, city: canonCity, clientValidUntil: (() => { const end = parseClientDate(draft.contractEnd); return end ? isoDateStr(end) : ""; })() }
-      : { ...draft, city: canonCity };
+      : draft.clientType === "occasional"
+        ? { ...draft, city: canonCity, contractStart: "", contractEnd: "", clientValidUntil: "", frequency: "weekly", frequencyAnchor: "", hoursMonth: 0, days: [], durationByDay: {} }
+        : { ...draft, city: canonCity };
     if (isNew) {
-      const created = { ...toSave, id: Date.now(), days: draft.days.length ? draft.days : [1] };
+      const created = { ...toSave, id: Date.now(), days: draft.clientType === "occasional" ? [] : (draft.days.length ? draft.days : [1]) };
       setClients((prev) => [...prev, created]);
       setOpenClientId(created.id);
       setMode("view");
@@ -367,8 +373,9 @@ function ClientesScreen({
     },
   ];
 
-  const anyFilterActive = !!(search.trim() || cityFilter || typeFilter || contractFilterOn || expiredFilterOn || replacementFilterOn || noCityFilterOn);
+  const anyFilterActive = !!(search.trim() || cityFilter || typeFilter || contractFilterOn || expiredFilterOn || replacementFilterOn || occasionalFilterOn || noCityFilterOn);
 
+  const occasional = draft?.clientType === "occasional";
   const drawerClient = isNew ? draft : openClient;
   const drawerStatus = drawerClient && mode === "view" ? contractStatus(drawerClient, contractAlertDays) : null;
   const TypeIcon = drawerClient ? (TYPE_ICONS[drawerClient.type] || Users) : Users;
@@ -407,6 +414,11 @@ function ClientesScreen({
         <FilterChip active={replacementFilterOn} onClick={() => setReplacementFilterOn((v) => !v)}>
           {t.clientTypeReplacement}
         </FilterChip>
+        {occasionalCount > 0 && (
+          <FilterChip active={occasionalFilterOn} onClick={() => setOccasionalFilterOn((v) => !v)} count={occasionalCount}>
+            {t.occasionalChip}
+          </FilterChip>
+        )}
         <FilterChip active={expiredFilterOn} onClick={() => setExpiredFilterOn((v) => !v)}>
           {t.contractExpired}
         </FilterChip>
@@ -500,7 +512,7 @@ function ClientesScreen({
           <>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
               <Pill variant="neutral">{CLIENT_TYPES[openClient.type]}</Pill>
-              <Pill variant="neutral">{openClient.clientType === "replacement" ? t.clientTypeReplacement : t.clientTypeFixed}</Pill>
+              <Pill variant="neutral">{openClient.clientType === "replacement" ? t.clientTypeReplacement : openClient.clientType === "occasional" ? t.clientTypeOccasional : t.clientTypeFixed}</Pill>
               {openClient.origin && <Pill variant="neutral">{openClient.origin}</Pill>}
             </div>
 
@@ -665,6 +677,7 @@ function ClientesScreen({
             <Field label={t.formContact}>
               <input style={styles.input} value={draft.contact} onChange={(e) => updateDraft("contact", e.target.value)} />
             </Field>
+            {!occasional && (<>
             <Field label={t.formFrequency}>
               <select style={styles.input} value={draft.frequency} onChange={(e) => { const v = e.target.value; setDraft((d) => ({ ...d, frequency: v, frequencyAnchor: v === "alternate" && !d.frequencyAnchor ? isoDateStr(TODAY) : d.frequencyAnchor })); }}>
                 {Object.keys(FREQS).map((k) => <option key={k} value={k}>{FREQS[k]}</option>)}
@@ -700,18 +713,23 @@ function ClientesScreen({
                 <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.alternateHint}</div>
               </Field>
             )}
+            </>)}
             <Field label={t.fClientType}>
               <select style={styles.input} value={draft.clientType} onChange={(e) => updateDraft("clientType", e.target.value)}>
                 <option value="fixo">{t.clientTypeFixed}</option>
                 <option value="replacement">{t.clientTypeReplacement}</option>
+                <option value="occasional">{t.clientTypeOccasional}</option>
               </select>
+              {draft.clientType === "occasional" && <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 4 }}>{t.occasionalHint}</div>}
             </Field>
+            {!occasional && (<>
             <Field label={t.formContractStart} required={draft.clientType === "replacement"} error={formErrors.contractStart}>
               <DateField value={draft.contractStart} onChange={(v) => updateDraft("contractStart", v)} openLabel={t.calendarOpen} />
             </Field>
             <Field label={t.formContractEnd} required={draft.clientType === "replacement"} error={formErrors.contractEnd}>
               <DateField value={draft.contractEnd} onChange={(v) => updateDraft("contractEnd", v)} openLabel={t.calendarOpen} />
             </Field>
+            </>)}
             <Field label={t.fHoursMode}>
               <select style={styles.input} value={draft.hoursMode || "dividida"} onChange={(e) => updateDraft("hoursMode", e.target.value)}>
                 <option value="dividida">{t.hoursModeSplit}</option>
@@ -720,6 +738,7 @@ function ClientesScreen({
               <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 4 }}>{draft.hoursMode === "individual" ? t.hoursModeIndividualHint : t.hoursModeSplitHint}</div>
             </Field>
             <Field label={t.formOrigin}><input style={styles.input} value={draft.origin} onChange={(e) => updateDraft("origin", e.target.value)} /></Field>
+            {!occasional && (<>
             <Field label={t.formHoursMonth} full>
               <input
                 type="number" style={{ ...styles.input, ...(suggestionDiffsALot ? { borderColor: COLORS.amberInk, background: COLORS.amberBg } : {}) }}
@@ -739,6 +758,7 @@ function ClientesScreen({
                 </div>
               )}
             </Field>
+            </>)}
             <Field label={t.formValueHour} required error={formErrors.valueHour ? c0.requiredField : undefined}>
               <input type="number" style={styles.input} value={draft.valueHour} onChange={(e) => updateDraft("valueHour", e.target.value)} />
             </Field>
@@ -747,6 +767,7 @@ function ClientesScreen({
               <DurationField value={draft.duration} onChange={(v) => updateDraft("duration", v)} />
               <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.durationHint}</div>
             </Field>
+            {!occasional && (<>
             <Field label={t.formDays} full>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {AGENDA_DAYS.map((d) => {
@@ -794,6 +815,7 @@ function ClientesScreen({
                 </div>
               </Field>
             )}
+            </>)}
             <Field label={t.formDescription} full><textarea style={styles.textarea} rows={2} value={draft.description} onChange={(e) => updateDraft("description", e.target.value)} /></Field>
             <Field label={t.formPriorities} full><textarea style={styles.textarea} rows={2} value={draft.priorities} onChange={(e) => updateDraft("priorities", e.target.value)} /></Field>
             <Field label={t.formNote} full><textarea style={styles.textarea} rows={2} value={draft.note} onChange={(e) => updateDraft("note", e.target.value)} /></Field>
