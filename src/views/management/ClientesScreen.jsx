@@ -14,6 +14,8 @@ import {
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
 import { DateField, DurationField } from "../shared/FormInputs.jsx";
+import CityField from "../shared/CityField.jsx";
+import { resolveCity } from "../../models/cities.js";
 import {
   PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, Drawer, Button, ConfirmDialog, ProgressBar, Card,
 } from "../shared/ui/index.js";
@@ -143,7 +145,7 @@ function ClientesScreen({
   const isMobile = useIsMobile();
 
   const [search, setSearch] = useState("");
-  const [cityFilter, setCityFilter] = useState(null);
+  const [cityFilter, setCityFilter] = useState(() => navIntent?.city || null);
   const [typeFilter, setTypeFilter] = useState(null);
   const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [contractFilterOn, setContractFilterOn] = useState(false);
@@ -153,6 +155,7 @@ function ClientesScreen({
   // distingue (ver função acima) mas não tinha chip nenhum pra filtrar.
   const [expiredFilterOn, setExpiredFilterOn] = useState(false);
   const [replacementFilterOn, setReplacementFilterOn] = useState(() => navIntent?.filter === "replacement");
+  const [noCityFilterOn, setNoCityFilterOn] = useState(() => navIntent?.filter === "nocity"); // clientes cuja cidade não é reconhecida
 
   const [openClientId, setOpenClientId] = useState(null); // id | "new" | null
   const [mode, setMode] = useState("view"); // "view" | "edit"
@@ -180,11 +183,15 @@ function ClientesScreen({
   const signedH = (h) => `${h > 0 ? "+" : h < 0 ? "−" : ""}${fmtHoursScreen(Math.abs(h))}`;
   const signedE = (e) => `${e > 0 ? "+" : e < 0 ? "−" : ""}${fmtEuro(Math.abs(e))}`;
   const activeCount = activeClientsCount(clients, TODAY);
-  const cities = Array.from(new Set(clients.map((c) => c.city).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  // Nome canónico da cidade ("nivelles" e "Nivelles" contam como uma só).
+  const cityOf = (c) => resolveCity(c.city)?.name || c.city;
+  const noCityCount = clients.filter((c) => !resolveCity(c.city)).length;
+  const cities = Array.from(new Set(clients.map(cityOf).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
   const filtered = clients.filter((c) => {
     if (search.trim() && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (cityFilter && c.city !== cityFilter) return false;
+    if (cityFilter && cityOf(c) !== cityFilter) return false;
+    if (noCityFilterOn && resolveCity(c.city)) return false;
     if (typeFilter && c.type !== typeFilter) return false;
     if (contractFilterOn) {
       const st = contractStatus(c, contractAlertDays);
@@ -225,6 +232,7 @@ function ClientesScreen({
     if (!draft.name.trim()) errs.name = true;
     else if (findByName(clients, draft.name, isNew ? null : openClient?.id)) errs.name = c0.nameTakenClient; // nome repetido
     if (!(draft.city || "").trim()) errs.city = true;
+    else if (!resolveCity(draft.city)) errs.city = t.cityInvalid;
     if (!draft.address.trim()) errs.address = true;
     if (!String(draft.valueHour).trim()) errs.valueHour = true;
     if (!(Number(draft.duration) > 0)) errs.duration = true;
@@ -243,9 +251,10 @@ function ClientesScreen({
     if (Object.keys(errs).length > 0) return;
     // Replacement: o antigo "Válido até" acompanha o fim do contrato (o
     // Dashboard e outros ecrãs ainda leem esse campo).
+    const canonCity = resolveCity(draft.city)?.name || draft.city;
     const toSave = draft.clientType === "replacement"
-      ? { ...draft, clientValidUntil: (() => { const end = parseClientDate(draft.contractEnd); return end ? isoDateStr(end) : ""; })() }
-      : draft;
+      ? { ...draft, city: canonCity, clientValidUntil: (() => { const end = parseClientDate(draft.contractEnd); return end ? isoDateStr(end) : ""; })() }
+      : { ...draft, city: canonCity };
     if (isNew) {
       const created = { ...toSave, id: Date.now(), days: draft.days.length ? draft.days : [1] };
       setClients((prev) => [...prev, created]);
@@ -358,7 +367,7 @@ function ClientesScreen({
     },
   ];
 
-  const anyFilterActive = !!(search.trim() || cityFilter || typeFilter || contractFilterOn || expiredFilterOn || replacementFilterOn);
+  const anyFilterActive = !!(search.trim() || cityFilter || typeFilter || contractFilterOn || expiredFilterOn || replacementFilterOn || noCityFilterOn);
 
   const drawerClient = isNew ? draft : openClient;
   const drawerStatus = drawerClient && mode === "view" ? contractStatus(drawerClient, contractAlertDays) : null;
@@ -401,6 +410,11 @@ function ClientesScreen({
         <FilterChip active={expiredFilterOn} onClick={() => setExpiredFilterOn((v) => !v)}>
           {t.contractExpired}
         </FilterChip>
+        {noCityCount > 0 && (
+          <FilterChip active={noCityFilterOn} onClick={() => setNoCityFilterOn((v) => !v)} count={noCityCount}>
+            {t.noCityChip}
+          </FilterChip>
+        )}
         <div style={{ position: "relative" }}>
           <FilterChip active={!!typeFilter} onClick={() => setTypeMenuOpen((o) => !o)}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -644,7 +658,7 @@ function ClientesScreen({
                 {Object.keys(CLIENT_TYPES).map((k) => <option key={k} value={k}>{CLIENT_TYPES[k]}</option>)}
               </select>
             </Field>
-            <Field label={t.formCity} required error={formErrors.city ? c0.requiredField : undefined}><input style={styles.input} value={draft.city} onChange={(e) => updateDraft("city", e.target.value)} /></Field>
+            <Field label={t.formCity} required error={formErrors.city === true ? c0.requiredField : formErrors.city || undefined}><CityField value={draft.city} onChange={(v) => updateDraft("city", v)} placeholder={t.cityPlaceholder} noMatchLabel={t.cityNotFound} /></Field>
             <Field label={t.formAddress} full required error={formErrors.address ? c0.requiredField : undefined}>
               <input style={styles.input} value={draft.address} onChange={(e) => updateDraft("address", e.target.value)} />
             </Field>

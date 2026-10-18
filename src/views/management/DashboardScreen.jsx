@@ -10,6 +10,7 @@ import {
   monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews, inReviewWindow,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
+import ClientsByCityCard from "./ClientsByCityCard.jsx";
 import {
   PageHeader, Card, KpiCard, SegmentedBar, Avatar, ReclamacoesCard, PeriodBarChart, PeriodLineChart, ChevronCircle,
 } from "../shared/ui/index.js";
@@ -52,14 +53,14 @@ function PendingRow({ icon: Icon, label, count, amber, onClick, okLabel, last })
       type="button"
       onClick={onClick}
       style={{
-        display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 2px",
+        display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "7px 2px",
         border: "none", borderBottom: last ? "none" : `1px solid ${COLORS.line}`, background: "transparent",
         cursor: "pointer", textAlign: "left", fontFamily: "inherit", opacity: isZero ? 0.55 : 1,
       }}
     >
       <div
         style={{
-          width: 38, height: 38, borderRadius: RADIUS.chip, flexShrink: 0,
+          width: 34, height: 34, borderRadius: RADIUS.chip, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
           background: useAmber ? COLORS.amberBg : COLORS.forest50,
           color: useAmber ? COLORS.amberInk : COLORS.forest600,
@@ -75,7 +76,7 @@ function PendingRow({ icon: Icon, label, count, amber, onClick, okLabel, last })
       ) : (
         <div
           style={{
-            width: 34, height: 34, borderRadius: RADIUS.chip, flexShrink: 0,
+            width: 30, height: 30, borderRadius: RADIUS.chip, flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
             background: useAmber ? COLORS.amberBg : COLORS.lineSoft,
             color: useAmber ? COLORS.amberInk : COLORS.ink,
@@ -249,6 +250,18 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     { label: currentLabel, value: currentPeriodHours, dateRangeLabel: currentPeriodLabel },
   ];
 
+  // Só o que realmente está pendente (contagem > 0) aparece no cartão.
+  const pendingRows = [
+    { key: "overtime", icon: Clock, label: t.pendingOvertime, count: overtimePending, amber: true, onClick: () => onNavigate("horas") },
+    { key: "custom", icon: Clock, label: t.pendingCustomClient, count: customClientPending, amber: true, onClick: () => onNavigate("horas") },
+    { key: "share", icon: Clock, label: t.pendingShareReview, count: shareReviewPending, amber: true, onClick: () => onNavigate("horas") },
+    { key: "visits", icon: Clock, label: t.pendingVisitReviews, count: visitReviewsPending, amber: true, onClick: () => onNavigate("horas") },
+    { key: "reopened", icon: Undo2, label: t.pendingReopened, count: reopenedCount, onClick: () => onNavigate("horas") },
+    { key: "unread", icon: Bell, label: t.pendingUnread, count: pendingRequests, onClick: () => onNavigate("avisos") },
+    { key: "absence", icon: CalendarX, label: tAbs.pendency, count: absencesPending, amber: true, onClick: () => onNavigate("agendas") },
+    { key: "contracts", icon: Calendar, label: t.pendingContracts, count: contractsNearExpiry, onClick: () => onNavigate("clientes") },
+    { key: "expired", icon: Calendar, label: t.pendingContractsExpired, count: contractsExpired, amber: true, onClick: () => onNavigate("clientes") },
+  ].filter((r) => r.count > 0);
   const row = { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 20 };
   // Lote 4, 4.7: herói com 1,5 parte e os três KPIs com 1 parte cada, na
   // mesma linha no desktop; 2 por 2 no tablet; 1 coluna no celular. Grid
@@ -327,33 +340,22 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
             para 260 — o mesmo piso já usado no cartão de Notas ao lado,
             que nunca deu problema — sem mudar a largura preferida (420)
             que já era usada em telas largas. */}
-        <Card style={{ flex: "1 1 420px", minWidth: 260 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>{t.pendingTitle}</div>
-          <PendingRow icon={Clock} label={t.pendingOvertime} count={overtimePending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
-          <PendingRow icon={Clock} label={t.pendingCustomClient} count={customClientPending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
-          <PendingRow icon={Clock} label={t.pendingShareReview} count={shareReviewPending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
-          <PendingRow icon={Clock} label={t.pendingVisitReviews} count={visitReviewsPending} amber onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
-          <PendingRow icon={Undo2} label={t.pendingReopened} count={reopenedCount} onClick={() => onNavigate("horas")} okLabel={t.pendingAllOk} />
-          <PendingRow icon={Bell} label={t.pendingUnread} count={pendingRequests} onClick={() => onNavigate("avisos")} okLabel={t.pendingAllOk} />
-          {/* "Contratos a vencer -> Clientes (filtro)": a navegação ainda não
-              sabe levar um filtro pré-aplicado (Clientes em si só é
-              redesenhado na 4f) — por agora só abre a tela, como o
-              Dashboard antigo já fazia. */}
-          <PendingRow icon={CalendarX} label={tAbs.pendency} count={absencesPending} amber onClick={() => onNavigate("agendas")} okLabel={t.pendingAllOk} />
-          <PendingRow icon={Calendar} label={t.pendingContracts} count={contractsNearExpiry} onClick={() => onNavigate("clientes")} okLabel={t.pendingAllOk} />
-          {/* QA pós-auditoria (Lote 3): linha própria para os já vencidos —
-              "Em dia" só aparece quando NEM esta nem a de cima têm contagem. */}
-          <PendingRow icon={Calendar} label={t.pendingContractsExpired} count={contractsExpired} amber onClick={() => onNavigate("clientes")} okLabel={t.pendingAllOk} last />
-        </Card>
-
-        <div style={{ flex: "1 1 260px", minWidth: 240, display: "flex", flexDirection: "column", gap: 16 }}>
-          <ReclamacoesCard
-            current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
-            recent={recentComplaints}
-            title={t.complaintsTitle} subtitle={t.complaintsSubtitle}
-            labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
-          />
-          <Card>
+        {/* Coluna esquerda: só o que está pendente (linhas com contagem 0 não
+            aparecem) e Destaques (cresce para igualar a altura da coluna ao lado). */}
+        <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          <Card style={{ flex: "0 0 auto" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink, marginBottom: 4 }}>{t.pendingTitle}</div>
+            {pendingRows.length === 0 ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: COLORS.ok, fontWeight: 600, padding: "8px 0 2px" }}>
+                <Check size={16} /> {t.pendingNone}
+              </div>
+            ) : (
+              pendingRows.map((r, i) => (
+                <PendingRow key={r.key} icon={r.icon} label={r.label} count={r.count} amber={r.amber} onClick={r.onClick} okLabel={t.pendingAllOk} last={i === pendingRows.length - 1} />
+              ))
+            )}
+          </Card>
+          <Card style={{ flex: "1 1 auto" }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{t.highlightsTitle}</div>
             <div style={{ fontSize: 12, color: COLORS.ink3, margin: "2px 0 10px" }}>{highlightsSubtitle}</div>
             {topStaff.length === 0 ? (
@@ -377,7 +379,22 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           </Card>
         </div>
 
-        <Card variant="warm" style={{ flex: "1 1 320px", minWidth: 260 }}>
+        {/* Coluna direita: medidor enxuto, logo abaixo "Clientes por cidade" em destaque e as Notas. */}
+        <div style={{ flex: "1.4 1 440px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          <ReclamacoesCard
+            compact
+            current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
+            recent={recentComplaints}
+            title={t.complaintsTitle} subtitle={t.complaintsSubtitle}
+            labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
+          />
+          <ClientsByCityCard
+            clients={clients} t={t} mobile={tier === "mobile"}
+            style={{ flex: "0 0 auto" }}
+            onOpenCity={(city) => onNavigate("clientes", { city })}
+            onOpenClients={() => onNavigate("clientes", { filter: "nocity" })}
+          />
+          <Card variant="warm" style={{ flex: "1 1 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: myNotes.length === 0 ? 0 : 12 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{tn.widgetTitle}</div>
             <button
@@ -403,6 +420,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
             </div>
           )}
         </Card>
+        </div>
       </div>
 
       {/* Linha 3 — gráficos de 6 períodos (documento 2.14) */}

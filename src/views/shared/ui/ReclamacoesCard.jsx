@@ -42,7 +42,7 @@ const BAND_STYLE = {
 // Régua de 3 segmentos: Excelente (largura proporcional ao limiar),
 // Razoável (idem) e Crítico (sem limite superior — usa a mesma largura do
 // segmento Razoável só pra efeito visual, já que "13+" não tem topo).
-function Ruler({ current, excelenteThreshold, razoavelThreshold, band }) {
+function Ruler({ current, excelenteThreshold, razoavelThreshold, band, compact }) {
   const segExcelente = Math.max(excelenteThreshold, 1);
   const segRazoavel = Math.max(razoavelThreshold - excelenteThreshold, 1);
   const segCritico = segRazoavel; // largura de referência, sem teto real
@@ -64,7 +64,7 @@ function Ruler({ current, excelenteThreshold, razoavelThreshold, band }) {
   const style = BAND_STYLE[band];
 
   return (
-    <div style={{ marginTop: 16 }}>
+    <div style={{ marginTop: compact ? 10 : 16 }}>
       <div style={{ position: "relative", display: "flex", height: 10, borderRadius: 5, overflow: "hidden" }}>
         <div style={{ width: `${wExcelente}%`, background: COLORS.okTint }} />
         <div style={{ width: `${wRazoavel}%`, background: style.ruleBg || "#FFF6E0" }} />
@@ -91,6 +91,8 @@ function ReclamacoesCard({
   current, excelenteThreshold, razoavelThreshold, recent = [],
   title = "Reclamações", subtitle = "este mês",
   labels = { excelente: "Excelente", razoavel: "Razoável", critico: "Crítico" },
+  // `compact`: versão mais enxuta (Dashboard) — número menor, menos espaço, só a última reclamação.
+  compact,
 }) {
   const band = bandFor(current, excelenteThreshold, razoavelThreshold);
   const style = BAND_STYLE[band];
@@ -105,15 +107,15 @@ function ReclamacoesCard({
         <Pill variant={style.pillVariant}>{labels[band]}</Pill>
       </div>
 
-      <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 64, lineHeight: 1, color: COLORS.ink, marginTop: 8 }}>
+      <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: compact ? 44 : 64, lineHeight: 1, color: COLORS.ink, marginTop: compact ? 4 : 8 }}>
         {current}
       </div>
 
-      <Ruler current={current} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold} band={band} />
+      <Ruler current={current} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold} band={band} compact={compact} />
 
       {recent.length > 0 && (
-        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-          {recent.slice(0, 2).map((item, i) => (
+        <div style={{ marginTop: compact ? 10 : 16, display: "flex", flexDirection: "column", gap: 6 }}>
+          {recent.slice(0, compact ? 1 : 2).map((item, i) => (
             <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: COLORS.ink2 }}>
               <span>{item.client}</span>
               <span>{item.date}</span>
