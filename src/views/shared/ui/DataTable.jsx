@@ -38,6 +38,10 @@ function DataTable({
   selectedIds, onToggleSelect, onToggleSelectAll,
   emptyIcon: EmptyIcon = Inbox, emptyMessage = "Nada por aqui.", emptyAction,
   loading, skeletonRows = 5,
+  // `fit`: a tabela ocupa só a largura disponível — sem rolagem lateral, sem
+  // primeira coluna pegajosa e com os títulos a quebrar linha. Opt-in por ecrã
+  // (Monitoramento); as outras tabelas continuam exatamente como estavam.
+  fit,
 }) {
   const [hoverId, setHoverId] = useState(null);
   const rowHeight = dense ? 48 : 56;
@@ -57,7 +61,7 @@ function DataTable({
   return (
     <div style={{ position: "relative", border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, overflow: "hidden", background: COLORS.card }}>
       <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: "100%", width: "max-content" }}>
+        <div style={fit ? { width: "100%" } : { minWidth: "100%", width: "max-content" }}>
           {/* Cabeçalho — pegajoso no topo. */}
           <div
             style={{
@@ -93,7 +97,8 @@ function DataTable({
                   fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
                   color: COLORS.ink2, background: "transparent", border: "none",
                   cursor: col.sortable ? "pointer" : "default", padding: 0, fontFamily: "inherit",
-                  position: i === 0 && !selectable ? "sticky" : "static", left: i === 0 ? 0 : undefined,
+                  ...(fit ? { textAlign: "left", lineHeight: 1.2, overflow: "hidden" } : {}),
+                  position: i === 0 && !selectable && !fit ? "sticky" : "static", left: i === 0 ? 0 : undefined,
                 }}
               >
                 {col.label}
@@ -168,8 +173,8 @@ function DataTable({
                         overflow: col.allowOverflow ? "visible" : "hidden",
                         textOverflow: col.allowOverflow ? undefined : "ellipsis",
                         whiteSpace: col.allowOverflow ? undefined : "nowrap",
-                        position: i === 0 && !selectable ? "sticky" : "static", left: i === 0 ? 0 : undefined,
-                        background: i === 0 && !selectable ? "inherit" : undefined,
+                        position: i === 0 && !selectable && !fit ? "sticky" : "static", left: i === 0 ? 0 : undefined,
+                        background: i === 0 && !selectable && !fit ? "inherit" : undefined,
                       }}
                     >
                       {col.render ? col.render(row) : row[col.key]}

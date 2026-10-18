@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Lock } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -36,6 +36,19 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   const [openStaffId, setOpenStaffId] = useState(null);
   const [remindedIds, setRemindedIds] = useState([]); // lembrados nesta sessão (evita repetir sem querer)
   const tier = useBreakpoint();
+  // Largura real da área do ecrã: abaixo de ~940px a tabela não cabe com uma
+  // coluna por bloco (e rolar para o lado não é aceitável) — nesse caso só
+  // ficam o funcionário e o total em falta; o detalhe por bloco continua no
+  // extrato (gaveta).
+  const wrapRef = useRef(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(([entry]) => setNarrow(entry.contentRect.width < 940));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const isSupervisorView = !!onHome;
 
   // Período aberto pelo histórico real de fechamentos (não por TODAY puro —
@@ -205,9 +218,9 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   // dinamicamente a partir de `blocks` (normalmente 4), mais a coluna do
   // nome e a de total em falta com o botão "Ver extrato" (documento, 4.5:
   // "última coluna: total em falta + botão 'Ver extrato'").
-  const tableColumns = [
+  const allColumns = [
     {
-      key: "staff", label: th.colStaff, width: 2, minWidth: 170,
+      key: "staff", label: th.colStaff, width: 2, minWidth: 120,
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
           <Avatar name={row.staffMember.name} size={32} />
@@ -216,7 +229,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       ),
     },
     ...blocks.map((chunk, bi) => ({
-      key: `block-${bi}`, label: calPeriodLabel(chunk, lang), width: 1, minWidth: 112,
+      key: `block-${bi}`, label: calPeriodLabel(chunk, lang), width: 1, minWidth: 84,
       render: (row) => {
         const w = row.weeksInfo[bi];
         if (w.locked) return <span style={{ display: "inline-flex", alignItems: "center", color: COLORS.ink3 }}><Lock size={13} /></span>;
@@ -233,20 +246,21 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       // cortado (sem reticências, porque o `overflow: hidden` de
       // DataTable.jsx não aplica elipse a um filho em flex/bloco como um
       // `<Button>`, só a texto que estoura direto na célula).
-      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 290,
+      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 214, allowOverflow: true,
       render: (row) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={(ev) => ev.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={(ev) => ev.stopPropagation()}>
           {row.totalGaps > 0 && <span style={{ fontWeight: 700, color: COLORS.alert, fontSize: 13 }}>{row.totalGaps}</span>}
           {row.totalGaps > 0 && setSentItems && (
-            <Button variant="secondary" disabled={remindedIds.includes(row.staffMember.id)} onClick={() => remindStaff(row.staffMember.id, row.totalGaps)}>
+            <Button variant="secondary" style={{ padding: "0 12px" }} disabled={remindedIds.includes(row.staffMember.id)} onClick={() => remindStaff(row.staffMember.id, row.totalGaps)}>
               {remindedIds.includes(row.staffMember.id) ? t.reminded : t.remind}
             </Button>
           )}
-          <Button variant="secondary" onClick={() => setOpenStaffId(row.staffMember.id)}>{t.viewExtract}</Button>
+          <Button variant="secondary" style={{ padding: "0 12px" }} onClick={() => setOpenStaffId(row.staffMember.id)}>{t.viewExtract}</Button>
         </div>
       ),
     },
   ];
+  const tableColumns = narrow ? allColumns.filter((c) => !c.key.startsWith("block-")) : allColumns;
 
   // ---------------------------------------------------------------------
   // Ramo gerência (4.5): PageHeader + faixa de 3 números + chips + pesquisa
@@ -254,7 +268,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   // ---------------------------------------------------------------------
   if (!isSupervisorView) {
     return (
-      <div style={styles.content}>
+      <div style={styles.content} ref={wrapRef}>
         <PageHeader
           title={t.title} subtitle={t.subtitlePeriodUpdated(periodLabel)}
           lang={lang} setLang={setLang} langNames={LANG_NAMES}
@@ -293,6 +307,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
           getRowId={(row) => row.staffMember.id}
           onRowClick={(row) => setOpenStaffId(row.staffMember.id)}
           emptyMessage={t.noResults}
+          fit
         />
 
         {extractDrawer}
