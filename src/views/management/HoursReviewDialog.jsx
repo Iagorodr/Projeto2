@@ -6,7 +6,7 @@ import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { TODAY } from "../../models/data.js";
 import { DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
-  acceptExtra, ackMissing, applyHoursChanges, applySuggestion, assignPendingEntry, clientById, confirmHoursOk, fmtEuro, fmtHoursScreen, hoursImpact, isoDateStr,
+  acceptExtra, ackMissing, markRepassed, outsideLeftover, applyHoursChanges, applySuggestion, assignPendingEntry, clientById, confirmHoursOk, fmtEuro, fmtHoursScreen, hoursImpact, isoDateStr,
   keepSeparate, reconcileVisits, resolveConflict, voidExtra, weekLabelPT,
 } from "../../models/utils.js";
 import { Button, Pill } from "../shared/ui/index.js";
@@ -19,17 +19,18 @@ import { Button, Pill } from "../shared/ui/index.js";
 // `onChange(nextHorasData, toastMsg)` recebe o novo horasData.
 const SUGGESTED = new Set(["join", "extra", "missing", "leftover"]); // têm caixa de seleção
 const PRESELECT = new Set(["join"]); // vêm marcados à partida (provas claras); o resto marca-se à mão
-const TAB_ORDER = ["hours", "join", "extra", "missing", "leftover", "conflict", "pending"]; // separadores (+ "clients")
+const TAB_ORDER = ["hours", "join", "extra", "missing", "leftover", "conflict", "pending", "repass"]; // separadores (+ "clients")
 
 function isoToDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
 
-export default function HoursReviewDialog({ open, onClose, onChange, horasData, clients, staff, period, ctx, lang, t }) {
+export default function HoursReviewDialog({ open, onClose, onChange, horasData, clients, staff, period, ctx, lang, t, initialTab = null }) {
   const isMobile = useIsMobile();
   const todayIso = isoDateStr(TODAY);
   const rec = useMemo(() => (open ? reconcileVisits(horasData, clients, period, ctx, todayIso) : null), [open, horasData, clients, period, ctx, todayIso]);
   const issues = useMemo(() => (rec ? rec.issues : []), [rec]);
   const [selected, setSelected] = useState(() => new Set());
-  const [tab, setTab] = useState(null);
+  const [tab, setTab] = useState(initialTab);
+  const [outsideAsk, setOutsideAsk] = useState(null); // chave da sobra que está a perguntar "Outro funcionário"
   const [hoursSel, setHoursSel] = useState(() => new Set()); // lançamentos de "Horas diferentes" ("funcionário|posição")
   const [openClient, setOpenClient] = useState(null);
   const [pick, setPick] = useState({});
@@ -132,7 +133,7 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
   const pct = rec.totals.expected > 0 ? Math.round((rec.totals.checked / rec.totals.expected) * 100) : 0;
 
   const kindPill = (i) => {
-    const map = { join: ["pending", t.reviewKindJoin], extra: ["neutral", t.reviewKindExtra], missing: ["missing", t.reviewKindMissing], leftover: ["pending", t.reviewKindLeftover], conflict: ["missing", t.reviewKindConflict], pending: ["reopened", t.reviewKindPending], hours: ["pending", t.reviewKindHours] };
+    const map = { join: ["pending", t.reviewKindJoin], extra: ["neutral", t.reviewKindExtra], missing: ["missing", t.reviewKindMissing], leftover: ["pending", t.reviewKindLeftover], conflict: ["missing", t.reviewKindConflict], pending: ["reopened", t.reviewKindPending], repass: ["reopened", t.reviewKindRepass], hours: ["pending", t.reviewKindHours] };
     const [variant, label] = map[i.kind];
     return <Pill variant={variant}>{label}</Pill>;
   };
@@ -252,6 +253,39 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
           <div style={{ ...line, fontVariantNumeric: "tabular-nums" }}>{t.reviewLeftoverGain(fmtHoursScreen(i.leftoverHours), fmtEuro(i.leftoverHours * (clientById(clients, i.clientId)?.valueHour || 0)))}</div>
           <div style={{ ...line, marginTop: 4 }}>{t.reviewLeftoverHint}</div>
           {suggestRow(i, t.reviewLeftoverSuggest, false)}
+          {outsideAsk === i.key ? (
+            <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: RADIUS.control, background: COLORS.lineSoft }} data-testid="review-outside-ask">
+              <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, marginBottom: 8 }}>{t.reviewOutsideAsk}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div>
+                  <Button variant="secondary" onClick={() => { setOutsideAsk(null); act(() => outsideLeftover(horasData, clients, i, "remove", ctx), t.reviewDoneOutsideRemove); }}>{t.reviewOutsideRemove}</Button>
+                  <div style={{ ...line, marginTop: 3 }}>{t.reviewOutsideRemoveHint}</div>
+                </div>
+                <div>
+                  <Button variant="secondary" onClick={() => { setOutsideAsk(null); act(() => outsideLeftover(horasData, clients, i, "repass", ctx), t.reviewDoneOutsideRepass); }}>{t.reviewOutsideRepass}</Button>
+                  <div style={{ ...line, marginTop: 3 }}>{t.reviewOutsideRepassHint}</div>
+                </div>
+                <div><Button variant="ghost" onClick={() => setOutsideAsk(null)}>{t.reviewOutsideCancel}</Button></div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop: 8 }}>
+              <Button variant="ghost" onClick={() => setOutsideAsk(i.key)} data-testid="review-outside-btn">{t.reviewOutsideBtn}</Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+    if (i.kind === "repass") {
+      const value = i.hours * (clientById(clients, i.clientId)?.valueHour || 0);
+      return (
+        <div key={i.key} style={card} data-testid="review-issue" data-kind="repass">
+          {head}
+          <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{dayLabel(i.date)}</div>
+          <div style={{ ...line, fontVariantNumeric: "tabular-nums" }}>{t.reviewRepassWhy(fmtHoursScreen(i.hours), fmtEuro(value), namesOf(i.markerIds))}</div>
+          <div style={{ marginTop: 8 }}>
+            <Button variant="secondary" onClick={() => act(() => markRepassed(horasData, i.date, i.clientId), t.reviewDoneRepassed)} data-testid="review-repassed-btn">{t.reviewRepassBtn}</Button>
+          </div>
         </div>
       );
     }
@@ -365,7 +399,7 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
           <div role="tablist" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, WebkitOverflowScrolling: "touch" }} data-testid="review-tabs">
             {tabs.map((k) => {
               const on = k === curTab;
-              const label = k === "clients" ? t.reviewTabClients : ({ hours: t.reviewKindHours, join: t.reviewKindJoin, extra: t.reviewKindExtra, missing: t.reviewKindMissing, leftover: t.reviewKindLeftover, conflict: t.reviewKindConflict, pending: t.reviewKindPending })[k];
+              const label = k === "clients" ? t.reviewTabClients : ({ hours: t.reviewKindHours, join: t.reviewKindJoin, extra: t.reviewKindExtra, missing: t.reviewKindMissing, leftover: t.reviewKindLeftover, conflict: t.reviewKindConflict, pending: t.reviewKindPending, repass: t.reviewKindRepass })[k];
               const n = k === "clients" ? rec.clients.length : counts[k];
               return (
                 <button

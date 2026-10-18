@@ -66,7 +66,7 @@ function groupEntriesByBlock(entries, payPeriodChunks, lang) {
 // filtro, `DataTable`, gaveta de 640 (em vez do modal centrado) com os
 // lançamentos agrupados por bloco do período, e confirmação escrita para
 // "Reabrir" (que antes agia direto, sem perguntar nada).
-function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHorasData, cutoffDay, closedPeriods, setClosedPeriods, sentItems, missingItems, setSentItems, setMissingItems, assignments = {}, covers = [], absences = [] }) {
+function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHorasData, cutoffDay, closedPeriods, setClosedPeriods, sentItems, missingItems, setSentItems, setMissingItems, assignments = {}, covers = [], absences = [], navIntent = null }) {
   const t = T[lang].horas;
   const c0 = T[lang].common;
   const pdfT = T[lang].pdf;
@@ -81,7 +81,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [closedToast, setClosedToast] = useState(false);
   const [recalcToast, setRecalcToast] = useState(null); // mensagem do aviso após recalcular
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(() => !!(navIntent && navIntent.openReviews)); // vindo do atalho "A repassar" do Dashboard
   // Lote 4, 4.4 (achado da Marta: "Como conferir" pede setas, Exportar PDF,
   // Fechar período, idioma e Pago com a MESMA altura e raio 12 a 1366px).
   // As setas do navegador de período eram círculos (raio "50%") de 40×40
@@ -274,7 +274,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
           ...h,
           entries: h.entries.map((e, idx) => {
             if (idx !== i) return e;
-            const { splitAdjusted, splitHours, shareReview, sharedCount, teamConfirmed, conflict, solo, soloCheck, ...base } = e;
+            const { splitAdjusted, splitHours, shareReview, sharedCount, teamConfirmed, outside, outsideHours, conflict, solo, soloCheck, ...base } = e;
             const kept = clientChanged ? base : e;
             return { ...kept, clientId: newClientId, custom: rowDraft.clientId ? undefined : e.custom, hours: Number(rowDraft.hours) || 0, approved: e.extra ? false : e.approved };
           }),
@@ -597,7 +597,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       />
 
       <HoursReviewDialog
-        open={reviewOpen}
+        open={reviewOpen} initialTab={navIntent && navIntent.openReviews ? navIntent.tab || null : null}
         onClose={() => setReviewOpen(false)}
         onChange={(next, msg) => {
           setHorasData(next);

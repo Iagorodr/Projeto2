@@ -262,7 +262,7 @@ function planLeftovers(horasData, clients, period, ctx, today) {
     const marks = markersOf(horasData, date, clientId);
     if (marks.length === 0) return;
     if (marks.some((m) => m.entry.solo || m.entry.conflict)) return;
-    if (marks.every((m) => m.entry.teamConfirmed)) return;
+    if (marks.every((m) => m.entry.teamConfirmed || m.entry.outside === "removed")) return; // já decidido (ou "outro funcionário": valor retirado)
     if (marks.some((m) => horasData[m.staffId] && horasData[m.staffId].paid)) return;
     const markerSet = new Set(marks.map((m) => String(m.staffId)));
     const missingIds = expectedTeamIds(ctx, client, date).filter((id) => !markerSet.has(String(id)));
@@ -296,6 +296,43 @@ function applyLeftovers(horasData, clients, items, ctx) {
   });
   return next;
 }
+// "Outro funcionário": quem faltava marcar não está no app (é de fora / de outra
+// empresa). Duas saídas para a sobra de uma visita:
+//   "remove" → o valor desse outro funcionário sai: a sobra deixa de contar e de
+//              aparecer; quem marcou fica só com a sua parte (nada se recalcula).
+//   "repass" → a sobra conta para quem marcou (como `applyLeftovers`) mas a visita
+//              fica "a repassar" (`outside:"passon"`, guarda as horas em `outsideHours`)
+//              até a gerência marcar que já repassou (`markRepassed`).
+function outsideLeftover(horasData, clients, item, mode, ctx) {
+  const set = (e) => (mode === "remove" ? { ...e, outside: "removed" } : { ...e, teamConfirmed: true, outside: "passon", outsideHours: item.leftoverHours || 0 });
+  let next = { ...horasData };
+  item.markerIds.forEach((sid) => {
+    if (!next[sid]) return;
+    next[sid] = { ...next[sid], entries: (next[sid].entries || []).map((e) => (visitDateOf(e) === item.date && e.clientId === item.clientId && !e.voided ? set(e) : e)) };
+  });
+  return mode === "remove" ? next : recomputeSharedHours(next, clients, item.date, item.clientId, { ctx });
+}
+// Visitas "a repassar" por fechar (todas as datas): [{ key, date, clientId, markerIds, hours }].
+function pendingRepasses(horasData) {
+  const map = new Map();
+  Object.keys(horasData || {}).forEach((sid) => ((horasData[sid] && horasData[sid].entries) || []).forEach((e) => {
+    if (e.voided || e.outside !== "passon") return;
+    const date = visitDateOf(e), key = `${date}|${e.clientId}`;
+    if (!map.has(key)) map.set(key, { key, date, clientId: e.clientId, markerIds: [], hours: e.outsideHours || 0 });
+    map.get(key).markerIds.push(sid);
+  }));
+  return [...map.values()].sort((a, b) => a.date.localeCompare(b.date) || String(a.clientId).localeCompare(String(b.clientId)));
+}
+// "Já repassei": tira a marca "a repassar" (a sobra continua a contar para quem marcou).
+function markRepassed(horasData, date, clientId) {
+  const next = { ...horasData };
+  Object.keys(next).forEach((sid) => {
+    const h = next[sid];
+    if (!h || !(h.entries || []).some((e) => !e.voided && e.outside === "passon" && visitDateOf(e) === date && e.clientId === clientId)) return;
+    next[sid] = { ...h, entries: h.entries.map((e) => (!e.voided && e.outside === "passon" && visitDateOf(e) === date && e.clientId === clientId ? { ...e, outside: "passed" } : e)) };
+  });
+  return next;
+}
 // Junta à visita de `toDate` o lançamento que `staffId` fez do cliente noutro dia
 // (`fromDate`): passa a contar como a mesma visita partilhada (a data em que
 // trabalhou não muda; só fica a substituir `toDate`, como em "Fiz o cliente de
@@ -307,7 +344,7 @@ function joinVisit(horasData, clients, staffId, fromDate, clientId, toDate, ctx,
   const entries = (h.entries || []).map((e) => {
     if (oldVisit === null && !e.voided && e.clientId === clientId && e.date === fromDate && visitDateOf(e) !== toDate) {
       oldVisit = visitDateOf(e);
-      const { shareReview, conflict, teamConfirmed, solo, soloCheck, splitAdjusted, splitHours, ...rest } = e;
+      const { shareReview, conflict, teamConfirmed, outside, outsideHours, solo, soloCheck, splitAdjusted, splitHours, ...rest } = e;
       return { ...rest, replacesDate: toDate };
     }
     return e;
@@ -595,6 +632,10 @@ function reconcileVisits(horasData, clients, period, ctx, today) {
     items.sort((x, y) => x.date.localeCompare(y.date) || String(x.staffId).localeCompare(String(y.staffId)));
     issues.push({ kind: "hours", key: `hours|${cid}`, clientId: cid, date: items[0].date, weekStart: null, items, marks: [], paid: items.every((x) => x.paid) });
   });
+  // "A repassar": visitas em que a sobra foi contada para quem marcou e falta passá-la ao outro funcionário (todas as datas).
+  pendingRepasses(horasData).forEach((r) => {
+    issues.push({ kind: "repass", key: `repass|${r.key}`, clientId: r.clientId, date: r.date, weekStart: isoDateStr(startOfISOWeek(dateFromIso(r.date))), markerIds: r.markerIds, hours: r.hours, marks: [] });
+  });
   // Pago: não se mexe nas horas de quem já recebeu.
   issues.forEach((i) => {
     if (i.kind === "hours") return;
@@ -604,7 +645,7 @@ function reconcileVisits(horasData, clients, period, ctx, today) {
   // Estado de cada visita + contagens.
   const touched = new Map();
   issues.forEach((i) => {
-    if (i.clientId == null || i.kind === "pending" || i.kind === "hours") return;
+    if (i.clientId == null || i.kind === "pending" || i.kind === "hours" || i.kind === "repass") return;
     if (!touched.has(i.clientId)) touched.set(i.clientId, new Set());
     const set = touched.get(i.clientId);
     if (i.kind === "missing") i.dates.forEach((x) => set.add(x.date)); else set.add(i.date);
@@ -658,7 +699,8 @@ function countReviews(horasData, clients, period, ctx, today) {
   const total = r.issues.length;
   return {
     conflicts: k.conflict || 0, hours: k.hours || 0, leftovers: k.leftover || 0, joins: k.join || 0, extras: k.extra || 0, missing: k.missing || 0, pending: k.pending || 0,
-    total, attention: total - (k.pending || 0),
+    repass: k.repass || 0,
+    total, attention: total - (k.pending || 0) - (k.repass || 0),
   };
 }
 
@@ -779,7 +821,7 @@ function assignPendingEntry(horasData, clients, issue, clientId, ctx) {
   const idx = h.entries.findIndex((e) => isPendingClientEntry(e) && e.date === issue.date && e.custom.name === issue.name);
   if (idx < 0) return horasData;
   const old = h.entries[idx];
-  const { splitAdjusted, splitHours, shareReview, sharedCount, teamConfirmed, conflict, solo, soloCheck, custom, ...base } = old;
+  const { splitAdjusted, splitHours, shareReview, sharedCount, teamConfirmed, outside, outsideHours, conflict, solo, soloCheck, custom, ...base } = old;
   let next = { ...horasData, [staffId]: { ...h, entries: h.entries.map((e, i) => (i === idx ? { ...base, clientId } : e)) } };
   const v = visitDateOf(old);
   const others = Object.keys(next).some((sid) => String(sid) !== String(staffId)
@@ -1778,4 +1820,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, isOccasionalClient, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, isOccasionalClient, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

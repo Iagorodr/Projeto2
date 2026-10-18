@@ -147,6 +147,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   // fora da lista já têm a sua própria linha, por isso não entram aqui.
   const hoursReviews = countReviews(horasData, clients, currentPeriod, { staff, assignments, covers, absences }, isoDateStr(TODAY));
   const visitReviewsPending = inReviewWindow(currentPeriod, TODAY) ? hoursReviews.attention : 0;
+  const repassPending = hoursReviews.repass;
   let overtimePending = 0, reopenedCount = 0, customClientPending = 0, shareReviewPending = 0;
   Object.values(horasData).forEach((data) => {
     if (data.reopened) reopenedCount += 1;
@@ -256,6 +257,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     { key: "custom", icon: Clock, label: t.pendingCustomClient, count: customClientPending, amber: true, onClick: () => onNavigate("horas") },
     { key: "share", icon: Clock, label: t.pendingShareReview, count: shareReviewPending, amber: true, onClick: () => onNavigate("horas") },
     { key: "visits", icon: Clock, label: t.pendingVisitReviews, count: visitReviewsPending, amber: true, onClick: () => onNavigate("horas") },
+    { key: "repass", icon: Clock, label: t.pendingRepass, count: repassPending, amber: true, onClick: () => onNavigate("horas", { openReviews: true, tab: "repass" }) },
     { key: "reopened", icon: Undo2, label: t.pendingReopened, count: reopenedCount, onClick: () => onNavigate("horas") },
     { key: "unread", icon: Bell, label: t.pendingUnread, count: pendingRequests, onClick: () => onNavigate("avisos") },
     { key: "absence", icon: CalendarX, label: tAbs.pendency, count: absencesPending, amber: true, onClick: () => onNavigate("agendas") },
