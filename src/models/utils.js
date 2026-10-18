@@ -1007,6 +1007,47 @@ function parseDMY(str) {
   return new Date(y, m - 1, d);
 }
 
+// "DD/MM/AAAA" -> Date (ou null se não for uma data válida). Os clientes
+// fixos antigos têm lixo nestes campos ("q", "0"), por isso nunca assumir.
+function parseClientDate(str) {
+  const m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*$/.exec(String(str == null ? "" : str));
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return Number.isNaN(d.getTime()) || d.getDate() !== Number(m[1]) ? null : d;
+}
+
+// Período de validade de um cliente REPLACEMENT (temporário): início e fim do
+// contrato; o fim cai para o antigo "Válido até" se o contrato não o tiver.
+// Só replacement tem validade imposta à agenda — nos fixos as datas do
+// contrato são informativas (e muitas vezes estão por preencher).
+function clientValidityRange(client) {
+  if (!client || client.clientType !== "replacement") return null;
+  const start = parseClientDate(client.contractStart);
+  let end = parseClientDate(client.contractEnd);
+  if (!end && /^\d{4}-\d{2}-\d{2}$/.test(client.clientValidUntil || "")) {
+    const [y, m, d] = client.clientValidUntil.split("-").map(Number);
+    end = new Date(y, m - 1, d);
+  }
+  if (!start && !end) return null;
+  return { start, end };
+}
+
+// O cliente está dentro da validade nesta data? (sem validade definida: sim)
+function clientValidOnDate(client, date) {
+  const r = clientValidityRange(client);
+  if (!r) return true;
+  const day = isoDateStr(date);
+  if (r.start && day < isoDateStr(r.start)) return false;
+  if (r.end && day > isoDateStr(r.end)) return false;
+  return true;
+}
+
+// Alguma data desta semana (seg-dom) está dentro da validade?
+function clientValidInWeek(client, weekStart) {
+  for (let i = 0; i < 7; i += 1) if (clientValidOnDate(client, addDays(weekStart, i))) return true;
+  return false;
+}
+
 function dateStrInPeriod(dateStr, period) {
   if (!dateStr) return false;
   let d;
@@ -1181,6 +1222,7 @@ function clientAppliesThisWeek(client, weekStart) {
 // referência global. Como o molde semanal tem os mesmos dias em toda a
 // semana, a paridade alterna de uma semana para a outra, como esperado.
 function clientAppliesOnDate(client, date) {
+  if (!clientValidOnDate(client, date)) return false;
   if (!clientAppliesThisWeek(client, startOfISOWeek(date))) return false;
   if (client.frequency !== "alternate") return true;
   let ref = REFERENCE_WEEK_START;
@@ -1627,6 +1669,17 @@ function clientTeamStaffIds(assignments, clientId) {
 // mês, mesma constante usada em calendários de RH). Devolve horas em
 // decimal, pronta para `fmtHoursScreen`.
 function agendaHoursSuggestion(client) {
+  // Replacement com início e fim: conta as visitas REAIS dentro do período
+  // (dia a dia), não "4,33 semanas por mês".
+  const range = clientValidityRange(client);
+  if (range && range.start && range.end && range.end >= range.start) {
+    let minutes = 0;
+    for (let d = new Date(range.start); d <= range.end; d = addDays(d, 1)) {
+      const dow = d.getDay() === 0 ? 7 : d.getDay();
+      if ((client.days || []).includes(dow) && clientAppliesOnDate(client, d)) minutes += clientDurationOnDow(client, dow);
+    }
+    return minutes / 60;
+  }
   const weeklyHours = (client.days || []).reduce((sum, d) => sum + clientDurationOnDow(client, d) / 60, 0);
   // "dia sim, dia não": em média metade dos dias marcados cai em cada semana.
   return weeklyHours * 4.33 / (client.frequency === "alternate" ? 2 : 1);
@@ -1698,4 +1751,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

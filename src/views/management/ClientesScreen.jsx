@@ -8,7 +8,7 @@ import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { TYPE_ICONS, AGENDA_DAYS, TODAY, LANG_NAMES, EMPTY_CLIENT } from "../../models/data.js";
 import {
   startOfISOWeek, addDays, isoDateStr, clientAppliesThisWeek, weekLabelPT,
-  parseDMY, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
+  parseDMY, parseClientDate, clientValidityRange, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
   findByName, planHoursRecalc, fmtEuro,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -204,7 +204,17 @@ function ClientesScreen({
 
   function openView(c) { setOpenClientId(c.id); setMode("view"); }
   function openNew() { setDraft(EMPTY_CLIENT_FORM); setFormErrors({}); setOpenClientId("new"); setMode("edit"); }
-  function startEdit() { setDraft({ ...openClient, documents: openClient.documents || [null, null, null, null] }); setFormErrors({}); setMode("edit"); }
+  function startEdit() {
+    // Replacement antigo só com "Válido até": o fim do período passa a ser o
+    // fim do contrato (é nele que a agenda se baseia agora).
+    let contractEnd = openClient.contractEnd;
+    if (openClient.clientType === "replacement" && !parseClientDate(contractEnd) && /^\d{4}-\d{2}-\d{2}$/.test(openClient.clientValidUntil || "")) {
+      const [y, m, d] = openClient.clientValidUntil.split("-");
+      contractEnd = `${d}/${m}/${y}`;
+    }
+    setDraft({ ...openClient, contractEnd, documents: openClient.documents || [null, null, null, null] });
+    setFormErrors({}); setMode("edit");
+  }
   function cancelEdit() { if (isNew) { setOpenClientId(null); } else { setMode("view"); } }
   function closeDrawer() { setOpenClientId(null); }
   function updateDraft(field, value) { setDraft((d) => ({ ...d, [field]: value })); }
@@ -218,19 +228,31 @@ function ClientesScreen({
     if (!draft.address.trim()) errs.address = true;
     if (!String(draft.valueHour).trim()) errs.valueHour = true;
     if (!(Number(draft.duration) > 0)) errs.duration = true;
+    if (draft.clientType === "replacement") {
+      const start = parseClientDate(draft.contractStart);
+      const end = parseClientDate(draft.contractEnd);
+      if (!start) errs.contractStart = t.replacementDatesNeeded;
+      if (!end) errs.contractEnd = t.replacementDatesNeeded;
+      else if (start && end < start) errs.contractEnd = t.replacementEndBeforeStart;
+    }
     return errs;
   }
   function saveDraft() {
     const errs = validateDraft();
     setFormErrors(errs);
     if (Object.keys(errs).length > 0) return;
+    // Replacement: o antigo "Válido até" acompanha o fim do contrato (o
+    // Dashboard e outros ecrãs ainda leem esse campo).
+    const toSave = draft.clientType === "replacement"
+      ? { ...draft, clientValidUntil: (() => { const end = parseClientDate(draft.contractEnd); return end ? isoDateStr(end) : ""; })() }
+      : draft;
     if (isNew) {
-      const created = { ...draft, id: Date.now(), days: draft.days.length ? draft.days : [1] };
+      const created = { ...toSave, id: Date.now(), days: draft.days.length ? draft.days : [1] };
       setClients((prev) => [...prev, created]);
       setOpenClientId(created.id);
       setMode("view");
     } else {
-      const updated = { ...draft, id: openClient.id };
+      const updated = { ...toSave, id: openClient.id };
       setClients((prev) => prev.map((c) => (c.id === openClient.id ? updated : c)));
       setMode("view");
       // Mudou a duração (ou o modo de contar as horas)? Se há marcações já
@@ -507,9 +529,6 @@ function ClientesScreen({
               <ViewField icon={Euro} label={t.fValueHour}>{openClient.valueHour ? `€ ${openClient.valueHour}` : "—"}</ViewField>
               <ViewField label={t.fHoursMonth}>{openClient.hoursMonth ? fmtHoursScreen(openClient.hoursMonth) : "—"}</ViewField>
               <ViewField label={t.fHoursMode}>{openClient.hoursMode === "individual" ? t.hoursModeIndividual : t.hoursModeSplit}</ViewField>
-              {openClient.clientType === "replacement" && (
-                <ViewField icon={Calendar} label={t.fValidUntil}>{openClient.clientValidUntil || "—"}</ViewField>
-              )}
             </div>
 
             <SectionTitle>{t.sectionService}</SectionTitle>
@@ -667,17 +686,17 @@ function ClientesScreen({
                 <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.alternateHint}</div>
               </Field>
             )}
-            <Field label={t.formContractStart}>
-              <DateField value={draft.contractStart} onChange={(v) => updateDraft("contractStart", v)} openLabel={t.calendarOpen} />
-            </Field>
-            <Field label={t.formContractEnd}>
-              <DateField value={draft.contractEnd} onChange={(v) => updateDraft("contractEnd", v)} openLabel={t.calendarOpen} />
-            </Field>
             <Field label={t.fClientType}>
               <select style={styles.input} value={draft.clientType} onChange={(e) => updateDraft("clientType", e.target.value)}>
                 <option value="fixo">{t.clientTypeFixed}</option>
                 <option value="replacement">{t.clientTypeReplacement}</option>
               </select>
+            </Field>
+            <Field label={t.formContractStart} required={draft.clientType === "replacement"} error={formErrors.contractStart}>
+              <DateField value={draft.contractStart} onChange={(v) => updateDraft("contractStart", v)} openLabel={t.calendarOpen} />
+            </Field>
+            <Field label={t.formContractEnd} required={draft.clientType === "replacement"} error={formErrors.contractEnd}>
+              <DateField value={draft.contractEnd} onChange={(v) => updateDraft("contractEnd", v)} openLabel={t.calendarOpen} />
             </Field>
             <Field label={t.fHoursMode}>
               <select style={styles.input} value={draft.hoursMode || "dividida"} onChange={(e) => updateDraft("hoursMode", e.target.value)}>
@@ -686,9 +705,6 @@ function ClientesScreen({
               </select>
               <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 4 }}>{draft.hoursMode === "individual" ? t.hoursModeIndividualHint : t.hoursModeSplitHint}</div>
             </Field>
-            {draft.clientType === "replacement" && (
-              <Field label={t.fValidUntil}><input type="date" style={styles.input} value={draft.clientValidUntil} onChange={(e) => updateDraft("clientValidUntil", e.target.value)} /></Field>
-            )}
             <Field label={t.formOrigin}><input style={styles.input} value={draft.origin} onChange={(e) => updateDraft("origin", e.target.value)} /></Field>
             <Field label={t.formHoursMonth} full>
               <input
@@ -698,7 +714,12 @@ function ClientesScreen({
               {suggestion > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: suggestionDiffsALot ? COLORS.amberInk : COLORS.ink3 }}>
-                    {t.agendaSuggestion(suggestionLabel, durationLabel, daysCount)}
+                    {(() => {
+                      const r = draft.clientType === "replacement" ? clientValidityRange(draft) : null;
+                      return r && r.start && r.end
+                        ? t.agendaSuggestionPeriod(suggestionLabel, draft.contractStart, draft.contractEnd)
+                        : t.agendaSuggestion(suggestionLabel, durationLabel, daysCount);
+                    })()}
                   </span>
                   <Button variant="ghost" onClick={() => updateDraft("hoursMonth", suggestion.toFixed(1))}>{t.useSuggestion}</Button>
                 </div>

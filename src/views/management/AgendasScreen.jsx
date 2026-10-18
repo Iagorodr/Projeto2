@@ -8,7 +8,7 @@ import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, clientDurationOnDow, clientPartMinutes, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
-  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, absenceOn,
+  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, clientValidOnDate, clientValidityRange, absenceOn,
   isSupervisorRole, agendaClientIdsOn, coveredAwayOn, coveringOn,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -294,6 +294,9 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
 // cliente em cada dia da semana". `assignments` é uma semana-tipo (repete
 // todas as semanas), independente de `client.days`/`frequency` — isso já
 // era assim no ecrã antigo e não muda aqui; só a apresentação muda.
+// 2026-10-06 -> "06/10" (datas curtas nos avisos de validade).
+function fmtDM(d) { return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`; }
+
 function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setCovers, clients, setClients, staff, assignments, setAssignments }) {
   const t = T[lang].agendas;
   const c0 = T[lang].common;
@@ -431,6 +434,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
     }
     mergeAdd(cellKey(staffId, day), clientId);
     setAuto(staffId, day, clientId, false); // escolha manual nesta célula
+    const outsideRange = picked && !clientValidOnDate(picked, weekDates[day - 1]) ? clientValidityRange(picked) : null;
     const p = partnerOf(staff, staffId, TODAY);
     if (p && !getCellClientIds(p.id, day).includes(clientId)) {
       mergeAdd(cellKey(p.id, day), clientId);
@@ -438,6 +442,9 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
       const client = clientById(clients, clientId);
       showToast(t.autoAddedToast(client?.name || "", p.name.split(" ")[0]));
     }
+    // Replacement fora do período nesta data: avisa (fica na semana-tipo, mas
+    // só aparece dentro do período). Vem por último para não ser coberto.
+    if (outsideRange) showToast(t.outsideValidityToast(picked.name, fmtDM(outsideRange.start), outsideRange.end ? fmtDM(outsideRange.end) : ""));
     setCellSearch(""); setOpenCell(null);
   }
   function removeClient(staffId, day, clientId) {
@@ -737,6 +744,10 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                           <span style={{ flexShrink: 0, fontSize: 11.5, color: COLORS.ink3 }}>
                             {fmtMinutes(clientDurationOnDow(c, day))}{existingTeamSize > 0 ? ` · ${t.alreadyWith(existingTeamSize)}` : ""}
+                            {!clientValidOnDate(c, weekDates[day - 1]) && (() => {
+                              const r = clientValidityRange(c);
+                              return r ? <span style={{ color: COLORS.amberInk, fontWeight: 600 }}> · {t.outsideValidityTag(r.start ? fmtDM(r.start) : "", r.end ? fmtDM(r.end) : "")}</span> : null;
+                            })()}
                           </span>
                         </button>
                       );
