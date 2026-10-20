@@ -589,6 +589,12 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const periodMissingCount = payPeriodChunks.reduce((sum, c) => sum + calPeriodDays(c).filter((d) =>
     d <= TODAY && scheduledIfActive(d).length > 0 && !dayIsCovered(myHoras, isoDateStr(d))).length, 0);
 
+  // Porque é que "Finalizar mês" está desativado — sempre com uma frase, nunca em silêncio.
+  const finalizeBlockedReason = canFinalizeMonth ? undefined
+    : periodMissingCount > 0 ? t.finalizeMonthDisabledReason(periodMissingCount)
+    : payPeriod.end > TODAY ? t.finalizeMonthWaitEnd(`${pad2(payPeriod.end.getDate())}/${pad2(payPeriod.end.getMonth() + 1)}`)
+    : t.finalizeMonthWaitWeeks(payPeriodChunks.length - finalizedCount);
+
   function downloadPdf(provisional) {
     exportStaffHorasPdf({
       companyName: company?.name, staffName, periodLabel: calPeriodLabel(payPeriod, lang),
@@ -871,7 +877,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <Button
                     variant="primary" disabled={!canFinalizeMonth}
-                    disabledReason={!canFinalizeMonth && periodMissingCount > 0 ? t.finalizeMonthDisabledReason(periodMissingCount) : undefined}
+                    disabledReason={finalizeBlockedReason}
                     disabledReasonBelow
                     onClick={startFinalizeMonth}
                   >
