@@ -493,6 +493,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
             )}
             <Button
               variant="primary" disabled={openHoras.status !== "finalizado"}
+              disabledReason={openHoras.status !== "finalizado" ? t.waitingFinalize(openStaff.name) : undefined} disabledReasonBelow
               icon={openHoras.paid ? Check : undefined}
               onClick={() => (openHoras.paid ? setUnpayId(openStaff.id) : openPayDialog(openStaff.id))}
             >

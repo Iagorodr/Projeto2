@@ -617,6 +617,11 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
 
   const weekEligible = !weekLockedFlag && days.every((d) =>
     scheduledIfActive(d).length === 0 || dayIsCovered(myHoras, isoDateStr(d)));
+  // "Finalizar semana" só aparece quando dá; quando não dá, diz porquê (senão o funcionário não percebe).
+  const weekUncovered = days.filter((d) => scheduledIfActive(d).length > 0 && !dayIsCovered(myHoras, isoDateStr(d)));
+  const weekBlockedReason = chunkZone === "within" && !weekLockedFlag && !weekEligible && weekUncovered.length > 0
+    ? (weekUncovered.some((d) => d > TODAY) ? t.weekWaitEnd(dmOf(days[days.length - 1])) : t.weekMissingDays(weekUncovered.length))
+    : null;
   const dayMarkedCount = dayCards.filter((c) => c.checked).length;
   const containerMaxWidth = isDesktop ? 1040 : 560;
 
@@ -669,6 +674,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         {!monthFinalized && chunkZone !== "before" && (
           <div style={{ textAlign: "center", fontSize: 11.5, color: COLORS.ink3, marginBottom: 14 }}>
             {t.weeksProgress(finalizedCount, payPeriodChunks.length)}
+            {weekBlockedReason && <div style={{ marginTop: 2 }}>{weekBlockedReason}</div>}
           </div>
         )}
       </div>

@@ -46,7 +46,7 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences }) {
     <>
       <Drawer
         open={open} onClose={onClose} title={t.sheetTitle} closeLabel={c0.close}
-        footer={<Button size="mobile" style={{ width: "100%" }} onClick={handleSend} disabled={!from}>{t.send}</Button>}
+        footer={<Button size="mobile" style={{ width: "100%" }} onClick={handleSend} disabled={!from} disabledReason={!from ? t.fromRequired : undefined} disabledReasonBelow>{t.send}</Button>}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ fontSize: 13, color: COLORS.ink2 }}>{t.intro}</div>

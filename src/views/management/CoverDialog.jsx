@@ -219,7 +219,7 @@ function CoverDialog({ open, onClose, t, lang, staff, clients, assignments, cove
       <ErrorLine>{error}</ErrorLine>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
         <Button variant="secondary" onClick={onClose}>{t.cancel}</Button>
-        <Button variant="primary" onClick={save} disabled={!ownerId || nChosen === 0}>{t.save}</Button>
+        <Button variant="primary" onClick={save} disabled={!ownerId || nChosen === 0} disabledReason={!ownerId ? t.errNoOwner : nChosen === 0 ? t.errNone : undefined} disabledReasonBelow>{t.save}</Button>
       </div>
     </Overlay>
   );
