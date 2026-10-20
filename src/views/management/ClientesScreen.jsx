@@ -162,6 +162,7 @@ function ClientesScreen({
   const [copyOpen, setCopyOpen] = useState(false);
   const [draft, setDraft] = useState(EMPTY_CLIENT_FORM);
   const [formErrors, setFormErrors] = useState({});
+  const [docRemoveIdx, setDocRemoveIdx] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
@@ -627,7 +628,7 @@ function ClientesScreen({
                           type="button"
                           aria-label={t.removeDoc}
                           style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: COLORS.dangerBg, color: COLORS.dangerInk, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, fontSize: 18 }}
-                          onClick={() => attachDocument(openClient.id, idx, null)}
+                          onClick={() => setDocRemoveIdx(idx)}
                         >
                           ×
                         </button>
@@ -803,6 +804,17 @@ function ClientesScreen({
       {copyOpen && openClient && (
         <CopyClientsDialog lang={lang} title={T[lang].absences.shareTitleOne(openClient.name)} clients={[openClient]} onClose={() => setCopyOpen(false)} />
       )}
+
+      <ConfirmDialog
+        open={docRemoveIdx != null && !!openClient}
+        title={t.docRemoveTitle}
+        body={docRemoveIdx != null && openClient ? t.docRemoveBody(String((openClient.documents || [])[docRemoveIdx] || "")) : ""}
+        cancelLabel={t.docRemoveKeep}
+        confirmLabel={t.docRemoveYes}
+        destructive
+        onCancel={() => setDocRemoveIdx(null)}
+        onConfirm={() => { if (openClient) attachDocument(openClient.id, docRemoveIdx, null); setDocRemoveIdx(null); }}
+      />
 
       <ConfirmDialog
         open={deleteConfirmOpen && !!openClient}

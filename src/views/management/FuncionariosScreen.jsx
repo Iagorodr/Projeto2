@@ -415,7 +415,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
             )}
 
             <SectionTitle>{t.knownClientsTitle}</SectionTitle>
-            <KnownClientsSection staffMember={openStaff} clients={clients} setStaff={setStaff} t={t} />
+            <KnownClientsSection staffMember={openStaff} clients={clients} assignments={assignments} setStaff={setStaff} t={t} cancelLabel={c0.cancel} />
 
             <SectionTitle>{t.documentsTitle}</SectionTitle>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>

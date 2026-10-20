@@ -1,123 +1,90 @@
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Trash2 } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { TODAY } from "../../models/data.js";
 import { isoDateStr, clientById } from "../../models/utils.js";
-import { Button, Pill } from "../shared/ui/index.js";
+import { Button, ConfirmDialog } from "../shared/ui/index.js";
 
-// Funcionário → "Clientes conhecidos": clientes ocasionais (tipo «Ocasional /
-// conhecido» em Clientes) que esta pessoa conhece. Aparecem no celular dela em
-// «Adicionar outro cliente», sem estarem na agenda. Cada linha: { clientId,
-// from, to } (datas "YYYY-MM-DD"; `to` vazio = sem fim). Remover = pôr uma
-// data final: a pessoa ainda pode lançar horas até essa data (inclusive).
-const fmt = (iso) => { const [y, m, d] = String(iso).split("-"); return `${d}/${m}/${y}`; };
-
-function KnownClientsSection({ staffMember, clients, setStaff, t }) {
+// Funcionário → "Clientes conhecidos": atalho com clientes que esta pessoa faz
+// de vez em quando (e que NÃO são da agenda dela). Aparecem no celular dela em
+// «Adicionar outro cliente», sem precisar de procurar/digitar o nome. Não é um
+// tipo de cliente nem muda a agenda. Cada linha: { clientId } (listas antigas
+// podem ter `from`/`to`; as que já terminaram deixam de aparecer e saem ao gravar).
+function KnownClientsSection({ staffMember, clients, assignments = {}, setStaff, t, cancelLabel = "Cancelar" }) {
   const today = isoDateStr(TODAY);
-  const list = Array.isArray(staffMember.knownClients) ? staffMember.knownClients : [];
+  const all = Array.isArray(staffMember.knownClients) ? staffMember.knownClients : [];
+  const list = all.filter((k) => !k.to || k.to >= today);
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState({ clientId: "", from: today, to: "" });
-  const [removeIdx, setRemoveIdx] = useState(null);
-  const [removeDate, setRemoveDate] = useState(today);
-  const [err, setErr] = useState("");
+  const [pick, setPick] = useState("");
+  const [removeId, setRemoveId] = useState(null);
 
-  const isLive = (k) => !k.to || k.to >= today;
-  const takenIds = new Set(list.filter(isLive).map((k) => String(k.clientId)));
-  const options = clients.filter((c) => !takenIds.has(String(c.id))).sort((a, b) => a.name.localeCompare(b.name));
+  // Clientes fixos da agenda dele não entram (já aparecem sozinhos).
+  const agendaIds = new Set();
+  Object.keys(assignments || {}).forEach((key) => {
+    if (key.startsWith(`${staffMember.id}-`)) (assignments[key] || []).forEach((cid) => agendaIds.add(String(cid)));
+  });
+  const knownIds = new Set(list.map((k) => String(k.clientId)));
+  const options = clients.filter((c) => !agendaIds.has(String(c.id)) && !knownIds.has(String(c.id))).sort((a, b) => a.name.localeCompare(b.name));
 
-  function save(nextList) {
-    setStaff((prev) => prev.map((s) => (s.id === staffMember.id ? { ...s, knownClients: nextList } : s)));
-  }
+  const save = (next) => setStaff((prev) => prev.map((s) => (s.id === staffMember.id ? { ...s, knownClients: next } : s)));
   function add() {
-    if (!draft.clientId) return;
-    if (draft.to && draft.to < draft.from) { setErr(t.knownInvalidRange); return; }
-    const entry = { clientId: Number(draft.clientId), from: draft.from || today, to: draft.to || null };
-    save([...list, entry]);
-    setAdding(false); setErr(""); setDraft({ clientId: "", from: today, to: "" });
+    if (!pick) return;
+    save([...list, { clientId: Number(pick) }]);
+    setAdding(false); setPick("");
   }
-  function confirmRemove() {
-    const k = list[removeIdx];
-    if (!k) return;
-    if (removeDate < (k.from || "")) { setErr(t.knownInvalidRange); return; }
-    save(list.map((x, i) => (i === removeIdx ? { ...x, to: removeDate } : x)));
-    setRemoveIdx(null); setErr("");
-  }
-
-  // Mais recentes/ativos primeiro; terminados no fim.
-  const rows = list.map((k, i) => ({ k, i })).sort((a, b) => Number(isLive(b.k)) - Number(isLive(a.k)) || String(a.k.from).localeCompare(String(b.k.from)));
+  const removing = removeId != null ? clientById(clients, removeId) : null;
 
   return (
     <div data-testid="known-clients">
       <div style={{ fontSize: 12.5, color: COLORS.ink3, marginBottom: 8 }}>{t.knownClientsHint}</div>
-      {rows.length === 0 && <div style={styles.noClientsText}>{t.knownEmpty}</div>}
+      {list.length === 0 && <div style={styles.noClientsText}>{t.knownEmpty}</div>}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
-        {rows.map(({ k, i }) => {
+        {list.map((k) => {
           const c = clientById(clients, k.clientId);
-          const live = isLive(k);
           return (
-            <div key={`${k.clientId}-${k.from}-${i}`} style={{ border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: "9px 12px", opacity: live ? 1 : 0.6 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 120 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{c ? c.name : `#${k.clientId}`}</div>
-                  <div style={{ fontSize: 12, color: COLORS.ink3 }}>
-                    {k.from ? t.knownSince(fmt(k.from)) : ""}{k.to ? ` · ${t.knownUntil(fmt(k.to))}` : ""}
-                  </div>
-                </div>
-                {!live && <Pill variant="neutral">{t.knownEnded}</Pill>}
-                {live && removeIdx !== i && (
-                  <Button variant="ghost" onClick={() => { setRemoveIdx(i); setRemoveDate(k.to || today); setErr(""); }}>{k.to ? t.knownRemoveFrom : t.knownRemove}</Button>
-                )}
+            <div key={k.clientId} style={{ border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: "9px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{c ? c.name : `#${k.clientId}`}</div>
+                {c && c.city && <div style={{ fontSize: 12, color: COLORS.ink3 }}>{c.city}</div>}
               </div>
-              {removeIdx === i && (
-                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink2 }}>{t.knownRemoveFrom}
-                    <input type="date" style={{ ...styles.input, marginTop: 4 }} value={removeDate} onChange={(e) => setRemoveDate(e.target.value)} />
-                  </label>
-                  <div style={{ fontSize: 12, color: COLORS.ink3 }}>{t.knownRemoveNote}</div>
-                  {err && <div style={{ fontSize: 12.5, color: COLORS.dangerInk }}>{err}</div>}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <Button variant="primary" onClick={confirmRemove} disabled={!removeDate}>{t.knownRemoveConfirm}</Button>
-                    <Button variant="secondary" onClick={() => { setRemoveIdx(null); setErr(""); }}><X size={14} /></Button>
-                  </div>
-                </div>
-              )}
+              <Button variant="dangerSoft" icon={Trash2} onClick={() => setRemoveId(k.clientId)}>{t.knownRemove}</Button>
             </div>
           );
         })}
       </div>
 
       {!adding ? (
-        <Button variant="secondary" onClick={() => { setAdding(true); setErr(""); }}><Plus size={14} /> {t.knownAdd}</Button>
+        <Button variant="secondary" onClick={() => setAdding(true)}><Plus size={14} /> {t.knownAdd}</Button>
       ) : (
         <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
           {options.length === 0 ? (
             <div style={{ fontSize: 12.5, color: COLORS.ink2 }}>{t.knownNoOptions}</div>
           ) : (
-            <>
-              <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink2 }}>{t.knownPick}
-                <select style={{ ...styles.input, marginTop: 4 }} value={draft.clientId} onChange={(e) => setDraft((d) => ({ ...d, clientId: e.target.value }))}>
-                  <option value="">{t.knownPickPlaceholder}</option>
-                  {options.map((c) => <option key={c.id} value={c.id}>{c.name}{c.city ? ` — ${c.city}` : ""}</option>)}
-                </select>
-              </label>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink2, flex: "1 1 140px" }}>{t.knownFrom}
-                  <input type="date" style={{ ...styles.input, marginTop: 4 }} value={draft.from} onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))} />
-                </label>
-                <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink2, flex: "1 1 140px" }}>{t.knownTo}
-                  <input type="date" style={{ ...styles.input, marginTop: 4 }} value={draft.to} onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))} />
-                </label>
-              </div>
-            </>
+            <label style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink2 }}>{t.knownPick}
+              <select style={{ ...styles.input, marginTop: 4 }} value={pick} onChange={(e) => setPick(e.target.value)}>
+                <option value="">{t.knownPickPlaceholder}</option>
+                {options.map((c) => <option key={c.id} value={c.id}>{c.name}{c.city ? ` — ${c.city}` : ""}</option>)}
+              </select>
+            </label>
           )}
-          {err && <div style={{ fontSize: 12.5, color: COLORS.dangerInk }}>{err}</div>}
           <div style={{ display: "flex", gap: 8 }}>
-            {options.length > 0 && <Button variant="primary" onClick={add} disabled={!draft.clientId || !draft.from}>{t.knownSave}</Button>}
-            <Button variant="secondary" onClick={() => { setAdding(false); setErr(""); }}><X size={14} /></Button>
+            {options.length > 0 && <Button variant="primary" onClick={add} disabled={!pick}>{t.knownSave}</Button>}
+            <Button variant="secondary" onClick={() => { setAdding(false); setPick(""); }}><X size={14} /></Button>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={removeId != null}
+        title={t.knownRemoveTitle}
+        body={t.knownRemoveBody(removing ? removing.name : "", (staffMember.name || "").split(" ")[0])}
+        cancelLabel={cancelLabel}
+        confirmLabel={t.knownRemove}
+        destructive
+        onCancel={() => setRemoveId(null)}
+        onConfirm={() => { save(list.filter((k) => String(k.clientId) !== String(removeId))); setRemoveId(null); }}
+      />
     </div>
   );
 }

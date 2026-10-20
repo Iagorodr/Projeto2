@@ -6,7 +6,7 @@ import { TODAY } from "../../models/data.js";
 import { isoDateStr, isoDatesBetween, fmtNoteDate } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { Field } from "./Layout.jsx";
-import { Drawer, Button, Toast } from "./ui/index.js";
+import { Drawer, Button, Toast, ConfirmDialog } from "./ui/index.js";
 
 // Aviso de falta do funcionário: escolhe um dia (ou um intervalo) e, se
 // quiser, um motivo. Grava uma linha por dia em `absences`; a gerência vê no
@@ -19,6 +19,7 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences }) {
   const [to, setTo] = useState(todayIso);
   const [note, setNote] = useState("");
   const [toastMsg, setToastMsg] = useState(null);
+  const [cancelId, setCancelId] = useState(null);
 
   const mine = (absences || [])
     .filter((a) => a.staffId === staffId && a.date >= todayIso)
@@ -69,7 +70,7 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences }) {
                 <span style={{ fontSize: 13, color: COLORS.ink }}>
                   {fmtNoteDate(a.date)}{a.note ? ` · ${a.note}` : ""}{a.handled ? ` · ${t.coveredTag}` : ""}
                 </span>
-                <button type="button" onClick={() => handleRemove(a.id)} aria-label={t.cancel}
+                <button type="button" onClick={() => setCancelId(a.id)} aria-label={t.cancel}
                   style={{ border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, display: "flex", padding: 6 }}>
                   <Trash2 size={15} />
                 </button>
@@ -78,6 +79,16 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences }) {
           </div>
         </div>
       </Drawer>
+      <ConfirmDialog
+        open={cancelId != null}
+        title={t.cancelTitle}
+        body={(() => { const a = (absences || []).find((x) => x.id === cancelId); return a ? t.cancelBody(fmtNoteDate(a.date)) : ""; })()}
+        cancelLabel={t.cancelKeep}
+        confirmLabel={t.cancelYes}
+        destructive
+        onCancel={() => setCancelId(null)}
+        onConfirm={() => { handleRemove(cancelId); setCancelId(null); }}
+      />
       {toastMsg && <Toast message={toastMsg} onDismiss={() => setToastMsg(null)} closeLabel={c0.close} />}
     </>
   );
