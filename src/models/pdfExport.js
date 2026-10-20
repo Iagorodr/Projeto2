@@ -20,9 +20,49 @@ function todayStr() {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
+// Marca Servix no canto superior direito de todos os relatórios: o visto partido
+// em dois traços (curto quente + longo verde, ver views/shared/Logo.jsx) e o nome.
+// Desenhada em vetor (sem imagem), por isso fica nítida em qualquer zoom/impressão.
+const LOGO_ACCENT = [179, 73, 46]; // COLORS.extra
+function drawServixLogo(doc, rightX, topY, size = 26) {
+  const k = size / 96;
+  // Quadrática (P0,Q,P2) -> cúbica relativa a P0, em coordenadas do desenho 96x96.
+  const quad = (p0, q, p2) => {
+    const c1 = [p0[0] + (2 / 3) * (q[0] - p0[0]), p0[1] + (2 / 3) * (q[1] - p0[1])];
+    const c2 = [p2[0] + (2 / 3) * (q[0] - p2[0]), p2[1] + (2 / 3) * (q[1] - p2[1])];
+    return [(c1[0] - p0[0]) * k, (c1[1] - p0[1]) * k, (c2[0] - p0[0]) * k, (c2[1] - p0[1]) * k, (p2[0] - p0[0]) * k, (p2[1] - p0[1]) * k];
+  };
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(size * 0.62);
+  const wServi = doc.getTextWidth("Servi");
+  const wX = doc.getTextWidth("x");
+  const gap = size * 0.28;
+  const textW = wServi + wX;
+  const markX = rightX - textW - gap - size; // canto esquerdo do desenho
+  const strokes = [
+    { color: LOGO_ACCENT, p0: [26, 50], q: [34, 62], p2: [42, 66] },
+    { color: BRAND, p0: [42, 66], q: [58, 56], p2: [76, 24] },
+  ];
+  doc.setLineWidth(10 * k);
+  doc.setLineCap("round");
+  strokes.forEach(({ color, p0, q, p2 }) => {
+    doc.setDrawColor(...color);
+    doc.lines([quad(p0, q, p2)], markX + p0[0] * k, topY + p0[1] * k, [1, 1], "S", false);
+  });
+  doc.setLineCap("butt");
+  const baseY = topY + size * 0.66;
+  const textX = markX + size + gap;
+  doc.setTextColor(...BRAND_DARK);
+  doc.text("Servi", textX, baseY);
+  doc.setTextColor(...LOGO_ACCENT);
+  doc.text("x", textX + wServi, baseY);
+  doc.setFont("helvetica", "normal");
+}
+
 // Monta o cabeçalho comum (nome da empresa, título do relatório, subtítulo
 // com o período/funcionário) e devolve o doc + o Y onde a tabela deve começar.
 function buildHeader(doc, { companyName, reportTitle, subtitle, pdfT }) {
+  drawServixLogo(doc, doc.internal.pageSize.getWidth() - 40, 22);
   doc.setFontSize(16);
   doc.setTextColor(...BRAND_DARK);
   doc.text(companyName || "", 40, 42);
