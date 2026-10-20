@@ -227,7 +227,7 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
       columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
       totals: [
         { label: pdfT.totalHoursLabel, value: `${fmtHoursNum(open.totalHours)}h` },
-        { label: pdfT.totalValueLabel, value: fmtEuro(open.totalEuros) },
+        { label: pdfT.totalValueLabel, value: fmtEuro(open.totalEuros + (open.totalExpenses || 0)) },
         { label: t.colComplaints, value: String(open.reclamacoes) },
         { label: t.colPraise, value: String(open.elogios) },
         { label: t.colNotices, value: String(open.avisos) },
@@ -263,10 +263,10 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
         key: "value", label: t.colValue, width: 1.3,
         render: (p) => {
           const prev = closedPeriods[closedPeriods.indexOf(p) + 1];
-          const delta = pctChange(p.totalEuros, prev ? prev.totalEuros : null);
+          const delta = pctChange(p.totalEuros + (p.totalExpenses || 0), prev ? prev.totalEuros + (prev.totalExpenses || 0) : null);
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span>{fmtEuro(p.totalEuros)}</span>
+              <span>{fmtEuro(p.totalEuros + (p.totalExpenses || 0))}</span>
               <DeltaPill value={delta} t={t} compact />
             </div>
           );
@@ -316,7 +316,7 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
   // ---------- Detalhe (documento, 4.6: "página, com '‹ Histórico' no topo") ----------
   const staffInvolved = open.staffSummaries.filter((s) => s.hours > 0).length;
   const deltaHours = pctChange(open.totalHours, previous ? previous.totalHours : null);
-  const deltaValue = pctChange(open.totalEuros, previous ? previous.totalEuros : null);
+  const deltaValue = pctChange(open.totalEuros + (open.totalExpenses || 0), previous ? previous.totalEuros + (previous.totalExpenses || 0) : null);
 
   // open.clientCount é o nº de clientes NO FECHO deste período — congelado,
   // pra faixa não "andar" quando clientes são criados/removidos depois.
@@ -353,7 +353,7 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
         <KpiCard icon={Clock} label={t.kpiHours} value={fmtHoursScreen(open.totalHours)} style={{ flex: 1, minWidth: 220 }}>
           <DeltaPill value={deltaHours} t={t} />
         </KpiCard>
-        <KpiCard icon={Euro} label={t.kpiValue} value={fmtEuro(open.totalEuros)} style={{ flex: 1, minWidth: 220 }}>
+        <KpiCard icon={Euro} label={t.kpiValue} value={fmtEuro(open.totalEuros + (open.totalExpenses || 0))} style={{ flex: 1, minWidth: 220 }}>
           <DeltaPill value={deltaValue} t={t} />
         </KpiCard>
         <KpiCard icon={Users} label={t.kpiStaffInvolved} value={staffInvolved} style={{ flex: 1, minWidth: 220 }} />

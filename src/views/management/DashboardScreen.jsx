@@ -8,7 +8,7 @@ import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, parseDMY, getOpenPeriod, unseenAvisosCount, formatPeriodLabel, staffTotalHours, staffTotalPay,
   recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
-  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews, inReviewWindow, pendingExpenseList,
+  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews, inReviewWindow, pendingExpenseList, staffExpensesApproved,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
 import ClientsByCityCard from "./ClientsByCityCard.jsx";
@@ -128,7 +128,8 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   // literalmente os mesmos números (total a receber, horas, pagos/por
   // pagar/pendentes), por isso o cálculo tem de bater certo nos dois.
   const currentPeriodHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }, currentPeriod), 0);
-  const currentPeriodEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, currentPeriod), 0);
+  // Horas + reembolsos aprovados (o que realmente se paga no período).
+  const currentPeriodEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, currentPeriod) + staffExpensesApproved(horasData[st.id], currentPeriod), 0);
   // QA pós-auditoria (Lote 1): mesmo `board` do cartão herói de Horas (ver
   // `boardStaff` em utils.js) — antes este cartão contava `staff` inteiro
   // (incluindo inativos e contas de teste), por isso pagos+por
@@ -245,7 +246,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   const recentClosed = recentClosedPeriodsChronological(closedPeriods, 5);
   const currentLabel = monthAbbr(lang, currentPeriod.end.getMonth());
   const valueChartData = [
-    ...recentClosed.map((p) => ({ label: shortMonthFromIso(p.periodEnd, lang), value: p.totalEuros, dateRangeLabel: p.periodLabel })),
+    ...recentClosed.map((p) => ({ label: shortMonthFromIso(p.periodEnd, lang), value: p.totalEuros + (p.totalExpenses || 0), dateRangeLabel: p.periodLabel })),
     { label: currentLabel, value: currentPeriodEuros, dateRangeLabel: currentPeriodLabel },
   ];
   const hoursChartData = [
