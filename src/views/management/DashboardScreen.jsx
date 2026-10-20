@@ -8,7 +8,7 @@ import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, parseDMY, getOpenPeriod, unseenAvisosCount, formatPeriodLabel, staffTotalHours, staffTotalPay,
   recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
-  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews, inReviewWindow,
+  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews, inReviewWindow, pendingExpenseList,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
 import ClientsByCityCard from "./ClientsByCityCard.jsx";
@@ -149,6 +149,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   const hoursReviews = countReviews(horasData, clients, currentPeriod, { staff, assignments, covers, absences }, isoDateStr(TODAY));
   const visitReviewsPending = inReviewWindow(currentPeriod, TODAY) ? hoursReviews.attention : 0;
   const repassPending = hoursReviews.repass;
+  const expensesPending = pendingExpenseList(horasData).length;
   let overtimePending = 0, reopenedCount = 0, customClientPending = 0, shareReviewPending = 0;
   Object.values(horasData).forEach((data) => {
     if (data.reopened) reopenedCount += 1;
@@ -259,6 +260,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     { key: "share", icon: Clock, label: t.pendingShareReview, count: shareReviewPending, amber: true, onClick: () => onNavigate("horas") },
     { key: "visits", icon: Clock, label: t.pendingVisitReviews, count: visitReviewsPending, amber: true, onClick: () => onNavigate("horas") },
     { key: "repass", icon: Clock, label: t.pendingRepass, count: repassPending, amber: true, onClick: () => onNavigate("horas", { openReviews: true, tab: "repass" }) },
+    { key: "expenses", icon: Clock, label: t.pendingExpenses, count: expensesPending, amber: true, onClick: () => onNavigate("horas", { openExpenses: true }) },
     { key: "reopened", icon: Undo2, label: t.pendingReopened, count: reopenedCount, onClick: () => onNavigate("horas") },
     { key: "unread", icon: Bell, label: t.pendingUnread, count: pendingRequests, onClick: () => onNavigate("avisos") },
     { key: "absence", icon: CalendarX, label: tAbs.pendency, count: absencesPending, amber: true, onClick: () => onNavigate("agendas") },

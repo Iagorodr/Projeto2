@@ -1101,13 +1101,51 @@ function dateStrInPeriod(dateStr, period) {
   return d >= period.start && d <= period.end;
 }
 
+// ---- Despesas a reembolsar ----
+// Ficam em `horasData[staffId].expenses` (junto das horas do funcionário, por
+// isso o fecho do período e a gravação já as levam). Cada uma:
+// { id, date:"YYYY-MM-DD", type:"fuel"|"product"|"other", description, amount,
+//   status:"pending"|"approved"|"rejected", approvedAmount?, note? }.
+// Só as APROVADAS contam para o valor a reembolsar (`approvedAmount` quando a
+// gerência corrigiu o valor, senão o pedido).
+const EXPENSE_TYPES = ["fuel", "product", "other"];
+function parseMoneyInput(v) {
+  let str = String(v == null ? "" : v).replace(/[€\s]/g, "");
+  if (str.includes(",")) str = str.replace(/\./g, "").replace(",", ".");
+  const n = Number(str);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+}
+function expensesOf(h, period) {
+  return ((h && h.expenses) || []).filter((e) => !period || dateStrInPeriod(e.date, period));
+}
+function expenseApprovedValue(e) {
+  if (!e || e.status !== "approved") return 0;
+  return e.approvedAmount != null ? e.approvedAmount : (e.amount || 0);
+}
+function staffExpensesApproved(h, period) {
+  return Math.round(expensesOf(h, period).reduce((s, e) => s + expenseApprovedValue(e), 0) * 100) / 100;
+}
+function staffExpensesPending(h, period) {
+  return expensesOf(h, period).filter((e) => e.status === "pending").length;
+}
+// Todas as despesas por decidir, de todos os funcionários (opcionalmente só as de um período).
+function pendingExpenseList(horasData, period) {
+  const out = [];
+  Object.keys(horasData || {}).forEach((sid) => {
+    expensesOf(horasData[sid], period).forEach((e) => { if (e.status === "pending") out.push({ staffId: isNaN(Number(sid)) ? sid : Number(sid), expense: e }); });
+  });
+  return out.sort((a, b) => String(a.expense.date).localeCompare(String(b.expense.date)));
+}
+
 function buildClosedPeriodSnapshot(period, clients, staff, horasData, sentItems, missingItems) {
   const staffSummaries = staff.map((s) => {
     const h = horasData[s.id] || { entries: [], paid: false, status: "pendente" };
-    return { staffId: s.id, name: s.name, iban: s.iban, hours: staffTotalHours(h, period), euros: staffTotalPay(h, clients, period), paid: h.paid, entries: h.entries.filter((e) => !e.voided && dateStrInPeriod(e.date, period)) };
+    return { staffId: s.id, name: s.name, iban: s.iban, hours: staffTotalHours(h, period), euros: staffTotalPay(h, clients, period), paid: h.paid, entries: h.entries.filter((e) => !e.voided && dateStrInPeriod(e.date, period)),
+      expenses: expensesOf(h, period).filter((e) => e.status === "approved"), expensesTotal: staffExpensesApproved(h, period) };
   });
   const totalHours = staffSummaries.reduce((s, x) => s + x.hours, 0);
   const totalEuros = staffSummaries.reduce((s, x) => s + x.euros, 0);
+  const totalExpenses = Math.round(staffSummaries.reduce((s, x) => s + (x.expensesTotal || 0), 0) * 100) / 100;
   const reclamacoesItems = sentItems.filter((i) => i.type === "reclamacao" && dateStrInPeriod(i.date, period));
   const elogiosItems = sentItems.filter((i) => i.type === "elogio" && dateStrInPeriod(i.date, period));
   const avisosItems = sentItems.filter((i) => i.type === "aviso" && dateStrInPeriod(i.date, period));
@@ -1118,7 +1156,7 @@ function buildClosedPeriodSnapshot(period, clients, staff, horasData, sentItems,
     periodStart: isoDateStr(period.start),
     periodEnd: isoDateStr(period.end),
     closedAt: isoDateStr(TODAY),
-    staffSummaries, totalHours, totalEuros,
+    staffSummaries, totalHours, totalEuros, totalExpenses,
     reclamacoes: reclamacoesItems.length, elogios: elogiosItems.length, avisos: avisosItems.length,
     reclamacoesItems, elogiosItems, avisosItems,
     solicitacoes: solicitacoesItems.length, solicitacoesResolvidas: solicitacoesItems.filter((i) => i.resolved).length,
@@ -1822,4 +1860,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

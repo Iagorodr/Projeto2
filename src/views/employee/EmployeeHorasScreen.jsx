@@ -9,13 +9,14 @@ import {
   startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, visitDateOf, isHorasFrozenOn, getOpenPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
-  parseHoursInput, staffTotalPay, fmtEuro,
+  parseHoursInput, staffTotalPay, fmtEuro, expensesOf,
   staffStartedOn, knownClientsOn, absenceOn, clientDurationOn, findByName, expectedShare, suggestSameVisit, linkSameVisit,
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG, WEEKDAY_FULL_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
 import { Minus2 } from "../shared/Icons.jsx";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
+import ExpensesCard from "./ExpensesCard.jsx";
 import {
   MobileHeader, WeekStrip, DayPanel, ClientCheckCard, BottomActionBar, PeriodCalendar,
   Card, ConfirmDialog, Drawer, Button, Pill, SearchField, Toast, ProgressBar,
@@ -116,6 +117,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const [customCity, setCustomCity] = useState("");
   const [customHours, setCustomHours] = useState(1);
   const [finalizeMonthConfirmOpen, setFinalizeMonthConfirmOpen] = useState(false);
+  const [expenseAskOpen, setExpenseAskOpen] = useState(false);
+  const [expenseNonce, setExpenseNonce] = useState(0);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionText, setCorrectionText] = useState("");
   const [toastMsg, setToastMsg] = useState(null);
@@ -181,6 +184,33 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   function updateMyHoras(updater) {
     setHorasData((prev) => ({ ...prev, [staffId]: updater(prev[staffId] || emptyHoras()) }));
   }
+  // Despesas a reembolsar (só quem tem o privilégio). Só se mexe nas que ainda
+  // estão por aprovar; as decididas pela gerência ficam como estão.
+  const canExpenses = !!(me && me.canExpenses);
+  const te = T[lang].expenses;
+  const periodExpenses = expensesOf(myHoras, payPeriod);
+  function saveExpense(exp) {
+    updateMyHoras((h) => {
+      const list = h.expenses || [];
+      const old = list.find((x) => x.id === exp.id);
+      if (old && old.status !== "pending") return h;
+      return { ...h, expenses: old ? list.map((x) => (x.id === exp.id ? { ...x, ...exp } : x)) : [...list, exp] };
+    });
+  }
+  function deleteExpense(id) {
+    updateMyHoras((h) => ({ ...h, expenses: (h.expenses || []).filter((x) => !(x.id === id && x.status === "pending")) }));
+  }
+  function startFinalizeMonth() {
+    // "Tem despesas a reembolsar?": só pergunta a quem pode lançar e ainda não lançou nenhuma.
+    if (canExpenses && periodExpenses.length === 0 && !myHoras.paid) setExpenseAskOpen(true);
+    else setFinalizeMonthConfirmOpen(true);
+  }
+  const expensesCard = canExpenses ? (
+    <ExpensesCard
+      lang={lang} expenses={periodExpenses} period={payPeriod} locked={!!myHoras.paid}
+      onSave={saveExpense} onDelete={deleteExpense} openNonce={expenseNonce}
+    />
+  ) : null;
   // Recálculo da divisão de horas feito por um funcionário: quem já tem a
   // semana/mês fechado fica como está (a gerência corrige depois, ver
   // `recomputeSharedHours`); o próprio nunca conta como fechado aqui — as
@@ -564,6 +594,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       companyName: company?.name, staffName, periodLabel: calPeriodLabel(payPeriod, lang),
       entries: periodEntries, clients, totalHours: periodHours,
       totalValue: periodEntries.reduce((s, e) => { const c = clientById(clients, e.clientId); return s + e.hours * (c ? c.valueHour : 0); }, 0),
+      expenses: periodExpenses.filter((x) => x.status !== "rejected"),
       lang, pdfT, provisional,
     });
   }
@@ -705,6 +736,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                 </div>
               )}
             </Card>
+            {expensesCard}
           </div>
         ) : (
           <>
@@ -818,6 +850,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               </div>
             )}
 
+            {expensesCard}
+
             {isLastPeriodChunk && (
               <Card variant="default">
                 <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.ink, marginBottom: 12 }}>{t.weekReviewCardTitle}</div>
@@ -839,7 +873,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                     variant="primary" disabled={!canFinalizeMonth}
                     disabledReason={!canFinalizeMonth && periodMissingCount > 0 ? t.finalizeMonthDisabledReason(periodMissingCount) : undefined}
                     disabledReasonBelow
-                    onClick={() => setFinalizeMonthConfirmOpen(true)}
+                    onClick={startFinalizeMonth}
                   >
                     {t.finalizeMonth}
                   </Button>
@@ -1081,10 +1115,36 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         onCancel={() => setReopenWeekOpen(false)} onConfirm={reopenWeek}
       />
       <ConfirmDialog
-        open={finalizeMonthConfirmOpen} title={t.finalizeMonthConfirmTitle} body={t.finalizeMonthConfirmBody}
+        open={finalizeMonthConfirmOpen} title={t.finalizeMonthConfirmTitle}
+        body={canExpenses && periodExpenses.length > 0 ? `${t.finalizeMonthConfirmBody} ${te.finalizeNote(periodExpenses.length, fmtEuro(periodExpenses.reduce((s2, x) => s2 + x.amount, 0)))}` : t.finalizeMonthConfirmBody}
         cancelLabel={t.confirmNo} confirmLabel={t.confirmYes} destructive
         onCancel={() => setFinalizeMonthConfirmOpen(false)} onConfirm={finalizeMonth}
       />
+
+      {expenseAskOpen && (
+        <div
+          role="dialog" aria-modal="true" aria-label={te.askTitle}
+          onClick={() => setExpenseAskOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(15,49,41,.45)", zIndex: 90, display: "flex", alignItems: tier === "mobile" ? "flex-end" : "center", justifyContent: "center", padding: tier === "mobile" ? 0 : 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: COLORS.card, width: tier === "mobile" ? "100%" : 420, borderRadius: tier === "mobile" ? `${RADIUS.sheetMobile}px ${RADIUS.sheetMobile}px 0 0` : RADIUS.card, padding: 24, boxSizing: "border-box" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.ink }}>{te.askTitle}</div>
+              <button type="button" onClick={() => setExpenseAskOpen(false)} aria-label={te.askClose} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink3, flexShrink: 0 }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 18 }}>{te.askBody}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <Button variant="primary" onClick={() => { setExpenseAskOpen(false); setExpenseNonce((n) => n + 1); }}>{te.askAdd}</Button>
+              <Button variant="secondary" onClick={() => { setExpenseAskOpen(false); setFinalizeMonthConfirmOpen(true); }}>{te.askNone}</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {sameAsk && (
         <div

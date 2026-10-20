@@ -10,6 +10,7 @@ import {
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
   weekBlocksOfPayPeriod, calPeriodLabel, boardStaff, countReviews,
+  expensesOf, staffExpensesApproved, staffExpensesPending, pendingExpenseList,
 } from "../../models/utils.js";
 import { formatTodayLabel, T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf, exportPeriodSummaryPdf } from "../../models/pdfExport.js";
@@ -20,6 +21,7 @@ import {
 import { LANG_NAMES } from "../../models/data.js";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
 import HoursReviewDialog from "./HoursReviewDialog.jsx";
+import { ExpenseDecisionRow, ExpensesReviewDrawer } from "./ExpensesReview.jsx";
 
 // "2026-09-20" -> Date local (meia-noite), igual ao resto do app faz com
 // datas ISO vindas de `horasData`.
@@ -82,6 +84,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const [closedToast, setClosedToast] = useState(false);
   const [recalcToast, setRecalcToast] = useState(null); // mensagem do aviso após recalcular
   const [reviewOpen, setReviewOpen] = useState(() => !!(navIntent && navIntent.openReviews)); // vindo do atalho "A repassar" do Dashboard
+  const [expensesOpen, setExpensesOpen] = useState(() => !!(navIntent && navIntent.openExpenses)); // vindo de "Despesas por aprovar" do Dashboard
   // Lote 4, 4.4 (achado da Marta: "Como conferir" pede setas, Exportar PDF,
   // Fechar período, idioma e Pago com a MESMA altura e raio 12 a 1366px).
   // As setas do navegador de período eram círculos (raio "50%") de 40×40
@@ -134,7 +137,13 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   // período (staffTotalHours > 0) e ainda não foi marcado como pago — uma
   // conta de teste com 0h no período não trava mais o fecho.
   const unpaidForClose = board.filter((s) => staffTotalHours(horasData[s.id] || { entries: [] }, period) > 0 && !horasData[s.id]?.paid).length;
-  const canClosePeriod = board.length > 0 && unpaidForClose === 0;
+  // Despesas a reembolsar: só aparece (coluna, botão, linha) em empresas que usam
+  // o privilégio — quem não o dá a ninguém vê o ecrã exatamente como antes.
+  const expensesInUse = staff.some((s) => s.canExpenses) || Object.values(horasData).some((h) => h && (h.expenses || []).length > 0);
+  const expensesApprovedTotal = Math.round(staff.reduce((sum, st) => sum + staffExpensesApproved(horasData[st.id], period), 0) * 100) / 100;
+  const pendingExpenses = pendingExpenseList(horasData);
+  const pendingExpensesInPeriod = pendingExpenseList(horasData, period).length;
+  const canClosePeriod = board.length > 0 && unpaidForClose === 0 && pendingExpensesInPeriod === 0;
   // A divisão das horas conta também com quem a AGENDA diz que faz o cliente
   // (staff, agenda, coberturas, faltas) — ver `expectedTeamIds` em utils.js.
   const ctx = useMemo(() => ({ staff, assignments, covers, absences }), [staff, assignments, covers, absences]);
@@ -177,7 +186,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
           if (!dateStrInPeriod(weekKey, period)) keptLockedWeeks[weekKey] = val;
         });
         const keptNoClientDays = (current.noClientDays || []).filter((d) => !dateStrInPeriod(d, period));
-        next[s.id] = { ...current, status: "pendente", paid: false, entries: keptEntries, lockedWeeks: keptLockedWeeks, noClientDays: keptNoClientDays, reopened: false };
+        const keptExpenses = (current.expenses || []).filter((x) => !dateStrInPeriod(x.date, period));
+        next[s.id] = { ...current, status: "pendente", paid: false, entries: keptEntries, lockedWeeks: keptLockedWeeks, noClientDays: keptNoClientDays, reopened: false, ...(current.expenses ? { expenses: keptExpenses } : {}) };
       });
       return next;
     });
@@ -194,7 +204,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   function exportPeriodPdf() {
     const rows = staff.map((s) => {
       const h = horasData[s.id] || { status: "pendente", paid: false, entries: [] };
-      return { name: s.name, paid: h.paid, status: h.status, hours: staffTotalHours(h, period), value: staffTotalPay(h, clients, period) };
+      return { name: s.name, paid: h.paid, status: h.status, hours: staffTotalHours(h, period), value: staffTotalPay(h, clients, period), expenses: staffExpensesApproved(h, period) };
     });
     exportPeriodSummaryPdf({
       companyName: company?.name,
@@ -202,6 +212,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       rows,
       totalHours: periodTotalHours,
       totalValue: periodTotalEuros,
+      totalExpenses: expensesApprovedTotal,
       pdfT,
       statusLabels: { paid: c0.paid, finished: t.statusFinished, pending: c0.pending },
     });
@@ -215,6 +226,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       clients,
       totalHours: staffTotalHours(openHoras, period),
       totalValue: staffTotalPay(openHoras, clients, period),
+      expenses: expensesOf(openHoras, period).filter((x) => x.status !== "rejected"),
       lang,
       pdfT,
     });
@@ -235,6 +247,10 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   }
   function revertApproval(staffId, i) {
     updateHoras(staffId, (h) => ({ ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, approved: false } : e)) }));
+  }
+  // Decisão da gerência sobre uma despesa (aprovar com valor, recusar com nota, voltar a decidir).
+  function decideExpense(staffId, id, patch) {
+    updateHoras(staffId, (h) => ({ ...h, expenses: (h.expenses || []).map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
   }
   // Correções da gerência mexem na divisão de horas de quem partilha o mesmo
   // cliente no mesmo dia (anular/repor uma linha muda o nº de pessoas). Aqui
@@ -337,6 +353,21 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       },
     },
     { key: "pay", label: t.colTotalPay, width: 1, numeric: true, render: (s) => fmtEuro(staffTotalPay(horasData[s.id] || { entries: [] }, clients, period)) },
+    ...(expensesInUse ? [{
+      key: "expenses", label: T[lang].expenses.colExpenses, width: 1, numeric: true,
+      render: (s) => {
+        const h = horasData[s.id];
+        const approved = staffExpensesApproved(h, period);
+        const pend = staffExpensesPending(h, period);
+        if (!approved && !pend) return <span style={{ color: COLORS.ink3 }}>–</span>;
+        return (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+            {pend > 0 && <Pill variant="pending">{pend}</Pill>}
+            {approved > 0 && fmtEuro(approved)}
+          </span>
+        );
+      },
+    }] : []),
     {
       key: "paid", label: t.colPaid, width: 1,
       render: (s) => {
@@ -379,7 +410,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
             <Button variant="secondary" onClick={exportPeriodPdf}>{t.exportPdfGeneral}</Button>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
               <Button variant="primary" disabled={!canClosePeriod} onClick={() => setCloseConfirmOpen(true)}>{t.closePeriod}</Button>
-              {!canClosePeriod && <Pill variant="pending">{t.missingPaymentsHint(unpaidForClose)}</Pill>}
+              {!(board.length > 0 && unpaidForClose === 0) && <Pill variant="pending">{t.missingPaymentsHint(unpaidForClose)}</Pill>}
+              {!canClosePeriod && pendingExpensesInPeriod > 0 && <Pill variant="pending">{T[lang].expenses.closeBlocked(pendingExpensesInPeriod)}</Pill>}
             </div>
           </div>
         )}
@@ -394,7 +426,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       <Card variant="hero" style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>{t.heroTitle}</div>
         <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 32, marginBottom: 2 }}>{fmtEuro(periodTotalEuros)}</div>
-        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 16 }}>{fmtHoursScreen(periodTotalHours)} · {periodLabel}</div>
+        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: expensesApprovedTotal > 0 ? 4 : 16 }}>{fmtHoursScreen(periodTotalHours)} · {periodLabel}</div>
+        {expensesApprovedTotal > 0 && <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 16 }}>{T[lang].expenses.heroLine(fmtEuro(expensesApprovedTotal))}</div>}
         <SegmentedBar
           onHero
           segments={[
@@ -417,6 +450,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {monthOffset === 0 && <Button variant={reviewCount > 0 ? "primary" : "secondary"} onClick={() => setReviewOpen(true)}>{t.reviewButton(reviewCount)}</Button>}
+          {expensesInUse && <Button variant={pendingExpenses.length > 0 ? "primary" : "secondary"} onClick={() => setExpensesOpen(true)}>{T[lang].expenses.reviewButton(pendingExpenses.length)}</Button>}
           <SearchField value={staffSearch} onChange={setStaffSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
         </div>
       </div>
@@ -466,6 +500,34 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                   <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 18 }}>{pendingExtras || "–"}</div>
                 </Card>
               </div>
+
+              {(() => {
+                const list = expensesOf(openHoras, period);
+                if (!openStaff.canExpenses && list.length === 0) return null;
+                const tx = T[lang].expenses;
+                return (
+                  <div style={{ marginBottom: 18 }} data-testid="staff-expenses">
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 700, color: COLORS.ink2, marginBottom: 8 }}>
+                      <span>{tx.drawerTitle}</span>
+                      <span>{tx.drawerTotal}: {fmtEuro(staffExpensesApproved(openHoras, period))}</span>
+                    </div>
+                    {list.length === 0 ? (
+                      <div style={{ fontSize: 13, color: COLORS.ink3 }}>{tx.drawerEmpty}</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {list.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).map((x) => (
+                          <ExpenseDecisionRow
+                            key={x.id} lang={lang} expense={x} locked={!!openHoras.paid}
+                            onApprove={(value) => decideExpense(openStaff.id, x.id, { status: "approved", approvedAmount: value, note: "" })}
+                            onReject={(note) => decideExpense(openStaff.id, x.id, { status: "rejected", approvedAmount: null, note })}
+                            onRevert={() => decideExpense(openStaff.id, x.id, { status: "pending", approvedAmount: null, note: "" })}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {locked && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, background: COLORS.lineSoft, color: COLORS.ink2, borderRadius: RADIUS.control, padding: "10px 14px", marginBottom: 18, fontSize: 13 }}>
@@ -605,6 +667,10 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
           setTimeout(() => setRecalcToast(null), 5000);
         }}
         horasData={horasData} clients={clients} staff={staff} period={period} ctx={ctx} lang={lang} t={t}
+      />
+      <ExpensesReviewDrawer
+        lang={lang} open={expensesOpen} onClose={() => setExpensesOpen(false)}
+        items={pendingExpenses} staff={staff} decide={decideExpense}
       />
       {closedToast && <Toast message={t.closedToast} onDismiss={() => setClosedToast(false)} closeLabel={c0.close} />}
       {recalcToast && <Toast message={recalcToast} onDismiss={() => setRecalcToast(null)} closeLabel={c0.close} />}

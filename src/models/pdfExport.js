@@ -3,7 +3,7 @@
 // imprimia a tela como estava (com botões, ícones de edição etc.).
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { clientById, entryClientName, fmtEuro, fmtHoursNum } from "./utils.js";
+import { clientById, entryClientName, fmtEuro, fmtHoursNum, expenseApprovedValue } from "./utils.js";
 
 const BRAND = [31, 111, 92]; // COLORS.primary
 const BRAND_DARK = [20, 63, 53]; // COLORS.primaryDark
@@ -61,7 +61,7 @@ function buildTotalsBox(doc, startY, totals) {
 
 // Relatório detalhado por funcionário: Data, Cliente, Horas, Valor/hora, Total
 // — igual às colunas já usadas na tela (Data/Cliente/Horas/Valor/Total).
-function exportStaffHorasPdf({ companyName, staffName, periodLabel, entries, clients, totalHours, totalValue, lang, pdfT, provisional }) {
+function exportStaffHorasPdf({ companyName, staffName, periodLabel, entries, clients, totalHours, totalValue, expenses, lang, pdfT, provisional }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const startY = buildHeader(doc, {
     companyName,
@@ -108,10 +108,46 @@ function exportStaffHorasPdf({ companyName, staffName, periodLabel, entries, cli
     doc.text(pdfT.extraPendingLegend, 40, afterTableY + 14);
     afterTableY += 14;
   }
-  buildTotalsBox(doc, afterTableY, [
+  // Reembolsos (despesas pagas pelo funcionário): tabela à parte; só as
+  // aprovadas somam, as ainda por aprovar aparecem marcadas com "†".
+  const expenseList = (expenses || []).filter((x) => x.status !== "rejected");
+  const totals = [
     { label: pdfT.totalHoursLabel, value: `${fmtHoursNum(totalHours)}h` },
     { label: pdfT.totalValueLabel, value: fmtEuro(totalValue) },
-  ]);
+  ];
+  if (expenseList.length > 0) {
+    const typeName = (ty) => (ty === "fuel" ? pdfT.expTypeFuel : ty === "product" ? pdfT.expTypeProduct : pdfT.expTypeOther);
+    const hasPendingExp = expenseList.some((x) => x.status !== "approved");
+    const expTotal = expenseList.reduce((s, x) => s + expenseApprovedValue(x), 0);
+    doc.setFontSize(11);
+    doc.setTextColor(...BRAND_DARK);
+    doc.text(pdfT.expensesTitle, 40, afterTableY + 28);
+    autoTable(doc, {
+      startY: afterTableY + 36,
+      head: [[pdfT.colDate, pdfT.colExpenseDesc, pdfT.colExpenseStatus, pdfT.colTotal]],
+      body: expenseList.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).map((x) => [
+        shortDate(x.date),
+        [typeName(x.type), x.description].filter(Boolean).join(" — "),
+        x.status === "approved" ? pdfT.expApproved : `${pdfT.expPending} †`,
+        x.status === "approved" ? fmtEuro(expenseApprovedValue(x)) : `${fmtEuro(x.amount)} †`,
+      ]),
+      styles: { fontSize: 9, cellPadding: 6, textColor: [22, 33, 29] },
+      headStyles: { fillColor: BRAND, textColor: [255, 255, 255], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [245, 248, 246] },
+      columnStyles: { 3: { halign: "right" } },
+      margin: { left: 40, right: 40 },
+    });
+    afterTableY = doc.lastAutoTable.finalY;
+    if (hasPendingExp) {
+      doc.setFontSize(8.5);
+      doc.setTextColor(...TEXT_SOFT);
+      doc.text(pdfT.expensePendingLegend, 40, afterTableY + 14);
+      afterTableY += 14;
+    }
+    totals.push({ label: pdfT.expenseTotalLabel, value: fmtEuro(expTotal) });
+    totals.push({ label: pdfT.grandTotalLabel, value: fmtEuro(totalValue + expTotal) });
+  }
+  buildTotalsBox(doc, afterTableY, totals);
 
   if (provisional) {
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -132,7 +168,7 @@ function exportStaffHorasPdf({ companyName, staffName, periodLabel, entries, cli
 
 // Resumo do período inteiro (todos os funcionários): Funcionário, Status,
 // Total de horas, Total a pagar — para o botão "Exportar PDF (geral)".
-function exportPeriodSummaryPdf({ companyName, periodLabel, rows, totalHours, totalValue, pdfT, statusLabels }) {
+function exportPeriodSummaryPdf({ companyName, periodLabel, rows, totalHours, totalValue, totalExpenses, pdfT, statusLabels }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const startY = buildHeader(doc, {
     companyName,
@@ -141,21 +177,23 @@ function exportPeriodSummaryPdf({ companyName, periodLabel, rows, totalHours, to
     pdfT,
   });
 
+  const withExpenses = (totalExpenses || 0) > 0;
   const body = rows.map((r) => [
     r.name,
     r.paid ? statusLabels.paid : r.status === "finalizado" ? statusLabels.finished : statusLabels.pending,
     `${fmtHoursNum(r.hours)}h`,
     fmtEuro(r.value),
+    ...(withExpenses ? [r.expenses ? fmtEuro(r.expenses) : "-"] : []),
   ]);
 
   autoTable(doc, {
     startY,
-    head: [[pdfT.colStaff, pdfT.colStatus, pdfT.colTotalHours, pdfT.colTotalPay]],
+    head: [[pdfT.colStaff, pdfT.colStatus, pdfT.colTotalHours, pdfT.colTotalPay, ...(withExpenses ? [pdfT.colExpenses] : [])]],
     body,
     styles: { fontSize: 9, cellPadding: 6, textColor: [22, 33, 29] },
     headStyles: { fillColor: BRAND, textColor: [255, 255, 255], fontStyle: "bold" },
     alternateRowStyles: { fillColor: [245, 248, 246] },
-    columnStyles: { 2: { halign: "right" }, 3: { halign: "right" } },
+    columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
     margin: { left: 40, right: 40 },
   });
 
@@ -163,6 +201,7 @@ function exportPeriodSummaryPdf({ companyName, periodLabel, rows, totalHours, to
   buildTotalsBox(doc, afterTableY, [
     { label: pdfT.totalHoursLabel, value: `${fmtHoursNum(totalHours)}h` },
     { label: pdfT.totalValueLabel, value: fmtEuro(totalValue) },
+    ...(withExpenses ? [{ label: pdfT.expenseTotalLabel, value: fmtEuro(totalExpenses) }] : []),
   ]);
 
   doc.save(`periodo-${periodLabel.replace(/\s+/g, "_")}.pdf`);

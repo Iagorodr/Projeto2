@@ -16,7 +16,7 @@ import KnownClientsSection from "./KnownClientsSection.jsx";
 
 const EMPTY_STAFF = {
   name: "", email: "", contact: "", accountType: "fixo", status: "ativo", validUntil: "",
-  iban: "", role: "funcionario", canViewAllClients: false, partnerId: null, startDate: "", documents: [null, null, null, null],
+  iban: "", role: "funcionario", canViewAllClients: false, canExpenses: false, partnerId: null, startDate: "", documents: [null, null, null, null],
 };
 
 // "YYYY-MM-DD" -> "23/09" (documento, 4.9: "Expirou a 23/09", "até 23/09").
@@ -395,6 +395,12 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
                   <span>{openStaff.canViewAllClients ? c0.yes : c0.no}</span>
                 </div>
               </ViewField>
+              <ViewField label={t.fCanExpenses}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <ReadOnlyToggle on={!!openStaff.canExpenses} />
+                  <span>{openStaff.canExpenses ? c0.yes : c0.no}</span>
+                </div>
+              </ViewField>
             </div>
 
             <SectionTitle>{t.assignedClients}</SectionTitle>
@@ -565,6 +571,13 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
                 <Toggle on={!!draft.canViewAllClients} onChange={(v) => updateDraft("canViewAllClients", v)} ariaLabel={t.fCanViewAllClients} />
                 <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{draft.canViewAllClients ? c0.yes : c0.no}</span>
               </div>
+            </Field>
+            <Field label={t.fCanExpenses}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Toggle on={!!draft.canExpenses} onChange={(v) => updateDraft("canExpenses", v)} ariaLabel={t.fCanExpenses} />
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{draft.canExpenses ? c0.yes : c0.no}</span>
+              </div>
+              <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.fCanExpensesHint}</div>
             </Field>
             {!isNew && <div style={{ ...styles.defSettingHint, gridColumn: "1 / -1" }}>{t.loginNote}</div>}
           </div>
