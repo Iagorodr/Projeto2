@@ -152,7 +152,11 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   const repassPending = hoursReviews.repass;
   const expensesPending = pendingExpenseList(horasData).length;
   let overtimePending = 0, reopenedCount = 0, customClientPending = 0, shareReviewPending = 0;
-  Object.values(horasData).forEach((data) => {
+  // Só conta funcionários que existem: sobras de contas antigas (ids que já não estão
+  // na equipa) deixavam "reabertos" fantasma que ninguém consegue abrir nem resolver.
+  const staffIdSet = new Set(staff.map((s) => String(s.id)));
+  Object.entries(horasData).forEach(([sid, data]) => {
+    if (!data || !staffIdSet.has(String(sid))) return;
     if (data.reopened) reopenedCount += 1;
     data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; if (!e.voided && !e.clientId && e.custom) customClientPending += 1; if (!e.voided && e.shareReview) shareReviewPending += 1; });
   });
