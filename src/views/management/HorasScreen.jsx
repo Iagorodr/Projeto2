@@ -21,6 +21,7 @@ import {
 import { LANG_NAMES } from "../../models/data.js";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
 import HoursReviewDialog from "./HoursReviewDialog.jsx";
+import { DateField } from "../shared/FormInputs.jsx";
 import { ExpenseDecisionRow, ExpensesReviewDrawer } from "./ExpensesReview.jsx";
 
 // "2026-09-20" -> Date local (meia-noite), igual ao resto do app faz com
@@ -84,6 +85,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const [closedToast, setClosedToast] = useState(false);
   const [recalcToast, setRecalcToast] = useState(null); // mensagem do aviso após recalcular
   const [reviewOpen, setReviewOpen] = useState(() => !!(navIntent && navIntent.openReviews)); // vindo do atalho "A repassar" do Dashboard
+  const [payAsk, setPayAsk] = useState(null); // { staffId, date "dd/mm/aaaa" } — pop-up "já pagou?"
+  const [unpayId, setUnpayId] = useState(null);
   const [expensesOpen, setExpensesOpen] = useState(() => !!(navIntent && navIntent.openExpenses)); // vindo de "Despesas por aprovar" do Dashboard
   // Lote 4, 4.4 (achado da Marta: "Como conferir" pede setas, Exportar PDF,
   // Fechar período, idioma e Pago com a MESMA altura e raio 12 a 1366px).
@@ -187,7 +190,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         });
         const keptNoClientDays = (current.noClientDays || []).filter((d) => !dateStrInPeriod(d, period));
         const keptExpenses = (current.expenses || []).filter((x) => !dateStrInPeriod(x.date, period));
-        next[s.id] = { ...current, status: "pendente", paid: false, entries: keptEntries, lockedWeeks: keptLockedWeeks, noClientDays: keptNoClientDays, reopened: false, ...(current.expenses ? { expenses: keptExpenses } : {}) };
+        next[s.id] = { ...current, status: "pendente", paid: false, entries: keptEntries, lockedWeeks: keptLockedWeeks, noClientDays: keptNoClientDays, reopened: false, paidAt: null, ...(current.expenses ? { expenses: keptExpenses } : {}) };
       });
       return next;
     });
@@ -235,8 +238,26 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   function updateHoras(staffId, updater) {
     setHorasData((prev) => ({ ...prev, [staffId]: updater(prev[staffId]) }));
   }
-  function togglePaid(staffId) {
-    updateHoras(staffId, (h) => (h.status === "finalizado" ? { ...h, paid: !h.paid } : h));
+  // Marcar/desmarcar pago pede confirmação: marcar abre um pop-up com o valor e a
+  // data do pagamento (hoje, editável); desmarcar pergunta antes e apaga a data.
+  function openPayDialog(staffId) {
+    const h = horasData[staffId];
+    if (!h || h.status !== "finalizado" || h.paid) return;
+    const d = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+    setPayAsk({ staffId, date: `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}` });
+  }
+  const payIso = payAsk ? (/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(payAsk.date) ? payAsk.date.split("/").reverse().join("-") : "") : "";
+  const payDateOk = !!payIso && !Number.isNaN(new Date(`${payIso}T12:00:00`).getTime()) && payIso <= isoDateStr(TODAY)
+    && payAsk.date === `${pad2(new Date(`${payIso}T12:00:00`).getDate())}/${pad2(new Date(`${payIso}T12:00:00`).getMonth() + 1)}/${new Date(`${payIso}T12:00:00`).getFullYear()}`;
+  function confirmPay() {
+    if (!payAsk || !payDateOk) return;
+    updateHoras(payAsk.staffId, (h) => (h.status === "finalizado" ? { ...h, paid: true, paidAt: payIso } : h));
+    setPayAsk(null);
+  }
+  function confirmUnpay() {
+    if (unpayId == null) return;
+    updateHoras(unpayId, (h) => ({ ...h, paid: false, paidAt: null }));
+    setUnpayId(null);
   }
   function reopenForCorrection(staffId) {
     updateHoras(staffId, (h) => ({ ...h, status: "pendente", lockedWeeks: {}, reopened: true }));
@@ -376,9 +397,9 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         return (
           <button
             type="button"
-            title={togglable ? t.markAsPaid : t.waitingFinalize(s.name)}
+            title={!togglable ? t.waitingFinalize(s.name) : h.paid ? t.unpayHint : t.markAsPaid}
             disabled={!togglable}
-            onClick={(ev) => { ev.stopPropagation(); togglePaid(s.id); }}
+            onClick={(ev) => { if (!h.paid) { ev.stopPropagation(); openPayDialog(s.id); } }}
             style={{
               width: ctrlHeight, height: ctrlHeight, borderRadius: ctrlRadius,
               border: `1.5px solid ${h.paid ? COLORS.ok : COLORS.lineInput}`,
@@ -473,7 +494,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
             <Button
               variant="primary" disabled={openHoras.status !== "finalizado"}
               icon={openHoras.paid ? Check : undefined}
-              onClick={() => togglePaid(openStaff.id)}
+              onClick={() => (openHoras.paid ? setUnpayId(openStaff.id) : openPayDialog(openStaff.id))}
             >
               {openHoras.paid ? c0.paid : t.markAsPaid}
             </Button>
@@ -531,7 +552,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
 
               {locked && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, background: COLORS.lineSoft, color: COLORS.ink2, borderRadius: RADIUS.control, padding: "10px 14px", marginBottom: 18, fontSize: 13 }}>
-                  🔒 {t.lockedBanner}
+                  🔒 {t.lockedBanner}{openHoras.paidAt ? ` · ${t.paidOn(openHoras.paidAt.split("-").reverse().join("/"))}` : ""}
                 </div>
               )}
 
@@ -646,6 +667,45 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         confirmLabel={t.confirmClose}
         onCancel={() => setCloseConfirmOpen(false)}
         onConfirm={closePeriod}
+      />
+
+      {payAsk && (() => {
+        const st = staff.find((x) => x.id === payAsk.staffId);
+        const h = horasData[payAsk.staffId] || { entries: [] };
+        const hoursValue = staffTotalPay(h, clients, period);
+        const exp = staffExpensesApproved(h, period);
+        return (
+          <div
+            role="dialog" aria-modal="true" aria-label={t.payConfirmTitle}
+            onClick={() => setPayAsk(null)}
+            style={{ position: "fixed", inset: 0, background: "rgba(15,49,41,.45)", zIndex: 95, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+          >
+            <div onClick={(e) => e.stopPropagation()} style={{ background: COLORS.card, width: 440, maxWidth: "100%", borderRadius: RADIUS.card, padding: 24, boxSizing: "border-box" }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>{t.payConfirmTitle}</div>
+              <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 14 }}>{t.payConfirmBody(st ? st.name : "")}</div>
+              <div style={{ background: COLORS.bg, borderRadius: RADIUS.control, padding: "12px 14px", marginBottom: 14, fontSize: 13.5, color: COLORS.ink }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>{t.payHoursLine(fmtHoursScreen(staffTotalHours(h, period)))}</span><span>{fmtEuro(hoursValue)}</span></div>
+                {exp > 0 && <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}><span>{T[lang].expenses.colExpenses}</span><span>{fmtEuro(exp)}</span></div>}
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: `1px solid ${COLORS.line}`, fontWeight: 700 }}><span>{t.payTotalLine}</span><span>{fmtEuro(hoursValue + exp)}</span></div>
+                {st && st.iban && <div style={{ marginTop: 8, fontSize: 12.5, color: COLORS.ink2 }}>IBAN: {st.iban}</div>}
+              </div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink2, marginBottom: 4 }}>{t.payDateLabel}</div>
+              <DateField value={payAsk.date} onChange={(v) => setPayAsk((a) => ({ ...a, date: v }))} openLabel={c0.edit} />
+              {!payDateOk && <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: 4 }}>{t.payDateInvalid}</div>}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
+                <Button variant="secondary" onClick={() => setPayAsk(null)}>{c0.cancel}</Button>
+                <Button variant="primary" disabled={!payDateOk} onClick={confirmPay}>{t.payConfirmYes}</Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      <ConfirmDialog
+        open={unpayId != null} title={t.unpayTitle}
+        body={t.unpayBody((staff.find((x) => x.id === unpayId) || {}).name || "")}
+        cancelLabel={t.unpayKeep} confirmLabel={t.unpayYes} destructive
+        onCancel={() => setUnpayId(null)} onConfirm={confirmUnpay}
       />
 
       <ConfirmDialog

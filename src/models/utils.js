@@ -1140,7 +1140,7 @@ function pendingExpenseList(horasData, period) {
 function buildClosedPeriodSnapshot(period, clients, staff, horasData, sentItems, missingItems) {
   const staffSummaries = staff.map((s) => {
     const h = horasData[s.id] || { entries: [], paid: false, status: "pendente" };
-    return { staffId: s.id, name: s.name, iban: s.iban, hours: staffTotalHours(h, period), euros: staffTotalPay(h, clients, period), paid: h.paid, entries: h.entries.filter((e) => !e.voided && dateStrInPeriod(e.date, period)),
+    return { staffId: s.id, name: s.name, iban: s.iban, hours: staffTotalHours(h, period), euros: staffTotalPay(h, clients, period), paid: h.paid, paidAt: h.paidAt || null, entries: h.entries.filter((e) => !e.voided && dateStrInPeriod(e.date, period)),
       expenses: expensesOf(h, period).filter((e) => e.status === "approved"), expensesTotal: staffExpensesApproved(h, period) };
   });
   const totalHours = staffSummaries.reduce((s, x) => s + x.hours, 0);
