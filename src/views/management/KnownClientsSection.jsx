@@ -3,7 +3,7 @@ import { Plus, X } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { TODAY } from "../../models/data.js";
-import { isoDateStr, isOccasionalClient, clientById } from "../../models/utils.js";
+import { isoDateStr, clientById } from "../../models/utils.js";
 import { Button, Pill } from "../shared/ui/index.js";
 
 // Funcionário → "Clientes conhecidos": clientes ocasionais (tipo «Ocasional /
@@ -24,7 +24,7 @@ function KnownClientsSection({ staffMember, clients, setStaff, t }) {
 
   const isLive = (k) => !k.to || k.to >= today;
   const takenIds = new Set(list.filter(isLive).map((k) => String(k.clientId)));
-  const options = clients.filter((c) => isOccasionalClient(c) && !takenIds.has(String(c.id))).sort((a, b) => a.name.localeCompare(b.name));
+  const options = clients.filter((c) => !takenIds.has(String(c.id))).sort((a, b) => a.name.localeCompare(b.name));
 
   function save(nextList) {
     setStaff((prev) => prev.map((s) => (s.id === staffMember.id ? { ...s, knownClients: nextList } : s)));

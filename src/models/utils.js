@@ -466,8 +466,8 @@ function analyseClientWeek(horasData, client, days, ctx, opts = {}) {
   strayDates.forEach((g) => {
     const marks = groups.get(g);
     if (isResolved(marks)) return;
-    // Cliente ocasional/conhecido: não há visita prevista, por isso o registo é normal (não é "visita extra").
-    if (isOccasionalClient(client)) return;
+    // Quem lançou tem este cliente na sua lista de «conhecidos» nesse dia: o registo é normal (não é "visita extra").
+    if (marks.every((m) => staffKnowsClient(ctx && ctx.staff, m.staffId, cid, g))) return;
     const staffSet = new Set(marks.map((m) => String(m.staffId)));
     let join = null;
     if (!saidNo(marks)) {
@@ -993,8 +993,7 @@ function boardStaff(staffList, horasData, period, today) {
 // vira só uma pendência à parte (cartão de Pendências), não tira o
 // cliente da contagem.
 function activeClientsCount(clients, today) {
-  // Os ocasionais/conhecidos não são clientes de agenda: não entram na contagem.
-  return clients.filter((c) => !isOccasionalClient(c)).length;
+  return clients.length;
 }
 
 function pad2(n) { return String(n).padStart(2, "0"); }
@@ -1261,16 +1260,20 @@ function clientAppliesThisWeek(client, weekStart) {
   return true;
 }
 
-// Cliente "Ocasional / conhecido" (clientType "occasional"): não tem agenda,
-// contrato nem frequência — o funcionário só o regista quando aparece. Cada
-// funcionário tem a sua lista (staff.knownClients: [{ clientId, from, to }],
-// datas "YYYY-MM-DD"; `to` vazio = sem fim; depois de `to` já não pode lançar).
-function isOccasionalClient(client) { return !!client && client.clientType === "occasional"; }
+// "Clientes conhecidos" de um funcionário: atalho para ele não ter de procurar
+// sempre o mesmo cliente em «Adicionar outro cliente». NÃO é um tipo de cliente:
+// são clientes normais (staff.knownClients: [{ clientId, from, to }], datas
+// "YYYY-MM-DD"; `to` vazio = sem fim; depois de `to` já não aparece).
 function knownClientActiveOn(entry, iso) {
   if (!entry) return false;
   if (entry.from && iso < entry.from) return false;
   if (entry.to && iso > entry.to) return false;
   return true;
+}
+// O funcionário `staffId` tem `clientId` na lista de conhecidos nesta data (ISO)?
+function staffKnowsClient(staffList, staffId, clientId, iso) {
+  const m = (staffList || []).find((x) => String(x.id) === String(staffId));
+  return !!m && (m.knownClients || []).some((k) => String(k.clientId) === String(clientId) && knownClientActiveOn(k, iso));
 }
 // Clientes conhecidos de `staffMember` que ele pode lançar nesta data.
 function knownClientsOn(staffMember, clients, date) {
@@ -1279,7 +1282,7 @@ function knownClientsOn(staffMember, clients, date) {
   ((staffMember && staffMember.knownClients) || []).forEach((k) => {
     if (!knownClientActiveOn(k, iso)) return;
     const c = clientById(clients, k.clientId);
-    if (c && isOccasionalClient(c) && !out.some((x) => x.id === c.id)) out.push(c);
+    if (c && !out.some((x) => x.id === c.id)) out.push(c);
   });
   return out;
 }
@@ -1290,7 +1293,6 @@ function knownClientsOn(staffMember, clients, date) {
 // referência global. Como o molde semanal tem os mesmos dias em toda a
 // semana, a paridade alterna de uma semana para a outra, como esperado.
 function clientAppliesOnDate(client, date) {
-  if (isOccasionalClient(client)) return false; // sem agenda
   if (!clientValidOnDate(client, date)) return false;
   if (!clientAppliesThisWeek(client, startOfISOWeek(date))) return false;
   if (client.frequency !== "alternate") return true;
@@ -1820,4 +1822,4 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, isOccasionalClient, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };
+export { staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange };

@@ -8,7 +8,7 @@ import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, clientDurationOnDow, clientPartMinutes, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
-  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, clientValidOnDate, clientValidityRange, isOccasionalClient, absenceOn,
+  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, clientValidOnDate, clientValidityRange, absenceOn,
   isSupervisorRole, agendaClientIdsOn, coveredAwayOn, coveringOn,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -587,7 +587,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
           const isOpenPopover = openCell === key;
           const isHovered = hoverCell === key;
           const availableClients = clients
-            .filter((c) => !isOccasionalClient(c) && c.name.toLowerCase().includes(cellSearch.toLowerCase()) && !clientIds.includes(c.id) && !coverAway.some((x) => x.clientId === c.id))
+            .filter((c) => c.name.toLowerCase().includes(cellSearch.toLowerCase()) && !clientIds.includes(c.id) && !coverAway.some((x) => x.clientId === c.id))
             .sort((a, b) => a.name.localeCompare(b.name));
           return (
             <div
