@@ -201,7 +201,7 @@ function exportPeriodSummaryPdf({ companyName, periodLabel, rows, totalHours, to
   buildTotalsBox(doc, afterTableY, [
     { label: pdfT.totalHoursLabel, value: `${fmtHoursNum(totalHours)}h` },
     { label: pdfT.totalValueLabel, value: fmtEuro(totalValue) },
-    ...(withExpenses ? [{ label: pdfT.expenseTotalLabel, value: fmtEuro(totalExpenses) }] : []),
+    ...(withExpenses ? [{ label: pdfT.expenseTotalLabel, value: fmtEuro(totalExpenses) }, { label: pdfT.grandTotalLabel, value: fmtEuro(totalValue + totalExpenses) }] : []),
   ]);
 
   doc.save(`periodo-${periodLabel.replace(/\s+/g, "_")}.pdf`);

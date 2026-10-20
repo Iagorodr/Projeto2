@@ -144,6 +144,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   // o privilégio — quem não o dá a ninguém vê o ecrã exatamente como antes.
   const expensesInUse = staff.some((s) => s.canExpenses) || Object.values(horasData).some((h) => h && (h.expenses || []).length > 0);
   const expensesApprovedTotal = Math.round(staff.reduce((sum, st) => sum + staffExpensesApproved(horasData[st.id], period), 0) * 100) / 100;
+  // "A pagar" = horas + reembolsos aprovados (o que a gerência realmente transfere).
+  const periodGrandTotal = periodTotalEuros + expensesApprovedTotal;
   const pendingExpenses = pendingExpenseList(horasData);
   const pendingExpensesInPeriod = pendingExpenseList(horasData, period).length;
   const canClosePeriod = board.length > 0 && unpaidForClose === 0 && pendingExpensesInPeriod === 0;
@@ -373,7 +375,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         return n > 0 ? <Pill variant="pending">{n}</Pill> : <span style={{ color: COLORS.ink3 }}>–</span>;
       },
     },
-    { key: "pay", label: t.colTotalPay, width: 1, numeric: true, render: (s) => fmtEuro(staffTotalPay(horasData[s.id] || { entries: [] }, clients, period)) },
+    { key: "pay", label: t.colTotalPay, width: 1, numeric: true, render: (s) => fmtEuro(staffTotalPay(horasData[s.id] || { entries: [] }, clients, period) + staffExpensesApproved(horasData[s.id], period)) },
     ...(expensesInUse ? [{
       key: "expenses", label: T[lang].expenses.colExpenses, width: 1, numeric: true,
       render: (s) => {
@@ -446,9 +448,9 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
 
       <Card variant="hero" style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>{t.heroTitle}</div>
-        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 32, marginBottom: 2 }}>{fmtEuro(periodTotalEuros)}</div>
+        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 32, marginBottom: 2 }}>{fmtEuro(periodGrandTotal)}</div>
         <div style={{ fontSize: 13, opacity: 0.85, marginBottom: expensesApprovedTotal > 0 ? 4 : 16 }}>{fmtHoursScreen(periodTotalHours)} · {periodLabel}</div>
-        {expensesApprovedTotal > 0 && <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 16 }}>{T[lang].expenses.heroLine(fmtEuro(expensesApprovedTotal))}</div>}
+        {expensesApprovedTotal > 0 && <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 16 }}>{T[lang].expenses.heroLine(fmtEuro(periodTotalEuros), fmtEuro(expensesApprovedTotal))}</div>}
         <SegmentedBar
           onHero
           segments={[
@@ -515,7 +517,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                 </Card>
                 <Card style={{ flex: 1, padding: "14px 16px" }}>
                   <div style={{ fontSize: 11.5, color: COLORS.ink2, marginBottom: 4 }}>{t.miniReceiveLabel}</div>
-                  <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 18 }}>{fmtEuro(staffTotalPay(openHoras, clients, period))}</div>
+                  <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 18 }}>{fmtEuro(staffTotalPay(openHoras, clients, period) + staffExpensesApproved(openHoras, period))}</div>
                 </Card>
                 <Card style={{ flex: 1, padding: "14px 16px" }}>
                   <div style={{ fontSize: 11.5, color: COLORS.ink2, marginBottom: 4 }}>{t.miniExtrasLabel}</div>
@@ -663,7 +665,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       <ConfirmDialog
         open={closeConfirmOpen}
         title={t.closeConfirmTitle}
-        body={t.closeConfirmBody(periodLabel, fmtHoursScreen(periodTotalHours), fmtEuro(periodTotalEuros)) + (reviewCount > 0 ? ` ${t.reviewCloseWarn(reviewCount)}` : "")}
+        body={t.closeConfirmBody(periodLabel, fmtHoursScreen(periodTotalHours), fmtEuro(periodGrandTotal)) + (reviewCount > 0 ? ` ${t.reviewCloseWarn(reviewCount)}` : "")}
         cancelLabel={c0.cancel}
         confirmLabel={t.confirmClose}
         onCancel={() => setCloseConfirmOpen(false)}
