@@ -5,11 +5,11 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
-import { clientById, staffById, isoDateStr, fmtNoteDate, getAssignedClientIds } from "../../models/utils.js";
+import { clientById, staffById, isoDateStr, fmtNoteDate, getAssignedClientIds, isStaffActive, groupSentItems, recipientsText } from "../../models/utils.js";
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { Field } from "../shared/Layout.jsx";
 import {
-  PageHeader, Button, Drawer, Pill, SupervisorTag, FilterChip, SearchSelect, PhotoDropzone, Card, Toast, MobileHeader,
+  PageHeader, Button, Drawer, Pill, SupervisorTag, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, Card, Toast, MobileHeader,
 } from "../shared/ui/index.js";
 import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
 import AbsenceSheet from "../shared/AbsenceSheet.jsx";
@@ -158,7 +158,7 @@ function SentFeedCard({ entry, staff, clients, lang, t, c0 }) {
         <TypeIconBlock type={item.type} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.ink }}>{s ? s.name : "—"}</span>
+            <span style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.ink }}>{(item.recipients || []).length > 1 ? recipientsText(item.recipients, staff, c0, TODAY) : (s ? s.name : "—")}</span>
             {c && <Pill variant="neutral">{c.name}</Pill>}
           </div>
           <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 6 }}>{fmtNoteDate(item.date)}{item.hasPhoto && " · 📎"}</div>
@@ -198,7 +198,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
 
   const [reportSheetOpen, setReportSheetOpen] = useState(false);
   const [reportType, setReportType] = useState("reclamacao");
-  const [reportStaffId, setReportStaffId] = useState("");
+  const [reportStaffIds, setReportStaffIds] = useState([]);
   const [reportClientId, setReportClientId] = useState("");
   const [reportText, setReportText] = useState("");
   const [reportPhoto, setReportPhoto] = useState(null);
@@ -210,13 +210,14 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
 
   const mySent = missingItems.filter((m) => m.staffId === staffId);
   const reportTargets = staff.filter((s) => s.id !== staffId);
-  const mySentReports = isSupervisor ? sentItems.filter((i) => i.sentByStaffId === staffId) : [];
+  const mySentReports = isSupervisor ? groupSentItems(sentItems.filter((i) => i.sentByStaffId === staffId)) : [];
   const sentFeed = [
     ...mySent.map((m) => ({ kind: "pedido", date: m.date, data: m })),
     ...mySentReports.map((r) => ({ kind: "report", date: r.date, data: r })),
   ].sort((a, b) => b.date.localeCompare(a.date));
 
   const reportStaffOptions = reportTargets.map((s) => ({ id: s.id, label: s.name }));
+  const reportActiveIds = reportTargets.filter((s) => isStaffActive(s, TODAY)).map((s) => s.id);
   const reportClientOptions = clients.map((c) => ({ id: c.id, label: c.name }));
 
   function openSheet() { setSubjectKey(null); setDraftClientId(""); setDraftText(""); setSheetOpen(true); }
@@ -232,18 +233,21 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
   }
 
   function openReportSheet() {
-    setReportType("reclamacao"); setReportStaffId(""); setReportClientId(""); setReportText(""); setReportPhoto(null);
+    setReportType("reclamacao"); setReportStaffIds([]); setReportClientId(""); setReportText(""); setReportPhoto(null);
     setReportSheetOpen(true);
   }
   function handleSendReport() {
-    if (!reportStaffId || !reportClientId || !reportText.trim()) return;
+    if (reportStaffIds.length === 0 || !reportClientId || !reportText.trim()) return;
     // QA (achado do Iago, Avisos da gerência — "só deve aparecer o
     // número de coisas novas"): sem `seenByManagement` aqui (ao contrário
     // do que a própria gerência cria em AvisosScreen.jsx, que já nasce
     // visto) — isto é exatamente o tipo de item que deve contar como
     // "novo" pra gerência até ela abrir aquela aba.
+    // Várias pessoas: um item por pessoa, ligados por `groupId` (um cartão na lista, uma conta no total).
+    const now = Date.now();
+    const groupId = reportStaffIds.length > 1 ? now : undefined;
     setSentItems((prev) => [
-      { id: Date.now(), type: reportType, staffId: Number(reportStaffId), clientId: Number(reportClientId), text: reportText.trim(), date: isoDateStr(TODAY), hasPhoto: !!reportPhoto, sentBy: "supervisor", sentByStaffId: staffId },
+      ...reportStaffIds.map((sid, i) => ({ id: now + i, ...(groupId ? { groupId } : {}), type: reportType, staffId: Number(sid), clientId: Number(reportClientId), text: reportText.trim(), date: isoDateStr(TODAY), hasPhoto: !!reportPhoto, sentBy: "supervisor", sentByStaffId: staffId })),
       ...prev,
     ]);
     setReportSheetOpen(false);
@@ -329,8 +333,8 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
       footer={
         <Button
           size="mobile" style={{ width: "100%" }} onClick={handleSendReport}
-          disabled={!reportStaffId || !reportClientId || !reportText.trim()}
-          disabledReason={!reportStaffId ? avT.chooseStaffReason : (!reportClientId || !reportText.trim()) ? c0.requiredField : undefined} disabledReasonBelow
+          disabled={reportStaffIds.length === 0 || !reportClientId || !reportText.trim()}
+          disabledReason={reportStaffIds.length === 0 ? c0.recipChooseReason : (!reportClientId || !reportText.trim()) ? c0.requiredField : undefined} disabledReasonBelow
         >
           {tr.send}
         </Button>
@@ -344,7 +348,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <Field label={tr.formStaff}>
-          <SearchSelect value={reportStaffId} onChange={setReportStaffId} options={reportStaffOptions} placeholder={tr.formStaffPlaceholder} searchPlaceholder={T[lang].funcionarios.searchPlaceholder} noResultsLabel={c0.noResults} />
+          <MultiSelect value={reportStaffIds} onChange={setReportStaffIds} options={reportStaffOptions} allIds={reportActiveIds} allLabel={c0.recipAll} summary={(ids, all) => (all ? c0.recipWholeTeam : ids.length === 1 ? (reportStaffOptions.find((o) => String(o.id) === String(ids[0])) || {}).label : c0.recipCount(ids.length))} placeholder={tr.formStaffPlaceholder} searchPlaceholder={T[lang].funcionarios.searchPlaceholder} noResultsLabel={c0.noResults} />
         </Field>
         <Field label={tr.formClient}>
           <SearchSelect value={reportClientId} onChange={setReportClientId} options={reportClientOptions} placeholder={tr.formClientPlaceholder} searchPlaceholder={T[lang].clientes.searchPlaceholder} noResultsLabel={c0.noResults} />

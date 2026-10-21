@@ -4,11 +4,11 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
-import { clientById, staffById, isoDateStr, fmtNoteDate, getOpenPeriod, isSolicitationStale } from "../../models/utils.js";
+import { clientById, staffById, isoDateStr, fmtNoteDate, getOpenPeriod, isSolicitationStale, isStaffActive, groupSentItems, uniqueSentCount, recipientsText } from "../../models/utils.js";
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { Field } from "../shared/Layout.jsx";
 import {
-  PageHeader, Button, Drawer, Pill, SupervisorTag, Avatar, FilterChip, SearchSelect, PhotoDropzone, Card, Toast,
+  PageHeader, Button, Drawer, Pill, SupervisorTag, Avatar, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, Card, Toast,
 } from "../shared/ui/index.js";
 import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
 
@@ -116,6 +116,7 @@ function PedidoCard({ m, staff, clients, lang, t, c0, stale, replying, replyDraf
 function SentItemCard({ item, type, staff, clients, c0 }) {
   const s = staffById(staff, item.staffId);
   const c = clientById(clients, item.clientId);
+  const multi = (item.recipients || []).length > 1;
   const fromSupervisor = item.sentBy === "supervisor";
   return (
     <Card style={{ padding: 14 }}>
@@ -124,7 +125,8 @@ function SentItemCard({ item, type, staff, clients, c0 }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <Avatar name={s ? s.name : "—"} size={24} />
-            <span style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.ink }}>{s ? s.name : "—"}</span>
+            <span style={{ fontWeight: 600, fontSize: 13.5, color: COLORS.ink }}>{multi ? recipientsText(item.recipients, staff, c0, TODAY) : (s ? s.name : "—")}</span>
+            {multi && <Pill variant="neutral">{c0.recipCount(item.recipients.length)}</Pill>}
             {c && <Pill variant="neutral">{c.name}</Pill>}
             {fromSupervisor && <SupervisorTag kind="origin">{c0.sentBySupervisor}</SupervisorTag>}
           </div>
@@ -153,7 +155,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   const [tab, setTab] = useState("pedidos");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draftType, setDraftType] = useState("reclamacao");
-  const [draftStaffId, setDraftStaffId] = useState("");
+  const [draftStaffIds, setDraftStaffIds] = useState([]); // vários destinatários
   const [draftClientId, setDraftClientId] = useState("");
   const [draftText, setDraftText] = useState("");
   const [draftPhoto, setDraftPhoto] = useState(null);
@@ -165,9 +167,11 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   // antigos da visão padrão"); o botão abaixo revela, nunca apaga nada.
   const [showStale, setShowStale] = useState(false);
 
-  const complaints = sentItems.filter((i) => i.type === "reclamacao");
-  const praises = sentItems.filter((i) => i.type === "elogio");
-  const notices = sentItems.filter((i) => i.type === "aviso");
+  // Um envio a várias pessoas aparece num cartão só (itens ligados por `groupId`).
+  const complaints = groupSentItems(sentItems.filter((i) => i.type === "reclamacao"));
+  const praises = groupSentItems(sentItems.filter((i) => i.type === "elogio"));
+  const notices = groupSentItems(sentItems.filter((i) => i.type === "aviso"));
+  const unseenOf = (list) => uniqueSentCount(list.flatMap((g) => g.members).filter((i) => !i.seenByManagement));
   const openPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
   const staleMissingItems = missingItems.filter((m) => isSolicitationStale(m, openPeriod));
   const visibleMissingItems = showStale ? missingItems : missingItems.filter((m) => !isSolicitationStale(m, openPeriod));
@@ -185,47 +189,36 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, missingItems]);
 
-  // Documento, 4.7, literal: "Funcionário (seletor com pesquisa; em
-  // 'Aviso' pode ser 'Todos')" — a opção "Todos" só faz sentido pro tipo
-  // Aviso (um aviso geral costuma ser pra equipa toda; reclamação/elogio
-  // são sempre sobre uma pessoa). Em vez de inventar um valor "broadcast"
-  // no modelo de dados (que obrigaria a mudar todo o código que já lê
-  // `sentItems[].staffId]`, incluindo o ecrã do funcionário), "Todos" cria
-  // um item igual por cada funcionário — cada um fica indistinguível de um
-  // aviso enviado individualmente, sem precisar de nenhuma outra mudança.
-  const staffOptions = draftType === "aviso"
-    ? [{ id: "all", label: t.allStaff }, ...staff.map((s) => ({ id: s.id, label: s.name }))]
-    : staff.map((s) => ({ id: s.id, label: s.name }));
+  // Destinatários: uma ou várias pessoas, ou "Todos" (os funcionários ativos), para qualquer
+  // tipo (reclamação, elogio, aviso). Cada pessoa recebe o seu item (cada um com o seu "lido"
+  // e a sua conta no Dashboard), ligados por `groupId`: na lista aparecem num cartão só e no
+  // total da empresa contam uma vez.
+  const staffOptions = staff.map((s) => ({ id: s.id, label: s.name }));
+  const activeStaffIds = staff.filter((s) => isStaffActive(s, TODAY)).map((s) => s.id);
   const clientOptions = clients.map((c) => ({ id: c.id, label: c.name }));
 
   function openDrawer() {
-    setDraftType("reclamacao"); setDraftStaffId(""); setDraftClientId(""); setDraftText(""); setDraftPhoto(null);
+    setDraftType("reclamacao"); setDraftStaffIds([]); setDraftClientId(""); setDraftText(""); setDraftPhoto(null);
     setDrawerOpen(true);
   }
   // Muda o tipo e limpa o funcionário escolhido: "Todos" só existe pro
   // tipo Aviso, por isso uma seleção de "Todos" não pode sobreviver a uma
   // troca pra Reclamação/Elogio (ficaria um valor inválido escondido).
-  function changeDraftType(type) { setDraftType(type); setDraftStaffId(""); }
+  function changeDraftType(type) { setDraftType(type); }
   function handleSend() {
-    if (!draftStaffId || !draftClientId || !draftText.trim()) return;
+    if (draftStaffIds.length === 0 || !draftClientId || !draftText.trim()) return;
     // `seenByManagement: true` aqui — a própria gerência acabou de criar o
     // item, não há nada "novo" pra ela ver (ver `selectTab`/badges abaixo,
     // e o contraponto em EmployeeAvisosScreen.jsx: lá o supervisor cria
     // SEM esse campo, `undefined` conta como não visto).
-    if (draftStaffId === "all") {
-      const now = Date.now();
-      setSentItems((prev) => [
-        ...staff.map((s, i) => ({ id: now + i, type: draftType, staffId: s.id, clientId: Number(draftClientId), text: draftText.trim(), date: isoDateStr(TODAY), hasPhoto: !!draftPhoto, seenByManagement: true })),
-        ...prev,
-      ]);
-    } else {
-      setSentItems((prev) => [
-        { id: Date.now(), type: draftType, staffId: Number(draftStaffId), clientId: Number(draftClientId), text: draftText.trim(), date: isoDateStr(TODAY), hasPhoto: !!draftPhoto, seenByManagement: true },
-        ...prev,
-      ]);
-    }
+    const now = Date.now();
+    const groupId = draftStaffIds.length > 1 ? now : undefined;
+    setSentItems((prev) => [
+      ...draftStaffIds.map((sid, i) => ({ id: now + i, ...(groupId ? { groupId } : {}), type: draftType, staffId: Number(sid), clientId: Number(draftClientId), text: draftText.trim(), date: isoDateStr(TODAY), hasPhoto: !!draftPhoto, seenByManagement: true })),
+      ...prev,
+    ]);
     setDrawerOpen(false);
-    setToastMsg(t.sent);
+    setToastMsg(draftStaffIds.length > 1 ? `${t.sent} · ${c0.recipCount(draftStaffIds.length)}` : t.sent);
     setTimeout(() => setToastMsg(null), 5000);
   }
   function toggleResolved(id) {
@@ -268,9 +261,9 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
         <FilterChip active={tab === "pedidos"} onClick={() => selectTab("pedidos")} count={pendingSolicitations}>{t.sectionSolicitations}</FilterChip>
-        <FilterChip active={tab === "reclamacoes"} onClick={() => selectTab("reclamacoes")} count={complaints.filter((i) => !i.seenByManagement).length}>{t.tabComplaints}</FilterChip>
-        <FilterChip active={tab === "elogios"} onClick={() => selectTab("elogios")} count={praises.filter((i) => !i.seenByManagement).length}>{t.sectionPraise}</FilterChip>
-        <FilterChip active={tab === "avisos"} onClick={() => selectTab("avisos")} count={notices.filter((i) => !i.seenByManagement).length}>{t.sectionNotices}</FilterChip>
+        <FilterChip active={tab === "reclamacoes"} onClick={() => selectTab("reclamacoes")} count={unseenOf(complaints)}>{t.tabComplaints}</FilterChip>
+        <FilterChip active={tab === "elogios"} onClick={() => selectTab("elogios")} count={unseenOf(praises)}>{t.sectionPraise}</FilterChip>
+        <FilterChip active={tab === "avisos"} onClick={() => selectTab("avisos")} count={unseenOf(notices)}>{t.sectionNotices}</FilterChip>
       </div>
 
       {tab === "pedidos" ? (
@@ -316,8 +309,8 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
             <Button variant="secondary" onClick={() => setDrawerOpen(false)}>{c0.cancel}</Button>
             <Button
               onClick={handleSend}
-              disabled={!draftStaffId || !draftClientId || !draftText.trim()}
-              disabledReason={!draftStaffId ? t.chooseStaffReason : (!draftClientId || !draftText.trim()) ? c0.requiredField : undefined}
+              disabled={draftStaffIds.length === 0 || !draftClientId || !draftText.trim()}
+              disabledReason={draftStaffIds.length === 0 ? c0.recipChooseReason : (!draftClientId || !draftText.trim()) ? c0.requiredField : undefined}
             >
               {t.send}
             </Button>
@@ -332,8 +325,9 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <Field label={t.formStaff}>
-            <SearchSelect
-              value={draftStaffId} onChange={setDraftStaffId} options={staffOptions}
+            <MultiSelect
+              value={draftStaffIds} onChange={setDraftStaffIds} options={staffOptions} allIds={activeStaffIds} allLabel={c0.recipAll}
+              summary={(ids, all) => (all ? c0.recipWholeTeam : ids.length === 1 ? (staffOptions.find((o) => String(o.id) === String(ids[0])) || {}).label : c0.recipCount(ids.length))}
               placeholder={t.formStaffPlaceholder} searchPlaceholder={T[lang].funcionarios.searchPlaceholder} noResultsLabel={c0.noResults}
             />
           </Field>

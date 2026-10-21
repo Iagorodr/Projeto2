@@ -6,7 +6,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
-import { clientById, entryClientName, fmtEuro, fmtHoursNum, fmtHoursScreen, fmtNoteDate, pctChange } from "../../models/utils.js";
+import { clientById, entryClientName, fmtEuro, fmtHoursNum, fmtHoursScreen, fmtNoteDate, pctChange, groupSentItems } from "../../models/utils.js";
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { exportGenericTablePdf } from "../../models/pdfExport.js";
 import {
@@ -369,7 +369,7 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
             current={open.reclamacoes}
             excelenteThreshold={excelenteThreshold}
             razoavelThreshold={razoavelThreshold}
-            recent={open.reclamacoesItems.slice(0, 2).map((i) => ({ client: clientById(clients, i.clientId)?.name || "—", date: fmtNoteDate(i.date) }))}
+            recent={groupSentItems(open.reclamacoesItems).slice(0, 2).map((i) => ({ client: clientById(clients, i.clientId)?.name || "—", date: fmtNoteDate(i.date) }))}
             title={dashT.complaintsTitle}
             subtitle={open.periodLabel}
             labels={{ excelente: dashT.gaugeExcelente, razoavel: dashT.gaugeRazoavel, critico: dashT.gaugeCritico }}
@@ -379,9 +379,9 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
 
       <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink2, marginBottom: 10 }}>{t.occurrences}</div>
       <Card>
-        <OccurrenceSection first icon={MessageSquare} title={`${t.complaintsCount} (${open.reclamacoes})`} items={open.reclamacoesItems} emptyLabel={t.noneThisPeriod} clients={clients} lang={lang} />
-        <OccurrenceSection icon={ThumbsUp} title={`${t.praiseCount} (${open.elogios})`} items={open.elogiosItems} emptyLabel={t.noneMasc} clients={clients} lang={lang} />
-        <OccurrenceSection icon={Bell} title={`${avisosT.sectionNotices} (${open.avisos})`} items={open.avisosItems} emptyLabel={t.noneMasc} clients={clients} lang={lang} />
+        <OccurrenceSection first icon={MessageSquare} title={`${t.complaintsCount} (${open.reclamacoes})`} items={groupSentItems(open.reclamacoesItems)} emptyLabel={t.noneThisPeriod} clients={clients} lang={lang} />
+        <OccurrenceSection icon={ThumbsUp} title={`${t.praiseCount} (${open.elogios})`} items={groupSentItems(open.elogiosItems)} emptyLabel={t.noneMasc} clients={clients} lang={lang} />
+        <OccurrenceSection icon={Bell} title={`${avisosT.sectionNotices} (${open.avisos})`} items={groupSentItems(open.avisosItems)} emptyLabel={t.noneMasc} clients={clients} lang={lang} />
         <OccurrenceSection
           icon={PackageX}
           title={`${t.solicitationsCount} (${open.solicitacoesResolvidas}/${open.solicitacoes} ${t.resolvedOf})`}

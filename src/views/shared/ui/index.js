@@ -9,6 +9,7 @@ export { KpiCard } from "./KpiCard.jsx";
 export { SegmentedControl, FilterChip } from "./SegmentedControl.jsx";
 export { SearchField } from "./SearchField.jsx";
 export { SearchSelect } from "./SearchSelect.jsx";
+export { MultiSelect } from "./MultiSelect.jsx";
 export { PhotoDropzone } from "./PhotoDropzone.jsx";
 export { ProgressBar } from "./ProgressBar.jsx";
 export { SegmentedBar } from "./SegmentedBar.jsx";

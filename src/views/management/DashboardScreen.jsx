@@ -8,7 +8,7 @@ import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, parseDMY, getOpenPeriod, unseenAvisosCount, formatPeriodLabel, staffTotalHours, staffTotalPay,
   recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
-  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews, inReviewWindow, pendingExpenseList, staffExpensesApproved,
+  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews, inReviewWindow, pendingExpenseList, staffExpensesApproved, uniqueSentCount, groupSentItems,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
 import ClientsByCityCard from "./ClientsByCityCard.jsx";
@@ -221,7 +221,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   // antigos que ficaram em `sentItems` (de antes de um fecho, por exemplo) não
   // contam; os do período já fechado vivem no Histórico.
   const periodComplaints = (sentItems || []).filter((i) => i.type === "reclamacao" && dateStrInPeriod(i.date, currentPeriod));
-  const complaintsCurrent = periodComplaints.length;
+  const complaintsCurrent = uniqueSentCount(periodComplaints); // um envio a várias pessoas conta 1
   // Limites escalam com o tamanho da carteira de clientes (configurado em
   // Definições como "reclamações a cada N clientes"), em vez de um valor fixo.
   const excelenteThreshold = Math.max(0, Math.round((clients.length / (reclamacaoBaseClients || 10)) * (reclamacaoExcelenteCount ?? 1)));
@@ -233,7 +233,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   // jeito. (QA pós-auditoria: `fmtNoteDate` já entende os dois formatos —
   // deixou de ser o motivo de não o usar aqui; manter em bruto continua
   // sendo o comportamento certo, só não é mais por causa do bug antigo.)
-  const recentComplaints = periodComplaints
+  const recentComplaints = groupSentItems(periodComplaints)
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 2)

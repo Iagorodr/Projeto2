@@ -1157,7 +1157,7 @@ function buildClosedPeriodSnapshot(period, clients, staff, horasData, sentItems,
     periodEnd: isoDateStr(period.end),
     closedAt: isoDateStr(TODAY),
     staffSummaries, totalHours, totalEuros, totalExpenses,
-    reclamacoes: reclamacoesItems.length, elogios: elogiosItems.length, avisos: avisosItems.length,
+    reclamacoes: uniqueSentCount(reclamacoesItems), elogios: uniqueSentCount(elogiosItems), avisos: uniqueSentCount(avisosItems),
     reclamacoesItems, elogiosItems, avisosItems,
     solicitacoes: solicitacoesItems.length, solicitacoesResolvidas: solicitacoesItems.filter((i) => i.resolved).length,
     solicitacoesItems,
@@ -1258,9 +1258,35 @@ function isSolicitationStale(m, openPeriod) {
 // contava TODOS os pedidos por resolver, mesmo os já vistos, e nunca
 // desaparecia enquanto o pedido não fosse resolvido. Pedidos de períodos já
 // fechados ficam de fora (`isSolicitationStale`), tal como na tela.
+// Reclamação/elogio/aviso enviado a VÁRIAS pessoas = um item por pessoa (cada um com o seu
+// "lido" e a sua conta no Dashboard), ligados por `groupId`. Para listas e totais da empresa
+// conta-se uma vez só por envio.
+function sentGroupKey(i) { return i.groupId != null ? `g${i.groupId}` : `i${i.id}`; }
+function groupSentItems(items) {
+  const map = new Map();
+  const out = [];
+  (items || []).forEach((i) => {
+    const k = sentGroupKey(i);
+    let g = map.get(k);
+    if (!g) { g = { ...i, recipients: [i.staffId], members: [i] }; map.set(k, g); out.push(g); }
+    else { g.recipients.push(i.staffId); g.members.push(i); }
+  });
+  return out;
+}
+// "Talia", "Talia, Iago", "Talia, Iago +2" ou "Toda a equipa" (quando foi a toda a gente ativa).
+function recipientsText(recipients, staff, c0, today) {
+  const ids = recipients.map(String);
+  const active = staff.filter((s) => isStaffActive(s, today)).map((s) => String(s.id));
+  if (ids.length > 1 && active.length > 0 && active.every((id) => ids.includes(id))) return c0.recipWholeTeam;
+  const names = ids.map((id) => { const m = staffById(staff, Number(id)) || staffById(staff, id); return m ? m.name.trim() : "—"; });
+  return names.length <= 3 ? names.join(", ") : `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+}
+
+function uniqueSentCount(items) { return new Set((items || []).map(sentGroupKey)).size; }
+
 function unseenAvisosCount(missingItems, sentItems, openPeriod) {
   const pedidos = (missingItems || []).filter((m) => !m.resolved && !m.seenByManagement && !isSolicitationStale(m, openPeriod)).length;
-  const enviados = (sentItems || []).filter((i) => !i.seenByManagement).length;
+  const enviados = uniqueSentCount((sentItems || []).filter((i) => !i.seenByManagement));
   return pedidos + enviados;
 }
 
@@ -1883,5 +1909,5 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
+export { EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
 };

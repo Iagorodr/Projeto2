@@ -8,6 +8,7 @@ const T = {
     common: {
       cdEmpTitle: (d) => `Período terminado: finalize até ${d}`, cdEmpOverdueTitle: "Prazo terminou: período por fechar", cdEmpBody: (n) => `Faltam ${n} dia(s). Finalize o seu mês nas Horas.`, cdEmpOverdueBody: "O prazo acabou. Sem novos lançamentos até a gerência fechar o período; finalize o seu mês agora.", cdMgmtBody: (n) => `Faltam ${n} dia(s) para fechar o período. Feche em Horas.`, cdMgmtOverdueTitle: "Fecho em atraso", cdMgmtLockBody: (p) => `O período ${p} terminou e passou do prazo. Feche-o para voltar a usar o Dashboard.`, cdGoHours: "Ir para Horas", cdMgmtOverdueBanner: "Prazo de fecho terminou. Feche o período em Horas.",
       cancel: "Cancelar", save: "Guardar", saveChanges: "Guardar alterações", discard: "Descartar",
+      recipAll: "Todos", recipWholeTeam: "Toda a equipa", recipCount: (n) => `${n} pessoas`, recipChooseReason: "Escolha pelo menos uma pessoa", recipAlsoTo: "Para",
       edit: "Editar", close: "Fechar", search: "Pesquisar", newLabel: "Novo",
       yes: "Sim", no: "Não", active: "Ativo", inactive: "Inativo",
       resolved: "Resolvido", pending: "Pendente", paid: "Pago", unpaid: "Não pago",
@@ -422,7 +423,7 @@ const T = {
     avisos: {
       title: "Avisos",
       typeComplaint: "Reclamação", typePraise: "Elogio", typeNotice: "Aviso",
-      formStaff: "Funcionário", formStaffPlaceholder: "Escolha",
+      formStaff: "Funcionário(s)", formStaffPlaceholder: "Escolha",
       formClient: "Cliente", formClientPlaceholder: "Escolha",
       formText: "Texto", formTextPlaceholder: "Escreva a mensagem...",
       attachPhoto: "Anexar foto (opcional)", photoAttached: "Foto anexada",
@@ -669,7 +670,7 @@ const T = {
     reportar: {
       subtitle: "Registe uma reclamação, elogio ou aviso sobre um funcionário.",
       typeComplaint: "Reclamação", typePraise: "Elogio", typeNotice: "Aviso",
-      formStaff: "Funcionário", formStaffPlaceholder: "Escolha",
+      formStaff: "Funcionário(s)", formStaffPlaceholder: "Escolha",
       formClient: "Cliente", formClientPlaceholder: "Escolha",
       formText: "Texto", formTextPlaceholder: "Escreva a mensagem...",
       attachPhoto: "Anexar foto (opcional)", photoAttached: "Foto anexada",
@@ -827,6 +828,7 @@ const T = {
     common: {
       cdEmpTitle: (d) => `Period ended: finalize by ${d}`, cdEmpOverdueTitle: "Deadline passed: period not closed", cdEmpBody: (n) => `${n} day(s) left. Finalize your month in Hours.`, cdEmpOverdueBody: "The deadline has passed. No new entries until management closes the period; finalize your month now.", cdMgmtBody: (n) => `${n} day(s) left to close the period. Close it in Hours.`, cdMgmtOverdueTitle: "Close overdue", cdMgmtLockBody: (p) => `Period ${p} has ended and is past the deadline. Close it to use the Dashboard again.`, cdGoHours: "Go to Hours", cdMgmtOverdueBanner: "Close deadline passed. Close the period in Hours.",
       cancel: "Cancel", save: "Save", saveChanges: "Save changes", discard: "Discard",
+      recipAll: "Everyone", recipWholeTeam: "Whole team", recipCount: (n) => `${n} people`, recipChooseReason: "Choose at least one person", recipAlsoTo: "To",
       edit: "Edit", close: "Close", search: "Search", newLabel: "New",
       yes: "Yes", no: "No", active: "Active", inactive: "Inactive",
       resolved: "Resolved", pending: "Pending", paid: "Paid", unpaid: "Unpaid",
@@ -1585,6 +1587,7 @@ const T = {
     common: {
       cdEmpTitle: (d) => `Période terminée : finalisez avant le ${d}`, cdEmpOverdueTitle: "Délai dépassé : période non clôturée", cdEmpBody: (n) => `Il reste ${n} jour(s). Finalisez votre mois dans Heures.`, cdEmpOverdueBody: "Le délai est dépassé. Plus de nouvelles saisies tant que la direction n'a pas clôturé la période ; finalisez votre mois maintenant.", cdMgmtBody: (n) => `Il reste ${n} jour(s) pour clôturer la période. Clôturez-la dans Heures.`, cdMgmtOverdueTitle: "Clôture en retard", cdMgmtLockBody: (p) => `La période ${p} est terminée et le délai est dépassé. Clôturez-la pour réutiliser le tableau de bord.`, cdGoHours: "Aller à Heures", cdMgmtOverdueBanner: "Délai de clôture dépassé. Clôturez la période dans Heures.",
       cancel: "Annuler", save: "Enregistrer", saveChanges: "Enregistrer les modifications", discard: "Ignorer",
+      recipAll: "Tout le monde", recipWholeTeam: "Toute l'équipe", recipCount: (n) => `${n} personnes`, recipChooseReason: "Choisissez au moins une personne", recipAlsoTo: "À",
       edit: "Modifier", close: "Fermer", search: "Rechercher", newLabel: "Nouveau",
       yes: "Oui", no: "Non", active: "Actif", inactive: "Inactif",
       resolved: "Résolu", pending: "En attente", paid: "Payé", unpaid: "Non payé",
@@ -1975,7 +1978,7 @@ const T = {
     avisos: {
       title: "Avis",
       typeComplaint: "Réclamation", typePraise: "Compliment", typeNotice: "Avis",
-      formStaff: "Employé", formStaffPlaceholder: "Choisir",
+      formStaff: "Employé(s)", formStaffPlaceholder: "Choisir",
       formClient: "Client", formClientPlaceholder: "Choisir",
       formText: "Texte", formTextPlaceholder: "Écrivez le message...",
       attachPhoto: "Joindre une photo (optionnel)", photoAttached: "Photo jointe",
@@ -2207,7 +2210,7 @@ const T = {
     reportar: {
       subtitle: "Enregistrez une réclamation, un compliment ou un avis sur un employé.",
       typeComplaint: "Réclamation", typePraise: "Compliment", typeNotice: "Avis",
-      formStaff: "Employé", formStaffPlaceholder: "Choisir",
+      formStaff: "Employé(s)", formStaffPlaceholder: "Choisir",
       formClient: "Client", formClientPlaceholder: "Choisir",
       formText: "Texte", formTextPlaceholder: "Écrivez le message...",
       attachPhoto: "Joindre une photo (optionnel)", photoAttached: "Photo jointe",
