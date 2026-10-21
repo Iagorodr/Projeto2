@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw, UsersRound } from "lucide-react";
+import { ChevronRight, RefreshCw, UsersRound } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -44,7 +44,7 @@ function RecurringPill({ label }) {
 // pessoas partilham um cliente num dia certo (`teamSizeFor`, mesma conta de
 // AgendasScreen.jsx, gerência, 4.3) — sem isso não dá pra saber se um
 // cliente é partilhado nem qual é "a parte" do próprio funcionário.
-function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, assignments, covers = [], desktop }) {
+function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, assignments, covers = [], onOpenClient, desktop }) {
   const t = T[lang].employeeAgenda;
   const tCov = T[lang].coberturas;
   const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
@@ -108,6 +108,15 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     if (names.length <= 2) return names.join(" · ");
     return `${names.slice(0, 2).join(" · ")} +${names.length - 2}`;
   }
+  // Tocar num cliente abre a ficha dele em Clientes (Enter/Espaço também).
+  function openProps(client) {
+    if (!onOpenClient) return {};
+    return {
+      role: "button", tabIndex: 0, "aria-label": client.name,
+      onClick: () => onOpenClient(client.id),
+      onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenClient(client.id); } },
+    };
+  }
   function goWeek(delta) { setWeekStart((w) => addDays(w, delta * 7)); }
 
   const weekNav = (
@@ -128,9 +137,11 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     const { shared, perPersonMin, recurring, freqLabel, teamSize, dur } = occurrenceMeta(day, client);
     return (
       <div
+        {...openProps(client)}
         style={{
           borderRadius: RADIUS.chip, border: `1px solid ${shared ? "#F3D9CB" : COLORS.line}`,
           background: shared ? COLORS.clayTint : COLORS.card, padding: "12px 14px",
+          cursor: onOpenClient ? "pointer" : "default",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
@@ -145,7 +156,10 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
               </span>
             </div>
           </div>
-          {recurring && <div style={{ flexShrink: 0 }}><RecurringPill label={freqLabel} /></div>}
+          <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>
+            {recurring && <RecurringPill label={freqLabel} />}
+            {onOpenClient && <ChevronRight size={16} color={shared ? COLORS.clayInk : COLORS.ink3} />}
+          </div>
         </div>
         {client.description && (
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${shared ? "#F3D9CB" : COLORS.lineSoft}` }}>
@@ -185,9 +199,11 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     return (
       <div
         title={tooltip}
+        {...openProps(client)}
         style={{
           display: "flex", alignItems: "center", gap: 4, height: 28, borderRadius: RADIUS.chip, padding: "0 9px",
           background: shared ? COLORS.clayTint : COLORS.lineSoft, fontSize: 12.5, maxWidth: 220,
+          cursor: onOpenClient ? "pointer" : "default",
         }}
       >
         {shared && <UsersRound size={11} style={{ flexShrink: 0, color: COLORS.clayInk }} />}

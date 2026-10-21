@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, Search, Store, MapPin, Clock, Megaphone } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
@@ -112,14 +112,27 @@ function AvailabilityChip({ text }) {
 // NotasScreen.jsx — PC/tablet ganham lista+detalhe lado a lado (5/7
 // colunas, documento), telemóvel mantém o acordeão dentro da moldura de
 // telemóvel.
-function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assignments, canViewAll, desktop }) {
+function EmployeeClientesScreen({ lang, setLang, onHome, onBackToAgenda, focus, onClearFocus, staffId, clients, assignments, canViewAll, desktop }) {
   const t = T[lang].employeeClientes;
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [expandedId, setExpandedId] = useState(null);
-  const [selectedId, setSelectedId] = useState(null);
+  // Vindo da Agenda: abre já a ficha desse cliente (mesmo que seja de um colega que cobre) e
+  // a seta de voltar regressa à Agenda. O pedido é consumido logo (não reabre mais tarde).
+  const [focusId] = useState(() => (focus ? focus.clientId : null));
+  const [cameFromAgenda] = useState(() => !!focus);
+  const [expandedId, setExpandedId] = useState(focusId);
+  const [selectedId, setSelectedId] = useState(focusId);
+  useEffect(() => {
+    if (focus && onClearFocus) onClearFocus();
+    if (focusId != null) {
+      const el = document.querySelector(`[data-client-card="${focusId}"]`);
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: "center" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const goBack = cameFromAgenda && onBackToAgenda ? onBackToAgenda : onHome;
   const myClientIds = getAssignedClientIds(assignments, staffId);
-  const myClients = canViewAll ? clients : clients.filter((c) => myClientIds.includes(c.id));
+  const myClients = canViewAll ? clients : clients.filter((c) => myClientIds.includes(c.id) || c.id === focusId);
   const filtered = myClients.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
 
   function rowSubtitle(c) {
@@ -204,7 +217,7 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
       {/* QA (achado do Iago, 3ª volta, 2ª rodada): título adicionado —
           "só a Horas fica sem título, o resto tem título" (esta tela
           nunca teve título, não só não tinha sido tocada nesta rodada). */}
-      <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      <MobileHeader onBack={goBack} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
       <div
         style={{
           ...mobStyles.searchWrap,
@@ -231,7 +244,7 @@ function EmployeeClientesScreen({ lang, setLang, onHome, staffId, clients, assig
             const Icon = TYPE_ICONS[c.type] || Store;
             const [line1] = splitClientName(c.name);
             return (
-              <div key={c.id} style={mobStyles.clientCard}>
+              <div key={c.id} data-client-card={c.id} style={mobStyles.clientCard}>
                 <button
                   style={{ ...mobStyles.clientHeader, minHeight: 72, borderBottom: isExpanded ? `1px solid ${COLORS.border}` : "none" }}
                   onClick={() => setExpandedId(isExpanded ? null : c.id)}

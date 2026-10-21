@@ -63,6 +63,9 @@ export function useAppController() {
   const setScreen = (s) => { setNavIntent(null); setScreenRaw(s); };
   const goTo = (s, intent = null) => { setNavIntent(intent); setScreenRaw(s); };
   const [empScreen, setEmpScreen] = useState("menu");
+  // Cliente a abrir já aberto em Clientes (vindo da Agenda do funcionário): { clientId } | null.
+  const [empClientFocus, setEmpClientFocus] = useState(null);
+  const openEmpClient = (clientId) => { setEmpClientFocus({ clientId }); setEmpScreen("clientes"); };
   const [loggedInStaffId, setLoggedInStaffId] = useState(null);
   const [lang, setLang] = useState("pt");
 
@@ -966,7 +969,7 @@ export function useAppController() {
   const companyNoticeValue = isSupabaseConfigured && perspective !== "login" ? companyNotice(companyStatus, isManagerSession) : null;
 
   return {
-    perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen,
+    perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen, empClientFocus, setEmpClientFocus, openEmpClient,
     loggedInStaffId, setLoggedInStaffId, lang, setLang,
     company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, closeDeadlineDays, setCloseDeadlineDays, highlightsMonths, setHighlightsMonths, highlightsRealtime, setHighlightsRealtime,
     // Base do medidor de reclamações = nº de clientes ativos (automático, não editável).
