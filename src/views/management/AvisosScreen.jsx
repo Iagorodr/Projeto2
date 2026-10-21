@@ -6,9 +6,10 @@ import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { clientById, staffById, isoDateStr, fmtNoteDate, getOpenPeriod, isSolicitationStale, isStaffActive, groupSentItems, uniqueSentCount, recipientsText } from "../../models/utils.js";
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
+import { uploadFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
 import { Field } from "../shared/Layout.jsx";
 import {
-  PageHeader, Button, Drawer, Pill, SupervisorTag, Avatar, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, Card, Toast,
+  PageHeader, Button, Drawer, Pill, SupervisorTag, Avatar, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, StoredFile, Card, Toast,
 } from "../shared/ui/index.js";
 import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
 
@@ -113,7 +114,7 @@ function PedidoCard({ m, staff, clients, lang, t, c0, stale, replying, replyDraf
 // a tratar), por isso sem pílula de estado, exatamente como o próprio
 // documento só pede "pílula de estado" para os itens que de facto têm um
 // estado (Pedidos).
-function SentItemCard({ item, type, staff, clients, c0 }) {
+function SentItemCard({ item, type, staff, clients, c0, lang }) {
   const s = staffById(staff, item.staffId);
   const c = clientById(clients, item.clientId);
   const multi = (item.recipients || []).length > 1;
@@ -131,8 +132,9 @@ function SentItemCard({ item, type, staff, clients, c0 }) {
             {fromSupervisor && <SupervisorTag kind="origin">{c0.sentBySupervisor}</SupervisorTag>}
           </div>
           <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 6 }}>
-            {fmtNoteDate(item.date)}{item.hasPhoto && ` · 📎`}
+            {fmtNoteDate(item.date)}{item.hasPhoto && !item.photo && ` · 📎`}
           </div>
+          {item.photo && <StoredFile file={item.photo} labels={T[lang].files} size={64} showName={false} style={{ marginTop: 8 }} />}
           <div style={{ fontSize: 13.5, color: COLORS.ink, marginTop: 4 }}>{item.text}</div>
         </div>
       </div>
@@ -159,6 +161,8 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   const [draftClientId, setDraftClientId] = useState("");
   const [draftText, setDraftText] = useState("");
   const [draftPhoto, setDraftPhoto] = useState(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
   const [toastMsg, setToastMsg] = useState(null);
   const [replyingId, setReplyingId] = useState(null);
   const [replyDraft, setReplyDraft] = useState("");
@@ -198,15 +202,23 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   const clientOptions = clients.map((c) => ({ id: c.id, label: c.name }));
 
   function openDrawer() {
-    setDraftType("reclamacao"); setDraftStaffIds([]); setDraftClientId(""); setDraftText(""); setDraftPhoto(null);
+    setDraftType("reclamacao"); setDraftStaffIds([]); setDraftClientId(""); setDraftText(""); setDraftPhoto(null); setSendError("");
     setDrawerOpen(true);
   }
   // Muda o tipo e limpa o funcionário escolhido: "Todos" só existe pro
   // tipo Aviso, por isso uma seleção de "Todos" não pode sobreviver a uma
   // troca pra Reclamação/Elogio (ficaria um valor inválido escondido).
   function changeDraftType(type) { setDraftType(type); }
-  function handleSend() {
-    if (draftStaffIds.length === 0 || !draftClientId || !draftText.trim()) return;
+  async function handleSend() {
+    if (sending || draftStaffIds.length === 0 || !draftClientId || !draftText.trim()) return;
+    // A foto (opcional) vai primeiro para o cofre; só depois se cria o aviso.
+    let photo = null;
+    if (draftPhoto) {
+      setSending(true); setSendError("");
+      try { photo = await uploadFile(draftPhoto, { kind: KINDS.avisos, imagesOnly: true }); }
+      catch (err) { setSending(false); setSendError(T[lang].files[uploadErrorKey(err)]); return; }
+      setSending(false);
+    }
     // `seenByManagement: true` aqui — a própria gerência acabou de criar o
     // item, não há nada "novo" pra ela ver (ver `selectTab`/badges abaixo,
     // e o contraponto em EmployeeAvisosScreen.jsx: lá o supervisor cria
@@ -214,7 +226,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
     const now = Date.now();
     const groupId = draftStaffIds.length > 1 ? now : undefined;
     setSentItems((prev) => [
-      ...draftStaffIds.map((sid, i) => ({ id: now + i, ...(groupId ? { groupId } : {}), type: draftType, staffId: Number(sid), clientId: Number(draftClientId), text: draftText.trim(), date: isoDateStr(TODAY), hasPhoto: !!draftPhoto, seenByManagement: true })),
+      ...draftStaffIds.map((sid, i) => ({ id: now + i, ...(groupId ? { groupId } : {}), type: draftType, staffId: Number(sid), clientId: Number(draftClientId), text: draftText.trim(), date: isoDateStr(TODAY), hasPhoto: !!photo, ...(photo ? { photo } : {}), seenByManagement: true })),
       ...prev,
     ]);
     setDrawerOpen(false);
@@ -293,7 +305,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {tabContent.items.length === 0 ? <EmptyNote>{t.nothingHere}</EmptyNote> : tabContent.items.map((item) => (
-            <SentItemCard key={item.id} item={item} type={tabContent.type} staff={staff} clients={clients} c0={c0} />
+            <SentItemCard key={item.id} item={item} type={tabContent.type} staff={staff} clients={clients} c0={c0} lang={lang} />
           ))}
         </div>
       )}
@@ -309,10 +321,10 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
             <Button variant="secondary" onClick={() => setDrawerOpen(false)}>{c0.cancel}</Button>
             <Button
               onClick={handleSend}
-              disabled={draftStaffIds.length === 0 || !draftClientId || !draftText.trim()}
+              disabled={sending || draftStaffIds.length === 0 || !draftClientId || !draftText.trim()}
               disabledReason={draftStaffIds.length === 0 ? c0.recipChooseReason : (!draftClientId || !draftText.trim()) ? c0.requiredField : undefined}
             >
-              {t.send}
+              {sending ? T[lang].files.uploading : t.send}
             </Button>
           </>
         }
@@ -340,7 +352,8 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
           <Field label={t.formText}>
             <textarea style={styles.textarea} rows={4} placeholder={t.formTextPlaceholder} value={draftText} onChange={(e) => setDraftText(e.target.value)} />
           </Field>
-          <PhotoDropzone file={draftPhoto} onChange={setDraftPhoto} label={t.attachPhoto} removeLabel={t.removePhoto} />
+          <PhotoDropzone file={draftPhoto} onChange={setDraftPhoto} label={t.attachPhoto} removeLabel={t.removePhoto} labels={T[lang].files} disabled={sending} />
+          {sendError && <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: -8 }}>{sendError}</div>}
         </div>
       </Drawer>
 

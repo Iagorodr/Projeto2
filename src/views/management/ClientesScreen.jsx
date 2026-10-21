@@ -17,9 +17,10 @@ import { DateField, DurationField } from "../shared/FormInputs.jsx";
 import CityField from "../shared/CityField.jsx";
 import { resolveCity } from "../../models/cities.js";
 import {
-  PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, Drawer, Button, ConfirmDialog, ProgressBar, Card,
+  PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, Drawer, Button, ConfirmDialog, ProgressBar, Card, StoredFile,
 } from "../shared/ui/index.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
+import { uploadFile, removeFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
 
 // Documento gera "41 clientes ativos" (4.2) a partir dos 41 clientes do seed
 // em data.js. QA pós-auditoria (Lote 3, item 4 do briefing — "'Ativo' com
@@ -163,6 +164,8 @@ function ClientesScreen({
   const [draft, setDraft] = useState(EMPTY_CLIENT_FORM);
   const [formErrors, setFormErrors] = useState({});
   const [docRemoveIdx, setDocRemoveIdx] = useState(null);
+  const [docBusyIdx, setDocBusyIdx] = useState(null);
+  const [docError, setDocError] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
@@ -303,13 +306,25 @@ function ClientesScreen({
   // edição não tem upload de documentos) — por isso só mexe em `clients`;
   // `openClient` já é lido direto de `clients` a cada render, então o
   // anexo aparece de imediato sem precisar de tocar em `draft` também.
-  function attachDocument(clientId, slotIndex, fileName) {
+  function attachDocument(clientId, slotIndex, doc) {
     setClients((prev) => prev.map((c) => {
       if (c.id !== clientId) return c;
       const docs = [...(c.documents || [null, null, null, null])];
-      docs[slotIndex] = fileName;
+      docs[slotIndex] = doc;
       return { ...c, documents: docs };
     }));
+  }
+  // Envia o ficheiro para o cofre e só depois o liga ao cliente.
+  async function uploadDocument(clientId, slotIndex, file) {
+    if (!file || docBusyIdx != null) return;
+    setDocBusyIdx(slotIndex); setDocError("");
+    try {
+      const ref = await uploadFile(file, { kind: KINDS.docsClients, ownerId: clientId });
+      attachDocument(clientId, slotIndex, ref);
+    } catch (err) {
+      setDocError(T[lang].files[uploadErrorKey(err)]);
+    }
+    setDocBusyIdx(null);
   }
 
   const columns = [
@@ -634,28 +649,19 @@ function ClientesScreen({
             <SectionTitle>{t.documentsTitle}</SectionTitle>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
               {t.docSlots.map((label, idx) => {
-                const fileName = (openClient.documents || [])[idx];
+                const doc = (openClient.documents || [])[idx];
                 const inputId = `doc-client-${openClient.id}-${idx}`;
+                const busy = docBusyIdx === idx;
                 return (
                   <div key={idx} style={{ border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: "10px 12px" }}>
                     <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.ink2, marginBottom: 6 }}>{label}</div>
-                    {fileName ? (
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 12, color: COLORS.primaryDark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.attached(fileName)}</span>
-                        <button
-                          type="button"
-                          aria-label={t.removeDoc}
-                          style={{ width: 40, height: 40, borderRadius: "50%", border: "none", background: COLORS.dangerBg, color: COLORS.dangerInk, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, fontSize: 18 }}
-                          onClick={() => setDocRemoveIdx(idx)}
-                        >
-                          ×
-                        </button>
-                      </div>
+                    {doc ? (
+                      <StoredFile file={doc} labels={T[lang].files} size={40} onRemove={() => setDocRemoveIdx(idx)} removeLabel={t.removeDoc} />
                     ) : (
                       <>
-                        <input type="file" id={inputId} style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) attachDocument(openClient.id, idx, e.target.files[0].name); }} />
-                        <label htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", padding: "6px 12px", borderRadius: 8, border: `1px dashed ${COLORS.line}`, fontSize: 12, fontWeight: 600, color: COLORS.ink2, cursor: "pointer" }}>
-                          {t.attach}
+                        <input type="file" id={inputId} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" style={{ display: "none" }} disabled={docBusyIdx != null} onChange={(e) => { uploadDocument(openClient.id, idx, e.target.files[0]); e.target.value = ""; }} />
+                        <label htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", padding: "6px 12px", borderRadius: 8, border: `1px dashed ${COLORS.line}`, fontSize: 12, fontWeight: 600, color: COLORS.ink2, cursor: busy ? "wait" : "pointer" }}>
+                          {busy ? T[lang].files.uploading : t.attach}
                         </label>
                       </>
                     )}
@@ -663,6 +669,7 @@ function ClientesScreen({
                 );
               })}
             </div>
+            {docError && <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: 8 }}>{docError}</div>}
             <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 8 }}>{t.docsNote}</div>
           </>
         )}
@@ -826,12 +833,12 @@ function ClientesScreen({
       <ConfirmDialog
         open={docRemoveIdx != null && !!openClient}
         title={t.docRemoveTitle}
-        body={docRemoveIdx != null && openClient ? t.docRemoveBody(String((openClient.documents || [])[docRemoveIdx] || "")) : ""}
+        body={docRemoveIdx != null && openClient ? t.docRemoveBody(String(((openClient.documents || [])[docRemoveIdx] || {}).name || "")) : ""}
         cancelLabel={t.docRemoveKeep}
         confirmLabel={t.docRemoveYes}
         destructive
         onCancel={() => setDocRemoveIdx(null)}
-        onConfirm={() => { if (openClient) attachDocument(openClient.id, docRemoveIdx, null); setDocRemoveIdx(null); }}
+        onConfirm={() => { if (openClient) { removeFile((openClient.documents || [])[docRemoveIdx]); attachDocument(openClient.id, docRemoveIdx, null); } setDocRemoveIdx(null); }}
       />
 
       <ConfirmDialog

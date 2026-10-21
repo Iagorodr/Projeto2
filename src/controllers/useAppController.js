@@ -17,6 +17,7 @@ import { diffKeys, mergeRemote, buildPatch, isMissingRpc } from "../models/horas
 import { listDiff, listMerge, mapDiff, mapMerge, isEmptyDiff } from "../models/appDataSync.js";
 import { INITIAL_CLOSED_PERIODS } from "../models/seedHistory.js";
 import { supabase, isSupabaseConfigured } from "../models/supabaseClient.js";
+import { setStorageCompany, removeFile } from "../models/fileStorage.js";
 import {
   toDbClient, fromDbClient, toDbStaff, fromDbStaff,
   toDbCompanySettings, fromDbCompanySettings,
@@ -147,6 +148,7 @@ export function useAppController() {
   // Id desta empresa nas tabelas company_settings/app_data (vem de my_company_status;
   // 1 enquanto o banco ainda não tem o SQL de várias empresas).
   const companyIdRef = useRef(1);
+  const docsColumnMissingRef = useRef(false);
   const statusCheckRef = useRef(false);
   // Banco que ainda não tem o SQL de várias empresas (uma só empresa, como antes):
   // não há código a pedir. Sem código guardado, uma consulta de teste descobre-o
@@ -690,6 +692,7 @@ export function useAppController() {
     }
     if (res.kind === "legacy") { // banco ainda sem o SQL de várias empresas: uma só empresa, como antes
       companyIdRef.current = 1;
+      setStorageCompany(1);
       setCompanyStatus(null);
       return { ok: true };
     }
@@ -699,6 +702,7 @@ export function useAppController() {
     if (expectCode && String(st.code || "").toLowerCase() !== expectCode) return { ok: false, reason: "wrong_company", status: st };
     if (isBlockedState(st.state)) return { ok: false, reason: "blocked", status: st };
     companyIdRef.current = st.companyId;
+    setStorageCompany(st.companyId);
     setCompanyStatus(st);
     if (st.code) { storeCompanyCode(st.code); setCompanyCode(st.code); }
     return { ok: true, status: st };
@@ -738,6 +742,20 @@ export function useAppController() {
   }
   function dismissCompanyBlock() { setCompanyBlock(null); setAuthError(null); }
 
+  // Rede de segurança: se o banco ainda não tem a coluna `documents` (falta
+  // correr supabase/armazenamento.sql), grava sem ela em vez de perder as
+  // alterações de clientes/funcionários — os documentos só não ficam guardados.
+  async function upsertWithDocs(table, rows) {
+    if (docsColumnMissingRef.current) rows = rows.map(({ documents, ...rest }) => rest); // eslint-disable-line no-unused-vars
+    const res = await supabase.from(table).upsert(rows);
+    if (res.error && !docsColumnMissingRef.current && (res.error.code === "PGRST204" || /documents/i.test(res.error.message || ""))) {
+      docsColumnMissingRef.current = true;
+      console.warn("Coluna `documents` ausente: correr supabase/armazenamento.sql. A gravar sem documentos.");
+      return supabase.from(table).upsert(rows.map(({ documents, ...rest }) => rest)); // eslint-disable-line no-unused-vars
+    }
+    return res;
+  }
+
   // QA pós-auditoria ("Gravar só depois de ler"): `clients`, `staff` e
   // `company_settings` só são gravados na sessão de GERÊNCIA — nenhuma
   // tela de supervisor ou funcionário tem setter para estes três (só
@@ -749,14 +767,14 @@ export function useAppController() {
   // esse upsert redundante que o gatilho do banco recusava com P0001.
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
-    supabase.from("clients").upsert(clients.map(toDbClient)).then(({ error }) => {
+    upsertWithDocs("clients", clients.map(toDbClient)).then(({ error }) => {
       if (error) console.error("Erro ao gravar clientes:", error);
     });
   }, [hydrated, readOk, perspective, clients]);
 
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
-    supabase.from("staff").upsert(staff.map(toDbStaff)).then(({ error }) => {
+    upsertWithDocs("staff", staff.map(toDbStaff)).then(({ error }) => {
       if (error) console.error("Erro ao gravar funcionários:", error);
     });
   }, [hydrated, readOk, perspective, staff]);
@@ -859,6 +877,8 @@ export function useAppController() {
   function enterEmployee(staffId) { setLoggedInStaffId(staffId); setPerspective("employee"); setEmpScreen("menu"); }
 
   function deleteClient(clientId) {
+    // ficheiros do cliente saem do cofre (melhor esforço)
+    ((clients.find((c) => c.id === clientId) || {}).documents || []).forEach((d) => { if (d) removeFile(d); });
     setClients((prev) => prev.filter((c) => c.id !== clientId));
     setAssignments((prev) => {
       const next = {};
@@ -873,6 +893,7 @@ export function useAppController() {
   }
 
   function deleteStaff(staffId) {
+    ((staff.find((s) => s.id === staffId) || {}).documents || []).forEach((d) => { if (d) removeFile(d); });
     setStaff((prev) => prev.filter((s) => s.id !== staffId));
     setAssignments((prev) => {
       const next = {};

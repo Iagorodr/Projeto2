@@ -13,6 +13,30 @@ function numOrNull(v) {
   return Number.isNaN(n) ? null : n;
 }
 
+// Documentos (4 espaços por cliente/funcionário) <-> coluna jsonb `documents`.
+// Cada espaço é {name, path, size, type[, validUntil]} (ver models/fileStorage.js)
+// ou null. Nunca vai `dataUrl` (só existe no modo demonstração) e só vale com
+// `path` — sem ele o ficheiro não está guardado em lado nenhum.
+function refForDb(ref) {
+  if (!ref || typeof ref !== "object" || typeof ref.path !== "string" || !ref.path) return null;
+  const out = { name: String(ref.name || ""), path: ref.path };
+  if (Number.isFinite(ref.size)) out.size = ref.size;
+  if (ref.type) out.type = String(ref.type);
+  if (ref.validUntil) out.validUntil = String(ref.validUntil);
+  return out;
+}
+function docsForDb(docs) {
+  const list = Array.isArray(docs) ? docs : [];
+  return [0, 1, 2, 3].map((i) => refForDb(list[i]));
+}
+function docsFromDb(value) {
+  const list = Array.isArray(value) ? value : [];
+  return [0, 1, 2, 3].map((i) => {
+    const d = list[i];
+    return d && typeof d === "object" && d.path ? { ...d } : null;
+  });
+}
+
 function toDbClient(c) {
   return {
     id: c.id,
@@ -38,6 +62,7 @@ function toDbClient(c) {
     duration_by_day: c.durationByDay || {},
     client_valid_until: c.clientValidUntil,
     origin: c.origin,
+    documents: docsForDb(c.documents),
   };
 }
 
@@ -66,6 +91,7 @@ function fromDbClient(row) {
     durationByDay: row.duration_by_day || {},
     clientValidUntil: row.client_valid_until || "",
     origin: row.origin || "",
+    documents: docsFromDb(row.documents),
   };
 }
 
@@ -85,6 +111,7 @@ function toDbStaff(s) {
     partner_id: s.partnerId || null,
     start_date: s.startDate || null,
     known_clients: Array.isArray(s.knownClients) ? s.knownClients : [],
+    documents: docsForDb(s.documents),
   };
 }
 
@@ -104,6 +131,7 @@ function fromDbStaff(row) {
     partnerId: row.partner_id || null,
     startDate: row.start_date || "",
     knownClients: Array.isArray(row.known_clients) ? row.known_clients : [],
+    documents: docsFromDb(row.documents),
   };
 }
 
@@ -139,6 +167,7 @@ function fromDbCompanySettings(row) {
 }
 
 export {
+  refForDb, docsForDb, docsFromDb,
   toDbClient, fromDbClient,
   toDbStaff, fromDbStaff,
   toDbCompanySettings, fromDbCompanySettings,

@@ -6,7 +6,8 @@ import { TODAY } from "../../models/data.js";
 import { T } from "../../models/i18n.js";
 import { EXPENSE_TYPES, parseMoneyInput, dateStrInPeriod, fmtEuro, isoDateStr, expenseApprovedValue } from "../../models/utils.js";
 import { DateField } from "../shared/FormInputs.jsx";
-import { Card, Button, Pill, Drawer, ConfirmDialog } from "../shared/ui/index.js";
+import { Card, Button, Pill, Drawer, ConfirmDialog, PhotoDropzone, StoredFile } from "../shared/ui/index.js";
+import { uploadFile, removeFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
 
 const isoToDmy = (v) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ""); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
 const dmyToIso = (v) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v || ""); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; };
@@ -20,8 +21,12 @@ function typeLabel(t, type) {
 // esse privilégio. Lança-se durante o período (ou ao finalizar o mês); a gerência
 // aprova. Pendentes dá para editar/eliminar; decididas ficam só para ler.
 // `openNonce`: o pai incrementa para abrir o formulário (ex.: pergunta ao finalizar).
-function ExpensesCard({ lang, expenses, period, locked, onSave, onDelete, openNonce = 0 }) {
+function ExpensesCard({ lang, staffId, expenses, period, locked, onSave, onDelete, openNonce = 0 }) {
   const t = T[lang].expenses;
+  const tf = T[lang].files;
+  const [receiptFile, setReceiptFile] = useState(null); // foto nova, ainda por enviar
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [form, setForm] = useState(null); // null = fechado; { id?, type, description, amount, date(dd/mm/aaaa) }
   const [errors, setErrors] = useState({});
   const [deleteId, setDeleteId] = useState(null);
@@ -32,16 +37,17 @@ function ExpensesCard({ lang, expenses, period, locked, onSave, onDelete, openNo
     return isoToDmy(isoDateStr(d));
   }
   function startAdd() {
-    setErrors({});
-    setForm({ type: "fuel", description: "", amount: "", date: defaultDate() });
+    setErrors({}); setReceiptFile(null); setSaveError("");
+    setForm({ type: "fuel", description: "", amount: "", date: defaultDate(), receipt: null });
   }
   function startEdit(e) {
-    setErrors({});
-    setForm({ id: e.id, type: e.type, description: e.description || "", amount: String(e.amount).replace(".", ","), date: isoToDmy(e.date) });
+    setErrors({}); setReceiptFile(null); setSaveError("");
+    setForm({ id: e.id, type: e.type, description: e.description || "", amount: String(e.amount).replace(".", ","), date: isoToDmy(e.date), receipt: e.receipt || null, originalReceipt: e.receipt || null });
   }
   useEffect(() => { if (openNonce > 0 && !locked) startAdd(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [openNonce]);
 
-  function submit() {
+  async function submit() {
+    if (saving) return;
     const amount = parseMoneyInput(form.amount);
     const iso = dmyToIso(form.date);
     const next = {};
@@ -50,13 +56,29 @@ function ExpensesCard({ lang, expenses, period, locked, onSave, onDelete, openNo
     if (form.type !== "fuel" && !form.description.trim()) next.description = t.descRequired;
     setErrors(next);
     if (Object.keys(next).length > 0) return;
+    // O recibo é opcional: foto nova → envia para o cofre; foto já guardada fica;
+    // foto removida pelo utilizador → apaga a antiga do cofre.
+    let receipt = form.receipt || null;
+    if (receiptFile) {
+      setSaving(true); setSaveError("");
+      try {
+        receipt = await uploadFile(receiptFile, { kind: KINDS.receipts, ownerId: staffId, imagesOnly: true });
+      } catch (err) {
+        setSaving(false); setSaveError(tf[uploadErrorKey(err)]);
+        return;
+      }
+      setSaving(false);
+    }
+    const old = form.originalReceipt;
+    if (old && (!receipt || receipt.path !== old.path)) removeFile(old);
     onSave({
       id: form.id || Date.now(),
       type: EXPENSE_TYPES.includes(form.type) ? form.type : "other",
       description: form.description.trim(), amount, date: iso,
       status: "pending",
+      receipt,
     });
-    setForm(null);
+    setForm(null); setReceiptFile(null);
   }
 
   const sorted = expenses.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || (b.id - a.id));
@@ -102,6 +124,7 @@ function ExpensesCard({ lang, expenses, period, locked, onSave, onDelete, openNo
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 14.5, color: COLORS.ink, flexShrink: 0 }}>{fmtEuro(e.amount)}</div>
                 </div>
+                {e.receipt && <StoredFile file={e.receipt} labels={tf} size={36} showName={false} style={{ marginTop: 8 }} />}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Pill variant={e.status === "approved" ? "paid" : e.status === "rejected" ? "missing" : "pending"}>
@@ -127,7 +150,7 @@ function ExpensesCard({ lang, expenses, period, locked, onSave, onDelete, openNo
 
       <Drawer
         open={!!form} onClose={() => setForm(null)} title={form && form.id ? t.editTitle : t.newTitle} width={420}
-        footer={<><Button variant="secondary" onClick={() => setForm(null)}>{t.cancel}</Button><Button variant="primary" onClick={submit}>{t.save}</Button></>}
+        footer={<><Button variant="secondary" onClick={() => setForm(null)}>{t.cancel}</Button><Button variant="primary" onClick={submit} disabled={saving}>{saving ? tf.uploading : t.save}</Button></>}
       >
         {form && (
           <div>
@@ -161,6 +184,14 @@ function ExpensesCard({ lang, expenses, period, locked, onSave, onDelete, openNo
               <div style={label}>{t.fDate}</div>
               <DateField value={form.date} onChange={(v) => setForm({ ...form, date: v })} openLabel={t.calendar} />
               {errors.date && <div style={err}>{errors.date}</div>}
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <div style={label}>{t.fReceipt}</div>
+              <PhotoDropzone
+                file={receiptFile} onChange={setReceiptFile} label={t.receiptAdd} removeLabel={tf.remove} labels={tf}
+                existing={form.receipt} onClearExisting={() => setForm({ ...form, receipt: null })} disabled={saving}
+              />
+              {saveError && <div style={err}>{saveError}</div>}
             </div>
           </div>
         )}

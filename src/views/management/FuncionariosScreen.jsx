@@ -8,12 +8,14 @@ import { T } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
 import { Toggle } from "../shared/ui/Toggle.jsx";
 import {
-  PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, SupervisorTag, Drawer, Button, ConfirmDialog, Card,
+  PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, SupervisorTag, Drawer, Button, ConfirmDialog, Card, StoredFile,
 } from "../shared/ui/index.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { supabase } from "../../models/supabaseClient.js";
+import { uploadFile, removeFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
 import KnownClientsSection from "./KnownClientsSection.jsx";
 
+const DOC_ACCEPT = "image/*,application/pdf,.doc,.docx,.xls,.xlsx";
 const EMPTY_STAFF = {
   name: "", email: "", contact: "", accountType: "fixo", status: "ativo", validUntil: "",
   iban: "", role: "funcionario", canViewAllClients: false, canExpenses: false, partnerId: null, startDate: "", documents: [null, null, null, null],
@@ -148,6 +150,8 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
   // Novo funcionário: "Já trabalhava antes de entrar no app?" — só quando Sim
   // é que a gerência indica a data de início (dentro do período aberto).
   const [workedBefore, setWorkedBefore] = useState(false);
+  const [docBusyKey, setDocBusyKey] = useState(null);
+  const [docError, setDocError] = useState("");
   const [createBusy, setCreateBusy] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [createResult, setCreateResult] = useState(null);
@@ -253,10 +257,21 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
       return { ...s, documents: docs };
     }));
   }
-  function attachDocFile(staffId, slotIndex, file) {
-    const reader = new FileReader();
-    reader.onload = () => updateDocField(staffId, slotIndex, { name: file.name, dataUrl: reader.result, validUntil: null });
-    reader.readAsDataURL(file);
+  // Envia o ficheiro para o cofre; ao substituir, apaga o antigo (a validade
+  // é do documento, por isso recomeça vazia).
+  async function attachDocFile(staffId, slotIndex, file) {
+    if (!file || docBusyKey) return;
+    const key = `${staffId}-${slotIndex}`;
+    setDocBusyKey(key); setDocError("");
+    try {
+      const ref = await uploadFile(file, { kind: KINDS.docsStaff, ownerId: staffId });
+      const old = ((staff.find((s) => s.id === staffId) || {}).documents || [])[slotIndex];
+      if (old) removeFile(old);
+      updateDocField(staffId, slotIndex, { ...ref, validUntil: null });
+    } catch (err) {
+      setDocError(T[lang].files[uploadErrorKey(err)]);
+    }
+    setDocBusyKey(null);
   }
 
   async function createAccountNow() {
@@ -441,13 +456,10 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
                     </div>
                     {doc ? (
                       <>
-                        <div style={{ fontSize: 12, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 8 }}>{doc.name}</div>
+                        <StoredFile file={doc} labels={T[lang].files} size={40} style={{ marginBottom: 8 }} />
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-                          {doc.dataUrl && (
-                            <a href={doc.dataUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: COLORS.primary, textDecoration: "underline" }}>{t.docView}</a>
-                          )}
-                          <input type="file" id={inputId} style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) attachDocFile(openStaff.id, idx, e.target.files[0]); }} />
-                          <label htmlFor={inputId} style={{ fontSize: 12, fontWeight: 600, color: COLORS.primary, cursor: "pointer", textDecoration: "underline" }}>{t.docReplace}</label>
+                          <input type="file" id={inputId} accept={DOC_ACCEPT} style={{ display: "none" }} disabled={!!docBusyKey} onChange={(e) => { attachDocFile(openStaff.id, idx, e.target.files[0]); e.target.value = ""; }} />
+                          <label htmlFor={inputId} style={{ fontSize: 12, fontWeight: 600, color: COLORS.primary, cursor: docBusyKey ? "wait" : "pointer", textDecoration: "underline" }}>{docBusyKey === `${openStaff.id}-${idx}` ? T[lang].files.uploading : t.docReplace}</label>
                         </div>
                         <div>
                           <div style={{ fontSize: 10.5, color: COLORS.ink3, marginBottom: 3 }}>{t.docValidUntil}</div>
@@ -460,9 +472,9 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
                       </>
                     ) : (
                       <>
-                        <input type="file" id={inputId} style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) attachDocFile(openStaff.id, idx, e.target.files[0]); }} />
-                        <label htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", padding: "6px 12px", borderRadius: 8, border: `1px dashed ${COLORS.line}`, fontSize: 12, fontWeight: 600, color: COLORS.ink2, cursor: "pointer" }}>
-                          {t.attach}
+                        <input type="file" id={inputId} accept={DOC_ACCEPT} style={{ display: "none" }} disabled={!!docBusyKey} onChange={(e) => { attachDocFile(openStaff.id, idx, e.target.files[0]); e.target.value = ""; }} />
+                        <label htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", padding: "6px 12px", borderRadius: 8, border: `1px dashed ${COLORS.line}`, fontSize: 12, fontWeight: 600, color: COLORS.ink2, cursor: docBusyKey ? "wait" : "pointer" }}>
+                          {docBusyKey === `${openStaff.id}-${idx}` ? T[lang].files.uploading : t.attach}
                         </label>
                       </>
                     )}
@@ -470,6 +482,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
                 );
               })}
             </div>
+            {docError && <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: 8 }}>{docError}</div>}
             <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 8 }}>{t.docsNote}</div>
             <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 10 }}>{t.loginNote}</div>
           </>

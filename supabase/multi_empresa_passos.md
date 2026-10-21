@@ -53,3 +53,9 @@ a produção estiver estável: `drop schema backup_pre_multi_20261015 cascade;`.
   logins da gerência e dos funcionários; é preciso digitar o código da empresa; sem volta). A empresa 1
   (L & A em produção) nunca pode ser arquivada nem excluída. Enquanto o SQL não estiver aplicado num
   projeto, a página mostra a lista normalmente e avisa o que falta ao tentar excluir.
+- Fotos e ficheiros (`armazenamento.sql`, teste em `armazenamento_test.sql`): cria o cofre privado
+  `servix-files` (máx. 10 MB, só imagens/PDF/Word/Excel) e as colunas `documents` de clientes e
+  funcionários. Correr **antes** de publicar a versão do app que grava ficheiros. Recibos: só o próprio
+  funcionário e a gerência; fotos de avisos: a empresa toda lê, gerência e supervisor enviam; documentos
+  de clientes e de funcionários: só a gerência. Ao excluir uma empresa definitivamente, os ficheiros dela
+  no cofre não são apagados automaticamente (apagar a pasta `<id da empresa>/` no painel do Supabase).

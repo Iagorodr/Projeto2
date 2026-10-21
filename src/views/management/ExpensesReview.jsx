@@ -3,7 +3,7 @@ import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 import { T } from "../../models/i18n.js";
 import { parseMoneyInput, fmtEuro, expenseApprovedValue } from "../../models/utils.js";
-import { Button, Pill, Drawer } from "../shared/ui/index.js";
+import { Button, Pill, Drawer, StoredFile } from "../shared/ui/index.js";
 
 const shortDm = (iso) => (iso && iso.length >= 10 ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : iso || "");
 function typeLabel(t, type) {
@@ -30,6 +30,7 @@ function ExpenseDecisionRow({ lang, expense: e, staffName, locked, onApprove, on
           {staffName && <div style={{ fontWeight: 700 }}>{staffName}</div>}
           <div><b>{typeLabel(t, e.type)}</b><span style={{ color: COLORS.ink2 }}> · {shortDm(e.date)}</span></div>
           {e.description && <div style={{ color: COLORS.ink2 }}>{e.description}</div>}
+          {e.receipt && <StoredFile file={e.receipt} labels={T[lang].files} size={40} showName={false} style={{ marginTop: 6 }} />}
         </div>
         <div style={{ fontWeight: 700, fontSize: 14.5, color: COLORS.ink, flexShrink: 0 }}>{fmtEuro(e.amount)}</div>
       </div>

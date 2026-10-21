@@ -8,6 +8,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { clientById, staffById } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
+import { StoredFile } from "./ui/StoredFile.jsx";
 
 function SectionHeader({ icon: Icon, title, count, open, onToggle }) {
   return (
@@ -47,7 +48,8 @@ function ItemListSimple({ items, staff, clients, lang }) {
                   {s ? s.name : "—"} · {c ? c.name : "—"}
                   {fromSupervisor && <SupervisorTag lang={lang} />}
                 </div>
-                <div style={styles.avItemDate}>{it.date}{it.hasPhoto && ` · ${t.withPhoto}`}</div>
+                <div style={styles.avItemDate}>{it.date}{it.hasPhoto && !it.photo && ` · ${t.withPhoto}`}</div>
+                {it.photo && <StoredFile file={it.photo} labels={T[lang].files} size={48} showName={false} style={{ marginTop: 6 }} />}
               </div>
             </div>
             <div style={styles.avItemText}>{it.text}</div>

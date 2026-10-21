@@ -7,9 +7,10 @@ import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { clientById, staffById, isoDateStr, fmtNoteDate, getAssignedClientIds, isStaffActive, groupSentItems, recipientsText } from "../../models/utils.js";
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
+import { uploadFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
 import { Field } from "../shared/Layout.jsx";
 import {
-  PageHeader, Button, Drawer, Pill, SupervisorTag, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, Card, Toast, MobileHeader,
+  PageHeader, Button, Drawer, Pill, SupervisorTag, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, StoredFile, Card, Toast, MobileHeader,
 } from "../shared/ui/index.js";
 import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
 import AbsenceSheet from "../shared/AbsenceSheet.jsx";
@@ -93,9 +94,10 @@ function ReceivedCard({ item, lang, onOpen }) {
   const fromSupervisor = item.sentBy === "supervisor";
   const unread = !item.read;
   return (
-    <button
-      type="button"
+    <div
+      role="button" tabIndex={0}
       onClick={() => onOpen(item.id)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(item.id); } }}
       style={{
         display: "flex", gap: 12, width: "100%", textAlign: "left", cursor: "pointer", fontFamily: "inherit",
         padding: 14, borderRadius: RADIUS.card, border: `1px solid ${COLORS.line}`, background: COLORS.card, boxSizing: "border-box",
@@ -110,8 +112,9 @@ function ReceivedCard({ item, lang, onOpen }) {
         </div>
         <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 4 }}>{fmtNoteDate(item.date)}</div>
         <div style={{ fontSize: 13.5, color: COLORS.ink, marginTop: 6 }}>{item.text}</div>
+        {item.photo && <StoredFile file={item.photo} labels={T[lang].files} size={72} showName={false} style={{ marginTop: 8 }} />}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -161,7 +164,8 @@ function SentFeedCard({ entry, staff, clients, lang, t, c0 }) {
             <span style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.ink }}>{(item.recipients || []).length > 1 ? recipientsText(item.recipients, staff, c0, TODAY) : (s ? s.name : "—")}</span>
             {c && <Pill variant="neutral">{c.name}</Pill>}
           </div>
-          <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 6 }}>{fmtNoteDate(item.date)}{item.hasPhoto && " · 📎"}</div>
+          <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 6 }}>{fmtNoteDate(item.date)}{item.hasPhoto && !item.photo && " · 📎"}</div>
+          {item.photo && <StoredFile file={item.photo} labels={T[lang].files} size={64} showName={false} style={{ marginTop: 8 }} />}
           <div style={{ fontSize: 13.5, color: COLORS.ink, marginTop: 4 }}>{item.text}</div>
         </div>
       </div>
@@ -202,6 +206,8 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
   const [reportClientId, setReportClientId] = useState("");
   const [reportText, setReportText] = useState("");
   const [reportPhoto, setReportPhoto] = useState(null);
+  const [reportSending, setReportSending] = useState(false);
+  const [reportError, setReportError] = useState("");
   const [reportToastMsg, setReportToastMsg] = useState(null);
 
   const myReceived = sentItems.filter((i) => i.staffId === staffId);
@@ -233,11 +239,18 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
   }
 
   function openReportSheet() {
-    setReportType("reclamacao"); setReportStaffIds([]); setReportClientId(""); setReportText(""); setReportPhoto(null);
+    setReportType("reclamacao"); setReportStaffIds([]); setReportClientId(""); setReportText(""); setReportPhoto(null); setReportError("");
     setReportSheetOpen(true);
   }
-  function handleSendReport() {
-    if (reportStaffIds.length === 0 || !reportClientId || !reportText.trim()) return;
+  async function handleSendReport() {
+    if (reportSending || reportStaffIds.length === 0 || !reportClientId || !reportText.trim()) return;
+    let photo = null;
+    if (reportPhoto) {
+      setReportSending(true); setReportError("");
+      try { photo = await uploadFile(reportPhoto, { kind: KINDS.avisos, imagesOnly: true }); }
+      catch (err) { setReportSending(false); setReportError(T[lang].files[uploadErrorKey(err)]); return; }
+      setReportSending(false);
+    }
     // QA (achado do Iago, Avisos da gerência — "só deve aparecer o
     // número de coisas novas"): sem `seenByManagement` aqui (ao contrário
     // do que a própria gerência cria em AvisosScreen.jsx, que já nasce
@@ -247,7 +260,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
     const now = Date.now();
     const groupId = reportStaffIds.length > 1 ? now : undefined;
     setSentItems((prev) => [
-      ...reportStaffIds.map((sid, i) => ({ id: now + i, ...(groupId ? { groupId } : {}), type: reportType, staffId: Number(sid), clientId: Number(reportClientId), text: reportText.trim(), date: isoDateStr(TODAY), hasPhoto: !!reportPhoto, sentBy: "supervisor", sentByStaffId: staffId })),
+      ...reportStaffIds.map((sid, i) => ({ id: now + i, ...(groupId ? { groupId } : {}), type: reportType, staffId: Number(sid), clientId: Number(reportClientId), text: reportText.trim(), date: isoDateStr(TODAY), hasPhoto: !!photo, ...(photo ? { photo } : {}), sentBy: "supervisor", sentByStaffId: staffId })),
       ...prev,
     ]);
     setReportSheetOpen(false);
@@ -333,10 +346,10 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
       footer={
         <Button
           size="mobile" style={{ width: "100%" }} onClick={handleSendReport}
-          disabled={reportStaffIds.length === 0 || !reportClientId || !reportText.trim()}
+          disabled={reportSending || reportStaffIds.length === 0 || !reportClientId || !reportText.trim()}
           disabledReason={reportStaffIds.length === 0 ? c0.recipChooseReason : (!reportClientId || !reportText.trim()) ? c0.requiredField : undefined} disabledReasonBelow
         >
-          {tr.send}
+          {reportSending ? T[lang].files.uploading : tr.send}
         </Button>
       }
     >
@@ -356,7 +369,8 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
         <Field label={tr.formText}>
           <textarea style={styles.textarea} rows={4} placeholder={tr.formTextPlaceholder} value={reportText} onChange={(e) => setReportText(e.target.value)} />
         </Field>
-        <PhotoDropzone file={reportPhoto} onChange={setReportPhoto} label={tr.attachPhoto} removeLabel={avT.removePhoto} />
+        <PhotoDropzone file={reportPhoto} onChange={setReportPhoto} label={tr.attachPhoto} removeLabel={avT.removePhoto} labels={T[lang].files} disabled={reportSending} />
+        {reportError && <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: -8 }}>{reportError}</div>}
       </div>
     </Drawer>
   );

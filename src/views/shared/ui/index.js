@@ -11,6 +11,7 @@ export { SearchField } from "./SearchField.jsx";
 export { SearchSelect } from "./SearchSelect.jsx";
 export { MultiSelect } from "./MultiSelect.jsx";
 export { PhotoDropzone } from "./PhotoDropzone.jsx";
+export { StoredFile } from "./StoredFile.jsx";
 export { ProgressBar } from "./ProgressBar.jsx";
 export { SegmentedBar } from "./SegmentedBar.jsx";
 export { ToastProvider, useToast, Toast } from "./Toast.jsx";

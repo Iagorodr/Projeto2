@@ -17,6 +17,7 @@ import { exportStaffHorasPdf } from "../../models/pdfExport.js";
 import { Minus2 } from "../shared/Icons.jsx";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
 import ExpensesCard from "./ExpensesCard.jsx";
+import { removeFile } from "../../models/fileStorage.js";
 import {
   MobileHeader, WeekStrip, DayPanel, ClientCheckCard, BottomActionBar, PeriodCalendar,
   Card, ConfirmDialog, Drawer, Button, Pill, SearchField, Toast, ProgressBar,
@@ -212,6 +213,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     });
   }
   function deleteExpense(id) {
+    const gone = ((myHoras.expenses || []).find((x) => x.id === id && x.status === "pending") || {}).receipt;
+    if (gone) removeFile(gone);
     updateMyHoras((h) => ({ ...h, expenses: (h.expenses || []).filter((x) => !(x.id === id && x.status === "pending")) }));
   }
   function startFinalizeMonth() {
@@ -221,7 +224,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   }
   const expensesCard = canExpenses ? (
     <ExpensesCard
-      lang={lang} expenses={periodExpenses} period={payPeriod} locked={!!myHoras.paid}
+      lang={lang} staffId={staffId} expenses={periodExpenses} period={payPeriod} locked={!!myHoras.paid}
       onSave={saveExpense} onDelete={deleteExpense} openNonce={expenseNonce}
     />
   ) : null;

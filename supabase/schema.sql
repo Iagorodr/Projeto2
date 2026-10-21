@@ -24,8 +24,10 @@ create table if not exists clients (
   note text,
   client_type text,
   client_valid_until text,
-  origin text
+  origin text,
+  documents jsonb not null default '[null,null,null,null]'::jsonb
 );
+-- Bancos já existentes: correr supabase/armazenamento.sql (documentos + cofre de ficheiros).
 
 -- Funcionários e supervisores
 create table if not exists staff (
@@ -43,7 +45,8 @@ create table if not exists staff (
   partner_id bigint,
   start_date date,
   known_clients jsonb not null default '[]'::jsonb,
-  can_expenses boolean not null default false
+  can_expenses boolean not null default false,
+  documents jsonb not null default '[null,null,null,null]'::jsonb
 );
 -- Bancos já existentes: alter table staff add column if not exists partner_id bigint;
 -- Bancos já existentes: alter table staff add column if not exists start_date date;
