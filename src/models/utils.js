@@ -78,6 +78,12 @@ function isHorasFrozenOn(h, dateKey, cutoffDay, closedPeriods, today) {
     if (!block) return false;
     return !!migrateLockedWeeksToBlocks(h.lockedWeeks, open, cutoffDay)[isoDateStr(block.start)];
   }
+  // Depois do fim do período aberto (a gerência ainda não fechou, mas o funcionário já regista
+  // o período novo): vale só a semana (bloco) trancada, no período a que a data pertence.
+  let nextP = getNextPeriod(open, cutoffDay);
+  for (let i = 0; i < 6 && date > nextP.end; i++) nextP = getNextPeriod(nextP, cutoffDay);
+  const nextBlock = weekBlocksOfPayPeriod(nextP, cutoffDay).find((b) => date >= b.start && date <= b.end);
+  if (nextBlock) return !!(h.lockedWeeks && h.lockedWeeks[isoDateStr(nextBlock.start)]);
   const chunk = getWeekChunkFor(date, cutoffDay);
   return !!(h.lockedWeeks && h.lockedWeeks[isoDateStr(chunk.start)]);
 }
@@ -1212,6 +1218,13 @@ function getOpenPeriod(closedPeriods, cutoffDay, today) {
   return { start, end };
 }
 
+// O período a seguir a `period` (mesma regra de `getOpenPeriod` depois de fechar `period`):
+// começa no dia seguinte ao fim e acaba no dia do corte do mês seguinte.
+function getNextPeriod(period, cutoffDay) {
+  const start = addDays(period.end, 1);
+  return { start, end: new Date(start.getFullYear(), start.getMonth() + 1, cutoffDay) };
+}
+
 // Prazo obrigatório de fecho do mês: o período aberto já terminou (`ended`) e a
 // gerência/funcionário têm `days` dias para finalizar/fechar; passado isso
 // (`overdue`) os lançamentos e o Dashboard ficam bloqueados até fechar.
@@ -1909,5 +1922,5 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
+export { EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
 };

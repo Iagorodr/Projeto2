@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Lock, Plus, X } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
@@ -6,7 +6,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   clientById, entryClientName, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
-  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, visitDateOf, isHorasFrozenOn, getOpenPeriod, getCutoffPeriod,
+  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, visitDateOf, isHorasFrozenOn, getOpenPeriod, getNextPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro, expensesOf,
@@ -88,12 +88,22 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // (`payPeriodChunks`, já calculado acima), depois os dos períodos
   // seguintes (um `getCutoffPeriod` por mês), até ter pelo menos 8 blocos
   // de margem depois de hoje.
-  const [chunks] = useState(() => {
-    // Só o período atual fica navegável (sem meses seguintes).
-    const list = [...payPeriodChunks];
+  // Navegável: o período aberto e, se ele já terminou no calendário mas a gerência ainda não o
+  // fechou, também as semanas do período novo — o funcionário continua a registar sem esperar
+  // pelo fecho (a gerência só vê o período aberto até fechar; quando fechar, o período novo já
+  // aparece com o que foi registado). Cada bloco leva o seu período em `periodRef`.
+  const chunks = useMemo(() => {
+    const list = payPeriodChunks.map((b) => ({ ...b, periodRef: payPeriod }));
+    let p = payPeriod;
+    for (let i = 0; i < 6 && p.end < TODAY; i++) {
+      p = getNextPeriod(p, cutoffDay);
+      const ref = p;
+      weekBlocksOfPayPeriod(p, cutoffDay).forEach((b) => list.push({ ...b, periodRef: ref }));
+    }
     const todayIndex = list.findIndex((b) => TODAY >= b.start && TODAY <= b.end);
     return { list, anchorIndex: todayIndex >= 0 ? todayIndex : 0 };
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payPeriod.start.getTime(), payPeriod.end.getTime(), cutoffDay]);
   const anchorIndex = chunks.anchorIndex;
   const idx = chunkIndex === null ? anchorIndex : chunkIndex;
   const chunk = chunks.list[idx];
@@ -153,8 +163,12 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // mesmo que a gerência ainda não tenha fechado esse período.
   const calendarPeriod = getCutoffPeriod(TODAY, cutoffDay, 0);
   const chunkInPastPeriod = chunk.start < calendarPeriod.start;
-  const canReopenWeek = weekLockedRaw && chunkZone === "within" && !chunkInClosedPeriod && !chunkInPastPeriod && !monthFinalized && !myHoras.paid;
-  const showTwoColumn = isDesktop && chunkZone !== "before" && !monthFinalized;
+  // O ecrã "mês finalizado" só vale para o período que foi finalizado; as semanas do período
+  // novo (depois do fim, enquanto a gerência não fecha) continuam editáveis.
+  const showFinalizedView = monthFinalized && chunkZone === "within";
+  const canReopenWeek = weekLockedRaw && !chunkInClosedPeriod && !chunkInPastPeriod
+    && ((chunkZone === "within" && !monthFinalized && !myHoras.paid) || chunkZone === "after");
+  const showTwoColumn = isDesktop && chunkZone !== "before" && !showFinalizedView;
 
   const migratedLocked = migrateLockedWeeksToBlocks(myHoras.lockedWeeks, payPeriod, cutoffDay);
   const allWeeksFinalized = payPeriodChunks.every((c) => !!migratedLocked[isoDateStr(c.start)]);
@@ -522,12 +536,14 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   }
   // Clientes de dias ANTERIORES (dentro do período aberto, em semanas ainda
   // não trancadas) que ficaram por fazer — o funcionário pode fazê-los hoje.
+  // Só dias do período que se está a ver (no período novo não sugere dias do anterior).
+  const viewPeriodStart = chunkZone === "after" && chunk.periodRef ? chunk.periodRef.start : payPeriod.start;
   function missedClientsEarlier() {
     const results = [];
     chunks.list.forEach((ch) => {
       if (myHoras.lockedWeeks && myHoras.lockedWeeks[isoDateStr(ch.start)]) return;
       calPeriodDays(ch).forEach((d) => {
-        if (d >= selectedDate || d < payPeriod.start) return;
+        if (d >= selectedDate || d < viewPeriodStart) return;
         const dKey = isoDateStr(d);
         if (absenceOn(absences, staffId, dKey) || (myHoras.noClientDays || []).includes(dKey)) return;
         scheduledIfActive(d).forEach((c) => {
@@ -639,7 +655,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // extra. Removido: sem risco de "costura" de cor, porque
   // `COLORS.page` e `COLORS.bg` (fundo da casca) são o mesmo tom.
   return (
-    <div style={{ background: COLORS.page, paddingBottom: (!isDesktop && chunkZone !== "before" && !monthFinalized) ? (isMobileTier ? 170 : 132) : 32 }}>
+    <div style={{ background: COLORS.page, paddingBottom: (!isDesktop && chunkZone !== "before" && !showFinalizedView) ? (isMobileTier ? 170 : 132) : 32 }}>
       <div style={{ padding: "16px 16px 0", maxWidth: containerMaxWidth, margin: "0 auto" }}>
         {/* QA (achado do Iago, 3ª volta): título "Horas" removido daqui —
             o item ativo do menu de baixo já diz em que tela se está, e
@@ -648,7 +664,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             Agenda, pro par de telas ficar igual. */}
         <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
-        {!monthFinalized && myHoras.reopened && (
+        {!showFinalizedView && chunkZone === "within" && myHoras.reopened && (
           <div style={{ marginBottom: 10 }}><Pill variant="reopened">{t.reopenedPill}</Pill></div>
         )}
 
@@ -668,10 +684,21 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               atual cai dentro do período que acabou de ser finalizado). O
               selo "neutral" de bloco parcial já é cinza, por isso não
               precisa do mesmo tratamento. */}
-          {idx === anchorIndex && !monthFinalized && <Pill variant="paid">{t.currentWeekBadge}</Pill>}
+          {idx === anchorIndex && !showFinalizedView && <Pill variant="paid">{t.currentWeekBadge}</Pill>}
+          {chunkZone === "after" && <Pill variant="neutral">{t.newPeriodBadge}</Pill>}
           {isBoundary && <Pill variant="neutral">{t.boundaryBadge}</Pill>}
         </div>
-        {!monthFinalized && chunkZone !== "before" && (
+        {chunkZone === "after" && (
+          <div style={{ textAlign: "center", fontSize: 12.5, color: COLORS.ink2, marginBottom: 14 }}>
+            {monthFinalized ? t.prevPeriodWaiting : t.prevPeriodPending}
+            {!monthFinalized && (
+              <div style={{ marginTop: 6 }}>
+                <Button variant="secondary" onClick={() => { const li = chunks.list.reduce((a, c, i) => (c.periodRef.start.getTime() === payPeriod.start.getTime() ? i : a), 0); setChunkIndex(li); }}>{t.prevPeriodGo}</Button>
+              </div>
+            )}
+          </div>
+        )}
+        {!showFinalizedView && chunkZone === "within" && (
           <div style={{ textAlign: "center", fontSize: 11.5, color: COLORS.ink3, marginBottom: 14 }}>
             {t.weeksProgress(finalizedCount, payPeriodChunks.length)}
             {weekBlockedReason && <div style={{ marginTop: 2 }}>{weekBlockedReason}</div>}
@@ -689,7 +716,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               </div>
             </Card>
           </div>
-        ) : monthFinalized ? (
+        ) : showFinalizedView ? (
           <div style={{ width: "100%", maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
             <Card variant="default" style={{ background: COLORS.lineSoft, border: `1px solid ${COLORS.line}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
@@ -748,7 +775,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                 </div>
               )}
             </Card>
-            {expensesCard}
+            {chunkZone !== "after" && expensesCard}
           </div>
         ) : (
           <>
@@ -862,7 +889,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               </div>
             )}
 
-            {expensesCard}
+            {chunkZone !== "after" && expensesCard}
 
             {isLastPeriodChunk && (
               <Card variant="default">
@@ -958,7 +985,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         )}
       </div>
 
-      {chunkZone !== "before" && !monthFinalized && !isDesktop && (
+      {chunkZone !== "before" && !showFinalizedView && !isDesktop && (
         // QA (achado do Iago, 2ª rodada, com print): quando não havia
         // nenhuma marcação no dia, o botão principal mostrava "Marque um
         // cliente" só no TEXTO, mas continuava com

@@ -6,7 +6,7 @@ import { TODAY } from "./data.js";
 const T = {
   pt: {
     common: {
-      cdEmpTitle: (d) => `Período terminado: finalize até ${d}`, cdEmpOverdueTitle: "Prazo terminou: período por fechar", cdEmpBody: (n) => `Faltam ${n} dia(s). Finalize o seu mês nas Horas.`, cdEmpOverdueBody: "O prazo acabou. Sem novos lançamentos até a gerência fechar o período; finalize o seu mês agora.", cdMgmtBody: (n) => `Faltam ${n} dia(s) para fechar o período. Feche em Horas.`, cdMgmtOverdueTitle: "Fecho em atraso", cdMgmtLockBody: (p) => `O período ${p} terminou e passou do prazo. Feche-o para voltar a usar o Dashboard.`, cdGoHours: "Ir para Horas", cdMgmtOverdueBanner: "Prazo de fecho terminou. Feche o período em Horas.",
+      cdEmpTitle: (d) => `Período terminado: finalize até ${d}`, cdEmpOverdueTitle: "Prazo terminou: período por fechar", cdEmpBody: (n) => `Faltam ${n} dia(s). Finalize o seu mês nas Horas.`, cdEmpOverdueBody: "O prazo acabou. Finalize o seu mês agora; pode continuar a registar o período novo.", cdMgmtBody: (n) => `Faltam ${n} dia(s) para fechar o período. Feche em Horas.`, cdMgmtOverdueTitle: "Fecho em atraso", cdMgmtLockBody: (p) => `O período ${p} terminou e passou do prazo. Feche-o para voltar a usar o Dashboard.`, cdGoHours: "Ir para Horas", cdMgmtOverdueBanner: "Prazo de fecho terminou. Feche o período em Horas.",
       cancel: "Cancelar", save: "Guardar", saveChanges: "Guardar alterações", discard: "Descartar",
       recipAll: "Todos", recipWholeTeam: "Toda a equipa", recipCount: (n) => `${n} pessoas`, recipChooseReason: "Escolha pelo menos uma pessoa", recipAlsoTo: "Para",
       edit: "Editar", close: "Fechar", search: "Pesquisar", newLabel: "Novo",
@@ -695,7 +695,7 @@ const T = {
       sureNo: "Não", sureYes: "Sim, está tudo certo",
       which: (weekday, dm) => `Que clientes fez ${weekday}, ${dm}?`,
       sharedWith: (n) => `dividido com mais ${n}`,
-      weeksProgress: (done, total) => `${done} de ${total} semanas finalizadas neste período.`, weekWaitEnd: (d) => `Ainda não dá para finalizar esta semana: há dias por vir (até ${d}).`, weekMissingDays: (n) => n === 1 ? "Ainda não dá para finalizar esta semana: falta 1 dia por registar." : `Ainda não dá para finalizar esta semana: faltam ${n} dias por registar.`,
+      weeksProgress: (done, total) => `${done} de ${total} semanas finalizadas neste período.`, newPeriodBadge: "Período novo", prevPeriodPending: "O período anterior ainda não foi finalizado.", prevPeriodGo: "Ir ao período anterior", prevPeriodWaiting: "O período anterior está finalizado e à espera do fecho da gerência. Pode continuar a registar aqui.", weekWaitEnd: (d) => `Ainda não dá para finalizar esta semana: há dias por vir (até ${d}).`, weekMissingDays: (n) => n === 1 ? "Ainda não dá para finalizar esta semana: falta 1 dia por registar." : `Ainda não dá para finalizar esta semana: faltam ${n} dias por registar.`,
       monthDoneNote: "Período finalizado. Se algo estiver errado, pode solicitar correção.",
       finalizeMonth: "Finalizar mês", viewDetails: "Ver detalhes do mês",
       reviewTitleView: "Detalhes do período",
@@ -826,7 +826,7 @@ const T = {
 
   en: {
     common: {
-      cdEmpTitle: (d) => `Period ended: finalize by ${d}`, cdEmpOverdueTitle: "Deadline passed: period not closed", cdEmpBody: (n) => `${n} day(s) left. Finalize your month in Hours.`, cdEmpOverdueBody: "The deadline has passed. No new entries until management closes the period; finalize your month now.", cdMgmtBody: (n) => `${n} day(s) left to close the period. Close it in Hours.`, cdMgmtOverdueTitle: "Close overdue", cdMgmtLockBody: (p) => `Period ${p} has ended and is past the deadline. Close it to use the Dashboard again.`, cdGoHours: "Go to Hours", cdMgmtOverdueBanner: "Close deadline passed. Close the period in Hours.",
+      cdEmpTitle: (d) => `Period ended: finalize by ${d}`, cdEmpOverdueTitle: "Deadline passed: period not closed", cdEmpBody: (n) => `${n} day(s) left. Finalize your month in Hours.`, cdEmpOverdueBody: "The deadline has passed. Finalize your month now; you can keep logging the new period.", cdMgmtBody: (n) => `${n} day(s) left to close the period. Close it in Hours.`, cdMgmtOverdueTitle: "Close overdue", cdMgmtLockBody: (p) => `Period ${p} has ended and is past the deadline. Close it to use the Dashboard again.`, cdGoHours: "Go to Hours", cdMgmtOverdueBanner: "Close deadline passed. Close the period in Hours.",
       cancel: "Cancel", save: "Save", saveChanges: "Save changes", discard: "Discard",
       recipAll: "Everyone", recipWholeTeam: "Whole team", recipCount: (n) => `${n} people`, recipChooseReason: "Choose at least one person", recipAlsoTo: "To",
       edit: "Edit", close: "Close", search: "Search", newLabel: "New",
@@ -1476,7 +1476,7 @@ const T = {
       sureNo: "No", sureYes: "Yes, everything is correct",
       which: (weekday, dm) => `Which clients did you visit on ${weekday}, ${dm}?`,
       sharedWith: (n) => `shared with ${n} more`,
-      weeksProgress: (done, total) => `${done} of ${total} weeks finished in this period.`, weekWaitEnd: (d) => `This week can't be finished yet: there are days still to come (until ${d}).`, weekMissingDays: (n) => n === 1 ? "This week can't be finished yet: 1 day still needs logging." : `This week can't be finished yet: ${n} days still need logging.`,
+      weeksProgress: (done, total) => `${done} of ${total} weeks finished in this period.`, newPeriodBadge: "New period", prevPeriodPending: "The previous period has not been finished yet.", prevPeriodGo: "Go to previous period", prevPeriodWaiting: "The previous period is finished and waiting for management to close it. You can keep logging here.", weekWaitEnd: (d) => `This week can't be finished yet: there are days still to come (until ${d}).`, weekMissingDays: (n) => n === 1 ? "This week can't be finished yet: 1 day still needs logging." : `This week can't be finished yet: ${n} days still need logging.`,
       monthDoneNote: "Period finished. If something is wrong, you can request a correction.",
       finalizeMonth: "Finish month", viewDetails: "View month details",
       reviewTitleView: "Period details",
@@ -1585,7 +1585,7 @@ const T = {
 
   fr: {
     common: {
-      cdEmpTitle: (d) => `Période terminée : finalisez avant le ${d}`, cdEmpOverdueTitle: "Délai dépassé : période non clôturée", cdEmpBody: (n) => `Il reste ${n} jour(s). Finalisez votre mois dans Heures.`, cdEmpOverdueBody: "Le délai est dépassé. Plus de nouvelles saisies tant que la direction n'a pas clôturé la période ; finalisez votre mois maintenant.", cdMgmtBody: (n) => `Il reste ${n} jour(s) pour clôturer la période. Clôturez-la dans Heures.`, cdMgmtOverdueTitle: "Clôture en retard", cdMgmtLockBody: (p) => `La période ${p} est terminée et le délai est dépassé. Clôturez-la pour réutiliser le tableau de bord.`, cdGoHours: "Aller à Heures", cdMgmtOverdueBanner: "Délai de clôture dépassé. Clôturez la période dans Heures.",
+      cdEmpTitle: (d) => `Période terminée : finalisez avant le ${d}`, cdEmpOverdueTitle: "Délai dépassé : période non clôturée", cdEmpBody: (n) => `Il reste ${n} jour(s). Finalisez votre mois dans Heures.`, cdEmpOverdueBody: "Le délai est dépassé. Finalisez votre mois maintenant ; vous pouvez continuer à saisir la nouvelle période.", cdMgmtBody: (n) => `Il reste ${n} jour(s) pour clôturer la période. Clôturez-la dans Heures.`, cdMgmtOverdueTitle: "Clôture en retard", cdMgmtLockBody: (p) => `La période ${p} est terminée et le délai est dépassé. Clôturez-la pour réutiliser le tableau de bord.`, cdGoHours: "Aller à Heures", cdMgmtOverdueBanner: "Délai de clôture dépassé. Clôturez la période dans Heures.",
       cancel: "Annuler", save: "Enregistrer", saveChanges: "Enregistrer les modifications", discard: "Ignorer",
       recipAll: "Tout le monde", recipWholeTeam: "Toute l'équipe", recipCount: (n) => `${n} personnes`, recipChooseReason: "Choisissez au moins une personne", recipAlsoTo: "À",
       edit: "Modifier", close: "Fermer", search: "Rechercher", newLabel: "Nouveau",
@@ -2235,7 +2235,7 @@ const T = {
       sureNo: "Non", sureYes: "Oui, tout est correct",
       which: (weekday, dm) => `Quels clients avez-vous faits ${weekday}, ${dm} ?`,
       sharedWith: (n) => `partagé avec ${n} de plus`,
-      weeksProgress: (done, total) => `${done} semaines sur ${total} terminées dans cette période.`, weekWaitEnd: (d) => `Impossible de terminer cette semaine pour le moment : il reste des jours à venir (jusqu'au ${d}).`, weekMissingDays: (n) => n === 1 ? "Impossible de terminer cette semaine pour le moment : 1 jour reste à enregistrer." : `Impossible de terminer cette semaine pour le moment : ${n} jours restent à enregistrer.`,
+      weeksProgress: (done, total) => `${done} semaines sur ${total} terminées dans cette période.`, newPeriodBadge: "Nouvelle période", prevPeriodPending: "La période précédente n'est pas encore finalisée.", prevPeriodGo: "Aller à la période précédente", prevPeriodWaiting: "La période précédente est finalisée et attend la clôture de la direction. Vous pouvez continuer à saisir ici.", weekWaitEnd: (d) => `Impossible de terminer cette semaine pour le moment : il reste des jours à venir (jusqu'au ${d}).`, weekMissingDays: (n) => n === 1 ? "Impossible de terminer cette semaine pour le moment : 1 jour reste à enregistrer." : `Impossible de terminer cette semaine pour le moment : ${n} jours restent à enregistrer.`,
       monthDoneNote: "Période terminée. Si quelque chose ne va pas, vous pouvez demander une correction.",
       finalizeMonth: "Terminer le mois", viewDetails: "Voir le détail du mois",
       reviewTitleView: "Détail de la période",
