@@ -8,7 +8,7 @@ import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { TYPE_ICONS, AGENDA_DAYS, TODAY, LANG_NAMES, EMPTY_CLIENT } from "../../models/data.js";
 import {
   startOfISOWeek, addDays, isoDateStr, clientAppliesThisWeek, weekLabelPT,
-  parseDMY, parseClientDate, clientValidityRange, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
+  parseDMY, parseClientDate, clientValidityRange, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientExpectedHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
   findByName, planHoursRecalc, fmtEuro,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -340,16 +340,34 @@ function ClientesScreen({
       // `overflow: hidden` da célula (herdado de DataTable.jsx). O
       // `minWidth: 150` que já existia era só no `style` do ProgressBar
       // (um filho), não na coluna em si — não segurava a célula.
-      key: "hours", label: t.colHoursPeriod, width: 1.6, minWidth: 190,
+      key: "hours", label: t.colHoursToDate, width: 1.6, minWidth: 190,
+      // Feito vs PREVISTO pela agenda até hoje (conta dia a dia: dias da semana, frequência,
+      // contrato, equipa nos "individual") — antes comparava com "horas/mês" (4,33 semanas),
+      // que não bate com o período (21→20) nem com a equipa, e a meio do período parecia sempre baixo.
       render: (c) => {
-        if (!c.hoursMonth) return <span style={{ fontSize: 12, color: COLORS.ink3 }}>—</span>;
         const logged = clientTotalHours(horasData, c.id, period);
+        const exp = clientExpectedHours(c, period, hoursCtx, TODAY);
+        const TOL = 0.5; // meia hora de margem
+        if (exp.whole <= 0 && logged <= 0) return <span style={{ fontSize: 12, color: COLORS.ink3 }}>{t.hoursNoPlan}</span>;
+        const late = exp.toYesterday - logged;
+        const over = logged - exp.toToday;
+        const status = late > TOL
+          ? <Pill variant="pending">{t.hoursLate(fmtHoursScreen(late))}</Pill>
+          : over > TOL
+            ? <Pill variant="owed">{t.hoursOver(fmtHoursScreen(over))}</Pill>
+            : <Pill variant="paid">{t.hoursOnTrack}</Pill>;
         return (
-          <ProgressBar
-            value={logged} max={c.hoursMonth}
-            label={t.hoursOfLabel(fmtHoursScreen(logged), fmtHoursScreen(c.hoursMonth))}
-            style={{ minWidth: 150 }}
-          />
+          <div title={t.hoursToDateHint} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <ProgressBar
+              value={logged} max={Math.max(exp.toToday, logged)}
+              label={t.hoursToDateLabel(fmtHoursScreen(logged), fmtHoursScreen(exp.toToday))}
+              style={{ minWidth: 150 }}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {status}
+              <span style={{ fontSize: 11.5, color: COLORS.ink3 }}>{t.hoursPlanTotal(fmtHoursScreen(exp.whole))}</span>
+            </div>
+          </div>
         );
       },
     },
