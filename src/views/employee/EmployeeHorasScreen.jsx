@@ -679,18 +679,6 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             prevDisabled={idx <= 0} nextDisabled={idx >= chunks.list.length - 1}
           />
         </div>
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 6 }}>
-          {/* QA pós-auditoria (Lote 2, "mês finalizado cinza"): este selo
-              verde ("paid") era o item colorido que sobrava na vista — ele
-              aparece sempre que a semana vista é a atual, o que é o caso
-              mais comum logo depois de finalizar o próprio mês (a semana
-              atual cai dentro do período que acabou de ser finalizado). O
-              selo "neutral" de bloco parcial já é cinza, por isso não
-              precisa do mesmo tratamento. */}
-          {idx === anchorIndex && !showFinalizedView && <Pill variant="paid">{t.currentWeekBadge}</Pill>}
-          {chunkZone === "after" && <Pill variant="neutral">{t.newPeriodBadge}</Pill>}
-          {isBoundary && <Pill variant="neutral">{t.boundaryBadge}</Pill>}
-        </div>
         {chunkZone === "after" && (
           <div style={{ textAlign: "center", fontSize: 12.5, color: COLORS.ink2, marginBottom: 14 }}>
             {monthFinalized ? t.prevPeriodWaiting : t.prevPeriodPending}

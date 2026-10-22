@@ -1641,7 +1641,7 @@ function dayScheduledClients(clients, assignments, staffId, date, covers) {
 // vezes) e horas previstas pela agenda, dia a dia, mais o estado de cada
 // um dos 7 pontos do cartão (verde registado · contorno alert em falta ·
 // vazio futuro · tracejado sem clientes).
-function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staffMember, covers, ctx) {
+function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staffMember, covers, ctx, periodStart) {
   const weekStart = startOfISOWeek(today);
   const days = [];
   let registeredHours = 0;
@@ -1649,6 +1649,9 @@ function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staff
   for (let i = 0; i < 7; i++) {
     const d = addDays(weekStart, i);
     const dateKey = isoDateStr(d);
+    // `periodStart` (opcional): dias anteriores ao início do período em curso (a semana que
+    // atravessa a virada do período) ficam de fora — não contam nas horas nem como "em falta".
+    if (periodStart && d < periodStart) { days.push({ dateKey, state: "outside", isToday: false }); continue; }
     // `staffMember` é opcional (Etapa 4j, 4.9) — quando passado, um dia já
     // para lá da validade de uma conta Replacement conta como "sem
     // clientes", mesmo que a agenda/atribuição ainda exista (as

@@ -272,7 +272,7 @@ export default function App() {
               <EmployeeClientesScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} onBackToAgenda={() => c.setEmpScreen("agenda")} focus={c.empClientFocus} onClearFocus={() => c.setEmpClientFocus(null)} staffId={c.me.id} clients={c.clients} assignments={c.assignments} canViewAll={!!c.me.canViewAllClients} desktop={empTier !== "mobile"} />
             )}
             {c.empScreen === "historico" && (
-              <EmployeeHistoricoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} closedPeriods={c.closedPeriods} desktop={empTier !== "mobile"} />
+              <EmployeeHistoricoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} desktop={empTier !== "mobile"} />
             )}
             {c.empScreen === "monitoramento" && (
               <MonitoramentoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} covers={c.covers} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} absences={c.absences} />

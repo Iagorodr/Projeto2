@@ -6,7 +6,7 @@ import { useBreakpoint, useControlSize } from "../../hooks/useBreakpoint.js";
 import {
   dayScheduledClients, thisWeekSummary, periodMissingDays, staffWithGapsCount, isStaffActive, expectedShare,
   fmtHoursScreen, pad2, isoDateStr, notesForOwner, fmtNoteDate,
-  getOpenPeriod, weekBlocksOfPayPeriod, staffTotalPay, staffTotalHours, fmtEuro, calPeriodLabel,
+  getOpenPeriod, getCutoffPeriod, weekBlocksOfPayPeriod, staffTotalPay, staffTotalHours, fmtEuro, calPeriodLabel,
   isSupervisorRole,
 } from "../../models/utils.js";
 import { T, formatTodayLabel, WEEKDAY_FULL_BY_LANG, DAY_ABBR_SUN0_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -21,6 +21,7 @@ function dotStyle(state) {
     case "registered": return { background: COLORS.forest600, border: `2px solid ${COLORS.forest600}` };
     case "missing": return { background: "transparent", border: `2px solid ${COLORS.alert}` };
     case "noClients": return { background: "transparent", border: `2px dashed ${COLORS.line}` };
+    case "outside": return { background: COLORS.lineSoft, border: "2px solid transparent", opacity: 0.6 };
     case "future":
     default: return { background: "transparent", border: `2px solid ${COLORS.line}` };
   }
@@ -71,18 +72,24 @@ function EmployeeInicioScreen({
   }
 
   // --- "Esta semana" ---
-  const week = thisWeekSummary(clients, assignments, me.id, horasEntry, TODAY, me, covers, { staff, assignments, covers, absences });
+  // O período "aberto" só muda quando a gerência fecha. Se o funcionário já finalizou o dele e o
+  // calendário já entrou no período novo, o Início mostra o período novo (começa limpo) e deixa o
+  // anterior para o Histórico ("em análise pela gerência").
+  const openPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
+  const prevDone = horasEntry.status === "finalizado" && openPeriod.end < TODAY;
+  const payPeriod = prevDone ? getCutoffPeriod(TODAY, cutoffDay, 0) : openPeriod;
+  const week = thisWeekSummary(clients, assignments, me.id, horasEntry, TODAY, me, covers, { staff, assignments, covers, absences }, prevDone ? payPeriod.start : undefined);
 
   // --- "Precisa da sua atenção" ---
-  const payPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
   const payPeriodChunks = weekBlocksOfPayPeriod(payPeriod, cutoffDay);
+  const openPeriodChunks = weekBlocksOfPayPeriod(openPeriod, cutoffDay);
   const missingDays = periodMissingDays(clients, assignments, me.id, horasEntry, payPeriodChunks, TODAY, me, absences, covers);
   // QA pós-auditoria (Lote 2, "dias em falta na equipa" contando dias):
   // `staffWithGapsCount` passou a devolver { staffCount, totalDays } — o
   // cartão mostra `totalDays` (bate com o total do Monitoramento) e usa
   // `staffCount` só na legenda de apoio ("X funcionários").
   const teamGaps = isSupervisor
-    ? staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, TODAY, absences, covers)
+    ? staffWithGapsCount(staff, horasData, clients, assignments, openPeriod, openPeriodChunks, cutoffDay, TODAY, absences, covers)
     : { staffCount: 0, totalDays: 0 };
 
   const attentionItems = [];
