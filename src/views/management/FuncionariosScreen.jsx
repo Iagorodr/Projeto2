@@ -530,7 +530,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
                       key={String(val)} type="button"
                       onClick={() => { setWorkedBefore(val); if (!val) updateDraft("startDate", ""); }}
                       style={{
-                        flex: 1, height: 44, borderRadius: 12, cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600,
+                        flex: 1, height: 44, borderRadius: 12, cursor: "pointer", fontFamily: "inherit", fontSize: 14,
                         border: `2px solid ${workedBefore === val ? COLORS.vivo : COLORS.iconBorder}`,
                         background: workedBefore === val ? COLORS.mintBg : COLORS.card,
                         color: workedBefore === val ? COLORS.vivoInk : COLORS.ink2,

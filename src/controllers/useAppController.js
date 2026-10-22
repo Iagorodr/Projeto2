@@ -21,7 +21,9 @@ import { setStorageCompany, removeFile } from "../models/fileStorage.js";
 import {
   toDbClient, fromDbClient, toDbStaff, fromDbStaff,
   toDbCompanySettings, fromDbCompanySettings,
+  toDbContractor, fromDbContractor,
 } from "../models/dbMappers.js";
+import { deriveContractors } from "../models/contractors.js";
 import {
   consumeUrlCompanyCode, getStoredCompanyCode, storeCompanyCode, clearStoredCompanyCode,
   lookupCompany, fetchCompanyStatus, isBlockedState, companyNotice,
@@ -81,6 +83,9 @@ export function useAppController() {
   const [reclamacaoRazoavelCount, setReclamacaoRazoavelCount] = useState(3);
 
   const [clients, setClients] = useState(START_EMPTY ? [] : INITIAL_CLIENTS);
+  // Contratantes (ver models/contractors.js). Em demonstração nascem das "origens" dos clientes de exemplo.
+  const [contractors, setContractors] = useState(() => (START_EMPTY ? [] : deriveContractors(INITIAL_CLIENTS)));
+  const contractorsReadyRef = useRef(false); // a tabela `contractors` existe e foi lida: só então se grava
   const [staff, setStaff] = useState(START_EMPTY ? [] : INITIAL_STAFF);
   const [assignments, setAssignments] = useState(START_EMPTY ? {} : INITIAL_ASSIGNMENTS);
   const [horasData, setHorasDataState] = useState(START_EMPTY ? {} : INITIAL_HORAS);
@@ -421,15 +426,33 @@ export function useAppController() {
     let staffList = staff;
     let ok = true;
     try {
-      const [clientsRes, staffRes, settingsRes, appDataRes] = await Promise.all([
+      const [clientsRes, staffRes, settingsRes, appDataRes, contractorsRes] = await Promise.all([
         supabase.from("clients").select("*"),
         supabase.from("staff").select("*"),
         supabase.from("company_settings").select("*").eq("id", companyIdRef.current).maybeSingle(),
         supabase.from("app_data").select("*").eq("id", companyIdRef.current).maybeSingle(),
+        supabase.from("contractors").select("*"),
       ]);
 
       if (clientsRes.error) { console.error("Erro ao carregar clientes:", clientsRes.error); ok = false; }
       else if (clientsRes.data && (START_EMPTY || clientsRes.data.length > 0)) setClients(clientsRes.data.map(fromDbClient));
+
+      // Contratantes. Tabela ainda por criar (falta correr supabase/contratantes.sql):
+      // não é erro — o resto do app funciona e os contratantes só não ficam guardados.
+      // Um funcionário/supervisor recebe a lista vazia (só a gerência lê): nunca grava.
+      if (contractorsRes.error) {
+        const e = contractorsRes.error;
+        if (e.code === "PGRST205" || e.code === "42P01" || /could not find the table|does not exist/i.test(e.message || "")) {
+          contractorsReadyRef.current = false;
+          console.warn("Tabela `contractors` ausente: correr supabase/contratantes.sql. Contratantes só em memória.");
+        } else { console.error("Erro ao carregar contratantes:", e); ok = false; }
+      } else if (contractorsRes.data) {
+        contractorsReadyRef.current = true;
+        const loadedClients = clientsRes.data ? clientsRes.data.map(fromDbClient) : [];
+        // Primeira vez: cria um contratante por cada "origem" que já estava escrita nos clientes.
+        if (contractorsRes.data.length === 0 && loadedClients.some((c) => String(c.origin || "").trim())) setContractors(deriveContractors(loadedClients));
+        else setContractors(contractorsRes.data.map(fromDbContractor));
+      }
 
       if (staffRes.error) { console.error("Erro ao carregar funcionários:", staffRes.error); ok = false; }
       else if (staffRes.data && (START_EMPTY || staffRes.data.length > 0)) {
@@ -773,6 +796,14 @@ export function useAppController() {
   }, [hydrated, readOk, perspective, clients]);
 
   useEffect(() => {
+    if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management" || !contractorsReadyRef.current) return;
+    if (contractors.length === 0) return;
+    supabase.from("contractors").upsert(contractors.map(toDbContractor)).then(({ error }) => {
+      if (error) console.error("Erro ao gravar contratantes:", error);
+    });
+  }, [hydrated, readOk, perspective, contractors]);
+
+  useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
     upsertWithDocs("staff", staff.map(toDbStaff)).then(({ error }) => {
       if (error) console.error("Erro ao gravar funcionários:", error);
@@ -892,6 +923,15 @@ export function useAppController() {
     }
   }
 
+  function deleteContractor(contractorId) {
+    setContractors((prev) => prev.filter((c) => c.id !== contractorId));
+    if (isSupabaseConfigured && contractorsReadyRef.current) {
+      supabase.from("contractors").delete().eq("id", contractorId).then(({ error }) => {
+        if (error) console.error("Erro ao excluir contratante:", error);
+      });
+    }
+  }
+
   function deleteStaff(staffId) {
     ((staff.find((s) => s.id === staffId) || {}).documents || []).forEach((d) => { if (d) removeFile(d); });
     setStaff((prev) => prev.filter((s) => s.id !== staffId));
@@ -997,7 +1037,7 @@ export function useAppController() {
     reclamacaoBaseClients: Math.max(1, activeClientsCount(clients, TODAY)), setReclamacaoBaseClients,
     reclamacaoExcelenteCount, setReclamacaoExcelenteCount,
     reclamacaoRazoavelCount, setReclamacaoRazoavelCount,
-    clients, setClients, staff, setStaff, assignments, setAssignments,
+    clients, setClients, contractors, setContractors, deleteContractor, staff, setStaff, assignments, setAssignments,
     horasData, setHorasData, closedPeriods, setClosedPeriods,
     missingItems, setMissingItems, sentItems, setSentItems,
     personalNotes, setPersonalNotes, absences, setAbsences, covers, setCovers,

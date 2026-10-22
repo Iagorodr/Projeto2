@@ -17,6 +17,7 @@ const TODAY = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
 const MENU_ITEMS = [
   { key: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { key: "clientes", icon: Users, label: "Clientes" },
+  { key: "contratantes", icon: Building2, label: "Contratantes" },
   { key: "agendas", icon: CalendarDays, label: "Agendas" },
   { key: "horas", icon: Clock, label: "Horas" },
   { key: "monitoramento", icon: Eye, label: "Monitoramento" },

@@ -95,6 +95,39 @@ function fromDbClient(row) {
   };
 }
 
+// ---- Contratantes (tabela `contractors`, só a gerência lê) ----
+function toDbContractor(c) {
+  return {
+    id: c.id,
+    name: c.name,
+    color: c.color || null,
+    is_direct: !!c.isDirect,
+    rate: c.isDirect ? null : numOrNull(c.rate),
+    staff_rate: numOrNull(c.staffRate),
+    billing_day: numOrNull(c.billingDay),
+    payment_days: numOrNull(c.paymentDays),
+    contact_name: c.contactName || null,
+    email: c.email || null,
+    note: c.note || null,
+  };
+}
+
+function fromDbContractor(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color || "#143F35",
+    isDirect: !!row.is_direct,
+    rate: row.rate === null || row.rate === undefined ? "" : Number(row.rate),
+    staffRate: row.staff_rate === null || row.staff_rate === undefined ? "" : Number(row.staff_rate),
+    billingDay: row.billing_day === null || row.billing_day === undefined ? "" : Number(row.billing_day),
+    paymentDays: row.payment_days === null || row.payment_days === undefined ? "" : Number(row.payment_days),
+    contactName: row.contact_name || "",
+    email: row.email || "",
+    note: row.note || "",
+  };
+}
+
 function toDbStaff(s) {
   return {
     id: s.id,
@@ -171,4 +204,5 @@ export {
   toDbClient, fromDbClient,
   toDbStaff, fromDbStaff,
   toDbCompanySettings, fromDbCompanySettings,
+  toDbContractor, fromDbContractor,
 };

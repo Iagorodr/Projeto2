@@ -1,6 +1,7 @@
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
 import { MapTrigger } from "../shared/MapPicker.jsx";
 import { useState } from "react";
+import { findContractor, normName } from "../../models/contractors.js";
 import { Plus, Pencil, MapPin, Phone, Calendar, Euro, ChevronDown, Users, Megaphone } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -134,7 +135,7 @@ function FeedbackHistory({ t, items }) {
 // liga o "Ver na agenda" da gaveta à tela de Agendas (mesmo padrão já usado
 // pela Dashboard, DashboardScreen.jsx).
 function ClientesScreen({
-  lang, setLang, clients, setClients, onDeleteClient,
+  lang, setLang, clients, setClients, onDeleteClient, contractors = [],
   staff = [], assignments = {}, horasData = {}, setHorasData, cutoffDay = 25, closedPeriods = [], contractAlertDays = 30,
   onNavigate, sentItems = [], navIntent = null, covers = [], absences = [],
 }) {
@@ -229,6 +230,23 @@ function ClientesScreen({
   function cancelEdit() { if (isNew) { setOpenClientId(null); } else { setMode("view"); } }
   function closeDrawer() { setOpenClientId(null); }
   function updateDraft(field, value) { setDraft((d) => ({ ...d, [field]: value })); }
+  // Escolher o contratante: num cliente NOVO, o valor/hora do funcionário vem do
+  // padrão do contratante (só se ainda estiver vazio ou for o padrão do contratante
+  // anterior); continua editável. Num cliente que já existe, nunca muda sozinho.
+  const [prefillNote, setPrefillNote] = useState(null);
+  function chooseContractor(name) {
+    const next = findContractor(contractors, name);
+    const prev = findContractor(contractors, draft.origin);
+    let valueHour = draft.valueHour;
+    let note = null;
+    if (isNew && next && Number(next.staffRate) > 0) {
+      const empty = !String(draft.valueHour).trim();
+      const wasDefault = prev && Number(draft.valueHour) === Number(prev.staffRate);
+      if (empty || wasDefault) { valueHour = next.staffRate; note = String(next.staffRate).replace(".", ","); }
+    }
+    setPrefillNote(note);
+    setDraft((d) => ({ ...d, origin: name, valueHour }));
+  }
 
   function validateDraft() {
     const errs = {};
@@ -745,7 +763,18 @@ function ClientesScreen({
               </select>
               <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 4 }}>{draft.hoursMode === "individual" ? t.hoursModeIndividualHint : t.hoursModeSplitHint}</div>
             </Field>
-            <Field label={t.formOrigin}><input style={styles.input} value={draft.origin} onChange={(e) => updateDraft("origin", e.target.value)} /></Field>
+            <Field label={t.formOrigin}>
+              {contractors.length === 0 && !draft.origin ? (
+                <div style={{ fontSize: 12.5, color: COLORS.ink3, padding: "9px 0" }}>{t.formOriginMissing}</div>
+              ) : (
+                <select style={styles.input} value={draft.origin || ""} onChange={(e) => chooseContractor(e.target.value)}>
+                  <option value="">{t.formOriginNone}</option>
+                  {contractors.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  {draft.origin && !findContractor(contractors, draft.origin) && <option value={draft.origin}>{draft.origin}</option>}
+                </select>
+              )}
+              <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.formOriginHint}</div>
+            </Field>
             <Field label={t.formHoursMonth} full>
               <input
                 type="number" style={{ ...styles.input, ...(suggestionDiffsALot ? { borderColor: COLORS.amberInk, background: COLORS.amberBg } : {}) }}
@@ -766,7 +795,8 @@ function ClientesScreen({
               )}
             </Field>
             <Field label={t.formValueHour} required error={formErrors.valueHour ? c0.requiredField : undefined}>
-              <input type="number" style={styles.input} value={draft.valueHour} onChange={(e) => updateDraft("valueHour", e.target.value)} />
+              <input type="number" style={styles.input} value={draft.valueHour} onChange={(e) => { setPrefillNote(null); updateDraft("valueHour", e.target.value); }} />
+              {prefillNote && <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.formOriginPrefilled(prefillNote)}</div>}
             </Field>
             <Field label={t.formAvailability}><input style={styles.input} value={draft.availability} onChange={(e) => updateDraft("availability", e.target.value)} /></Field>
             <Field label={t.formDuration} required error={formErrors.duration ? c0.requiredField : undefined}>
