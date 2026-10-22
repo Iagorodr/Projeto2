@@ -4,7 +4,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
-import { clientById, staffById, isoDateStr, fmtNoteDate, getOpenPeriod, isSolicitationStale, isStaffActive, groupSentItems, uniqueSentCount, recipientsText } from "../../models/utils.js";
+import { clientById, staffById, isoDateStr, fmtNoteDate, getOpenPeriod, isSolicitationOld, isSolicitationStale, isStaffActive, groupSentItems, uniqueSentCount, recipientsText } from "../../models/utils.js";
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { uploadFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
 import { Field } from "../shared/Layout.jsx";
@@ -177,8 +177,12 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   const notices = groupSentItems(sentItems.filter((i) => i.type === "aviso"));
   const unseenOf = (list) => uniqueSentCount(list.flatMap((g) => g.members).filter((i) => !i.seenByManagement));
   const openPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
-  const staleMissingItems = missingItems.filter((m) => isSolicitationStale(m, openPeriod));
-  const visibleMissingItems = showStale ? missingItems : missingItems.filter((m) => !isSolicitationStale(m, openPeriod));
+  // Pedidos de períodos já fechados que ainda ninguém tratou/viu continuam ativos; ao abrir
+  // esta página ficam marcados como vistos, mas esta visita ainda os mostra (`carry`).
+  const [carry] = useState(() => new Set(missingItems.filter((m) => isSolicitationOld(m, openPeriod) && !isSolicitationStale(m, openPeriod)).map((m) => m.id)));
+  const hiddenOld = (m) => isSolicitationStale(m, openPeriod) && !carry.has(m.id);
+  const staleMissingItems = missingItems.filter(hiddenOld);
+  const visibleMissingItems = showStale ? missingItems : missingItems.filter((m) => !hiddenOld(m));
   const pendingSolicitations = visibleMissingItems.filter((m) => !m.resolved).length;
 
   // Abrir o separador "Pedidos" (o que abre por omissão) marca como vistos os
@@ -283,7 +287,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
           {visibleMissingItems.length === 0 ? <EmptyNote>{t.nothingHere}</EmptyNote> : visibleMissingItems.map((m) => (
             <PedidoCard
               key={m.id} m={m} staff={staff} clients={clients} lang={lang} t={t} c0={c0}
-              stale={isSolicitationStale(m, openPeriod)}
+              stale={isSolicitationOld(m, openPeriod)}
               replying={replyingId} replyDraft={replyDraft} setReplyDraft={setReplyDraft}
               onStartReply={startReply} onSendReply={sendReply} onToggleResolved={toggleResolved}
             />
