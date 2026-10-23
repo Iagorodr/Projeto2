@@ -101,6 +101,9 @@ const BASE = {
 // Fecho do mês por contratante (assistente, histórico, estados).
 const CLOSE = {
   pt: {
+    titleShort: "Financeiro", whereFrom: "De onde vem", noPriceShort: "sem preço", toReceiveShort: "A receber", staffShort: "Funcionários",
+    marginLbl: "Margem", details: "Detalhes", defineDay: "Definir dia", define: "Definir", definePrice: "Definir preço", colContractor: "Contratante",
+    unpricedAlert: (n) => `${n} sem preço · fora da conta`, paidAll: "Pago aos funcionários (todos)", includesExpenses: (v) => `inclui ${v} de despesas`,
     monthsTitle: "Meses", stInProgress: "Em curso", stToClose: "Por fechar", stClosed: "Fechado", stReopened: "Reaberto", stNoHours: "Sem horas",
     colPeriod: "Período", colToInvoice: "A faturar", colState: "Estado",
     closeMonth: "Fechar mês", viewReport: "Ver relatório", downloadPdf: "Baixar PDF", reopen: "Reabrir",
@@ -138,6 +141,9 @@ const CLOSE = {
     deleteBlockedClosings: "Tem meses fechados: não pode ser eliminado.",
   },
   en: {
+    titleShort: "Finance", whereFrom: "Where it comes from", noPriceShort: "no price", toReceiveShort: "To receive", staffShort: "Staff",
+    marginLbl: "Margin", details: "Details", defineDay: "Set day", define: "Set", definePrice: "Set price", colContractor: "Contractor",
+    unpricedAlert: (n) => `${n} has no price · left out`, paidAll: "Paid to staff (all)", includesExpenses: (v) => `includes ${v} of expenses`,
     monthsTitle: "Months", stInProgress: "In progress", stToClose: "To close", stClosed: "Closed", stReopened: "Reopened", stNoHours: "No hours",
     colPeriod: "Period", colToInvoice: "To invoice", colState: "Status",
     closeMonth: "Close month", viewReport: "View report", downloadPdf: "Download PDF", reopen: "Reopen",
@@ -175,6 +181,9 @@ const CLOSE = {
     deleteBlockedClosings: "It has closed months: it cannot be deleted.",
   },
   fr: {
+    titleShort: "Finances", whereFrom: "D'où ça vient", noPriceShort: "sans prix", toReceiveShort: "À recevoir", staffShort: "Employés",
+    marginLbl: "Marge", details: "Détails", defineDay: "Définir le jour", define: "Définir", definePrice: "Définir le prix", colContractor: "Donneur d'ordre",
+    unpricedAlert: (n) => `${n} sans prix · hors calcul`, paidAll: "Payé aux employés (tous)", includesExpenses: (v) => `inclut ${v} de frais`,
     monthsTitle: "Mois", stInProgress: "En cours", stToClose: "À clôturer", stClosed: "Clôturé", stReopened: "Rouvert", stNoHours: "Sans heures",
     colPeriod: "Période", colToInvoice: "À facturer", colState: "État",
     closeMonth: "Clôturer le mois", viewReport: "Voir le rapport", downloadPdf: "Télécharger le PDF", reopen: "Rouvrir",

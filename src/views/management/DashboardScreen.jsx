@@ -131,6 +131,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   // pagar/pendentes), por isso o cálculo tem de bater certo nos dois.
   const currentPeriodHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }, currentPeriod), 0);
   // Horas + reembolsos aprovados (o que realmente se paga no período).
+  const currentExpensesApproved = staff.reduce((s, st) => s + staffExpensesApproved(horasData[st.id], currentPeriod), 0);
   const currentPeriodEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, currentPeriod) + staffExpensesApproved(horasData[st.id], currentPeriod), 0);
   // QA pós-auditoria (Lote 1): mesmo `board` do cartão herói de Horas (ver
   // `boardStaff` em utils.js) — antes este cartão contava `staff` inteiro
@@ -341,7 +342,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
       {/* 1 — Financeiro do período (A receber − A pagar = Margem) */}
       <FinanceBlock
         lang={lang} period={financePeriod} finance={finance} today={TODAY} tier={tier}
-        outstanding={outstanding} payTotal={currentPeriodEuros} paidCount={kpiCounts.paid} boardCount={board.length}
+        outstanding={outstanding} payTotal={currentPeriodEuros} expensesTotal={currentExpensesApproved} paidCount={kpiCounts.paid} boardCount={board.length}
         onSeeContractors={() => onNavigate("contratantes")}
       />
 
