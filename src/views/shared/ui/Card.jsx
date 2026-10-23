@@ -9,7 +9,8 @@ import { RADIUS, SHADOW } from "../../../styles/tokens.js";
 
 const BASE = {
   borderRadius: RADIUS.card,
-  padding: "21px 21px", // 20-22 do documento
+  // 21px (documento: 20-22) no PC/tablet; desce até 14px em ecrãs estreitos (telemóvel).
+  padding: "clamp(14px, 4vw, 21px)",
   boxSizing: "border-box",
 };
 

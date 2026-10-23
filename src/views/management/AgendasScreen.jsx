@@ -303,7 +303,8 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
   const tc = T[lang].clientes;
   const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
   const [search, setSearch] = useState("");
-  const [view, setView] = useState("staff"); // "staff" | "day"
+  // No telemóvel abre em "Por dia" (lista que cabe no ecrã); a grade "Por funcionário" continua a um toque.
+  const [view, setView] = useState(() => (typeof window !== "undefined" && window.innerWidth < 640 ? "day" : "staff")); // "staff" | "day"
   // Lote 4, 4.6 (achado do Iago — "a busca de cliente aparece muito em
   // baixo"): o popover de adicionar cliente/ver equipa já abriu PARA
   // BAIXO (`top: 100%`) ancorado à célula — numa linha perto do fim da
@@ -1131,7 +1132,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          <div className="chip-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
             {AGENDA_DAYS.map((day, i) => {
               const date = weekDates[i];
               const isToday = isoDateStr(date) === todayIso;

@@ -38,7 +38,7 @@ const styles = {
   menuIconWrapActive: { background: COLORS.primaryTint, color: COLORS.primaryDark },
   sairRow: { fontSize: 12, color: COLORS.textSoft, textDecoration: "underline", cursor: "pointer", marginTop: 20, background: "none", border: "none", textAlign: "left" },
 
-  content: { flex: 1, padding: "22px 28px", overflowY: "auto" },
+  content: { flex: 1, padding: "clamp(14px, 4vw, 22px) clamp(14px, 3.6vw, 28px)", overflowY: "auto", minWidth: 0 },
   // `topBar`/`todayLabel` eram só do `TopBar` (views/shared/Layout.jsx),
   // removido na limpeza pós-Etapa 4 — removidos junto por ficarem órfãos.
   langButton: { display: "flex", alignItems: "center", background: COLORS.card, border: `1.5px solid ${COLORS.fieldBorder}`, borderRadius: 8, padding: "6px 10px", fontSize: 13, fontWeight: 600, color: COLORS.vivoInk, cursor: "pointer" },

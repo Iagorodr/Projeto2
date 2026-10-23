@@ -9,6 +9,7 @@
 // projeto na limpeza pós-Etapa 4 (estava inteiro órfão, sem import).
 import { COLORS } from "../../../styles/colors.js";
 import { FONT } from "../../../styles/tokens.js";
+import { useBreakpoint } from "../../../hooks/useBreakpoint.js";
 import { Card } from "./Card.jsx";
 
 // `segments`: [{ label, value, color }] — só usado quando variant="hero".
@@ -42,29 +43,31 @@ function SegmentedBar({ segments }) {
 // `children`, o cartão fica exatamente como já estava.
 function KpiCard({ icon: Icon, label, value, variant = "default", segments, iconBg, iconColor, children, style, onClick }) {
   const isHero = variant === "hero";
+  // Telemóvel: cartão compacto (sem altura mínima, ícone e número menores) para caberem 2 por linha.
+  const mobile = useBreakpoint() === "mobile";
   return (
     <Card
       variant={isHero ? "hero" : "default"}
-      style={{ minHeight: 172, display: "flex", flexDirection: "column", ...(onClick ? { cursor: "pointer" } : null), ...style }}
+      style={{ minHeight: mobile ? 0 : 172, ...(mobile ? { padding: 14 } : null), display: "flex", flexDirection: "column", ...(onClick ? { cursor: "pointer" } : null), ...style }}
       {...(onClick ? { onClick, role: "button", tabIndex: 0, onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } } : null)}
     >
       {Icon && (
         <div
           style={{
-            width: 42, height: 42, borderRadius: 13, flexShrink: 0,
+            width: mobile ? 34 : 42, height: mobile ? 34 : 42, borderRadius: mobile ? 10 : 13, flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
             background: isHero ? "rgba(255,255,255,.16)" : (iconBg || COLORS.forest50),
             color: isHero ? "#fff" : (iconColor || COLORS.forest600),
-            marginBottom: 14,
+            marginBottom: mobile ? 8 : 14,
           }}
         >
-          <Icon size={20} strokeWidth={1.8} />
+          <Icon size={mobile ? 17 : 20} strokeWidth={1.8} />
         </div>
       )}
       <div style={{ fontSize: 13, color: isHero ? "rgba(255,255,255,.85)" : COLORS.ink2, marginBottom: 4 }}>
         {label}
       </div>
-      <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 36, lineHeight: 1.1, color: isHero ? "#fff" : COLORS.ink }}>
+      <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: mobile ? 28 : 36, lineHeight: 1.1, color: isHero ? "#fff" : COLORS.ink }}>
         {value}
       </div>
       {isHero && segments && segments.length > 0 && <SegmentedBar segments={segments} />}

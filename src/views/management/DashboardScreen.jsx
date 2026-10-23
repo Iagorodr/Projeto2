@@ -323,16 +323,18 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           )}
         </Card>
   );
-  const row = { display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 20 };
+  const isPhone = tier === "mobile";
+  const row = { display: "flex", flexWrap: "wrap", gap: isPhone ? 12 : 20, marginBottom: isPhone ? 12 : 20 };
   // Lote 4, 4.7: herói com 1,5 parte e os três KPIs com 1 parte cada, na
   // mesma linha no desktop; 2 por 2 no tablet; 1 coluna no celular. Grid
   // (não flex) porque não deve quebrar dentro de um nível — é exatamente
   // isso que fazia o Replacement esticar sozinho a 922px.
   const kpiRow = {
     display: "grid",
-    gridTemplateColumns: tier === "desktop" ? "1.5fr 1fr 1fr 1fr" : tier === "tablet" ? "1fr 1fr" : "1fr",
-    gap: 20,
-    marginBottom: 20,
+    // Telemóvel: 2 colunas (herói e "Funcionários ativos" a toda a largura, os outros 2 lado a lado).
+    gridTemplateColumns: tier === "desktop" ? "1.5fr 1fr 1fr 1fr" : "1fr 1fr",
+    gap: isPhone ? 12 : 20,
+    marginBottom: isPhone ? 12 : 20,
   };
 
   return (
@@ -341,7 +343,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
 
       {/* Linha 1 — 4 KPIs (herói + 3), documento 4.1 */}
       <div style={kpiRow}>
-        <Card variant="hero">
+        <Card variant="hero" style={isPhone ? { gridColumn: "1 / -1" } : undefined}>
           <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>{th.heroTitle}</div>
           <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 28, marginBottom: 2 }}>{fmtEuro(currentPeriodEuros)}</div>
           <div style={{ fontSize: 12.5, opacity: 0.85, marginBottom: 14 }}>{fmtHoursScreen(currentPeriodHours)} · {currentPeriodLabel}</div>
@@ -358,8 +360,8 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           </div>
         </Card>
 
-        <KpiCard icon={Users} label={t.kpiStaffActive} value={activeStaff.length} onClick={() => onNavigate("funcionarios")}>
-          <div style={{ display: "flex", alignItems: "center", marginTop: 14 }}>
+        <KpiCard icon={Users} label={t.kpiStaffActive} value={activeStaff.length} onClick={() => onNavigate("funcionarios")} style={isPhone ? { gridColumn: "1 / -1" } : undefined}>
+          <div style={{ display: "flex", alignItems: "center", marginTop: isPhone ? 8 : 14 }}>
             {activeStaff.slice(0, 5).map((s, i) => (
               <div key={s.id} style={{ marginLeft: i === 0 ? 0 : -10, borderRadius: "50%", border: "2px solid #fff", boxShadow: `0 0 0 1px ${COLORS.line}` }}>
                 <Avatar name={s.name} size={28} />
@@ -467,7 +469,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
 
       {/* Linha 3 — gráficos de 6 períodos (documento 2.14) */}
       <div style={row}>
-        <Card style={{ flex: "1 1 380px", minWidth: 300 }}>
+        <Card style={{ flex: "1 1 380px", minWidth: isPhone ? 0 : 300 }}>
           <PeriodBarChart
             data={valueChartData}
             valueFormatter={compactEuro}
@@ -476,7 +478,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
             comparisonLabel={t.vsPreviousPeriod}
           />
         </Card>
-        <Card style={{ flex: "1 1 380px", minWidth: 300 }}>
+        <Card style={{ flex: "1 1 380px", minWidth: isPhone ? 0 : 300 }}>
           <PeriodLineChart
             data={hoursChartData}
             valueFormatter={fmtHoursScreen}

@@ -246,7 +246,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       // cortado (sem reticências, porque o `overflow: hidden` de
       // DataTable.jsx não aplica elipse a um filho em flex/bloco como um
       // `<Button>`, só a texto que estoura direto na célula).
-      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 214, allowOverflow: true,
+      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 214, allowOverflow: true, mobileFull: true,
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={(ev) => ev.stopPropagation()}>
           {row.totalGaps > 0 && <span style={{ fontWeight: 700, color: COLORS.alert, fontSize: 13 }}>{row.totalGaps}</span>}
@@ -290,7 +290,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <div className="chip-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", minWidth: 0, maxWidth: "100%" }}>
             <FilterChip active={onlyGaps} onClick={() => setOnlyGaps(true)} count={totalWithGaps}>{t.chipOnlyGaps}</FilterChip>
             <FilterChip active={!onlyGaps} onClick={() => setOnlyGaps(false)} count={monitored.length}>{t.chipAllStaff}</FilterChip>
             {/* Lote 4, 4.5 (achado da Marta): a nota sobre inativos/

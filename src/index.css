@@ -105,3 +105,23 @@ input, select, textarea {
 html {
   overflow-x: hidden;
 }
+
+/* Telemóvel (<640): filas de filtros (chips) numa só linha que desliza para o
+   lado, em vez de ocuparem vários andares. Basta pôr className="chip-row" no
+   contentor; no PC/tablet nada muda. */
+@media (max-width: 639px) {
+  .chip-row {
+    display: flex !important;
+    flex: 1 1 100%;
+    min-width: 0;
+    gap: 8px;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .chip-row.chip-row-inline { flex: 1 1 0; } /* partilha a linha com um botão ao lado */
+  .chip-row::-webkit-scrollbar { display: none; }
+  .chip-row > * { flex-shrink: 0; }
+}

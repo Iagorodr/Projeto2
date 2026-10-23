@@ -465,7 +465,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       </Card>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="chip-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", minWidth: 0, maxWidth: "100%" }}>
           <FilterChip active={activeChip === "todos"} onClick={() => setActiveChip("todos")} count={board.length}>{t.filterAll}</FilterChip>
           <FilterChip active={activeChip === "pendentes"} onClick={() => setActiveChip("pendentes")} count={kpiCounts.pending}>{t.kpiPending}</FilterChip>
           <FilterChip active={activeChip === "porPagar"} onClick={() => setActiveChip("porPagar")} count={kpiCounts.unpaid}>{t.kpiUnpaid}</FilterChip>

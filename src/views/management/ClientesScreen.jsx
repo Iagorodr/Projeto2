@@ -359,7 +359,7 @@ function ClientesScreen({
       },
     },
     { key: "city", label: t.colCity, render: (c) => c.city || "—" },
-    { key: "contact", label: t.colContact, render: (c) => c.contact || "—" },
+    { key: "contact", label: t.colContact, mobileHidden: true, render: (c) => c.contact || "—" },
     {
       key: "team", label: t.colTeam, width: 1.3,
       render: (c) => <TeamAvatars ids={clientTeamStaffIds(assignments, c.id)} staff={staff} moreLabel={t.teamMore} />,
@@ -447,6 +447,7 @@ function ClientesScreen({
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18, alignItems: "center" }}>
+        <div className="chip-row chip-row-inline" style={{ display: "contents" }}>
         <FilterChip active={!cityFilter} onClick={() => setCityFilter(null)}>{t.allCities}</FilterChip>
         {cities.map((city) => (
           <FilterChip key={city} active={cityFilter === city} onClick={() => setCityFilter((cur) => (cur === city ? null : city))}>
@@ -467,6 +468,7 @@ function ClientesScreen({
             {t.noCityChip}
           </FilterChip>
         )}
+        </div>
         <div style={{ position: "relative" }}>
           <FilterChip active={!!typeFilter} onClick={() => setTypeMenuOpen((o) => !o)}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -477,7 +479,7 @@ function ClientesScreen({
           {typeMenuOpen && (
             <>
               <div style={{ position: "fixed", inset: 0, zIndex: 19 }} onClick={() => setTypeMenuOpen(false)} />
-              <div style={{ position: "absolute", top: 42, left: 0, background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, boxShadow: SHADOW.sh2, zIndex: 20, minWidth: 170, overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 42, right: 0, background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, boxShadow: SHADOW.sh2, zIndex: 20, minWidth: 170, overflow: "hidden" }}>
                 <button
                   type="button"
                   onClick={() => { setTypeFilter(null); setTypeMenuOpen(false); }}

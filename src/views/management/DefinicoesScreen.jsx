@@ -8,6 +8,7 @@ import { T } from "../../models/i18n.js";
 import { PageHeader, Card, Button, ConfirmDialog, SegmentedBar, InfoTip } from "../shared/ui/index.js";
 import { Toggle } from "../shared/ui/Toggle.jsx";
 import { supabase } from "../../models/supabaseClient.js";
+import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 
 // Diálogo simples de "feito" (um botão só) — reaproveitado pelo sucesso de
 // "Formatar dados" e pela troca de palavra-passe da empresa, pra não
@@ -53,6 +54,9 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
   const sectionRefs = {
     perfil: useRef(null), pagamento: useRef(null), alertas: useRef(null), risco: useRef(null),
   };
+  // Telemóvel: o índice de secções passa a uma linha de separadores no topo (desliza
+  // para o lado e fica preso ao rolar) e a foto fica por cima dos campos do perfil.
+  const phone = useBreakpoint() === "mobile";
   function goToSection(id) {
     setActiveSection(id);
     sectionRefs[id].current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -143,18 +147,21 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
     <div style={styles.content}>
       <PageHeader title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
-      <div style={{ display: "flex", gap: 32, alignItems: "flex-start" }}>
-        <nav style={{ position: "sticky", top: 24, width: 168, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ display: "flex", flexDirection: phone ? "column" : "row", gap: phone ? 12 : 32, alignItems: phone ? "stretch" : "flex-start" }}>
+        <nav style={phone
+          ? { position: "sticky", top: 0, zIndex: 5, display: "flex", gap: 6, overflowX: "auto", background: COLORS.page, padding: "6px 0", margin: "0 -2px", scrollbarWidth: "none" }
+          : { position: "sticky", top: 24, width: 168, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
           {SECTIONS.map((sec) => (
             <button
               key={sec.id}
               type="button"
               onClick={() => goToSection(sec.id)}
               style={{
-                textAlign: "left", border: "none", cursor: "pointer",
-                padding: "9px 12px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+                textAlign: "left", border: phone ? `1px solid ${activeSection === sec.id ? COLORS.forest200 : COLORS.line}` : "none", cursor: "pointer",
+                padding: "9px 12px", borderRadius: 10, fontSize: 13, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap", fontFamily: "inherit",
+                ...(phone && activeSection !== sec.id ? { background: COLORS.card } : null),
                 color: activeSection === sec.id ? COLORS.forest700 : COLORS.ink2,
-                background: activeSection === sec.id ? COLORS.forest50 : "transparent",
+                background: activeSection === sec.id ? COLORS.forest50 : phone ? COLORS.card : "transparent",
               }}
             >
               {t[sec.labelKey]}
@@ -162,11 +169,11 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
           ))}
         </nav>
 
-        <div style={{ flex: 1, maxWidth: 720, minWidth: 0, display: "flex", flexDirection: "column", gap: 16, paddingBottom: 90 }}>
+        <div style={{ flex: 1, maxWidth: 720, minWidth: 0, display: "flex", flexDirection: "column", gap: 16, paddingBottom: phone ? 24 : 90 }}>
           <div ref={sectionRefs.perfil}>
             <Card>
               <div style={styles.sectionTitle}>{t.companyProfile}</div>
-              <div style={styles.defProfileRow}>
+              <div style={phone ? { ...styles.defProfileRow, flexDirection: "column", alignItems: "stretch", gap: 16 } : styles.defProfileRow}>
                 <div style={styles.defPhotoBlock}>
                   <div style={styles.defPhotoCircle}>
                     {photoDraft ? <img src={photoDraft} alt="" style={styles.defPhotoImg} /> : <span style={styles.defPhotoInitial}>{nameDraft.slice(0, 1)}</span>}

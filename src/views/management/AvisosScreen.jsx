@@ -275,7 +275,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
     <div style={styles.content}>
       <PageHeader title={t.title} actions={<Button icon={Plus} onClick={openDrawer}>{t.newAviso}</Button>} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+      <div className="chip-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
         <FilterChip active={tab === "pedidos"} onClick={() => selectTab("pedidos")} count={pendingSolicitations}>{t.sectionSolicitations}</FilterChip>
         <FilterChip active={tab === "reclamacoes"} onClick={() => selectTab("reclamacoes")} count={unseenOf(complaints)}>{t.tabComplaints}</FilterChip>
         <FilterChip active={tab === "elogios"} onClick={() => selectTab("elogios")} count={unseenOf(praises)}>{t.sectionPraise}</FilterChip>

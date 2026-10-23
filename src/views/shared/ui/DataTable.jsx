@@ -19,7 +19,7 @@ import { useState } from "react";
 import { ChevronUp, ChevronDown, Inbox } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../../styles/tokens.js";
-import { useControlSize } from "../../../hooks/useBreakpoint.js";
+import { useControlSize, useBreakpoint } from "../../../hooks/useBreakpoint.js";
 
 function SkeletonRows({ columns, count, rowHeight }) {
   return Array.from({ length: count }).map((_, i) => (
@@ -42,6 +42,9 @@ function DataTable({
   // primeira coluna pegajosa e com os títulos a quebrar linha. Opt-in por ecrã
   // (Monitoramento); as outras tabelas continuam exatamente como estavam.
   fit,
+  // `noCards`: força a tabela também no telemóvel (por omissão, <640px vira lista de cartões).
+  noCards,
+  sortLabel = "Ordenar",
 }) {
   const [hoverId, setHoverId] = useState(null);
   const rowHeight = dense ? 48 : 56;
@@ -57,6 +60,20 @@ function DataTable({
   // (antes 44 fixo) sobe para caber esse alvo quando ele exceder 44.
   const { minTap } = useControlSize();
   const headerHeight = Math.max(44, minTap);
+  const tier = useBreakpoint();
+  if (tier === "mobile" && !noCards) {
+    return (
+      <MobileCards
+        columns={columns} rows={rows} getRowId={getRowId} onRowClick={onRowClick}
+        sortKey={sortKey} sortDir={sortDir} onSortChange={onSortChange} sortLabel={sortLabel}
+        selectable={selectable} selectedIds={selectedIds} selectedCount={selectedCount}
+        onToggleSelect={onToggleSelect} onToggleSelectAll={onToggleSelectAll}
+        batchActions={batchActions} batchLabel={batchLabel}
+        EmptyIcon={EmptyIcon} emptyMessage={emptyMessage} emptyAction={emptyAction}
+        loading={loading} skeletonRows={skeletonRows}
+      />
+    );
+  }
 
   return (
     <div style={{ position: "relative", border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, overflow: "hidden", background: COLORS.card }}>
@@ -198,6 +215,128 @@ function DataTable({
         >
           <span>{batchLabel(selectedCount)}</span>
           {batchActions}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Telemóvel (<640): a mesma informação em cartões — a 1ª coluna é o título do
+// cartão, as outras ficam em pares "RÓTULO valor" numa grelha de 2 colunas;
+// colunas sem rótulo (ações) ficam numa linha própria no fim. Ordenação passa
+// a um seletor; seleção em lote continua (caixa em cada cartão + "todos").
+function MobileCards({
+  columns, rows, getRowId, onRowClick, sortKey, sortDir, onSortChange, sortLabel,
+  selectable, selectedIds, selectedCount, onToggleSelect, onToggleSelectAll, batchActions, batchLabel,
+  EmptyIcon, emptyMessage, emptyAction, loading, skeletonRows,
+}) {
+  const [first, ...rest] = columns.filter((c) => !c.mobileHidden);
+  const infoCols = rest.filter((c) => c.label);
+  const actionCols = rest.filter((c) => !c.label);
+  const sortable = columns.filter((c) => c.sortable);
+  const chk = { cursor: "pointer", accentColor: COLORS.vivo, width: 20, height: 20, margin: 0 };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {(selectable || (sortable.length > 0 && onSortChange)) && rows.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", fontSize: 13, color: COLORS.ink2 }}>
+          {selectable ? (
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, minHeight: 40, cursor: "pointer" }}>
+              <input type="checkbox" checked={rows.length > 0 && selectedCount === rows.length} onChange={onToggleSelectAll} style={chk} />
+              {selectedCount > 0 ? batchLabel(selectedCount) : "Todos"}
+            </label>
+          ) : <span />}
+          {sortable.length > 0 && onSortChange && (
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {sortLabel}
+              <select
+                value={sortKey || ""}
+                onChange={(e) => onSortChange(e.target.value)}
+                style={{ height: 36, borderRadius: 10, border: `1px solid ${COLORS.line}`, background: COLORS.card, fontSize: 13, fontFamily: "inherit", color: COLORS.ink, padding: "0 8px" }}
+              >
+                {!sortKey && <option value="">—</option>}
+                {sortable.map((c) => <option key={c.key} value={c.key}>{typeof c.label === "string" ? c.label : c.key}</option>)}
+              </select>
+              {sortKey && (
+                <button type="button" onClick={() => onSortChange(sortKey)} aria-label={sortDir === "asc" ? "↑" : "↓"}
+                  style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${COLORS.line}`, background: COLORS.card, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                  {sortDir === "asc" ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                </button>
+              )}
+            </label>
+          )}
+        </div>
+      )}
+      {loading ? (
+        Array.from({ length: skeletonRows }).map((_, i) => (
+          <div key={i} style={{ height: 72, borderRadius: RADIUS.card, background: COLORS.lineSoft }} />
+        ))
+      ) : rows.length === 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "36px 16px", border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, background: COLORS.card }}>
+          <div style={{ width: 52, height: 52, borderRadius: "50%", background: COLORS.forest100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <EmptyIcon size={24} strokeWidth={1.6} color={COLORS.forest600} />
+          </div>
+          <div style={{ fontSize: 13.5, color: COLORS.ink2, textAlign: "center" }}>{emptyMessage}</div>
+          {emptyAction}
+        </div>
+      ) : (
+        rows.map((row) => {
+          const id = getRowId(row);
+          const selected = selectedIds?.has(id);
+          return (
+            <div
+              key={id} data-testid="dt-card"
+              tabIndex={onRowClick ? 0 : undefined}
+              onClick={() => onRowClick?.(row)}
+              onKeyDown={(e) => { if (onRowClick && (e.key === "Enter" || e.key === " ")) onRowClick(row); }}
+              style={{
+                display: "flex", gap: 10, alignItems: "flex-start", padding: "12px 14px",
+                border: `1px solid ${selected ? COLORS.forest600 : COLORS.line}`, borderRadius: RADIUS.card,
+                background: selected ? COLORS.forest50 : COLORS.card, cursor: onRowClick ? "pointer" : "default",
+              }}
+            >
+              {selectable && (
+                <label onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", paddingTop: 2, cursor: "pointer" }}>
+                  <input type="checkbox" checked={!!selected} onChange={() => onToggleSelect?.(id)} style={chk} />
+                </label>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {first && (
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: COLORS.ink, minWidth: 0, overflow: "hidden" }}>
+                    {first.render ? first.render(row) : row[first.key]}
+                  </div>
+                )}
+                {infoCols.length > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px 12px", marginTop: 8 }}>
+                    {infoCols.map((col) => (
+                      <div key={col.key} style={{ minWidth: 0, gridColumn: col.mobileFull ? "1 / -1" : undefined }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: COLORS.ink3, marginBottom: 1 }}>{col.label}</div>
+                        <div style={{ fontSize: 13.5, color: COLORS.ink, fontVariantNumeric: col.numeric ? "tabular-nums" : undefined, overflow: col.allowOverflow ? "visible" : "hidden", textOverflow: "ellipsis" }}>
+                          {col.render ? col.render(row) : row[col.key]}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {actionCols.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+                    {actionCols.map((col) => <div key={col.key}>{col.render ? col.render(row) : row[col.key]}</div>)}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })
+      )}
+      {selectable && selectedCount > 0 && (
+        <div
+          style={{
+            position: "fixed", bottom: 116, left: 12, right: 12,
+            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, background: COLORS.forest900, color: "#fff",
+            padding: "10px 14px", borderRadius: RADIUS.card, boxShadow: SHADOW.sh2, fontSize: 13, zIndex: 40,
+          }}
+        >
+          <span>{batchLabel(selectedCount)}</span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{batchActions}</div>
         </div>
       )}
     </div>

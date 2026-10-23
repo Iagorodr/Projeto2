@@ -333,7 +333,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
         <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} clearLabel={c0.close} mobile={isMobile} />
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+      <div className="chip-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
         <FilterChip active={chip === "todos"} onClick={() => setChip("todos")}>{t.chipAll}</FilterChip>
         <FilterChip active={chip === "fixos"} onClick={() => setChip("fixos")}>{t.chipFixed}</FilterChip>
         <FilterChip active={chip === "replacement"} onClick={() => setChip("replacement")}>{t.chipReplacement}</FilterChip>

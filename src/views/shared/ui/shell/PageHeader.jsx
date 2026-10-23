@@ -22,7 +22,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
 import { FONT } from "../../../../styles/tokens.js";
-import { useControlSize } from "../../../../hooks/useBreakpoint.js";
+import { useControlSize, useBreakpoint } from "../../../../hooks/useBreakpoint.js";
 
 // Lote 4, 4.4 (achado da Marta: "seletor de idioma hoje 104×30" — este é
 // o que a Horas realmente usa via PageHeader; "Como conferir" pede a
@@ -75,19 +75,23 @@ function LangSwitcher({ lang, setLang, langNames }) {
 // Lote 4, 4.5 (achado da Marta): `titleInfo` é um slot novo, opcional —
 // um InfoTip (ou qualquer nó) renderizado ao lado do título, na mesma
 // linha. Aditivo: quem não passa `titleInfo` continua exatamente igual.
+// Telemóvel (<640): título mais pequeno, menos espaço por baixo e SEM o seletor de
+// língua (no telemóvel a língua escolhe-se na folha "Mais", não em cada página).
 function PageHeader({ title, subtitle, titleInfo, actions, lang, setLang, langNames }) {
+  const mobile = useBreakpoint() === "mobile";
+  const showLang = !mobile && lang && setLang && langNames;
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, gap: 16, flexWrap: "wrap" }}>
-      <div>
+    <div style={{ display: "flex", alignItems: mobile ? "center" : "flex-start", justifyContent: "space-between", marginBottom: mobile ? 14 : 24, gap: mobile ? 10 : 16, flexWrap: "wrap" }}>
+      <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 26, color: COLORS.ink, lineHeight: 1.15 }}>{title}</div>
+          <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: mobile ? 22 : 26, color: COLORS.ink, lineHeight: 1.15 }}>{title}</div>
           {titleInfo}
         </div>
-        {subtitle && <div style={{ fontSize: 13, color: COLORS.ink2, marginTop: 4 }}>{subtitle}</div>}
+        {subtitle && <div style={{ fontSize: mobile ? 12.5 : 13, color: COLORS.ink2, marginTop: mobile ? 2 : 4 }}>{subtitle}</div>}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: mobile ? 8 : 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
         {actions}
-        {lang && setLang && langNames && <LangSwitcher lang={lang} setLang={setLang} langNames={langNames} />}
+        {showLang && <LangSwitcher lang={lang} setLang={setLang} langNames={langNames} />}
       </div>
     </div>
   );

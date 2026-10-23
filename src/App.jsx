@@ -1,6 +1,6 @@
 // Camada "View" raiz: lê o estado do controller e decide qual tela mostrar.
 // Não guarda estado do negócio — só consome useAppController().
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MoreHorizontal, LogOut, Repeat, Download } from "lucide-react";
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { useAppController } from "./controllers/useAppController.js";
@@ -8,7 +8,7 @@ import { styles } from "./styles/styles.js";
 import { AppSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.js";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useBreakpoint } from "./hooks/useBreakpoint.js";
-import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY } from "./models/data.js";
+import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY, LANG_NAMES } from "./models/data.js";
 import { CloseDeadlineBanner, CloseLockPanel } from "./views/shared/CloseDeadlineBanner.jsx";
 import { formatPeriodLabel, closeDeadlineInfo, isoDateStr } from "./models/utils.js";
 import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, unseenAvisosCount, countReviews, inReviewWindow } from "./models/utils.js";
@@ -58,6 +58,8 @@ export default function App() {
   // mudou, só a sidebar em volta).
   const empTier = useBreakpoint();
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  // Ao trocar de ecrã volta ao topo (antes ficava na posição de rolagem do ecrã anterior).
+  useEffect(() => { if (typeof window !== "undefined") window.scrollTo(0, 0); }, [c.screen, c.empScreen]);
   // styles.page tem minHeight fixo de 700px, pensado para desktop. Em telemóveis
   // (ex.: iPhone SE tem só 667px de altura) isso força o corpo a ficar mais alto
   // que o próprio ecrã, criando um pequeno scroll vertical sempre presente.
@@ -169,16 +171,15 @@ export default function App() {
         // largos. Só esta tela ganha um `shell` mais largo (1680); as
         // outras continuam exatamente como estavam.
         const shellStyle = (c.screen === "agendas" || c.screen === "monitoramento") ? { ...styles.shell, maxWidth: 1680 } : styles.shell;
-        return (
-        <div style={shellStyle}>
-          <AppSidebar
-            items={mgmtItemsFull} activeKey={c.screen} onNavigate={(k) => (k === "__switch" ? c.enterEmployee(c.loggedInStaffId) : c.setScreen(k))}
-            density="gerencia" collapsed={managementCollapsed}
-            user={managementUser} onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
-          />
+        // Telemóvel (<640): sem menu lateral — barra em baixo (Dashboard · Horas ·
+        // Agendas · Avisos · Mais) e o resto na folha "Mais" (com a língua e o Sair),
+        // igual ao app do funcionário. PC e tablet ficam exatamente como estavam.
+        const mgmtMobile = empTier === "mobile";
+        const padX = mgmtMobile ? 14 : 24;
+        const mgmtContent = (
           <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
             {c.companyNotice && (
-              <div style={{ padding: "16px 24px 0" }}>
+              <div style={{ padding: `16px ${padX}px 0` }}>
                 <CompanyNotice lang={c.lang} notice={c.companyNotice} audience="management" companyName={c.company.name} companyCode={c.companyCode} />
               </div>
             )}
@@ -186,7 +187,7 @@ export default function App() {
               <CloseLockPanel lang={c.lang} periodLabel={formatPeriodLabel(openPeriodNow, c.lang)} onGoHours={() => c.setScreen("horas")} />
             )}
             {(c.screen === "dashboard" && !closeInfo.overdue || c.screen === "horas") && closeInfo.ended && (
-              <div style={{ padding: "16px 24px 0" }}><CloseDeadlineBanner lang={c.lang} info={closeInfo} role="management" onGoHours={c.screen === "horas" ? undefined : () => c.setScreen("horas")} /></div>
+              <div style={{ padding: `16px ${padX}px 0` }}><CloseDeadlineBanner lang={c.lang} info={closeInfo} role="management" onGoHours={c.screen === "horas" ? undefined : () => c.setScreen("horas")} /></div>
             )}
             {c.screen === "dashboard" && !closeInfo.overdue && (
               <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} highlightsMonths={c.highlightsMonths} highlightsRealtime={c.highlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} assignments={c.assignments} covers={c.covers} onNavigate={c.goTo} />
@@ -211,6 +212,50 @@ export default function App() {
               <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} closeDeadlineDays={c.closeDeadlineDays} setCloseDeadlineDays={c.setCloseDeadlineDays} highlightsMonths={c.highlightsMonths} setHighlightsMonths={c.setHighlightsMonths} highlightsRealtime={c.highlightsRealtime} setHighlightsRealtime={c.setHighlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
             )}
           </div>
+        );
+        if (mgmtMobile) {
+          const byKey = Object.fromEntries(managementItems.map((it) => [it.key, it]));
+          const bottomKeys = ["dashboard", "horas", "agendas", "avisos"];
+          const bottomItems = [
+            ...bottomKeys.map((k) => byKey[k]).filter(Boolean),
+            { key: "__more", icon: MoreHorizontal, label: T[c.lang].common.more },
+          ];
+          const moreItems = [
+            ...managementItems.filter((it) => !bottomKeys.includes(it.key)).map((it) => ({ ...it, onSelect: () => c.setScreen(it.key) })),
+            ...(canSwitchToEmployee ? [{ key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsEmployee, onSelect: () => c.enterEmployee(c.loggedInStaffId) }] : []),
+            ...(!install.installed ? [{
+              key: "install", icon: Download, label: T[c.lang].common.installApp,
+              onSelect: () => { if (install.canPromptNative) install.promptInstall(); else window.location.assign(`/instalar?lang=${c.lang}`); },
+            }] : []),
+            { key: "logout", icon: LogOut, label: T[c.lang].common.logout, logout: true, onSelect: () => c.logout() },
+          ];
+          const moreActive = !bottomKeys.includes(c.screen);
+          return (
+            <div style={{ minHeight: "calc(100dvh - 14px)", display: "flex", flexDirection: "column", width: "100%" }}>
+              <div style={{ flex: 1, margin: "-14px -14px 0", minWidth: 0, display: "flex", flexDirection: "column" }}>
+                {mgmtContent}
+              </div>
+              <MobileBottomBar
+                activeKey={moreActive ? "__more" : c.screen}
+                onNavigate={(key) => (key === "__more" ? setMoreSheetOpen(true) : c.setScreen(key))}
+                items={bottomItems}
+              />
+              <MoreSheet
+                open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} items={moreItems} variant="grid"
+                activeKey={c.screen} user={{ name: managementUser.name, photoUrl: managementUser.photoUrl }}
+                lang={c.lang} setLang={c.setLang} langNames={LANG_NAMES}
+              />
+            </div>
+          );
+        }
+        return (
+        <div style={shellStyle}>
+          <AppSidebar
+            items={mgmtItemsFull} activeKey={c.screen} onNavigate={(k) => (k === "__switch" ? c.enterEmployee(c.loggedInStaffId) : c.setScreen(k))}
+            density="gerencia" collapsed={managementCollapsed}
+            user={managementUser} onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
+          />
+          {mgmtContent}
         </div>
         );
       })()}

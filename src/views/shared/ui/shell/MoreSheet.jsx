@@ -19,7 +19,10 @@ import { COLORS } from "../../../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../../../styles/tokens.js";
 import { Avatar } from "../Avatar.jsx";
 
-function MoreSheet({ open, onClose, items, user }) {
+// `variant="grid"` (gerência no telemóvel, muitos itens): grelha de 3 colunas
+// em vez de linhas de 70px, para caber sem rolar; o "Sair" fica numa linha à
+// parte no fim. `lang/setLang/langNames` (opcionais): seletor de língua no topo.
+function MoreSheet({ open, onClose, items, user, variant, activeKey, lang, setLang, langNames }) {
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e) { if (e.key === "Escape") onClose?.(); }
@@ -44,9 +47,67 @@ function MoreSheet({ open, onClose, items, user }) {
         {user && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px 14px" }}>
             <Avatar name={user.name} photoUrl={user.photoUrl} size={40} />
-            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{user.name}</div>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
+            {lang && setLang && langNames && (
+              <div role="group" aria-label="Língua" style={{ display: "flex", background: COLORS.lineSoft, borderRadius: 10, padding: 3, gap: 2, flexShrink: 0 }}>
+                {Object.keys(langNames).map((code) => (
+                  <button
+                    key={code} type="button" onClick={() => setLang(code)} aria-pressed={code === lang} title={langNames[code]}
+                    style={{
+                      minWidth: 40, height: 34, border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
+                      fontSize: 13, fontWeight: 700, textTransform: "uppercase",
+                      background: code === lang ? COLORS.card : "transparent", color: code === lang ? COLORS.vivoInk : COLORS.ink2,
+                      boxShadow: code === lang ? "0 1px 3px rgba(20,63,53,.15)" : "none",
+                    }}
+                  >
+                    {code}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
+        {variant === "grid" ? (() => {
+          const tiles = items.filter((it) => !it.logout);
+          const logout = items.find((it) => it.logout);
+          return (
+            <div style={{ maxHeight: "70dvh", overflowY: "auto" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, padding: "4px 14px 10px", borderTop: `1px solid ${COLORS.lineSoft}`, paddingTop: 12 }}>
+                {tiles.map((item) => {
+                  const Icon = item.icon;
+                  const active = item.key === activeKey;
+                  return (
+                    <button
+                      key={item.key} type="button" onClick={() => { item.onSelect?.(); onClose?.(); }}
+                      style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+                        minHeight: 84, padding: "10px 4px", borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
+                        border: `1px solid ${active ? COLORS.forest200 : COLORS.lineSoft}`, background: active ? COLORS.forest50 : COLORS.card,
+                      }}
+                    >
+                      <span style={{ width: 40, height: 40, borderRadius: 12, background: COLORS.rowIconBg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                        <Icon size={20} strokeWidth={1.9} color={COLORS.rowIconInk} />
+                        {item.badge != null && item.badge > 0 && (
+                          <span style={{ position: "absolute", top: -4, right: -6, minWidth: 16, height: 16, borderRadius: 999, background: COLORS.clay, color: "#3A1A0D", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{item.badge}</span>
+                        )}
+                      </span>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink, textAlign: "center", lineHeight: 1.2, overflowWrap: "anywhere" }}>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {logout && (
+                <button
+                  type="button" onClick={() => { logout.onSelect?.(); onClose?.(); }}
+                  style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", height: 56, padding: "0 18px", border: "none", borderTop: `1px solid ${COLORS.lineSoft}`, background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 15, fontWeight: 600, color: COLORS.ink }}
+                >
+                  <logout.icon size={20} strokeWidth={1.9} color={COLORS.rowIconInk} />
+                  {logout.label}
+                </button>
+              )}
+            </div>
+          );
+        })() : (
         <div style={{ display: "flex", flexDirection: "column" }}>
           {items.map((item, i) => {
             const Icon = item.icon;
@@ -88,6 +149,7 @@ function MoreSheet({ open, onClose, items, user }) {
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );
