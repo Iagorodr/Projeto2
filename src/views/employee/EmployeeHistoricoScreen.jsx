@@ -4,7 +4,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
-import { clientById, entryClientName, fmtEuro, fmtHoursScreen, fmtNoteDate, getOpenPeriod, formatPeriodLabel, dateStrInPeriod, staffTotalPay, staffTotalHours } from "../../models/utils.js";
+import { clientById, entryClientName, fmtEuro, fmtHoursScreen, fmtNoteDate, getOpenPeriod, formatPeriodLabel, dateStrInPeriod, staffTotalPay, staffTotalHours, expensesOf, expenseApprovedValue } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { PageHeader, Pill, Drawer, Button, Card, MobileHeader, ChevronCircle } from "../shared/ui/index.js";
 import { exportStaffHorasPdf } from "../../models/pdfExport.js";
@@ -49,6 +49,7 @@ function PeriodRow({ period, hours, onClick, badge }) {
 // precisar duplicar a Drawer pros dois casos.
 function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, company, clients, staff = [], horasData = {}, cutoffDay, closedPeriods, desktop }) {
   const t = T[lang].employeeHistorico;
+  const te = T[lang].expenses;
   const pdfT = T[lang].pdf;
   const [openId, setOpenId] = useState(null);
   const mine = closedPeriods.filter((p) => p.staffSummaries.some((s) => s.staffId === staffId));
@@ -64,6 +65,7 @@ function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, company, clie
       staffSummaries: [{
         staffId, name: (staff.find((x) => x.id === staffId) || {}).name || "", entries,
         hours: staffTotalHours(myHoras, pendingPeriod), euros: staffTotalPay(myHoras, clients, pendingPeriod),
+        expenses: expensesOf(myHoras, pendingPeriod),
       }],
     };
   })() : null;
@@ -110,6 +112,7 @@ function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, company, clie
       )}
     >
       {open && (() => {
+        const expenseList = line ? [...(line.expenses || []), ...(line.expensesRejected || [])].sort((a, b) => String(a.date).localeCompare(String(b.date))) : [];
         const sortedEntries = line ? [...line.entries].sort((a, b) => a.date.localeCompare(b.date)) : [];
         return (
           <>
@@ -126,6 +129,34 @@ function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, company, clie
                 <div style={{ fontSize: 18, fontWeight: 700, color: COLORS.primaryDark }}>{fmtEuro(line ? line.euros : 0)}</div>
               </Card>
             </div>
+            {expenseList.length > 0 && (
+              <div style={{ marginBottom: 18 }} data-testid="hist-expenses">
+                <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>{te.title}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {expenseList.map((e, i) => (
+                    <div key={e.id || i} style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.chip, padding: "10px 12px", background: COLORS.card }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13.5, color: COLORS.ink }}>
+                        <span><b>{e.type === "fuel" ? te.typeFuel : e.type === "product" ? te.typeProduct : te.typeOther}</b><span style={{ color: COLORS.ink2 }}> · {fmtNoteDate(e.date)}</span></span>
+                        <b>{fmtEuro(e.amount)}</b>
+                      </div>
+                      {e.description && <div style={{ fontSize: 13, color: COLORS.ink2, marginTop: 2 }}>{e.description}</div>}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                        <Pill variant={e.status === "approved" ? "paid" : e.status === "rejected" ? "missing" : "pending"}>
+                          {e.status === "approved" ? te.statusApproved : e.status === "rejected" ? te.statusRejected : te.statusPending}
+                        </Pill>
+                        {e.status === "approved" && e.approvedAmount != null && e.approvedAmount !== e.amount && (
+                          <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{te.approvedOf(fmtEuro(e.approvedAmount))}</span>
+                        )}
+                        {e.status === "rejected" && e.note && <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{te.rejectedNote(e.note)}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 13.5, fontWeight: 700, color: COLORS.ink }}>
+                  <span>{te.approvedTotal}</span><span>{fmtEuro(expenseList.reduce((sum, e) => sum + expenseApprovedValue(e), 0))}</span>
+                </div>
+              </div>
+            )}
             {sortedEntries.length === 0 ? (
               <div style={{ fontSize: 13, color: COLORS.ink3 }}>{T[lang].historico.noEntries}</div>
             ) : (
