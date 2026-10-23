@@ -6,10 +6,10 @@
 // O cliente liga-se ao contratante pelo NOME, em `client.origin`
 // (era a antiga "origem" em texto livre).
 
-// Paleta fixa de 8 cores (Tomás): todas aguentam texto branco (contraste ≥ 4,5:1). Ficam de fora
-// o clay (margem/atenção), o vermelho (erro) e o amarelo (avisos). A cor é guardada no contratante.
-export const CONTRACTOR_COLORS = ["#143F35", "#23806A", "#4A6FB5", "#7A5BB5", "#23809E", "#9A4F96", "#5E7E1F", "#5F6B66"];
-export const CONTRACTOR_COLOR_NAMES = { pt: ["Floresta", "Verde", "Azul", "Roxo", "Ciano", "Ameixa", "Oliva", "Cinza"], en: ["Forest", "Green", "Blue", "Purple", "Cyan", "Plum", "Olive", "Grey"], fr: ["Forêt", "Vert", "Bleu", "Violet", "Cyan", "Prune", "Olive", "Gris"] };
+// Paleta fixa de 12 cores (8 do Tomás + vermelho, laranja, amarelo e preto pedidos pelo Iago): todas aguentam texto branco (contraste ≥ 4,5:1). O amarelo é um mostarda
+// escuro (o amarelo claro não aguenta texto branco). A cor é guardada no contratante.
+export const CONTRACTOR_COLORS = ["#143F35", "#23806A", "#4A6FB5", "#7A5BB5", "#23809E", "#9A4F96", "#5E7E1F", "#5F6B66", "#C0392B", "#B8560A", "#9A6B00", "#1A1A1A"];
+export const CONTRACTOR_COLOR_NAMES = { pt: ["Floresta", "Verde", "Azul", "Roxo", "Ciano", "Ameixa", "Oliva", "Cinza", "Vermelho", "Laranja", "Amarelo", "Preto"], en: ["Forest", "Green", "Blue", "Purple", "Cyan", "Plum", "Olive", "Grey", "Red", "Orange", "Yellow", "Black"], fr: ["Forêt", "Vert", "Bleu", "Violet", "Cyan", "Prune", "Olive", "Gris", "Rouge", "Orange", "Jaune", "Noir"] };
 
 // Cores da paleta antiga → cor mais próxima da nova (só ao ler; XLG/CleanUp/L e A ficam como estavam).
 const LEGACY_COLORS = { "#143F35": "#143F35", "#2E8A73": "#23806A", "#7FC1AB": "#23809E", "#C8532E": "#9A4F96", "#5B7DB1": "#4A6FB5", "#B08A2E": "#5E7E1F" };
