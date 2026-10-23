@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Trash2, Check } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
-import { LANG_NAMES } from "../../models/data.js";
+import { LANG_NAMES, TODAY } from "../../models/data.js";
+import { useBreakpoint } from "../../hooks/useBreakpoint.js";
+import { contractorPeriods } from "../../models/contractorStats.js";
+import { ContractorsOverview } from "./finance/ContractorsOverview.jsx";
+import { ContractorDetail } from "./finance/ContractorDetail.jsx";
 import { T } from "../../models/i18n.js";
 import { Field } from "../shared/Layout.jsx";
-import { PageHeader, DataTable, Pill, Drawer, Button, ConfirmDialog, Card } from "../shared/ui/index.js";
+import { PageHeader, Pill, Drawer, Button, ConfirmDialog, Card } from "../shared/ui/index.js";
 import {
   CONTRACTOR_COLORS, EMPTY_CONTRACTOR, normName, contractorNameTaken, clientsOfContractor,
   clientsWithoutContractor, marginPerHour,
@@ -13,17 +17,22 @@ import {
 
 const eur = (v) => (v === "" || v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : `${Number(v).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
 
-function Dot({ color, size = 12 }) {
-  return <span style={{ width: size, height: size, borderRadius: 99, background: color || CONTRACTOR_COLORS[0], display: "inline-block", flexShrink: 0 }} />;
-}
-
 // Contratantes: quem paga à empresa pelas horas dos clientes. Esta página é
 // só da gerência (os valores são confidenciais: a tabela nem é legível para
 // funcionários). Cada contratante tem o seu valor/hora, o valor/hora padrão
 // pago ao funcionário (pré-preenche os clientes novos), o dia de faturação e
 // o prazo de pagamento; os clientes ligam-se a ele pelo nome (origem).
-function ContratantesScreen({ lang, setLang, contractors, setContractors, onDeleteContractor, clients, setClients }) {
+function ContratantesScreen({ lang, setLang, contractors, setContractors, onDeleteContractor, clients, setClients, staff, horasData, closedPeriods, cutoffDay }) {
   const t = T[lang].contratantes;
+  const tier = useBreakpoint();
+  const [detailId, setDetailId] = useState(null);
+  // 12 períodos (11 fechados + o aberto): a partir daí liberta-se o filtro 6 | 12 meses.
+  const periods = useMemo(
+    () => contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, cutoffDay, today: TODAY, lang, count: 12 }),
+    [closedPeriods, horasData, staff, clients, contractors, cutoffDay, lang],
+  );
+  const has12 = periods.length >= 12;
+  const detail = detailId != null ? contractors.find((c) => c.id === detailId) : null;
   const c0 = T[lang].common;
 
   const [editingId, setEditingId] = useState(null); // id | "new" | null
@@ -69,33 +78,19 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
   }
 
   const clientsCount = (c) => clientsOfContractor(clients, c).length;
-  const columns = [
-    {
-      key: "name", label: t.colName, width: 2.2,
-      render: (c) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <Dot color={c.color} />
-          <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-          {c.isDirect && <Pill variant="neutral">{t.direct}</Pill>}
-        </div>
-      ),
-    },
-    {
-      key: "rate", label: t.colRate, width: 1.4,
-      render: (c) => (c.isDirect ? <span style={{ color: COLORS.ink3 }}>{t.priceByClient}</span>
-        : c.rate === "" ? <Pill variant="pending">{t.missingRate}</Pill> : eur(c.rate)),
-    },
-    { key: "staffRate", label: t.colStaffRate, width: 1.4, render: (c) => eur(c.staffRate) },
-    { key: "billing", label: t.colBilling, width: 1, render: (c) => (c.billingDay === "" ? "—" : t.billingValue(c.billingDay)) },
-    { key: "payment", label: t.colPayment, width: 1, render: (c) => (c.paymentDays === "" ? "—" : t.paymentValue(c.paymentDays)) },
-    { key: "clients", label: t.colClients, width: 0.9, render: (c) => clientsCount(c) },
-  ];
 
   const draftClients = editing ? clientsOfContractor(clients, editing) : [];
   const blockedDelete = draftClients.length > 0;
 
   return (
     <div style={styles.content}>
+      {detail ? (
+        <ContractorDetail
+          lang={lang} tier={tier} contractor={detail} clients={clients} periods={periods} has12={has12}
+          onBack={() => setDetailId(null)} onEdit={() => openEdit(detail)}
+        />
+      ) : (
+      <>
       <PageHeader
         title={t.title} subtitle={t.subtitle} lang={lang} setLang={setLang} langNames={LANG_NAMES}
         actions={<Button icon={Plus} onClick={openNew}>{t.newContractor}</Button>}
@@ -125,7 +120,11 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
         </Card>
       )}
 
-      <DataTable columns={columns} rows={contractors} onRowClick={openEdit} emptyMessage={t.empty} />
+      {contractors.length === 0
+        ? <Card><div style={{ fontSize: 13, color: COLORS.ink3 }}>{t.empty}</div></Card>
+        : <ContractorsOverview lang={lang} tier={tier} contractors={contractors} clients={clients} periods={periods} has12={has12} today={TODAY} onOpen={(c) => setDetailId(c.id)} />}
+      </>
+      )}
 
       <Drawer
         open={!!(editingId && draft)}
