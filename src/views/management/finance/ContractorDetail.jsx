@@ -2,7 +2,7 @@
 // Documentos. Resumo = 3 gráficos (Horas por mês, Horas por cliente, Valor a receber) só com
 // os dados deste contratante, filtro 6 | 12 meses (só quando há 12 períodos) e
 // "Pré-visualizar relatório". Relatórios e Documentos chegam com o fecho do mês (etapa seguinte).
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Pencil, FileText } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";
 import { RADIUS } from "../../../styles/tokens.js";
@@ -24,6 +24,26 @@ import { TODAY } from "../../../models/data.js";
 const hoursAxis = (v) => `${Math.round(v)}h`;
 const eurCell = (v) => (v === "" || v == null || Number.isNaN(Number(v)) ? "—" : `${Number(v).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
 
+// Campo de preço por cliente (contratante direto): grava ao sair do campo / Enter, não a cada tecla
+// (cada gravação envia a tabela de clientes).
+function PriceInput({ value, onCommit, label }) {
+  const [txt, setTxt] = useState(value === "" || value == null ? "" : String(value));
+  useEffect(() => { setTxt(value === "" || value == null ? "" : String(value)); }, [value]);
+  const commit = () => {
+    const raw = txt.trim().replace(",", ".");
+    const n = raw === "" ? "" : Number(raw);
+    if (raw !== "" && !(n >= 0)) { setTxt(value === "" || value == null ? "" : String(value)); return; }
+    if (n !== value) onCommit(n);
+  };
+  return (
+    <input
+      type="text" inputMode="decimal" aria-label={label} placeholder="—" value={txt}
+      onChange={(e) => setTxt(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+      style={{ width: 78, textAlign: "right", border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, padding: "6px 8px", fontSize: 13.5, fontFamily: "inherit", background: COLORS.card, color: COLORS.ink }}
+    />
+  );
+}
+
 function ClientHoursBars({ rows, color, lang }) {
   const f = FIN[lang];
   const max = Math.max(1, ...rows.map((r) => r.hours));
@@ -42,11 +62,11 @@ function ClientHoursBars({ rows, color, lang }) {
   );
 }
 
-function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, closings, horasData, staff, assignments, covers, absences, cutoffDay, closedPeriods, onSaveClosing, companyName, who, onNavigate, onBack, onEdit }) {
+function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, closings, horasData, staff, assignments, covers, absences, cutoffDay, closedPeriods, onSaveClosing, companyName, who, onNavigate, onSetClientPrice, initialTab, onBack, onEdit }) {
   const f = FIN[lang];
   const tc = T[lang].contratantes;
   const isPhone = tier === "mobile";
-  const [tab, setTab] = useState("summary");
+  const [tab, setTab] = useState(initialTab || "summary");
   const [months, setMonths] = useState(6);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [wizardIso, setWizardIso] = useState(null);
@@ -59,7 +79,7 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
   const current = periods[periods.length - 1];
   const dataOf = (p) => p.contractors.get(c.id) || { hours: 0, value: c.isDirect ? null : 0, byClient: new Map() };
   const mine = clientsOfContractor(clients, c);
-  const priced = !c.isDirect && Number(c.rate) > 0;
+  const priced = c.isDirect ? periods.some((p) => dataOf(p).value != null) : Number(c.rate) > 0;
 
   const mkPeriods = (get) => win.map((p) => ({ key: p.key, label: p.label, rangeLabel: p.rangeLabel, isCurrent: p.isCurrent, values: { v: get(dataOf(p)) } }));
   const oneSeries = [{ id: "v", name: c.name, color: c.color }];
@@ -145,10 +165,13 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
           {mine.length === 0 ? (
             <div style={{ fontSize: 13, color: COLORS.ink3 }}>{f.clientsEmpty}</div>
           ) : (
+            <>
+            {c.isDirect && <div style={{ fontSize: 12.5, color: COLORS.ink2, marginBottom: 8 }}>{f.directPricesNote}</div>}
             <div style={{ overflowX: "auto" }}>
-              <div style={{ minWidth: 420 }}>
+              <div style={{ minWidth: c.isDirect ? 560 : 420 }}>
                 <div style={{ display: "flex", gap: 8, padding: "8px 4px", fontSize: 12, fontWeight: 600, color: COLORS.ink3 }}>
                   <span style={{ flex: 2 }}>{f.colClient}</span><span style={{ flex: 1, textAlign: "right" }}>{f.hours}</span>
+                  {c.isDirect && <span style={{ flex: 1.3, textAlign: "right" }}>{f.sellPriceCol}</span>}
                   <span style={{ flex: 1, textAlign: "right" }}>{f.colPaysEmployee}</span><span style={{ flex: 1, textAlign: "right" }}>{f.colMarginHour}</span>
                 </div>
                 {mine.map((cl) => {
@@ -157,6 +180,7 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
                     <div key={cl.id} style={{ display: "flex", gap: 8, padding: "10px 4px", fontSize: 13.5, borderTop: `1px solid ${COLORS.lineSoft}` }}>
                       <span style={{ flex: 2, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }}>{cl.name}</span>
                       <span style={{ flex: 1, textAlign: "right" }}>{fmtHoursScreen(cur.byClient.get(cl.id) || 0)}</span>
+                      {c.isDirect && <span style={{ flex: 1.3, textAlign: "right" }}><PriceInput value={cl.sellPrice} label={`${f.sellPriceCol} · ${cl.name}`} onCommit={(v) => onSetClientPrice && onSetClientPrice(cl.id, v)} /></span>}
                       <span style={{ flex: 1, textAlign: "right" }}>{eurCell(cl.valueHour)}</span>
                       <span style={{ flex: 1, textAlign: "right", fontWeight: 600, color: m === null ? COLORS.ink3 : m < 0 ? COLORS.alert : COLORS.forest800 }}>{m === null ? "—" : `${eurCell(m)}/h`}</span>
                     </div>
@@ -164,6 +188,7 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
                 })}
               </div>
             </div>
+            </>
           )}
         </Card>
       )}

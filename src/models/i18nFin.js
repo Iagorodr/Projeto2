@@ -101,6 +101,8 @@ const BASE = {
 // Fecho do mês por contratante (assistente, histórico, estados).
 const CLOSE = {
   pt: {
+    sellPriceCol: "Preço ao cliente (€/h)", sellPriceField: "Preço ao cliente (€/h)", sellPriceHint: "Só para clientes diretos: o que cobras por hora a este cliente.",
+    partialAlert: (name, n) => `${name}: ${n} cliente${n === 1 ? "" : "s"} sem preço · fora da conta`, directPricesNote: "Contratante direto: define o preço de cada cliente. Os clientes sem preço ficam fora da conta.",
     titleShort: "Financeiro", whereFrom: "De onde vem", noPriceShort: "sem preço", toReceiveShort: "A receber", staffShort: "Funcionários",
     marginLbl: "Margem", details: "Detalhes", defineDay: "Definir dia", define: "Definir", definePrice: "Definir preço", colContractor: "Contratante",
     unpricedAlert: (n) => `${n} sem preço · fora da conta`, paidAll: "Pago aos funcionários (todos)", includesExpenses: (v) => `inclui ${v} de despesas`,
@@ -114,6 +116,7 @@ const CLOSE = {
     pendTitle: "Pendências deste contratante", allClear: "Tudo em dia.", openHoras: "Abrir Horas",
     pend: {
       noRate: () => "Falta o valor/hora do contratante",
+      noSellPrice: (n) => `${n} cliente${n === 1 ? "" : "s"} sem preço de venda`,
       noStaffRate: (n) => `${n} cliente${n === 1 ? "" : "s"} sem valor/hora ao funcionário`,
       horasOpen: () => "O período ainda não foi fechado em Horas",
       overtime: (n) => `${n} hora${n === 1 ? "" : "s"} extra por aprovar`,
@@ -141,6 +144,8 @@ const CLOSE = {
     deleteBlockedClosings: "Tem meses fechados: não pode ser eliminado.",
   },
   en: {
+    sellPriceCol: "Price to client (€/h)", sellPriceField: "Price to client (€/h)", sellPriceHint: "Direct clients only: what you charge per hour to this client.",
+    partialAlert: (name, n) => `${name}: ${n} client${n === 1 ? "" : "s"} without a price · left out`, directPricesNote: "Direct contractor: set each client's price. Clients without a price are left out.",
     titleShort: "Finance", whereFrom: "Where it comes from", noPriceShort: "no price", toReceiveShort: "To receive", staffShort: "Staff",
     marginLbl: "Margin", details: "Details", defineDay: "Set day", define: "Set", definePrice: "Set price", colContractor: "Contractor",
     unpricedAlert: (n) => `${n} has no price · left out`, paidAll: "Paid to staff (all)", includesExpenses: (v) => `includes ${v} of expenses`,
@@ -154,6 +159,7 @@ const CLOSE = {
     pendTitle: "This contractor's open items", allClear: "All clear.", openHoras: "Open Hours",
     pend: {
       noRate: () => "The contractor has no hourly rate",
+      noSellPrice: (n) => `${n} client${n === 1 ? "" : "s"} without a selling price`,
       noStaffRate: (n) => `${n} client${n === 1 ? "" : "s"} without an hourly rate for staff`,
       horasOpen: () => "The period is not closed in Hours yet",
       overtime: (n) => `${n} overtime entr${n === 1 ? "y" : "ies"} to approve`,
@@ -181,6 +187,8 @@ const CLOSE = {
     deleteBlockedClosings: "It has closed months: it cannot be deleted.",
   },
   fr: {
+    sellPriceCol: "Prix au client (€/h)", sellPriceField: "Prix au client (€/h)", sellPriceHint: "Clients directs uniquement : ce que vous facturez par heure à ce client.",
+    partialAlert: (name, n) => `${name} : ${n} client${n === 1 ? "" : "s"} sans prix · hors calcul`, directPricesNote: "Donneur d'ordre direct : définissez le prix de chaque client. Les clients sans prix sont exclus.",
     titleShort: "Finances", whereFrom: "D'où ça vient", noPriceShort: "sans prix", toReceiveShort: "À recevoir", staffShort: "Employés",
     marginLbl: "Marge", details: "Détails", defineDay: "Définir le jour", define: "Définir", definePrice: "Définir le prix", colContractor: "Donneur d'ordre",
     unpricedAlert: (n) => `${n} sans prix · hors calcul`, paidAll: "Payé aux employés (tous)", includesExpenses: (v) => `inclut ${v} de frais`,
@@ -194,6 +202,7 @@ const CLOSE = {
     pendTitle: "Points en suspens de ce donneur d'ordre", allClear: "Tout est en ordre.", openHoras: "Ouvrir Heures",
     pend: {
       noRate: () => "Le donneur d'ordre n'a pas de tarif horaire",
+      noSellPrice: (n) => `${n} client${n === 1 ? "" : "s"} sans prix de vente`,
       noStaffRate: (n) => `${n} client${n === 1 ? "" : "s"} sans tarif horaire pour l'employé`,
       horasOpen: () => "La période n'est pas encore clôturée dans Heures",
       overtime: (n) => `${n} heure${n === 1 ? "" : "s"} supplémentaire${n === 1 ? "" : "s"} à approuver`,

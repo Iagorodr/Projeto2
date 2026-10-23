@@ -82,7 +82,8 @@ export function deriveContractors(clients, existing = []) {
 // Margem por hora de um cliente (o que o contratante paga menos o que o
 // funcionário recebe). null quando não dá para calcular (cliente direto sem preço).
 export function marginPerHour(contractor, client) {
-  const rate = Number(contractor && contractor.rate);
+  // Contratante normal: valor/hora único; "Direto": o preço de cada cliente (sellPrice).
+  const rate = Number(contractor && contractor.isDirect ? client && client.sellPrice : contractor && contractor.rate);
   const pay = Number(client && client.valueHour);
   if (!(rate > 0) || !(pay >= 0) || String(client && client.valueHour).trim() === "") return null;
   return rate - pay;

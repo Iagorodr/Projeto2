@@ -33,7 +33,7 @@ export function buildClosing({ contractor, period, existing, clients, pendingIte
     hours: d.hours,
     rate: contractor.isDirect || !(Number(contractor.rate) > 0) ? null : Number(contractor.rate),
     receivable: d.value,
-    staffCost: d.staffCost,
+    staffCost: d.pricedStaffCost != null ? d.pricedStaffCost : d.staffCost, // o custo que corresponde ao valor a receber
     byClient: [...d.byClient.entries()].map(([clientId, hours]) => ({ clientId, name: (clientById(clients, clientId) || {}).name || "—", hours })),
     pending: pendingItems && pendingItems.length ? { note, items: pendingItems } : null,
     docs: docs || (existing ? existing.docs : []) || [],
@@ -66,6 +66,9 @@ export function closingPendencies({ contractor, period, clients, horasData, staf
   const ids = new Set(mine.map((c) => c.id));
   const out = [];
   if (!contractor.isDirect && !(Number(contractor.rate) > 0)) out.push({ key: "noRate", count: 1 });
+  // Contratante direto: cada cliente com horas neste mês precisa do seu preço de venda.
+  const dEntry = period.contractors.get(contractor.id);
+  if (contractor.isDirect && dEntry && dEntry.missingPrice) out.push({ key: "noSellPrice", count: dEntry.missingPrice });
   const noStaffRate = mine.filter((c) => !(Number(c.valueHour) > 0)).length;
   if (noStaffRate) out.push({ key: "noStaffRate", count: noStaffRate });
   if (period.iso === openPeriodIso) out.push({ key: "horasOpen", count: 1 });

@@ -344,6 +344,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
         lang={lang} period={financePeriod} finance={finance} today={TODAY} tier={tier}
         outstanding={outstanding} payTotal={currentPeriodEuros} expensesTotal={currentExpensesApproved} paidCount={kpiCounts.paid} boardCount={board.length}
         onSeeContractors={() => onNavigate("contratantes")}
+        onDefine={(id) => onNavigate("contratantes", { contractorId: id, tab: "clients" })}
       />
 
       {/* 2 — quatro números pequenos */}

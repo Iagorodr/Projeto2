@@ -37,6 +37,11 @@ function docsFromDb(value) {
   });
 }
 
+// A coluna `sell_price` (supabase/clientes_preco_venda.sql) pode ainda não existir na base: o app
+// descobre isso ao ler os clientes e, se faltar, não a envia (para não falhar a gravação dos clientes).
+let sellPriceColumn = true;
+export function setSellPriceColumn(available) { sellPriceColumn = !!available; }
+
 function toDbClient(c) {
   return {
     id: c.id,
@@ -49,6 +54,7 @@ function toDbClient(c) {
     contract_end: c.contractEnd,
     hours_month: numOrNull(c.hoursMonth),
     value_hour: numOrNull(c.valueHour),
+    ...(sellPriceColumn ? { sell_price: numOrNull(c.sellPrice) } : {}),
     frequency: c.frequency,
     frequency_anchor: c.frequencyAnchor || null,
     availability: c.availability,
@@ -78,6 +84,7 @@ function fromDbClient(row) {
     contractEnd: row.contract_end,
     hoursMonth: row.hours_month === null ? "" : Number(row.hours_month),
     valueHour: row.value_hour === null ? "" : Number(row.value_hour),
+    sellPrice: row.sell_price == null ? "" : Number(row.sell_price),
     frequency: row.frequency,
     frequencyAnchor: row.frequency_anchor || "",
     availability: row.availability,

@@ -23,10 +23,11 @@ const eur = (v) => (v === "" || v === null || v === undefined || Number.isNaN(Nu
 // funcionários). Cada contratante tem o seu valor/hora, o valor/hora padrão
 // pago ao funcionário (pré-preenche os clientes novos), o dia de faturação e
 // o prazo de pagamento; os clientes ligam-se a ele pelo nome (origem).
-function ContratantesScreen({ lang, setLang, contractors, setContractors, onDeleteContractor, clients, setClients, staff, horasData, closedPeriods, cutoffDay, assignments, covers, absences, closings, onSaveClosing, companyName, who, onNavigate }) {
+function ContratantesScreen({ lang, setLang, contractors, setContractors, onDeleteContractor, clients, setClients, staff, horasData, closedPeriods, cutoffDay, assignments, covers, absences, closings, onSaveClosing, companyName, who, onNavigate, navIntent }) {
   const t = T[lang].contratantes;
   const tier = useBreakpoint();
-  const [detailId, setDetailId] = useState(null);
+  const [detailId, setDetailId] = useState(navIntent && navIntent.contractorId != null ? navIntent.contractorId : null);
+  const [detailTab, setDetailTab] = useState(navIntent && navIntent.tab ? navIntent.tab : null);
   // 12 períodos (11 fechados + o aberto): a partir daí liberta-se o filtro 6 | 12 meses.
   const periods = useMemo(
     () => contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, today: TODAY, lang, count: 12 }),
@@ -89,9 +90,10 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
       {detail ? (
         <ContractorDetail
           lang={lang} tier={tier} contractor={detail} clients={clients} periods={periods} has12={has12}
+          initialTab={detailTab} onSetClientPrice={(id, v) => setClients((prev) => prev.map((cl) => (cl.id === id ? { ...cl, sellPrice: v } : cl)))}
           closings={closings} horasData={horasData} staff={staff} assignments={assignments} covers={covers} absences={absences}
           cutoffDay={cutoffDay} closedPeriods={closedPeriods} onSaveClosing={onSaveClosing} companyName={companyName} who={who} onNavigate={onNavigate}
-          onBack={() => setDetailId(null)} onEdit={() => openEdit(detail)}
+          onBack={() => { setDetailId(null); setDetailTab(null); }} onEdit={() => openEdit(detail)}
         />
       ) : (
       <>
@@ -126,7 +128,7 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
 
       {contractors.length === 0
         ? <Card><div style={{ fontSize: 13, color: COLORS.ink3 }}>{t.empty}</div></Card>
-        : <ContractorsOverview lang={lang} tier={tier} contractors={contractors} clients={clients} periods={periods} has12={has12} today={TODAY} onOpen={(c) => setDetailId(c.id)} />}
+        : <ContractorsOverview lang={lang} tier={tier} contractors={contractors} clients={clients} periods={periods} has12={has12} today={TODAY} onOpen={(c) => { setDetailTab(null); setDetailId(c.id); }} />}
       </>
       )}
 

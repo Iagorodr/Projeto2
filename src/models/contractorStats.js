@@ -87,17 +87,29 @@ export function contractorPeriods({ closedPeriods, horasData, staff, clients, co
     p.byContractor.forEach((b, key) => {
       const c = key === "none" ? null : (contractors || []).find((x) => x.id === key);
       const rate = rateOf(c);
-      const v = rate != null ? b.hours * rate : null;
       // Custo ao funcionário = horas de cada cliente × o que se paga ao funcionário nesse cliente.
-      let staffCost = 0;
-      b.byClient.forEach((hrs, cid) => { const cl = clientById.get(cid); staffCost += hrs * (Number(cl && cl.valueHour) || 0); });
-      list.set(key, { hours: b.hours, value: v, staffCost, byClient: b.byClient });
+      let staffCost = 0, directValue = 0, directStaff = 0, missingPrice = 0;
+      b.byClient.forEach((hrs, cid) => {
+        const cl = clientById.get(cid);
+        const cost = hrs * (Number(cl && cl.valueHour) || 0);
+        staffCost += cost;
+        if (c && c.isDirect) {
+          // Contratante direto: cada cliente tem o seu preço de venda; os que não têm ficam de fora da conta.
+          const sp = Number(cl && cl.sellPrice);
+          if (sp > 0) { directValue += hrs * sp; directStaff += cost; } else if (hrs > 0) missingPrice += 1;
+        }
+      });
+      const direct = !!(c && c.isDirect);
+      const v = direct ? (directValue > 0 ? directValue : null) : (rate != null ? b.hours * rate : null);
+      // pricedStaffCost = o custo que corresponde ao valor a receber (para a margem comparar o mesmo com o mesmo).
+      const pricedStaffCost = direct ? directStaff : staffCost;
+      list.set(key, { hours: b.hours, value: v, staffCost, pricedStaffCost, missingPrice, byClient: b.byClient });
     });
     // Mês já fechado para o contratante: valem os valores guardados no fecho, não os de agora.
     (closings || []).forEach((row) => {
       if (row.status !== "closed" || row.periodEnd !== p.iso) return;
       list.set(row.contractorId, {
-        hours: row.hours || 0, value: row.receivable == null ? null : Number(row.receivable), staffCost: Number(row.staffCost) || 0,
+        hours: row.hours || 0, value: row.receivable == null ? null : Number(row.receivable), staffCost: Number(row.staffCost) || 0, pricedStaffCost: Number(row.staffCost) || 0, missingPrice: 0,
         byClient: new Map((row.byClient || []).map((b) => [b.clientId, b.hours])), frozen: true, closing: row,
       });
     });
@@ -143,9 +155,10 @@ export function periodFinance(period, contractors) {
     const d = period.contractors.get(c.id);
     if (!d || !(d.hours > 0)) return;
     const priced = d.value != null;
-    const margin = priced ? d.value - d.staffCost : null;
-    cards.push({ contractor: c, closing: d.closing || null, hours: d.hours, value: d.value, staffCost: d.staffCost, margin, marginPct: priced && d.value > 0 ? Math.round((margin / d.value) * 100) : null });
-    if (priced) { receivable += d.value; pricedStaff += d.staffCost; } else unpriced += 1;
+    const matched = d.pricedStaffCost != null ? d.pricedStaffCost : d.staffCost; // custo dos clientes que têm preço
+    const margin = priced ? d.value - matched : null;
+    cards.push({ contractor: c, closing: d.closing || null, hours: d.hours, value: d.value, staffCost: d.staffCost, pricedStaffCost: matched, missingPrice: d.missingPrice || 0, margin, marginPct: priced && d.value > 0 ? Math.round((margin / d.value) * 100) : null });
+    if (priced) { receivable += d.value; pricedStaff += matched; } else unpriced += 1;
   });
   return { cards, receivable, pricedStaff, margin: receivable - pricedStaff, unpriced, pricedCount: cards.length - unpriced };
 }

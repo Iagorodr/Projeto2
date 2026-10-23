@@ -21,7 +21,7 @@ import { setStorageCompany, removeFile } from "../models/fileStorage.js";
 import {
   toDbClient, fromDbClient, toDbStaff, fromDbStaff,
   toDbCompanySettings, fromDbCompanySettings,
-  toDbContractor, fromDbContractor, toDbClosing, fromDbClosing,
+  toDbContractor, fromDbContractor, toDbClosing, fromDbClosing, setSellPriceColumn,
 } from "../models/dbMappers.js";
 import { deriveContractors } from "../models/contractors.js";
 import {
@@ -441,7 +441,10 @@ export function useAppController() {
       ]);
 
       if (clientsRes.error) { console.error("Erro ao carregar clientes:", clientsRes.error); ok = false; }
-      else if (clientsRes.data && (START_EMPTY || clientsRes.data.length > 0)) setClients(clientsRes.data.map(fromDbClient));
+      else if (clientsRes.data && (START_EMPTY || clientsRes.data.length > 0)) {
+        setSellPriceColumn(clientsRes.data.length === 0 || "sell_price" in clientsRes.data[0]);
+        setClients(clientsRes.data.map(fromDbClient));
+      }
 
       // Contratantes. Tabela ainda por criar (falta correr supabase/contratantes.sql):
       // não é erro — o resto do app funciona e os contratantes só não ficam guardados.

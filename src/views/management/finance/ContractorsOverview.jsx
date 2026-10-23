@@ -62,7 +62,7 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, has12,
     key: p.key, label: p.label, rangeLabel: p.rangeLabel, isCurrent: p.isCurrent,
     values: Object.fromEntries(series.map((se) => [se.id, p.contractors.get(se.id) ? valueOf(p.contractors.get(se.id)) : 0])),
   }));
-  const hasDirectHours = metric === "eur" && contractors.some((c) => (c.isDirect || !(Number(c.rate) > 0)) && win.some((p) => (p.contractors.get(c.id)?.hours || 0) > 0));
+  const hasDirectHours = metric === "eur" && contractors.some((c) => win.some((p) => { const e = p.contractors.get(c.id); return e && e.hours > 0 && (e.value == null || e.missingPrice > 0); }));
 
   const rows = contractors.map((c) => {
     const d = current.contractors.get(c.id);

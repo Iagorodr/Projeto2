@@ -2,6 +2,7 @@ import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
 import { MapTrigger } from "../shared/MapPicker.jsx";
 import { useState } from "react";
 import { findContractor, normName } from "../../models/contractors.js";
+import { FIN } from "../../models/i18nFin.js";
 import { Plus, Pencil, MapPin, Phone, Calendar, Euro, ChevronDown, Users, Megaphone } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -595,6 +596,9 @@ function ClientesScreen({
                 })()}
               </ViewField>
               <ViewField icon={Euro} label={t.fValueHour}>{openClient.valueHour ? `€ ${openClient.valueHour}` : "—"}</ViewField>
+              {(() => { const ct = findContractor(contractors, openClient.origin); return ct && ct.isDirect; })() && (
+                <ViewField icon={Euro} label={FIN[lang].sellPriceField}>{openClient.sellPrice ? `€ ${openClient.sellPrice}` : "—"}</ViewField>
+              )}
               <ViewField label={t.fHoursMonth}>{openClient.hoursMonth ? fmtHoursScreen(openClient.hoursMonth) : "—"}</ViewField>
               <ViewField label={t.fHoursMode}>{openClient.hoursMode === "individual" ? t.hoursModeIndividual : t.hoursModeSplit}</ViewField>
             </div>
@@ -800,6 +804,12 @@ function ClientesScreen({
               <input type="number" style={styles.input} value={draft.valueHour} onChange={(e) => { setPrefillNote(null); updateDraft("valueHour", e.target.value); }} />
               {prefillNote && <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.formOriginPrefilled(prefillNote)}</div>}
             </Field>
+            {(() => { const ct = findContractor(contractors, draft.origin); return ct && ct.isDirect; })() && (
+              <Field label={FIN[lang].sellPriceField}>
+                <input type="number" step="0.5" style={styles.input} value={draft.sellPrice == null ? "" : draft.sellPrice} onChange={(e) => updateDraft("sellPrice", e.target.value === "" ? "" : Number(e.target.value))} />
+                <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{FIN[lang].sellPriceHint}</div>
+              </Field>
+            )}
             <Field label={t.formAvailability}><input style={styles.input} value={draft.availability} onChange={(e) => updateDraft("availability", e.target.value)} /></Field>
             <Field label={t.formDuration} required error={formErrors.duration ? c0.requiredField : undefined}>
               <DurationField value={draft.duration} onChange={(v) => updateDraft("duration", v)} />

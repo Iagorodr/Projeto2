@@ -208,7 +208,7 @@ const INITIAL_SENT = [
 ];
 const EMPTY_CLIENT = {
   name: "", type: "office", city: "", address: "", contact: "",
-  contractStart: "", contractEnd: "", hoursMonth: "", valueHour: "",
+  contractStart: "", contractEnd: "", hoursMonth: "", valueHour: "", sellPrice: "",
   frequency: "weekly", availability: "", duration: "", days: [],
   description: "", priorities: "", note: "",
   clientType: "fixo", hoursMode: "dividida", durationByDay: {}, clientValidUntil: "", origin: "",

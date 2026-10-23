@@ -74,12 +74,15 @@ function SourceBar({ cards, lang, f }) {
   );
 }
 
-function FinanceBlock({ lang, period, finance, payTotal, expensesTotal = 0, paidCount, boardCount, today, tier, outstanding = [], onSeeContractors }) {
+function FinanceBlock({ lang, period, finance, payTotal, expensesTotal = 0, paidCount, boardCount, today, tier, outstanding = [], onSeeContractors, onDefine }) {
   const f = FIN[lang];
   const [open, setOpen] = useState(false);
   const isPhone = tier === "mobile";
   const nothingPriced = finance.pricedCount === 0;
   const unpricedCards = finance.cards.filter((cd) => cd.value == null);
+  const partialCards = finance.cards.filter((cd) => cd.value != null && cd.missingPrice > 0);
+  const define = (cd) => (onDefine ? onDefine(cd.contractor.id) : onSeeContractors());
+  const firstToDefine = (unpricedCards[0] || partialCards[0]);
   const pct = finance.receivable > 0 ? Math.round((finance.margin / finance.receivable) * 100) : null;
   const ended = isoDateStr(today) > period.iso; // eslint-disable-line no-unused-vars
   const big = { fontFamily: FONT.heading, fontWeight: 700, fontSize: isPhone ? 22 : 28, color: COLORS.ink, lineHeight: 1.1 };
@@ -99,11 +102,15 @@ function FinanceBlock({ lang, period, finance, payTotal, expensesTotal = 0, paid
     </div>
   );
 
-  const alert = unpricedCards.length > 0 && (
+  const alertText = [
+    ...unpricedCards.map((cd) => f.unpricedAlert(cd.contractor.name)),
+    ...partialCards.map((cd) => f.partialAlert(cd.contractor.name, cd.missingPrice)),
+  ].join(" · ");
+  const alert = (unpricedCards.length > 0 || partialCards.length > 0) && (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 8px 6px 12px", background: COLORS.amberBg, color: COLORS.amberInk, borderRadius: RADIUS.pill, fontSize: 13, maxWidth: "100%", width: isPhone ? "100%" : "auto", boxSizing: "border-box" }}>
       <AlertTriangle size={15} style={{ flexShrink: 0 }} aria-hidden="true" />
-      <span style={{ flex: 1, minWidth: 0 }}>{f.unpricedAlert(unpricedCards.map((cd) => cd.contractor.name).join(", "))}</span>
-      <button type="button" onClick={onSeeContractors} style={{ border: `1.5px solid ${COLORS.vivo}`, background: COLORS.card, color: COLORS.vivo, fontWeight: 700, fontSize: 12.5, borderRadius: RADIUS.pill, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>{f.define}</button>
+      <span style={{ flex: 1, minWidth: 0 }}>{alertText}</span>
+      <button type="button" onClick={() => define(firstToDefine)} style={{ border: `1.5px solid ${COLORS.vivo}`, background: COLORS.card, color: COLORS.vivo, fontWeight: 700, fontSize: 12.5, borderRadius: RADIUS.pill, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>{f.define}</button>
     </div>
   );
 
@@ -149,10 +156,10 @@ function FinanceBlock({ lang, period, finance, payTotal, expensesTotal = 0, paid
                   <div role="row" key={cd.contractor.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 12, alignItems: "center", padding: "10px 2px", borderTop: `1px solid ${COLORS.lineSoft}`, fontSize: 13.5 }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, minWidth: 0 }}><Dot color={cd.contractor.color} size={10} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cd.contractor.name}</span></span>
                     <span>{fmtHoursScreen(cd.hours)}</span>
-                    <span style={{ fontWeight: 700 }}>{priced ? eur0(cd.value) : <span style={{ color: COLORS.ink3, fontWeight: 400 }}>{f.noPriceShort}</span>}</span>
+                    <span style={{ fontWeight: 700 }}>{priced ? eur0(cd.value) : <span style={{ color: COLORS.ink3, fontWeight: 400 }}>{f.noPriceShort}</span>}{priced && cd.missingPrice > 0 && <span style={{ display: "block", fontSize: 11.5, fontWeight: 400, color: COLORS.amberInk }}>+{cd.missingPrice} {f.noPriceShort}</span>}</span>
                     <span>{eur0(cd.staffCost)}</span>
                     <span style={{ fontWeight: 700, color: priced ? (cd.margin < 0 ? COLORS.alert : COLORS.clayInk) : COLORS.ink3 }}>{priced ? `${eur0(cd.margin)}${cd.marginPct != null ? ` · ${cd.marginPct}%` : ""}` : "—"}</span>
-                    <span>{priced || cd.contractor.billingDay ? <StageCell info={st.billing} lang={lang} f={f} onDefine={onSeeContractors} noInline={f.invoiced} /> : <button type="button" onClick={onSeeContractors} style={linkBtn}>{f.definePrice}</button>}</span>
+                    <span>{priced || cd.contractor.billingDay ? <StageCell info={st.billing} lang={lang} f={f} onDefine={onSeeContractors} noInline={f.invoiced} /> : <button type="button" onClick={() => define(cd)} style={linkBtn}>{f.definePrice}</button>}</span>
                     <span><StageCell info={st.payment} lang={lang} f={f} onDefine={onSeeContractors} noInline={f.received} /></span>
                   </div>
                 );
@@ -169,7 +176,7 @@ function FinanceBlock({ lang, period, finance, payTotal, expensesTotal = 0, paid
                     <div style={{ fontFamily: FONT.heading, fontWeight: 700, fontSize: 20 }}>{priced ? eur0(cd.value) : <span style={{ color: COLORS.ink3, fontSize: 15 }}>{f.noPrice}</span>}</div>
                     <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.staff} {eur0(cd.staffCost)}{priced && <> · {f.marginShort} <strong style={{ color: cd.margin < 0 ? COLORS.alert : COLORS.clayInk }}>{eur0(cd.margin)}{cd.marginPct != null ? ` · ${cd.marginPct}%` : ""}</strong></>}</div>
                     <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 13, alignItems: "center" }}>
-                      {!priced && <button type="button" onClick={onSeeContractors} style={linkBtn}>{f.definePrice}</button>}
+                      {(!priced || cd.missingPrice > 0) && <button type="button" onClick={() => define(cd)} style={linkBtn}>{f.definePrice}</button>}
                       <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>{f.billing}: <StageCell info={st.billing} lang={lang} f={f} onDefine={onSeeContractors} noInline={f.invoiced} /></span>
                       <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>{f.payment}: <StageCell info={st.payment} lang={lang} f={f} onDefine={onSeeContractors} noInline={f.received} /></span>
                     </div>
