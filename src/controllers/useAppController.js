@@ -21,7 +21,7 @@ import { setStorageCompany, removeFile } from "../models/fileStorage.js";
 import {
   toDbClient, fromDbClient, toDbStaff, fromDbStaff,
   toDbCompanySettings, fromDbCompanySettings,
-  toDbContractor, fromDbContractor,
+  toDbContractor, fromDbContractor, toDbClosing, fromDbClosing,
 } from "../models/dbMappers.js";
 import { deriveContractors } from "../models/contractors.js";
 import {
@@ -86,6 +86,11 @@ export function useAppController() {
   // Contratantes (ver models/contractors.js). Em demonstração nascem das "origens" dos clientes de exemplo.
   const [contractors, setContractors] = useState(() => (START_EMPTY ? [] : deriveContractors(INITIAL_CLIENTS)));
   const contractorsReadyRef = useRef(false); // a tabela `contractors` existe e foi lida: só então se grava
+  // Meses fechados por contratante (supabase/contratantes_fecho.sql). Gravados um a um, ao fechar/reabrir/marcar.
+  const [contractorClosings, setContractorClosings] = useState([]);
+  const closingsReadyRef = useRef(false);
+  const closingsRef = useRef([]);
+  closingsRef.current = contractorClosings;
   const [staff, setStaff] = useState(START_EMPTY ? [] : INITIAL_STAFF);
   const [assignments, setAssignments] = useState(START_EMPTY ? {} : INITIAL_ASSIGNMENTS);
   const [horasData, setHorasDataState] = useState(START_EMPTY ? {} : INITIAL_HORAS);
@@ -426,12 +431,13 @@ export function useAppController() {
     let staffList = staff;
     let ok = true;
     try {
-      const [clientsRes, staffRes, settingsRes, appDataRes, contractorsRes] = await Promise.all([
+      const [clientsRes, staffRes, settingsRes, appDataRes, contractorsRes, closingsRes] = await Promise.all([
         supabase.from("clients").select("*"),
         supabase.from("staff").select("*"),
         supabase.from("company_settings").select("*").eq("id", companyIdRef.current).maybeSingle(),
         supabase.from("app_data").select("*").eq("id", companyIdRef.current).maybeSingle(),
         supabase.from("contractors").select("*"),
+        supabase.from("contractor_periods").select("*"),
       ]);
 
       if (clientsRes.error) { console.error("Erro ao carregar clientes:", clientsRes.error); ok = false; }
@@ -452,6 +458,18 @@ export function useAppController() {
         // Primeira vez: cria um contratante por cada "origem" que já estava escrita nos clientes.
         if (contractorsRes.data.length === 0 && loadedClients.some((c) => String(c.origin || "").trim())) setContractors(deriveContractors(loadedClients));
         else setContractors(contractorsRes.data.map(fromDbContractor));
+      }
+
+      // Meses fechados dos contratantes: tabela ainda por criar → não é erro (o fecho fica só em memória).
+      if (closingsRes.error) {
+        const e = closingsRes.error;
+        if (e.code === "PGRST205" || e.code === "42P01" || /could not find the table|does not exist/i.test(e.message || "")) {
+          closingsReadyRef.current = false;
+          console.warn("Tabela `contractor_periods` ausente: correr supabase/contratantes_fecho.sql. Meses fechados só em memória.");
+        } else { console.error("Erro ao carregar meses fechados dos contratantes:", e); ok = false; }
+      } else if (closingsRes.data) {
+        closingsReadyRef.current = true;
+        setContractorClosings(closingsRes.data.map(fromDbClosing));
       }
 
       if (staffRes.error) { console.error("Erro ao carregar funcionários:", staffRes.error); ok = false; }
@@ -923,6 +941,18 @@ export function useAppController() {
     }
   }
 
+  // Fechar / reabrir / marcar faturado ou recebido: grava logo (um registo). Devolve { ok, saved }:
+  // `saved` = false quando a tabela ainda não existe (ficou só em memória) ou a gravação falhou.
+  async function saveClosing(record) {
+    const before = closingsRef.current;
+    setContractorClosings((prev) => (prev.some((r) => r.id === record.id) ? prev.map((r) => (r.id === record.id ? record : r)) : [...prev, record]));
+    if (!isSupabaseConfigured) return { ok: true, saved: false };
+    if (!closingsReadyRef.current) return { ok: true, saved: false };
+    const { error } = await supabase.from("contractor_periods").upsert(toDbClosing(record));
+    if (error) { console.error("Erro ao gravar o mês do contratante:", error); setContractorClosings(before); return { ok: false, saved: false, error }; }
+    return { ok: true, saved: true };
+  }
+
   function deleteContractor(contractorId) {
     setContractors((prev) => prev.filter((c) => c.id !== contractorId));
     if (isSupabaseConfigured && contractorsReadyRef.current) {
@@ -1037,7 +1067,7 @@ export function useAppController() {
     reclamacaoBaseClients: Math.max(1, activeClientsCount(clients, TODAY)), setReclamacaoBaseClients,
     reclamacaoExcelenteCount, setReclamacaoExcelenteCount,
     reclamacaoRazoavelCount, setReclamacaoRazoavelCount,
-    clients, setClients, contractors, setContractors, deleteContractor, staff, setStaff, assignments, setAssignments,
+    clients, setClients, contractors, setContractors, deleteContractor, contractorClosings, saveClosing, staff, setStaff, assignments, setAssignments,
     horasData, setHorasData, closedPeriods, setClosedPeriods,
     missingItems, setMissingItems, sentItems, setSentItems,
     personalNotes, setPersonalNotes, absences, setAbsences, covers, setCovers,

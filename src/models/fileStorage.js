@@ -24,6 +24,7 @@ export const KINDS = {
   avisos: "avisos",
   docsClients: "docs-clients",
   docsStaff: "docs-staff",
+  docsContractors: "docs-contractors",
 };
 
 const DOC_MIMES = new Set([

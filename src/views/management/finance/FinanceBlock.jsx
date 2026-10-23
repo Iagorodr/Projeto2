@@ -8,10 +8,13 @@ import { COLORS } from "../../../styles/colors.js";
 import { RADIUS, FONT } from "../../../styles/tokens.js";
 import { fmtHoursScreen } from "../../../models/utils.js";
 import { contractorDates } from "../../../models/contractorStats.js";
+import { paymentDueFromInvoice } from "../../../models/contractorClosings.js";
+import { isoDateStr } from "../../../models/utils.js";
 import { FIN } from "../../../models/i18nFin.js";
-import { Card } from "../../shared/ui/index.js";
+import { Card, Pill } from "../../shared/ui/index.js";
 import { eur0, fmtDay, Dot, DateChip } from "./financeUi.jsx";
 
+const parseIso = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
 const STAFF_COLOR = "#5E9C85";
 const MARGIN_COLOR = "#E08A66";
 
@@ -19,7 +22,12 @@ function ContractorFinanceCard({ card, period, today, lang }) {
   const f = FIN[lang];
   const { contractor: c } = card;
   const priced = card.value != null;
+  const row = card.closing && card.closing.status === "closed" ? card.closing : null;
+  const ended = isoDateStr(today) > period.iso;
   const dates = contractorDates(c, period.end, today);
+  // Depois de faturado, o pagamento conta a partir da data da fatura (não do dia de faturação previsto).
+  const payDue = row && row.invoicedOn ? paymentDueFromInvoice(c, row.invoicedOn) : null;
+  const payIn = payDue ? Math.round((payDue - today) / 86400000) : null;
   const staffPct = priced && card.value > 0 ? Math.max(0, Math.min(100, (card.staffCost / card.value) * 100)) : 0;
   return (
     <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, padding: 16, background: COLORS.headerTint, display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
@@ -64,14 +72,14 @@ function ContractorFinanceCard({ card, period, today, lang }) {
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <FileText size={15} color={COLORS.ink3} aria-hidden="true" />
-              <span style={{ color: COLORS.ink2, flex: 1 }}>{f.billing} <strong style={{ color: COLORS.ink }}>{fmtDay(dates.billing, lang)}</strong></span>
-              <DateChip days={dates.billingIn} next lang={lang} />
+              <span style={{ color: COLORS.ink2, flex: 1 }}>{f.billing} <strong style={{ color: COLORS.ink }}>{row && row.invoicedOn ? fmtDay(parseIso(row.invoicedOn), lang) : fmtDay(dates.billing, lang)}</strong></span>
+              {row && row.invoicedOn ? <Pill variant="paid">{f.invoiced}</Pill> : <DateChip days={dates.billingIn} next={!row ? false : true} lang={lang} />}
             </div>
-            {dates.payment && (
+            {(payDue || dates.payment) && (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <CircleDollarSign size={15} color={COLORS.ink3} aria-hidden="true" />
-                <span style={{ color: COLORS.ink2, flex: 1 }}>{f.payment} <strong style={{ color: COLORS.ink }}>{fmtDay(dates.payment, lang)}</strong></span>
-                <DateChip days={dates.paymentIn} lang={lang} />
+                <span style={{ color: COLORS.ink2, flex: 1 }}>{f.payment} <strong style={{ color: COLORS.ink }}>{fmtDay(payDue || dates.payment, lang)}</strong></span>
+                {row && row.receivedOn ? <Pill variant="paid">{f.received}</Pill> : <DateChip days={payDue ? payIn : dates.paymentIn} lang={lang} />}
               </div>
             )}
           </>
@@ -79,14 +87,16 @@ function ContractorFinanceCard({ card, period, today, lang }) {
           <div style={{ fontSize: 12.5, color: COLORS.ink3 }}>{f.noBillingDay}</div>
         )}
       </div>
-      {dates && (
-        <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, padding: "8px 10px", borderRadius: RADIUS.control, background: COLORS.clayTint, color: COLORS.clayInk }}>{f.nextBill}</div>
-      )}
+      {(() => {
+        const next = !row ? (ended ? f.nextClose : f.inProgressNote) : row.receivedOn ? f.allReceived : row.invoicedOn ? f.waitPay : f.nextBill;
+        const calm = !row ? !ended : !!row.receivedOn || !!row.invoicedOn;
+        return <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, padding: "8px 10px", borderRadius: RADIUS.control, background: calm ? COLORS.lineSoft : COLORS.clayTint, color: calm ? COLORS.ink2 : COLORS.clayInk }}>{next}</div>;
+      })()}
     </div>
   );
 }
 
-function FinanceBlock({ lang, period, finance, payTotal, paidCount, boardCount, today, tier, onSeeContractors }) {
+function FinanceBlock({ lang, period, finance, payTotal, paidCount, boardCount, today, tier, outstanding = [], onSeeContractors }) {
   const f = FIN[lang];
   const isPhone = tier === "mobile";
   const allPriced = finance.unpriced === 0;
@@ -132,6 +142,23 @@ function FinanceBlock({ lang, period, finance, payTotal, paidCount, boardCount, 
           {finance.cards.map((card) => (
             <ContractorFinanceCard key={card.contractor.id} card={card} period={period} today={today} lang={lang} />
           ))}
+        </div>
+      )}
+
+      {outstanding.length > 0 && (
+        <div style={{ marginTop: 16, borderTop: `1px solid ${COLORS.line}`, paddingTop: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>{f.receivablePrev}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {outstanding.map((o) => (
+              <div key={o.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, flexWrap: "wrap" }}>
+                <Dot color={o.color} size={9} />
+                <span style={{ fontWeight: 600 }}>{o.name}</span>
+                <span style={{ color: COLORS.ink3, flex: 1 }}>{o.label}</span>
+                <strong>{o.value != null ? eur0(o.value) : "—"}</strong>
+                <Pill variant={o.invoiced ? "pending" : "owed"}>{o.invoiced ? f.waitPay : f.nextBill}</Pill>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

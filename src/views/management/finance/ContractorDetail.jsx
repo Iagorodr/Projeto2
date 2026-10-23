@@ -15,6 +15,11 @@ import { Card, Pill, Button, Drawer, ChartHeaderLite } from "./detailParts.jsx";
 import { StackedBars } from "./StackedBars.jsx";
 import { WindowFilter } from "./ContractorsOverview.jsx";
 import { Dot } from "./financeUi.jsx";
+import { ReportsTab, DocsTab } from "./ClosingTabs.jsx";
+import { ClosingWizard } from "./ClosingWizard.jsx";
+import { findClosing } from "../../../models/contractorClosings.js";
+import { getOpenPeriod, isoDateStr } from "../../../models/utils.js";
+import { TODAY } from "../../../models/data.js";
 
 const hoursAxis = (v) => `${Math.round(v)}h`;
 const eurCell = (v) => (v === "" || v == null || Number.isNaN(Number(v)) ? "—" : `${Number(v).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
@@ -37,13 +42,18 @@ function ClientHoursBars({ rows, color, lang }) {
   );
 }
 
-function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, onBack, onEdit }) {
+function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, closings, horasData, staff, assignments, covers, absences, cutoffDay, closedPeriods, onSaveClosing, companyName, who, onNavigate, onBack, onEdit }) {
   const f = FIN[lang];
   const tc = T[lang].contratantes;
   const isPhone = tier === "mobile";
   const [tab, setTab] = useState("summary");
   const [months, setMonths] = useState(6);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [wizardIso, setWizardIso] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const showNotice = (text, bad) => { setNotice({ text, bad: !!bad }); setTimeout(() => setNotice(null), 6000); };
+  const openPeriodIso = isoDateStr(getOpenPeriod(closedPeriods || [], cutoffDay, TODAY).end);
+  const wizardPeriod = wizardIso ? periods.find((p) => p.iso === wizardIso) : null;
 
   const win = periods.slice(-(has12 ? months : 6));
   const current = periods[periods.length - 1];
@@ -89,6 +99,8 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
           <Button variant="primary" icon={FileText} onClick={() => setPreviewOpen(true)}>{f.preview}</Button>
         </div>
       </div>
+
+      {notice && <div role="status" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: RADIUS.control, fontSize: 13.5, fontWeight: 600, background: notice.bad ? COLORS.dangerBg : COLORS.amberBg, color: notice.bad ? COLORS.dangerInk : COLORS.amberInk }}>{notice.text}</div>}
 
       <div role="tablist" className="chip-row" style={{ display: "flex", gap: 4, borderBottom: `1px solid ${COLORS.line}`, marginBottom: 16, overflowX: "auto" }}>
         {tabs.map(([k, label]) => (
@@ -156,13 +168,22 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
         </Card>
       )}
 
-      {(tab === "reports" || tab === "docs") && (
-        <Card>
-          <div style={{ padding: "18px 4px", textAlign: "center" }}>
-            <div style={{ fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>{f.soonTitle}</div>
-            <div style={{ fontSize: 13, color: COLORS.ink2 }}>{tab === "reports" ? f.soonReports : f.soonDocs}</div>
-          </div>
-        </Card>
+      {tab === "reports" && (
+        <ReportsTab
+          lang={lang} tier={tier} contractor={c} periods={periods} closings={closings} clients={clients} today={TODAY} who={who} companyName={companyName}
+          onCloseMonth={(p) => setWizardIso(p.iso)} onSave={onSaveClosing} onNotice={showNotice}
+        />
+      )}
+      {tab === "docs" && <DocsTab lang={lang} contractor={c} periods={periods} closings={closings} />}
+
+      {wizardPeriod && (
+        <ClosingWizard
+          key={wizardPeriod.iso + c.id}
+          lang={lang} open onClose={(res) => { setWizardIso(null); if (res === "closed") showNotice(f.closedOk); else if (res === "closedLocal") showNotice(f.notSaved); }}
+          contractor={c} period={wizardPeriod} existing={findClosing(closings, c.id, wizardPeriod.iso)} clients={clients} horasData={horasData} staff={staff}
+          assignments={assignments} covers={covers} absences={absences} periods={periods} today={TODAY} openPeriodIso={openPeriodIso}
+          who={who} onSave={onSaveClosing} onNavigate={onNavigate}
+        />
       )}
 
       <Drawer

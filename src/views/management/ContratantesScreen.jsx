@@ -4,6 +4,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
+import { FIN } from "../../models/i18nFin.js";
 import { contractorPeriods } from "../../models/contractorStats.js";
 import { ContractorsOverview } from "./finance/ContractorsOverview.jsx";
 import { ContractorDetail } from "./finance/ContractorDetail.jsx";
@@ -22,14 +23,14 @@ const eur = (v) => (v === "" || v === null || v === undefined || Number.isNaN(Nu
 // funcionários). Cada contratante tem o seu valor/hora, o valor/hora padrão
 // pago ao funcionário (pré-preenche os clientes novos), o dia de faturação e
 // o prazo de pagamento; os clientes ligam-se a ele pelo nome (origem).
-function ContratantesScreen({ lang, setLang, contractors, setContractors, onDeleteContractor, clients, setClients, staff, horasData, closedPeriods, cutoffDay }) {
+function ContratantesScreen({ lang, setLang, contractors, setContractors, onDeleteContractor, clients, setClients, staff, horasData, closedPeriods, cutoffDay, assignments, covers, absences, closings, onSaveClosing, companyName, who, onNavigate }) {
   const t = T[lang].contratantes;
   const tier = useBreakpoint();
   const [detailId, setDetailId] = useState(null);
   // 12 períodos (11 fechados + o aberto): a partir daí liberta-se o filtro 6 | 12 meses.
   const periods = useMemo(
-    () => contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, cutoffDay, today: TODAY, lang, count: 12 }),
-    [closedPeriods, horasData, staff, clients, contractors, cutoffDay, lang],
+    () => contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, today: TODAY, lang, count: 12 }),
+    [closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, lang],
   );
   const has12 = periods.length >= 12;
   const detail = detailId != null ? contractors.find((c) => c.id === detailId) : null;
@@ -80,13 +81,16 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
   const clientsCount = (c) => clientsOfContractor(clients, c).length;
 
   const draftClients = editing ? clientsOfContractor(clients, editing) : [];
-  const blockedDelete = draftClients.length > 0;
+  const hasClosings = !!editing && (closings || []).some((r) => String(r.contractorId) === String(editing.id));
+  const blockedDelete = draftClients.length > 0 || hasClosings;
 
   return (
     <div style={styles.content}>
       {detail ? (
         <ContractorDetail
           lang={lang} tier={tier} contractor={detail} clients={clients} periods={periods} has12={has12}
+          closings={closings} horasData={horasData} staff={staff} assignments={assignments} covers={covers} absences={absences}
+          cutoffDay={cutoffDay} closedPeriods={closedPeriods} onSaveClosing={onSaveClosing} companyName={companyName} who={who} onNavigate={onNavigate}
           onBack={() => setDetailId(null)} onEdit={() => openEdit(detail)}
         />
       ) : (
@@ -136,7 +140,7 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
         dirty={!!draft && (editingId === "new" ? String(draft.name || "").trim() !== "" : JSON.stringify({ ...EMPTY_CONTRACTOR, ...editing }) !== JSON.stringify(draft))}
         footer={
           <>
-            {editing && <Button variant="dangerSoft" icon={Trash2} onClick={() => setDeleteOpen(true)} disabled={blockedDelete} disabledReason={blockedDelete ? t.deleteBlocked(draftClients.length) : undefined}>{c0.delete}</Button>}
+            {editing && <Button variant="dangerSoft" icon={Trash2} onClick={() => setDeleteOpen(true)} disabled={blockedDelete} disabledReason={blockedDelete ? (draftClients.length > 0 ? t.deleteBlocked(draftClients.length) : FIN[lang].deleteBlockedClosings) : undefined}>{c0.delete}</Button>}
             <div style={{ flex: 1 }} />
             <Button variant="secondary" onClick={close}>{c0.cancel}</Button>
             <Button variant="primary" onClick={save}>{c0.save}</Button>

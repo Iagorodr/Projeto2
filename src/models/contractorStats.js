@@ -42,7 +42,7 @@ function addEntry(period, contractorId, clientId, hours) {
 
 // Séries de `count` períodos: os fechados mais recentes + o período aberto agora (último).
 // Devolve [{ key, label, rangeLabel, start, end, isCurrent, pay, contractors: Map(id -> {hours, value, byClient}) }]
-export function contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, cutoffDay, today, lang, count = 6 }) {
+export function contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, today, lang, count = 6 }) {
   const cmap = contractorByClient(clients, contractors);
   const open = getOpenPeriod(closedPeriods, cutoffDay, today);
   const out = [];
@@ -51,7 +51,8 @@ export function contractorPeriods({ closedPeriods, horasData, staff, clients, co
   closed.forEach((p) => {
     const end = parseIso(p.periodEnd);
     const entry = {
-      key: p.periodEnd, label: monthAbbr(lang, end.getMonth()), rangeLabel: p.periodLabel,
+      key: p.periodEnd, iso: p.periodEnd, label: monthAbbr(lang, end.getMonth()), rangeLabel: p.periodLabel,
+      start: p.periodStart ? parseIso(p.periodStart) : addDays(new Date(end.getFullYear(), end.getMonth() - 1, end.getDate()), 1),
       end, isCurrent: false, pay: (p.totalEuros || 0) + (p.totalExpenses || 0), byContractor: new Map(),
     };
     (p.staffSummaries || []).forEach((ss) => (ss.entries || []).forEach((e) => {
@@ -63,7 +64,7 @@ export function contractorPeriods({ closedPeriods, horasData, staff, clients, co
   });
 
   const cur = {
-    key: "current", label: monthAbbr(lang, open.end.getMonth()), rangeLabel: formatPeriodLabel(open, lang),
+    key: "current", iso: isoDateStr(open.end), label: monthAbbr(lang, open.end.getMonth()), rangeLabel: formatPeriodLabel(open, lang),
     start: open.start, end: open.end, isCurrent: true, byContractor: new Map(), pay: 0,
   };
   (staff || []).forEach((st) => {
@@ -91,9 +92,16 @@ export function contractorPeriods({ closedPeriods, horasData, staff, clients, co
       let staffCost = 0;
       b.byClient.forEach((hrs, cid) => { const cl = clientById.get(cid); staffCost += hrs * (Number(cl && cl.valueHour) || 0); });
       list.set(key, { hours: b.hours, value: v, staffCost, byClient: b.byClient });
-      hours += b.hours;
-      if (v != null && key !== "none") { value += v; hasValue = true; }
     });
+    // Mês já fechado para o contratante: valem os valores guardados no fecho, não os de agora.
+    (closings || []).forEach((row) => {
+      if (row.status !== "closed" || row.periodEnd !== p.iso) return;
+      list.set(row.contractorId, {
+        hours: row.hours || 0, value: row.receivable == null ? null : Number(row.receivable), staffCost: Number(row.staffCost) || 0,
+        byClient: new Map((row.byClient || []).map((b) => [b.clientId, b.hours])), frozen: true, closing: row,
+      });
+    });
+    list.forEach((v, key) => { hours += v.hours; if (v.value != null && key !== "none") { value += v.value; hasValue = true; } });
     p.contractors = list;
     p.totalHours = hours;
     p.totalValue = hasValue ? value : null;
@@ -136,7 +144,7 @@ export function periodFinance(period, contractors) {
     if (!d || !(d.hours > 0)) return;
     const priced = d.value != null;
     const margin = priced ? d.value - d.staffCost : null;
-    cards.push({ contractor: c, hours: d.hours, value: d.value, staffCost: d.staffCost, margin, marginPct: priced && d.value > 0 ? Math.round((margin / d.value) * 100) : null });
+    cards.push({ contractor: c, closing: d.closing || null, hours: d.hours, value: d.value, staffCost: d.staffCost, margin, marginPct: priced && d.value > 0 ? Math.round((margin / d.value) * 100) : null });
     if (priced) { receivable += d.value; pricedStaff += d.staffCost; } else unpriced += 1;
   });
   return { cards, receivable, pricedStaff, margin: receivable - pricedStaff, unpriced, pricedCount: cards.length - unpriced };

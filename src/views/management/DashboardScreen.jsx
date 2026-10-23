@@ -104,7 +104,7 @@ function PendingRow({ icon: Icon, label, count, amber, onClick, okLabel, last })
 // cartão de Notas (o documento pede explicitamente que o duplicado
 // desapareça) e os dois gráficos de 6 períodos (2.14) no lugar dos SVGs
 // antigos.
-function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, highlightsMonths = 3, highlightsRealtime = false, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, absences, assignments, covers, contractors, onNavigate }) {
+function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, highlightsMonths = 3, highlightsRealtime = false, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, absences, assignments, covers, contractors, closings, onNavigate }) {
   const t = T[lang].dashboard;
   const tAbs = T[lang].absences;
   const absencesPending = (absences || []).filter((a) => !a.handled && a.date >= isoDateStr(TODAY)).length;
@@ -260,6 +260,21 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     { label: currentLabel, value: currentPeriodHours, dateRangeLabel: currentPeriodLabel },
   ];
 
+  // Financeiro: só o período aberto (horas × valor do contratante, calculado na hora).
+  const financePeriod = useMemo(
+    () => contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, today: TODAY, lang, count: 1 })[0],
+    [closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, lang],
+  );
+  const finance = useMemo(() => periodFinance(financePeriod, contractors), [financePeriod, contractors]);
+  // Meses por fechar (o período aberto já terminou) + meses reabertos; e o que falta receber de meses já fechados.
+  const finEnded = isoDateStr(TODAY) > financePeriod.iso;
+  const closingsToDo = finance.cards.filter((cd) => finEnded && !(cd.closing && cd.closing.status === "closed")).length
+    + (closings || []).filter((r) => r.status === "reopened" && r.periodEnd !== financePeriod.iso).length;
+  const outstanding = (closings || [])
+    .filter((r) => r.status === "closed" && !r.receivedOn && r.periodEnd !== financePeriod.iso)
+    .map((r) => { const ct = (contractors || []).find((x) => String(x.id) === String(r.contractorId)); return ct ? { key: r.id, name: ct.name, color: ct.color, label: r.periodLabel, value: r.receivable, invoiced: !!r.invoicedOn } : null; })
+    .filter(Boolean);
+
   // Só o que realmente está pendente (contagem > 0) aparece no cartão.
   const pendingRows = [
     { key: "overtime", icon: Clock, label: t.pendingOvertime, count: overtimePending, amber: true, onClick: () => onNavigate("horas") },
@@ -268,6 +283,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     { key: "visits", icon: Clock, label: t.pendingVisitReviews, count: visitReviewsPending, amber: true, onClick: () => onNavigate("horas") },
     { key: "repass", icon: Clock, label: t.pendingRepass, count: repassPending, amber: true, onClick: () => onNavigate("horas", { openReviews: true, tab: "repass" }) },
     { key: "expenses", icon: Clock, label: t.pendingExpenses, count: expensesPending, amber: true, onClick: () => onNavigate("horas", { openExpenses: true }) },
+    { key: "closings", icon: Clock, label: FIN[lang].pendingClosings(closingsToDo), count: closingsToDo, amber: true, onClick: () => onNavigate("contratantes") },
     { key: "reopened", icon: Undo2, label: t.pendingReopened, count: reopenedCount, onClick: () => onNavigate("horas") },
     { key: "unread", icon: Bell, label: t.pendingUnread, count: pendingRequests, onClick: () => onNavigate("avisos") },
     { key: "absence", icon: CalendarX, label: tAbs.pendency, count: absencesPending, amber: true, onClick: () => onNavigate("agendas") },
@@ -279,12 +295,6 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   const isPhone = tier === "mobile";
   const row = { display: "flex", flexWrap: "wrap", gap: isPhone ? 12 : 20, marginBottom: isPhone ? 12 : 20 };
 
-  // Financeiro: só o período aberto (horas × valor do contratante, calculado na hora).
-  const financePeriod = useMemo(
-    () => contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, cutoffDay, today: TODAY, lang, count: 1 })[0],
-    [closedPeriods, horasData, staff, clients, contractors, cutoffDay, lang],
-  );
-  const finance = useMemo(() => periodFinance(financePeriod, contractors), [financePeriod, contractors]);
 
   const complaintBand = complaintsCurrent <= excelenteThreshold ? t.gaugeExcelente : complaintsCurrent <= razoavelThreshold ? t.gaugeRazoavel : t.gaugeCritico;
   const statsRow = {
@@ -331,7 +341,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
       {/* 1 — Financeiro do período (A receber − A pagar = Margem) */}
       <FinanceBlock
         lang={lang} period={financePeriod} finance={finance} today={TODAY} tier={tier}
-        payTotal={currentPeriodEuros} paidCount={kpiCounts.paid} boardCount={board.length}
+        outstanding={outstanding} payTotal={currentPeriodEuros} paidCount={kpiCounts.paid} boardCount={board.length}
         onSeeContractors={() => onNavigate("contratantes")}
       />
 

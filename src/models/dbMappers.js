@@ -128,6 +128,52 @@ function fromDbContractor(row) {
   };
 }
 
+// Mês fechado de um contratante (ver models/contractorClosings.js e supabase/contratantes_fecho.sql).
+function toDbClosing(r) {
+  return {
+    id: r.id,
+    contractor_id: r.contractorId,
+    period_start: r.periodStart || null,
+    period_end: r.periodEnd,
+    period_label: r.periodLabel || null,
+    status: r.status,
+    hours: Number(r.hours) || 0,
+    rate: numOrNull(r.rate),
+    receivable: numOrNull(r.receivable),
+    staff_cost: Number(r.staffCost) || 0,
+    by_client: r.byClient || [],
+    pending: r.pending || null,
+    docs: r.docs || [],
+    invoiced_on: r.invoicedOn || null,
+    received_on: r.receivedOn || null,
+    closed_at: r.closedAt || null,
+    history: r.history || [],
+  };
+}
+
+function fromDbClosing(row) {
+  const n = (v) => (v === null || v === undefined ? null : Number(v));
+  return {
+    id: row.id,
+    contractorId: row.contractor_id,
+    periodStart: row.period_start || null,
+    periodEnd: row.period_end,
+    periodLabel: row.period_label || "",
+    status: row.status,
+    hours: Number(row.hours) || 0,
+    rate: n(row.rate),
+    receivable: n(row.receivable),
+    staffCost: Number(row.staff_cost) || 0,
+    byClient: row.by_client || [],
+    pending: row.pending || null,
+    docs: row.docs || [],
+    invoicedOn: row.invoiced_on || null,
+    receivedOn: row.received_on || null,
+    closedAt: row.closed_at || null,
+    history: row.history || [],
+  };
+}
+
 function toDbStaff(s) {
   return {
     id: s.id,
@@ -204,5 +250,5 @@ export {
   toDbClient, fromDbClient,
   toDbStaff, fromDbStaff,
   toDbCompanySettings, fromDbCompanySettings,
-  toDbContractor, fromDbContractor,
+  toDbContractor, fromDbContractor, toDbClosing, fromDbClosing,
 };
