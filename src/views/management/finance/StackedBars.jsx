@@ -13,7 +13,7 @@ import { niceCeiling, roundedTopBarPath } from "../../shared/ui/charts/chartMath
 
 const GAP = 2;
 
-function StackedBars({ periods, series, valueFormatter, axisFormatter, ariaLabel, compact = false, width, height = 190, totalLabel = "Total", tableLabel = "Ver como tabela", emptyLabel = "Sem dados.", showTable = true }) {
+function StackedBars({ periods, series, valueFormatter, axisFormatter, ariaLabel, compact = false, width, height = 190, totalLabel = "Total", tableLabel = "Ver como tabela", emptyLabel = "Sem dados.", showTable = true, showLegend = true }) {
   const [hover, setHover] = useState(null);
   const axisFmt = axisFormatter || valueFormatter;
   const w = width || (compact ? 340 : 640), h = height, padL = 40, padR = 6, padTop = 22, padBottom = 24;
@@ -36,7 +36,7 @@ function StackedBars({ periods, series, valueFormatter, axisFormatter, ariaLabel
 
   return (
     <div style={{ position: "relative" }}>
-      {series.length >= 2 && (
+      {showLegend && series.length >= 2 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginBottom: 8 }}>
           {series.map((se) => (
             <span key={se.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.ink2 }}>
@@ -61,6 +61,15 @@ function StackedBars({ periods, series, valueFormatter, axisFormatter, ariaLabel
           let acc = 0;
           const present = series.filter((se) => (p.values[se.id] || 0) > 0);
           const topId = present.length ? present[present.length - 1].id : null;
+          if (p.empty) {
+            // Período sem dados: marcador tracejado no chão + o nome do mês em cinza.
+            return (
+              <g key={p.key}>
+                <rect x={cx - barW / 2} y={baseY - 7} width={barW} height={6} rx={2} fill="none" stroke="#C3CFC9" strokeWidth={1} strokeDasharray="3 2" />
+                {(i % labelEvery === (n - 1) % labelEvery) && <text x={cx} y={h - 7} textAnchor="middle" fontSize={11.5} fill={COLORS.ink3}>{p.label}</text>}
+              </g>
+            );
+          }
           return (
             <g key={p.key} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover((v) => (v === i ? null : v))} onClick={() => setHover((v) => (v === i ? null : i))} style={{ cursor: "default" }}>
               <rect x={cx - slot / 2} y={padTop - 14} width={slot} height={plotH + 14 + padBottom} fill={hover === i ? COLORS.lineSoft : "transparent"} opacity={hover === i ? 0.7 : 1} rx={6} />
@@ -89,7 +98,7 @@ function StackedBars({ periods, series, valueFormatter, axisFormatter, ariaLabel
         const cxPct = ((padL + slot * hover + slot / 2) / w) * 100;
         const left = Math.max(22, Math.min(78, cxPct));
         return (
-          <div style={{ position: "absolute", left: `${left}%`, top: series.length >= 2 ? 34 : 6, transform: "translateX(-50%)", pointerEvents: "none", zIndex: 5, background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, boxShadow: SHADOW.sh2, padding: "8px 12px", fontSize: 12, maxWidth: "90%", minWidth: 130 }}>
+          <div style={{ position: "absolute", left: `${left}%`, top: showLegend && series.length >= 2 ? 34 : 6, transform: "translateX(-50%)", pointerEvents: "none", zIndex: 5, background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, boxShadow: SHADOW.sh2, padding: "8px 12px", fontSize: 12, maxWidth: "90%", minWidth: 130 }}>
             <div style={{ color: COLORS.ink3, marginBottom: 4 }}>{active.rangeLabel}</div>
             {series.filter((se) => (active.values[se.id] || 0) > 0).map((se) => (
               <div key={se.id} style={{ display: "flex", alignItems: "center", gap: 6, color: COLORS.ink }}>
@@ -120,7 +129,7 @@ function StackedBars({ periods, series, valueFormatter, axisFormatter, ariaLabel
                 </tr>
               </thead>
               <tbody>
-                {periods.map((p, i) => (
+                {periods.map((p, i) => p.empty ? null : (
                   <tr key={p.key} style={{ borderTop: `1px solid ${COLORS.lineSoft}` }}>
                     <td style={{ padding: "4px 8px 4px 0", whiteSpace: "nowrap" }}>{p.rangeLabel}</td>
                     {series.map((se) => <td key={se.id} style={{ textAlign: "right", padding: "4px 8px" }}>{valueFormatter(p.values[se.id] || 0)}</td>)}

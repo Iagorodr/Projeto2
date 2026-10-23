@@ -6,7 +6,23 @@
 // O cliente liga-se ao contratante pelo NOME, em `client.origin`
 // (era a antiga "origem" em texto livre).
 
-export const CONTRACTOR_COLORS = ["#143F35", "#2E8A73", "#7FC1AB", "#C8532E", "#5B7DB1", "#B08A2E"];
+// Paleta fixa de 8 cores (Tomás): todas aguentam texto branco (contraste ≥ 4,5:1). Ficam de fora
+// o clay (margem/atenção), o vermelho (erro) e o amarelo (avisos). A cor é guardada no contratante.
+export const CONTRACTOR_COLORS = ["#143F35", "#23806A", "#4A6FB5", "#7A5BB5", "#23809E", "#9A4F96", "#5E7E1F", "#5F6B66"];
+export const CONTRACTOR_COLOR_NAMES = { pt: ["Floresta", "Verde", "Azul", "Roxo", "Ciano", "Ameixa", "Oliva", "Cinza"], en: ["Forest", "Green", "Blue", "Purple", "Cyan", "Plum", "Olive", "Grey"], fr: ["Forêt", "Vert", "Bleu", "Violet", "Cyan", "Prune", "Olive", "Gris"] };
+
+// Cores da paleta antiga → cor mais próxima da nova (só ao ler; XLG/CleanUp/L e A ficam como estavam).
+const LEGACY_COLORS = { "#143F35": "#143F35", "#2E8A73": "#23806A", "#7FC1AB": "#23809E", "#C8532E": "#9A4F96", "#5B7DB1": "#4A6FB5", "#B08A2E": "#5E7E1F" };
+export function normalizeContractorColor(hex) {
+  const h = String(hex || "").toUpperCase();
+  return LEGACY_COLORS[h] || (h || CONTRACTOR_COLORS[0]);
+}
+
+// Contratante novo: a primeira cor da paleta ainda não usada (se as 8 estiverem usadas, recomeça na 1).
+export function nextContractorColor(contractors) {
+  const used = new Set((contractors || []).map((c) => String(c.color || "").toUpperCase()));
+  return CONTRACTOR_COLORS.find((c) => !used.has(c)) || CONTRACTOR_COLORS[(contractors || []).length % CONTRACTOR_COLORS.length];
+}
 
 export const EMPTY_CONTRACTOR = {
   name: "", color: CONTRACTOR_COLORS[0], isDirect: false,
@@ -64,18 +80,20 @@ export function deriveContractors(clients, existing = []) {
     byName.get(n).clients.push(cl);
   });
   const base = Date.now();
-  const used = (existing || []).length;
+  const taken = [...(existing || [])];
   return Array.from(byName.values()).map((g, i) => {
     const direct = isDirectName(g.name);
     const values = g.clients.map((cl) => Number(cl.valueHour)).filter((v) => v > 0);
-    return {
+    const made = {
       ...EMPTY_CONTRACTOR,
       id: base + i,
       name: g.name,
-      color: CONTRACTOR_COLORS[(used + i) % CONTRACTOR_COLORS.length],
+      color: nextContractorColor(taken),
       isDirect: direct,
       staffRate: values.length ? mostCommon(values) : "",
     };
+    taken.push(made);
+    return made;
   });
 }
 

@@ -103,8 +103,9 @@ const CLOSE = {
   pt: {
     sellPriceCol: "Preço ao cliente (€/h)", sellPriceField: "Preço ao cliente (€/h)", sellPriceHint: "Só para clientes diretos: o que cobras por hora a este cliente.",
     partialAlert: (name, n) => `${name}: ${n} cliente${n === 1 ? "" : "s"} sem preço · fora da conta`, directPricesNote: "Contratante direto: define o preço de cada cliente. Os clientes sem preço ficam fora da conta.",
-    titleShort: "Financeiro", whereFrom: "De onde vem", noPriceShort: "sem preço", toReceiveShort: "A receber", staffShort: "Funcionários",
+    titleShort: "Resultado", whereFrom: "De onde vem", noPriceShort: "sem preço", toReceiveShort: "A receber", staffShort: "Funcionários",
     marginLbl: "Margem", details: "Detalhes", defineDay: "Definir dia", define: "Definir", definePrice: "Definir preço", colContractor: "Contratante",
+    curPeriod: "Período atual", monthly: "Mês a mês", histNote: (m) => `O histórico começa em ${m}. Os próximos períodos vão aparecendo aqui.`,
     unpricedAlert: (n) => `${n} sem preço · fora da conta`, paidAll: "Pago aos funcionários (todos)", includesExpenses: (v) => `inclui ${v} de despesas`,
     monthsTitle: "Meses", stInProgress: "Em curso", stToClose: "Por fechar", stClosed: "Fechado", stReopened: "Reaberto", stNoHours: "Sem horas",
     colPeriod: "Período", colToInvoice: "A faturar", colState: "Estado",
@@ -146,8 +147,9 @@ const CLOSE = {
   en: {
     sellPriceCol: "Price to client (€/h)", sellPriceField: "Price to client (€/h)", sellPriceHint: "Direct clients only: what you charge per hour to this client.",
     partialAlert: (name, n) => `${name}: ${n} client${n === 1 ? "" : "s"} without a price · left out`, directPricesNote: "Direct contractor: set each client's price. Clients without a price are left out.",
-    titleShort: "Finance", whereFrom: "Where it comes from", noPriceShort: "no price", toReceiveShort: "To receive", staffShort: "Staff",
+    titleShort: "Result", whereFrom: "Where it comes from", noPriceShort: "no price", toReceiveShort: "To receive", staffShort: "Staff",
     marginLbl: "Margin", details: "Details", defineDay: "Set day", define: "Set", definePrice: "Set price", colContractor: "Contractor",
+    curPeriod: "Current period", monthly: "Month by month", histNote: (m) => `History starts in ${m}. Next periods will show up here.`,
     unpricedAlert: (n) => `${n} has no price · left out`, paidAll: "Paid to staff (all)", includesExpenses: (v) => `includes ${v} of expenses`,
     monthsTitle: "Months", stInProgress: "In progress", stToClose: "To close", stClosed: "Closed", stReopened: "Reopened", stNoHours: "No hours",
     colPeriod: "Period", colToInvoice: "To invoice", colState: "Status",
@@ -189,8 +191,9 @@ const CLOSE = {
   fr: {
     sellPriceCol: "Prix au client (€/h)", sellPriceField: "Prix au client (€/h)", sellPriceHint: "Clients directs uniquement : ce que vous facturez par heure à ce client.",
     partialAlert: (name, n) => `${name} : ${n} client${n === 1 ? "" : "s"} sans prix · hors calcul`, directPricesNote: "Donneur d'ordre direct : définissez le prix de chaque client. Les clients sans prix sont exclus.",
-    titleShort: "Finances", whereFrom: "D'où ça vient", noPriceShort: "sans prix", toReceiveShort: "À recevoir", staffShort: "Employés",
+    titleShort: "Résultat", whereFrom: "D'où ça vient", noPriceShort: "sans prix", toReceiveShort: "À recevoir", staffShort: "Employés",
     marginLbl: "Marge", details: "Détails", defineDay: "Définir le jour", define: "Définir", definePrice: "Définir le prix", colContractor: "Donneur d'ordre",
+    curPeriod: "Période actuelle", monthly: "Mois par mois", histNote: (m) => `L'historique commence en ${m}. Les prochaines périodes apparaîtront ici.`,
     unpricedAlert: (n) => `${n} sans prix · hors calcul`, paidAll: "Payé aux employés (tous)", includesExpenses: (v) => `inclut ${v} de frais`,
     monthsTitle: "Mois", stInProgress: "En cours", stToClose: "À clôturer", stClosed: "Clôturé", stReopened: "Rouvert", stNoHours: "Sans heures",
     colPeriod: "Période", colToInvoice: "À facturer", colState: "État",

@@ -86,15 +86,17 @@ function FinanceBlock({ lang, period, finance, payTotal, expensesTotal = 0, paid
   const pct = finance.receivable > 0 ? Math.round((finance.margin / finance.receivable) * 100) : null;
   const ended = isoDateStr(today) > period.iso; // eslint-disable-line no-unused-vars
   const big = { fontFamily: FONT.heading, fontWeight: 700, fontSize: isPhone ? 22 : 28, color: COLORS.ink, lineHeight: 1.1 };
-  const lbl = { fontSize: 13, color: COLORS.ink2, marginBottom: 4 };
-  const op = { fontSize: 20, color: COLORS.ink3, alignSelf: "flex-end", paddingBottom: 8 };
+  const lbl = { fontSize: 13, lineHeight: "16px", color: COLORS.ink2, marginBottom: 4 };
+  const plain = { paddingTop: 6 }; // alinha A receber / Funcionários com o interior da caixa da Margem
+  // Sinais − e = em bolinhas suaves, alinhados ao centro do número (não ao rodapé da linha).
+  const op = { width: 26, height: 26, borderRadius: 99, background: COLORS.line, color: COLORS.ink2, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, lineHeight: 1, alignSelf: "flex-start", marginTop: 28, flexShrink: 0 };
 
   const equation = (
     <div style={{ display: "flex", gap: isPhone ? 10 : 16, alignItems: "stretch", flexWrap: "nowrap" }}>
-      <div><div style={lbl}>{f.toReceiveShort}</div><div style={big}>{nothingPriced ? "—" : eur0(finance.receivable)}</div></div>
-      {!isPhone && <span style={op}>−</span>}
-      <div><div style={lbl}>{f.staffShort}</div><div style={big}>{nothingPriced ? "—" : eur0(finance.pricedStaff)}</div></div>
-      {!isPhone && <span style={op}>=</span>}
+      <div style={plain}><div style={lbl}>{f.toReceiveShort}</div><div style={big}>{nothingPriced ? "—" : eur0(finance.receivable)}</div></div>
+      {!isPhone && <span style={op} aria-hidden="true">−</span>}
+      <div style={plain}><div style={lbl}>{f.staffShort}</div><div style={big}>{nothingPriced ? "—" : eur0(finance.pricedStaff)}</div></div>
+      {!isPhone && <span style={op} aria-hidden="true">=</span>}
       <div style={{ background: MARGIN_BG, borderRadius: RADIUS.control, padding: "6px 12px" }}>
         <div style={{ ...lbl, color: COLORS.clayInk }}>{f.marginLbl}{!nothingPriced && pct != null ? ` · ${pct}%` : ""}</div>
         <div style={{ ...big, color: finance.margin < 0 ? COLORS.alert : COLORS.clayInk }}>{nothingPriced ? "—" : eur0(finance.margin)}</div>

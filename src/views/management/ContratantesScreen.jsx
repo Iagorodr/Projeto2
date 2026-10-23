@@ -12,7 +12,7 @@ import { T } from "../../models/i18n.js";
 import { Field } from "../shared/Layout.jsx";
 import { PageHeader, Pill, Drawer, Button, ConfirmDialog, Card } from "../shared/ui/index.js";
 import {
-  CONTRACTOR_COLORS, EMPTY_CONTRACTOR, normName, contractorNameTaken, clientsOfContractor,
+  CONTRACTOR_COLORS, CONTRACTOR_COLOR_NAMES, nextContractorColor, EMPTY_CONTRACTOR, normName, contractorNameTaken, clientsOfContractor,
   clientsWithoutContractor, marginPerHour,
 } from "../../models/contractors.js";
 
@@ -45,7 +45,7 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
   const editing = editingId && editingId !== "new" ? contractors.find((c) => c.id === editingId) : null;
   const unassigned = clientsWithoutContractor(clients, contractors);
 
-  function openNew() { setDraft({ ...EMPTY_CONTRACTOR, color: CONTRACTOR_COLORS[contractors.length % CONTRACTOR_COLORS.length] }); setErrors({}); setEditingId("new"); }
+  function openNew() { setDraft({ ...EMPTY_CONTRACTOR, color: nextContractorColor(contractors) }); setErrors({}); setEditingId("new"); }
   function openEdit(c) { setDraft({ ...EMPTY_CONTRACTOR, ...c }); setErrors({}); setEditingId(c.id); }
   function close() { setEditingId(null); setDraft(null); setErrors({}); setDeleteOpen(false); }
   function update(field, value) { setErrors((e) => ({ ...e, [field]: undefined })); setDraft((d) => ({ ...d, [field]: value })); }
@@ -99,8 +99,9 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
       <>
       <PageHeader
         title={t.title} subtitle={t.subtitle} lang={lang} setLang={setLang} langNames={LANG_NAMES}
-        actions={<Button icon={Plus} onClick={openNew}>{t.newContractor}</Button>}
+        actions={tier === "mobile" ? null : <Button icon={Plus} onClick={openNew}>{t.newContractor}</Button>}
       />
+      {tier === "mobile" && <Button icon={Plus} onClick={openNew} style={{ width: "100%", marginBottom: 14 }}>{t.newContractor}</Button>}
 
       {unassigned.length > 0 && (
         <Card variant="default" style={{ marginBottom: 18, padding: 16 }}>
@@ -128,7 +129,7 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
 
       {contractors.length === 0
         ? <Card><div style={{ fontSize: 13, color: COLORS.ink3 }}>{t.empty}</div></Card>
-        : <ContractorsOverview lang={lang} tier={tier} contractors={contractors} clients={clients} periods={periods} has12={has12} today={TODAY} onOpen={(c) => { setDetailTab(null); setDetailId(c.id); }} />}
+        : <ContractorsOverview lang={lang} tier={tier} contractors={contractors} clients={clients} periods={periods} today={TODAY} onOpen={(c) => { setDetailTab(null); setDetailId(c.id); }} onDefineDay={openEdit} />}
       </>
       )}
 
@@ -160,9 +161,9 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
 
             <Field label={t.fColor} full>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {CONTRACTOR_COLORS.map((col) => (
+                {CONTRACTOR_COLORS.map((col, ci) => (
                   <button
-                    key={col} type="button" aria-label={col} aria-pressed={draft.color === col} onClick={() => update("color", col)}
+                    key={col} type="button" aria-label={(CONTRACTOR_COLOR_NAMES[lang] || CONTRACTOR_COLOR_NAMES.pt)[ci]} title={(CONTRACTOR_COLOR_NAMES[lang] || CONTRACTOR_COLOR_NAMES.pt)[ci]} aria-pressed={draft.color === col} onClick={() => update("color", col)}
                     style={{ width: 32, height: 32, borderRadius: 99, background: col, border: draft.color === col ? `3px solid ${COLORS.ink}` : `2px solid ${COLORS.line}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
                   >
                     {draft.color === col && <Check size={14} color="#fff" />}

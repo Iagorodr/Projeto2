@@ -2,6 +2,7 @@
 // como já vinham em models/data.js) e as linhas do Supabase (snake_case).
 // Sem dependências de browser/Node — usado tanto pelo app (Vite) como pelo
 // script de seed (Node), para as duas nunca poderem divergir.
+import { normalizeContractorColor } from "./contractors.js";
 
 // "" (campo numérico deixado em branco no formulário) não é um número válido
 // para o Postgres — teria de ser um número ou null. Sem isto, gravar um
@@ -123,7 +124,7 @@ function fromDbContractor(row) {
   return {
     id: row.id,
     name: row.name,
-    color: row.color || "#143F35",
+    color: normalizeContractorColor(row.color),
     isDirect: !!row.is_direct,
     rate: row.rate === null || row.rate === undefined ? "" : Number(row.rate),
     staffRate: row.staff_rate === null || row.staff_rate === undefined ? "" : Number(row.staff_rate),
