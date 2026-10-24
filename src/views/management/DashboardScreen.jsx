@@ -403,16 +403,14 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
         </div>
 
         <div style={{ flex: "1.4 1 440px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* O medidor grande só aparece quando há reclamações; senão basta o número pequeno acima. */}
-          {complaintsCurrent > 0 && (
-            <ReclamacoesCard
-              compact
-              current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
-              recent={recentComplaints}
-              title={t.complaintsTitle} subtitle={t.complaintsSubtitle}
-              labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
-            />
-          )}
+          {/* Medidor de reclamações: sempre visível (também com zero, para mostrar "Excelente"). */}
+          <ReclamacoesCard
+            compact
+            current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
+            recent={recentComplaints}
+            title={t.complaintsTitle} subtitle={t.complaintsSubtitle}
+            labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
+          />
           <ClientsByCityCard
             clients={clients} t={t} mobile={tier === "mobile"}
             style={{ flex: "0 0 auto" }}
