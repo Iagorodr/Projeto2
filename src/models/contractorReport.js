@@ -4,6 +4,7 @@
 // de horas (período fechado: o arquivo do período; período aberto: as horas dos funcionários).
 // Não inclui nada do que se paga aos funcionários.
 import { clientsOfContractor } from "./contractors.js";
+import { allMarks } from "./contractorStats.js";
 import { clientAppliesOnDate, addDays, isoDateStr, visitDateOf } from "./utils.js";
 
 function dowOf(date) { const d = date.getDay(); return d === 0 ? 7 : d; }
@@ -16,17 +17,10 @@ export function buildContractorReport({ contractor, clients, staff, horasData, c
   const endIso = isoDateStr(period.end);
   const lastExpectedIso = today && isoDateStr(today) < endIso ? isoDateStr(today) : endIso;
 
-  // Marcações do período: { name, e }.
-  const marks = [];
-  if (!period.isCurrent) {
-    const cp = (closedPeriods || []).find((x) => x.periodEnd === period.iso);
-    ((cp && cp.staffSummaries) || []).forEach((ss) => (ss.entries || []).forEach((e) => marks.push({ name: ss.name || "—", e })));
-  } else {
-    (staff || []).forEach((st) => {
-      const h = (horasData || {})[st.id];
-      ((h && h.entries) || []).forEach((e) => { if (e.date >= startIso && e.date <= endIso) marks.push({ name: st.name, e }); });
-    });
-  }
+  // Marcações do período (fechadas + em curso, pelo dia): { name, e }.
+  const marks = allMarks({ closedPeriods, horasData, staff })
+    .filter(({ e }) => e.date >= startIso && e.date <= endIso)
+    .map(({ name, e }) => ({ name, e }));
 
   // Dias da semana (1=seg…7=dom) em que o cliente está na agenda de alguém.
   const agendaDows = new Map();

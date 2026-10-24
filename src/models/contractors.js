@@ -27,6 +27,7 @@ export function nextContractorColor(contractors) {
 export const EMPTY_CONTRACTOR = {
   name: "", color: CONTRACTOR_COLORS[0], isDirect: false,
   rate: "", staffRate: "", billingDay: "", paymentDays: "",
+  periodStartDay: "", periodEndDay: "", periodMonths: "", periodAnchor: "",
   contactName: "", email: "", note: "",
 };
 
@@ -105,4 +106,17 @@ export function marginPerHour(contractor, client) {
   const pay = Number(client && client.valueHour);
   if (!(rate > 0) || !(pay >= 0) || String(client && client.valueHour).trim() === "") return null;
   return rate - pay;
+}
+
+// Ciclo de faturação PRÓPRIO do contratante (opcional): do dia `s` ao dia `e` do mês, repetido a cada
+// `n` meses (1 = todos os meses). Com n > 1 é preciso uma data de início de um ciclo (`anchor`) para
+// saber quais são os meses. Sem isto vale o período geral (21→20). Devolve null quando não há ciclo próprio.
+export function cycleConfig(c) {
+  if (!c) return null;
+  const s = Number(c.periodStartDay), e = Number(c.periodEndDay);
+  if (!(Number.isInteger(s) && s >= 1 && s <= 31 && Number.isInteger(e) && e >= 1 && e <= 31)) return null;
+  const n = Math.max(1, Math.floor(Number(c.periodMonths)) || 1);
+  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(c.periodAnchor || "") ? c.periodAnchor : "";
+  if (n > 1 && !anchor) return null;
+  return { s, e, n, anchor };
 }

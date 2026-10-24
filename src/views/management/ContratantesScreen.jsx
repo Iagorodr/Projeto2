@@ -5,15 +5,16 @@ import { COLORS } from "../../styles/colors.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { FIN } from "../../models/i18nFin.js";
-import { contractorPeriods } from "../../models/contractorStats.js";
+import { contractorPeriods, contractorCyclePeriods, cycleWindows } from "../../models/contractorStats.js";
 import { ContractorsOverview } from "./finance/ContractorsOverview.jsx";
 import { ContractorDetail } from "./finance/ContractorDetail.jsx";
 import { T } from "../../models/i18n.js";
 import { Field } from "../shared/Layout.jsx";
+import { formatPeriodLabel } from "../../models/utils.js";
 import { PageHeader, Pill, Drawer, Button, ConfirmDialog, Card } from "../shared/ui/index.js";
 import {
   CONTRACTOR_COLORS, CONTRACTOR_COLOR_NAMES, nextContractorColor, EMPTY_CONTRACTOR, normName, contractorNameTaken, clientsOfContractor,
-  clientsWithoutContractor, marginPerHour,
+  clientsWithoutContractor, marginPerHour, cycleConfig,
 } from "../../models/contractors.js";
 
 const eur = (v) => (v === "" || v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : `${Number(v).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
@@ -33,20 +34,28 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
     () => contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, today: TODAY, lang, count: 12 }),
     [closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, lang],
   );
-  const has12 = periods.length >= 12;
   const detail = detailId != null ? contractors.find((c) => c.id === detailId) : null;
+  // Contratante com ciclo próprio: o detalhe, o relatório e o fecho seguem os ciclos dele.
+  const detailPeriods = useMemo(
+    () => (detail && cycleConfig(detail)
+      ? contractorCyclePeriods({ contractor: detail, closedPeriods, horasData, staff, clients, contractors, closings, today: TODAY, lang, count: 12 })
+      : periods),
+    [detail, periods, closedPeriods, horasData, staff, clients, contractors, closings, lang],
+  );
+  const has12 = detailPeriods.length >= 12;
   const c0 = T[lang].common;
 
   const [editingId, setEditingId] = useState(null); // id | "new" | null
   const [draft, setDraft] = useState(null);
   const [errors, setErrors] = useState({});
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [cycleCustom, setCycleCustom] = useState(false);
 
   const editing = editingId && editingId !== "new" ? contractors.find((c) => c.id === editingId) : null;
   const unassigned = clientsWithoutContractor(clients, contractors);
 
-  function openNew() { setDraft({ ...EMPTY_CONTRACTOR, color: nextContractorColor(contractors) }); setErrors({}); setEditingId("new"); }
-  function openEdit(c) { setDraft({ ...EMPTY_CONTRACTOR, ...c }); setErrors({}); setEditingId(c.id); }
+  function openNew() { setDraft({ ...EMPTY_CONTRACTOR, color: nextContractorColor(contractors) }); setCycleCustom(false); setErrors({}); setEditingId("new"); }
+  function openEdit(c) { setDraft({ ...EMPTY_CONTRACTOR, ...c }); setCycleCustom(!!cycleConfig(c)); setErrors({}); setEditingId(c.id); }
   function close() { setEditingId(null); setDraft(null); setErrors({}); setDeleteOpen(false); }
   function update(field, value) { setErrors((e) => ({ ...e, [field]: undefined })); setDraft((d) => ({ ...d, [field]: value })); }
 
@@ -59,9 +68,18 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
     ["rate", "staffRate"].forEach((k) => { const n = num(draft[k]); if (n !== null && !(n >= 0)) errs[k] = t.numberInvalid; });
     const bd = num(draft.billingDay); if (bd !== null && !(Number.isInteger(bd) && bd >= 1 && bd <= 31)) errs.billingDay = t.dayInvalid;
     const pd = num(draft.paymentDays); if (pd !== null && !(Number.isInteger(pd) && pd >= 0 && pd <= 365)) errs.paymentDays = t.daysInvalid;
+    if (cycleCustom) {
+      const sd = num(draft.periodStartDay), ed = num(draft.periodEndDay), pm = num(draft.periodMonths) || 1;
+      if (!(Number.isInteger(sd) && sd >= 1 && sd <= 31)) errs.periodStartDay = t.dayInvalid;
+      if (!(Number.isInteger(ed) && ed >= 1 && ed <= 31)) errs.periodEndDay = t.dayInvalid;
+      if (pm > 1 && !/^\d{4}-\d{2}-\d{2}$/.test(draft.periodAnchor || "")) errs.periodAnchor = t.cycleAnchorNeeded;
+    }
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    const clean = { ...draft, name, rate: draft.isDirect ? "" : draft.rate };
+    const cycleFields = cycleCustom
+      ? { periodMonths: Number(draft.periodMonths) || 1, periodAnchor: (Number(draft.periodMonths) || 1) > 1 ? draft.periodAnchor : "" }
+      : { periodStartDay: "", periodEndDay: "", periodMonths: "", periodAnchor: "" };
+    const clean = { ...draft, name, rate: draft.isDirect ? "" : draft.rate, ...cycleFields };
     if (editing) {
       setContractors((prev) => prev.map((c) => (c.id === editing.id ? { ...clean, id: editing.id } : c)));
       // Mudou o nome? Os clientes dele passam a usar o nome novo.
@@ -81,6 +99,15 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
 
   const clientsCount = (c) => clientsOfContractor(clients, c).length;
 
+  // Exemplo do ciclo que o formulário vai criar (o mais recente já começado).
+  const cycleExample = (() => {
+    if (!cycleCustom || !draft) return "";
+    const probe = { periodStartDay: draft.periodStartDay, periodEndDay: draft.periodEndDay, periodMonths: Number(draft.periodMonths) || 1, periodAnchor: draft.periodAnchor };
+    if (!cycleConfig(probe)) return "";
+    const w = cycleWindows(probe, TODAY, 1)[0];
+    return w ? formatPeriodLabel({ start: w.start, end: w.end }, lang) : "";
+  })();
+
   const draftClients = editing ? clientsOfContractor(clients, editing) : [];
   const hasClosings = !!editing && (closings || []).some((r) => String(r.contractorId) === String(editing.id));
   const blockedDelete = draftClients.length > 0 || hasClosings;
@@ -89,7 +116,7 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
     <div style={styles.content}>
       {detail ? (
         <ContractorDetail
-          lang={lang} tier={tier} contractor={detail} clients={clients} periods={periods} has12={has12}
+          lang={lang} tier={tier} contractor={detail} clients={clients} periods={detailPeriods} has12={has12}
           initialTab={detailTab} onSetClientPrice={(id, v) => setClients((prev) => prev.map((cl) => (cl.id === id ? { ...cl, sellPrice: v } : cl)))}
           closings={closings} horasData={horasData} staff={staff} assignments={assignments} covers={covers} absences={absences}
           cutoffDay={cutoffDay} closedPeriods={closedPeriods} onSaveClosing={onSaveClosing} companyName={companyName} who={who} onNavigate={onNavigate}
@@ -129,7 +156,7 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
 
       {contractors.length === 0
         ? <Card><div style={{ fontSize: 13, color: COLORS.ink3 }}>{t.empty}</div></Card>
-        : <ContractorsOverview lang={lang} tier={tier} contractors={contractors} clients={clients} periods={periods} today={TODAY} onOpen={(c) => { setDetailTab(null); setDetailId(c.id); }} onDefineDay={openEdit} />}
+        : <ContractorsOverview lang={lang} tier={tier} contractors={contractors} clients={clients} periods={periods} closings={closings} today={TODAY} onOpen={(c) => { setDetailTab(null); setDetailId(c.id); }} onDefineDay={openEdit} />}
       </>
       )}
 
@@ -188,6 +215,35 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
                 <input style={styles.input} type="number" min="0" step="0.01" value={draft.staffRate} onChange={(e) => update("staffRate", e.target.value)} />
                 <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.fStaffRateHint}</div>
               </Field>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{t.cycleTitle}</div>
+                <select style={styles.input} value={cycleCustom ? "custom" : "general"} onChange={(e) => setCycleCustom(e.target.value === "custom")}>
+                  <option value="general">{t.cycleGeneral}</option>
+                  <option value="custom">{t.cycleCustom}</option>
+                </select>
+                {cycleCustom && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 12 }}>
+                    <Field label={t.cycleStart} error={errors.periodStartDay}>
+                      <input style={styles.input} type="number" min="1" max="31" value={draft.periodStartDay} onChange={(e) => update("periodStartDay", e.target.value)} />
+                    </Field>
+                    <Field label={t.cycleEnd} error={errors.periodEndDay}>
+                      <input style={styles.input} type="number" min="1" max="31" value={draft.periodEndDay} onChange={(e) => update("periodEndDay", e.target.value)} />
+                    </Field>
+                    <Field label={t.cycleEvery}>
+                      <select style={styles.input} value={draft.periodMonths || 1} onChange={(e) => update("periodMonths", Number(e.target.value))}>
+                        {[1, 2, 3, 4, 6, 12].map((n) => <option key={n} value={n}>{t.cycleMonths(n)}</option>)}
+                      </select>
+                    </Field>
+                    {(Number(draft.periodMonths) || 1) > 1 && (
+                      <Field label={t.cycleAnchor} error={errors.periodAnchor}>
+                        <input style={styles.input} type="date" value={draft.periodAnchor || ""} onChange={(e) => update("periodAnchor", e.target.value)} />
+                        <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.cycleAnchorHint}</div>
+                      </Field>
+                    )}
+                    {cycleExample && <div style={{ gridColumn: "1 / -1", fontSize: 12.5, color: COLORS.ink2 }}>{t.cycleExample(cycleExample)} · {t.cycleBillingHint}</div>}
+                  </div>
+                )}
+              </div>
               <Field label={t.fBillingDay} error={errors.billingDay}>
                 <input style={styles.input} type="number" min="1" max="31" value={draft.billingDay} onChange={(e) => update("billingDay", e.target.value)} />
               </Field>

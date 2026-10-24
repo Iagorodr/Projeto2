@@ -40,7 +40,7 @@ function Stepper({ step, labels }) {
 
 function ClosingWizard({
   lang, open, onClose, contractor: c, period, existing, clients, horasData, staff, assignments, covers, absences,
-  periods, today, openPeriodIso, who, onSave, onNavigate,
+  periods, today, openPeriodIso, openPeriodStartIso, who, onSave, onNavigate,
 }) {
   const f = FIN[lang];
   const tFiles = T[lang].files;
@@ -53,7 +53,7 @@ function ClosingWizard({
   const fileRef = useRef(null);
 
   const pend = useMemo(
-    () => closingPendencies({ contractor: c, period, clients, horasData, staff, assignments, covers, absences, today, openPeriodIso }),
+    () => closingPendencies({ contractor: c, period, clients, horasData, staff, assignments, covers, absences, today, openPeriodIso, openPeriodStartIso }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [c, period, clients, horasData, staff, assignments, covers, absences, openPeriodIso],
   );

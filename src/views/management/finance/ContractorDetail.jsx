@@ -74,7 +74,9 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
   const [wizardIso, setWizardIso] = useState(null);
   const [notice, setNotice] = useState(null);
   const showNotice = (text, bad) => { setNotice({ text, bad: !!bad }); setTimeout(() => setNotice(null), 6000); };
-  const openPeriodIso = isoDateStr(getOpenPeriod(closedPeriods || [], cutoffDay, TODAY).end);
+  const openGlobal = getOpenPeriod(closedPeriods || [], cutoffDay, TODAY);
+  const openPeriodIso = isoDateStr(openGlobal.end);
+  const openPeriodStartIso = isoDateStr(openGlobal.start);
   const wizardPeriod = wizardIso ? periods.find((p) => p.iso === wizardIso) : null;
 
   const win = periods.slice(-(has12 ? months : 6));
@@ -210,7 +212,7 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
           key={wizardPeriod.iso + c.id}
           lang={lang} open onClose={(res) => { setWizardIso(null); if (res === "closed") showNotice(f.closedOk); else if (res === "closedLocal") showNotice(f.notSaved); }}
           contractor={c} period={wizardPeriod} existing={findClosing(closings, c.id, wizardPeriod.iso)} clients={clients} horasData={horasData} staff={staff}
-          assignments={assignments} covers={covers} absences={absences} periods={periods} today={TODAY} openPeriodIso={openPeriodIso}
+          assignments={assignments} covers={covers} absences={absences} periods={periods} today={TODAY} openPeriodIso={openPeriodIso} openPeriodStartIso={openPeriodStartIso}
           who={who} onSave={onSaveClosing} onNavigate={onNavigate}
         />
       )}

@@ -61,7 +61,7 @@ export function addDocs(row, docs) { return { ...row, docs: [...(row.docs || [])
 
 // O que ainda precisa de atenção antes de fechar o mês deste contratante (só os clientes dele).
 // Devolve [{ key, text(lang → texto vem do i18n), count }] como { key, count }.
-export function closingPendencies({ contractor, period, clients, horasData, staff, assignments, covers, absences, today, openPeriodIso }) {
+export function closingPendencies({ contractor, period, clients, horasData, staff, assignments, covers, absences, today, openPeriodIso, openPeriodStartIso }) {
   const mine = clientsOfContractor(clients, contractor);
   const ids = new Set(mine.map((c) => c.id));
   const out = [];
@@ -71,7 +71,9 @@ export function closingPendencies({ contractor, period, clients, horasData, staf
   if (contractor.isDirect && dEntry && dEntry.missingPrice) out.push({ key: "noSellPrice", count: dEntry.missingPrice });
   const noStaffRate = mine.filter((c) => !(Number(c.valueHour) > 0)).length;
   if (noStaffRate) out.push({ key: "noStaffRate", count: noStaffRate });
-  if (period.iso === openPeriodIso) out.push({ key: "horasOpen", count: 1 });
+  // Ciclo próprio: ainda há horas por fechar se ele chega ao período geral aberto.
+  const horasOpen = period.cycle ? (openPeriodStartIso ? period.iso >= openPeriodStartIso : false) : period.iso === openPeriodIso;
+  if (horasOpen) out.push({ key: "horasOpen", count: 1 });
   let overtime = 0, share = 0;
   Object.values(horasData || {}).forEach((h) => ((h && h.entries) || []).forEach((e) => {
     if (e.voided || !e.clientId || !ids.has(e.clientId) || !dateStrInPeriod(e.date, period)) return;

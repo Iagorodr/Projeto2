@@ -11,7 +11,7 @@ import { COLORS } from "../../../styles/colors.js";
 import { RADIUS, FONT } from "../../../styles/tokens.js";
 import { fmtHoursScreen, compactEuro, monthAbbr } from "../../../models/utils.js";
 import { clientsOfContractor } from "../../../models/contractors.js";
-import { contractorDates, changePct } from "../../../models/contractorStats.js";
+import { contractorDates, changePct, activeCycleWindow } from "../../../models/contractorStats.js";
 import { FIN } from "../../../models/i18nFin.js";
 import { T } from "../../../models/i18n.js";
 import { Card, Pill, SegmentedControl } from "../../shared/ui/index.js";
@@ -51,7 +51,7 @@ export function WindowFilter({ lang, has12, months, setMonths }) {
 
 const linkBtn = { border: "none", background: "transparent", color: COLORS.vivo, fontWeight: 700, fontSize: 13, textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 3, cursor: "pointer", fontFamily: "inherit", padding: 0 };
 
-function ContractorsOverview({ lang, tier, contractors, clients, periods, today, onOpen, onDefineDay }) {
+function ContractorsOverview({ lang, tier, contractors, clients, periods, closings, today, onOpen, onDefineDay }) {
   const f = FIN[lang];
   const isPhone = tier === "mobile";
   const [metric, setMetric] = useState("hours");
@@ -89,7 +89,7 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, today,
     const pd = previous ? previous.contractors.get(c.id) : null;
     return {
       c, hours: d ? d.hours : 0, value: d ? d.value : null,
-      margin: d && d.value != null ? d.value - (d.pricedStaffCost || 0) : null, dates: contractorDates(c, current.end, today),
+      margin: d && d.value != null ? d.value - (d.pricedStaffCost || 0) : null, dates: contractorDates(c, (activeCycleWindow(c, closings, today) || current).end, today),
       change: changePct(d ? d.hours : 0, pd ? pd.hours : 0),
       trend: periods.slice(-6).map((p) => (p.contractors.get(c.id) ? p.contractors.get(c.id).hours : 0)),
       clientsN: clientsOfContractor(clients, c).length,
