@@ -18,6 +18,7 @@ import { Minus2 } from "../shared/Icons.jsx";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
 import ExpensesCard from "./ExpensesCard.jsx";
 import { removeFile } from "../../models/fileStorage.js";
+import { tagManagerChanges } from "../../models/managerTag.js";
 import {
   MobileHeader, WeekStrip, DayPanel, ClientCheckCard, BottomActionBar, PeriodCalendar,
   Card, ConfirmDialog, Drawer, Button, Pill, SearchField, Toast, ProgressBar,
@@ -46,7 +47,7 @@ function emptyHoras() {
 // (5.2.8/5.2.9, fora do período ou já finalizado) continuam de coluna
 // única em qualquer tamanho — o documento só descreve as duas colunas
 // para a vista normal/editável.
-function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [], covers = [] }) {
+function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [], covers = [], asManager = false, startDate = null }) {
   const t = T[lang].employeeHoras;
   const pdfT = T[lang].pdf;
   const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang];
@@ -54,6 +55,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const dayLabels17 = DAY_LABELS_1_7_BY_LANG[lang];
   const me = staff.find((s) => s.id === staffId);
   const staffName = me?.name || "";
+  // Gerência a preencher por este funcionário (Monitoramento): tudo o que se grava fica marcado "pela gerência".
+  const writeHoras = asManager ? (fn) => setHorasData((prev) => tagManagerChanges(fn(prev), prev, staffId)) : setHorasData;
   // Etapa 4j (4.9) — um dia já fora da validade de uma conta Replacement
   // mostra-se sem agenda ("sem clientes"), mesmo que a atribuição em si
   // continue guardada (só deixa de se aplicar nesses dias).
@@ -61,7 +64,8 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     return (isStaffActive(me, d) && staffStartedOn(me, d)) ? dayScheduledClients(clients, assignments, staffId, d, covers) : [];
   }
   const tier = useBreakpoint();
-  const isDesktop = tier === "desktop";
+  // Na gerência há a barra lateral: só usa as duas colunas em janelas bem largas.
+  const isDesktop = tier === "desktop" && (!asManager || (typeof window !== "undefined" && window.innerWidth >= 1280));
   // No mobile "puro" (<640), a MobileBottomBar da casca (App.jsx) convive
   // com esta BottomActionBar (QA antiga, ver comentário em
   // MobileBottomBar.jsx) — passamos essa flag pra ela saber que precisa
@@ -106,12 +110,13 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payPeriod.start.getTime(), payPeriod.end.getTime(), cutoffDay]);
   const anchorIndex = chunks.anchorIndex;
-  const idx = chunkIndex === null ? anchorIndex : chunkIndex;
+  const startIdx = startDate ? chunks.list.findIndex((b) => isoDateStr(b.start) <= startDate && startDate <= isoDateStr(b.end)) : -1;
+  const idx = chunkIndex === null ? (startIdx >= 0 ? startIdx : anchorIndex) : chunkIndex;
   const chunk = chunks.list[idx];
   const days = calPeriodDays(chunk);
   const isBoundary = days.length < 7;
 
-  const [selectedDateKey, setSelectedDateKey] = useState(() => isoDateStr(TODAY));
+  const [selectedDateKey, setSelectedDateKey] = useState(() => startDate || isoDateStr(TODAY));
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [addClientSearch, setAddClientSearch] = useState("");
   const [advanceOpen, setAdvanceOpen] = useState(false);
@@ -197,7 +202,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   const dmOf = (d) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
 
   function updateMyHoras(updater) {
-    setHorasData((prev) => ({ ...prev, [staffId]: updater(prev[staffId] || emptyHoras()) }));
+    writeHoras((prev) => ({ ...prev, [staffId]: updater(prev[staffId] || emptyHoras()) }));
   }
   // Despesas a reembolsar (só quem tem o privilégio). Só se mexe nas que ainda
   // estão por aprovar; as decididas pela gerência ficam como estão.
@@ -219,7 +224,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   }
   function startFinalizeMonth() {
     // "Tem despesas a reembolsar?": só pergunta a quem pode lançar e ainda não lançou nenhuma.
-    if (canExpenses && periodExpenses.length === 0 && !myHoras.paid) setExpenseAskOpen(true);
+    if (!asManager && canExpenses && periodExpenses.length === 0 && !myHoras.paid) setExpenseAskOpen(true);
     else setFinalizeMonthConfirmOpen(true);
   }
   const expensesCard = canExpenses ? (
@@ -261,7 +266,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     if (weekLockedFlag || !entry) return;
     const turningOn = !entry.solo;
     const others = turningOn ? otherMarkers(visitDateOf(entry), entry.clientId) : [];
-    setHorasData((prev) => {
+    writeHoras((prev) => {
       const current = prev[staffId];
       const updated = { ...prev, [staffId]: { ...current, entries: current.entries.map((e) => {
         if (e !== entry) return e;
@@ -298,7 +303,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     }
     const soloOthers = otherMarkers(replacesDate || selectedKey, clientId).filter((o) => o.entry.solo && !o.entry.soloCheck);
     if (soloOthers.length > 0) showToast(t.conflictToastOther(namesOf(soloOthers), soloOthers.length));
-    setHorasData((prev) => {
+    writeHoras((prev) => {
       const current = prev[staffId] || emptyHoras();
       const baseHours = (clientDurationOn(client, replacesDate || selectedKey) || 60) / 60;
       // Horas escritas acima da duração normal do cliente entram como horas extras por aprovar.
@@ -340,7 +345,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       date: selectedKey, clientId: null, custom: { name: customName.trim(), city: customCity.trim() },
       hours: (parseHoursInput(customHours) ?? 60) / 60 || 1, extra: false, extraMinutes: 0, approved: false, voided: false,
     };
-    setHorasData((prev) => {
+    writeHoras((prev) => {
       const current = prev[staffId] || emptyHoras();
       return { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
     });
@@ -367,7 +372,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   function saveSplit(reset) {
     const target = splitTarget;
     if (!target) return;
-    setHorasData((prev) => {
+    writeHoras((prev) => {
       const current = prev[staffId];
       const { max } = splitLimits(target);
       const withIt = {
@@ -387,7 +392,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   }
   function removeEntryObj(entry) {
     if (weekLockedFlag) return;
-    setHorasData((prev) => {
+    writeHoras((prev) => {
       const current = prev[staffId];
       const withoutIt = { ...prev, [staffId]: { ...current, entries: current.entries.filter((e) => e !== entry) } };
       return recomputeSharedHours(withoutIt, clients, visitDateOf(entry), entry.clientId, sharedOpts(entry.date));
@@ -401,7 +406,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   }
   function openExtra(entry) { if (weekLockedFlag) return; setExtraDraft(entry.extraMinutes || 0); setExtraTarget(entry); }
   function saveExtra() {
-    setHorasData((prev) => {
+    writeHoras((prev) => {
       const current = prev[staffId];
       const updated = {
         ...prev,
@@ -436,7 +441,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     if (next) setSelectedDateKey(isoDateStr(next));
   }
   function finalizeWeek() {
-    updateMyHoras((h) => ({ ...h, lockedWeeks: { ...(h.lockedWeeks || {}), [chunkKey]: true } }));
+    updateMyHoras((h) => { const { [chunkKey]: _gone, ...lb } = h.lockedBy || {}; return { ...h, lockedWeeks: { ...(h.lockedWeeks || {}), [chunkKey]: true }, lockedBy: lb }; });
     setConfirmWeekOpen(false);
   }
   // Reabrir a própria semana: só enquanto o mês não foi finalizado e a
@@ -445,12 +450,13 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     updateMyHoras((h) => {
       const lw = { ...(h.lockedWeeks || {}) };
       delete lw[chunkKey];
-      return { ...h, lockedWeeks: lw };
+      const { [chunkKey]: _gone, ...lb } = h.lockedBy || {};
+      return { ...h, lockedWeeks: lw, lockedBy: lb };
     });
     setReopenWeekOpen(false);
   }
   function finalizeMonth() {
-    updateMyHoras((h) => ({ ...h, status: "finalizado", reopened: false }));
+    updateMyHoras((h) => { const { finalizedBy: _fb, ...rest } = h; return { ...rest, status: "finalizado", reopened: false }; });
     setFinalizeMonthConfirmOpen(false);
   }
 
@@ -680,12 +686,15 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             sem o título a fileira de troca de semana sobe, ficando mais
             perto do cabeçalho (voltar + idioma). Mesmo tratamento da
             Agenda, pro par de telas ficar igual. */}
-        <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+        {!asManager && <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />}
 
         {!showFinalizedView && chunkZone === "within" && myHoras.reopened && (
           <div style={{ marginBottom: 10 }}><Pill variant="reopened">{t.reopenedPill}</Pill></div>
         )}
 
+        {weekLockedRaw && myHoras.lockedBy && myHoras.lockedBy[chunkKey] === "gerencia" && (
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}><Pill variant="neutral">{t.byManagerWeek}</Pill></div>
+        )}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 6, marginTop: -4 }}>
           <PeriodNav
             label={calPeriodLabel(chunk, lang)} size={40}
@@ -727,7 +736,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             <Card variant="default" style={{ background: COLORS.lineSoft, border: `1px solid ${COLORS.line}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
                 <Lock size={18} strokeWidth={1.8} color={COLORS.ink2} />
-                <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.ink }}>{t.monthFinalizedBanner}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.ink }}>{t.monthFinalizedBanner}{myHoras.finalizedBy === "gerencia" ? ` · ${t.byManagerShort}` : ""}</div>
               </div>
               <div style={{ fontSize: 13, color: COLORS.ink2 }}>{t.monthDoneNote}</div>
             </Card>
@@ -854,6 +863,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                   onSolo={card.checked && card.soloAllowed ? () => toggleSolo(card.entry) : undefined}
                   soloLabel={t.soloButton} soloUndoLabel={t.soloUndo} soloActive={card.soloActive} soloTag={t.soloTag}
                   conflictTag={card.conflict ? t.conflictTag : undefined}
+                  managerTag={card.entry && card.entry.byManagement ? t.byManagerShort : undefined}
                   extraTimeLabel={t.extraTimeButton}
                 />
               ))}

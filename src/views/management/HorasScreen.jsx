@@ -262,7 +262,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     setUnpayId(null);
   }
   function reopenForCorrection(staffId) {
-    updateHoras(staffId, (h) => ({ ...h, status: "pendente", lockedWeeks: {}, reopened: true }));
+    updateHoras(staffId, (h) => { const { finalizedBy: _fb, lockedBy: _lb, ...rest } = h; return { ...rest, status: "pendente", lockedWeeks: {}, reopened: true }; });
     setReopenConfirmOpen(false);
   }
   function approveEntry(staffId, i) {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Lock } from "lucide-react";
+import { AlertTriangle, Check, Lock, ArrowLeft } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT, SHADOW } from "../../styles/tokens.js";
@@ -11,8 +11,9 @@ import {
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
-  PageHeader, MobileHeader, Card, Pill, Avatar, FilterChip, SearchField, Button, Drawer, DataTable, InfoTip, ChevronCircle,
+  PageHeader, MobileHeader, Card, Pill, Avatar, FilterChip, SearchField, Button, Drawer, DataTable, InfoTip, ChevronCircle, ConfirmDialog,
 } from "../shared/ui/index.js";
+import EmployeeHorasScreen from "../employee/EmployeeHorasScreen.jsx";
 
 // Monitoramento — documento de design, secções 4.4/4.5 (mesmo ficheiro; o
 // texto do documento fala em "4.4, 4.5" para a gerência) e 5.8 (a mesma
@@ -26,7 +27,7 @@ import {
 // redesenhar só um deles deixaria o outro com um visual completamente
 // desencontrado (tabela/gaveta novas dum lado, cartões antigos do outro).
 // Optei por redesenhar os dois já nesta leva.
-function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignments, covers, cutoffDay, closedPeriods, absences, sentItems, setSentItems, onHome }) {
+function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignments, covers, cutoffDay, closedPeriods, absences, sentItems, setSentItems, onHome, company, setHorasData, setMissingItems }) {
   const t = T[lang].monitoramento;
   const th = T[lang].horas;
   const c0 = T[lang].common;
@@ -34,6 +35,9 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
   const [search, setSearch] = useState("");
   const [onlyGaps, setOnlyGaps] = useState(true);
   const [openStaffId, setOpenStaffId] = useState(null);
+  // Gerência a preencher as horas de um funcionário: { staffId, date } (sub-página dentro do Monitoramento).
+  const [fill, setFill] = useState(null);
+  const [reopenOpen, setReopenOpen] = useState(false);
   const [remindedIds, setRemindedIds] = useState([]); // lembrados nesta sessão (evita repetir sem querer)
   const tier = useBreakpoint();
   // Largura real da área do ecrã: abaixo de ~940px a tabela não cabe com uma
@@ -188,6 +192,20 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
                       </span>
                     )}
                   </div>
+                  {!w.notStarted && !isSupervisorView && setHorasData && (
+                    <div style={{ marginTop: 8 }}>
+                      <Button
+                        variant="secondary" style={{ padding: "0 12px" }}
+                        onClick={() => {
+                          const firstMissed = w.days.find((d, di) => w.dayStatuses[di] === "missed");
+                          setOpenStaffId(null);
+                          setFill({ staffId: openStaff.id, date: isoDateStr(firstMissed || w.chunk.start) });
+                        }}
+                      >
+                        {hasGaps ? t.fillWeek : t.openWeek}
+                      </Button>
+                    </div>
+                  )}
                   {hasGaps && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                       {w.days.map((d, di) => (
@@ -246,7 +264,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       // cortado (sem reticências, porque o `overflow: hidden` de
       // DataTable.jsx não aplica elipse a um filho em flex/bloco como um
       // `<Button>`, só a texto que estoura direto na célula).
-      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 214, allowOverflow: true, mobileFull: true,
+      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 330, allowOverflow: true, mobileFull: true,
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={(ev) => ev.stopPropagation()}>
           {row.totalGaps > 0 && <span style={{ fontWeight: 700, color: COLORS.alert, fontSize: 13 }}>{row.totalGaps}</span>}
@@ -255,12 +273,59 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
               {remindedIds.includes(row.staffMember.id) ? t.reminded : t.remind}
             </Button>
           )}
+          {setHorasData && <Button variant="secondary" style={{ padding: "0 12px" }} onClick={() => setFill({ staffId: row.staffMember.id, date: null })}>{t.fillHours}</Button>}
           <Button variant="secondary" style={{ padding: "0 12px" }} onClick={() => setOpenStaffId(row.staffMember.id)}>{t.viewExtract}</Button>
         </div>
       ),
     },
   ];
   const tableColumns = narrow ? allColumns.filter((c) => !c.key.startsWith("block-")) : allColumns;
+
+  // ---------------------------------------------------------------------
+  // Gerência a preencher as horas de um funcionário: o mesmo ecrã de Horas do funcionário (dias, semanas,
+  // mês, reabrir), com tudo o que se grava marcado "pela gerência".
+  // ---------------------------------------------------------------------
+  const fillStaff = fill ? staff.find((s) => String(s.id) === String(fill.staffId)) : null;
+  if (!isSupervisorView && fillStaff && setHorasData) {
+    const fh = horasData[fillStaff.id] || {};
+    const canReopenMonth = fh.status === "finalizado" && !fh.paid;
+    return (
+      <div style={styles.content}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+          <Button variant="secondary" icon={ArrowLeft} onClick={() => setFill(null)}>{t.fillBack}</Button>
+          <Avatar name={fillStaff.name} size={36} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 20, color: COLORS.ink }}>{fillStaff.name}</div>
+            <div style={{ fontSize: 12.5, color: COLORS.ink2 }}>{periodLabel}</div>
+          </div>
+          {canReopenMonth && <Button variant="secondary" onClick={() => setReopenOpen(true)}>{th.reopenForCorrection}</Button>}
+        </div>
+        <div style={{ background: COLORS.amberBg, color: COLORS.amberInk, borderRadius: RADIUS.control, padding: "10px 14px", fontSize: 13, marginBottom: 6 }}>
+          {t.fillBanner(fillStaff.name)}
+        </div>
+        <EmployeeHorasScreen
+          key={`${fillStaff.id}-${fill.date || "now"}`}
+          lang={lang} setLang={setLang} onHome={() => setFill(null)} staffId={fillStaff.id} company={company}
+          clients={clients} staff={staff} assignments={assignments} horasData={horasData} setHorasData={setHorasData}
+          cutoffDay={cutoffDay} closedPeriods={closedPeriods} setMissingItems={setMissingItems || (() => {})}
+          absences={absences} covers={covers} asManager startDate={fill.date}
+        />
+        <ConfirmDialog
+          open={reopenOpen} title={th.reopenConfirmTitle} body={th.reopenConfirmBody(fillStaff.name)}
+          cancelLabel={c0.cancel} confirmLabel={th.reopenConfirmConfirm}
+          onCancel={() => setReopenOpen(false)}
+          onConfirm={() => {
+            setHorasData((prev) => {
+              const h = prev[fillStaff.id] || {};
+              const { finalizedBy: _fb, lockedBy: _lb, ...rest } = h;
+              return { ...prev, [fillStaff.id]: { ...rest, status: "pendente", lockedWeeks: {}, reopened: true } };
+            });
+            setReopenOpen(false);
+          }}
+        />
+      </div>
+    );
+  }
 
   // ---------------------------------------------------------------------
   // Ramo gerência (4.5): PageHeader + faixa de 3 números + chips + pesquisa

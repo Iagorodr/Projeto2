@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Users, Building2, Clock, Undo2, Bell, Calendar, CalendarX, Check, AlertCircle } from "lucide-react";
+import { Users, Building2, Clock, Undo2, Bell, Calendar, CalendarX, Check } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
@@ -297,9 +297,8 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
   const row = { display: "flex", flexWrap: "wrap", gap: isPhone ? 12 : 20, marginBottom: isPhone ? 12 : 20 };
 
 
-  const complaintBand = complaintsCurrent <= excelenteThreshold ? t.gaugeExcelente : complaintsCurrent <= razoavelThreshold ? t.gaugeRazoavel : t.gaugeCritico;
   const statsRow = {
-    display: "grid", gridTemplateColumns: tier === "desktop" ? "repeat(4, 1fr)" : "1fr 1fr",
+    display: "grid", gridTemplateColumns: tier === "desktop" ? "repeat(3, 1fr)" : "1fr 1fr",
     gap: isPhone ? 10 : 16, marginBottom: isPhone ? 12 : 20,
   };
 
@@ -347,7 +346,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
         onDefine={(id) => onNavigate("contratantes", { contractorId: id, tab: "clients" })}
       />
 
-      {/* 2 — quatro números pequenos */}
+      {/* 2 — três números pequenos (reclamações: medidor ao lado) */}
       <div style={statsRow}>
         <MiniStat icon={Users} label={f.statStaff} value={activeStaff.length} onClick={() => onNavigate("funcionarios")} />
         <MiniStat
@@ -355,11 +354,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           sub={f.replacementN(replacementClientsActive)} subWarn={replacementClientsActive > 0}
           onClick={() => onNavigate("clientes", replacementClientsActive > 0 ? { filter: "replacement" } : undefined)}
         />
-        <MiniStat icon={Clock} label={f.statHours} value={fmtHoursScreen(currentPeriodHours)} sub={currentPeriodLabel} onClick={() => onNavigate("horas")} />
-        <MiniStat
-          icon={AlertCircle} label={f.statComplaints} value={complaintsCurrent} sub={complaintBand}
-          subWarn={complaintsCurrent > excelenteThreshold} onClick={() => onNavigate("avisos")}
-        />
+        <MiniStat icon={Clock} label={f.statHours} value={fmtHoursScreen(currentPeriodHours)} sub={currentPeriodLabel} onClick={() => onNavigate("horas")} style={tier === "desktop" ? undefined : { gridColumn: "1 / -1" }} />
       </div>
 
       {/* 3 — Pendências + Destaques (esq.) e Clientes por cidade (dir.) */}
@@ -450,13 +445,13 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
 }
 
 // Número pequeno do topo (substitui os cartões grandes): ícone, rótulo, valor e uma linha de apoio.
-function MiniStat({ icon: Icon, label, value, sub, subWarn, onClick }) {
+function MiniStat({ icon: Icon, label, value, sub, subWarn, onClick, style }) {
   return (
     <button
       type="button" onClick={onClick}
       style={{
         display: "flex", alignItems: "center", gap: 12, textAlign: "left", fontFamily: "inherit", cursor: "pointer",
-        background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, padding: "12px 14px", minWidth: 0,
+        background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, padding: "12px 14px", minWidth: 0, ...style,
       }}
     >
       <div style={{ width: 38, height: 38, borderRadius: RADIUS.chip, background: COLORS.forest50, color: COLORS.forest600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
