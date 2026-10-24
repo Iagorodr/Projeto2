@@ -19,7 +19,7 @@ const BASE = {
     noData: "Sem dados nestes períodos.", directNoRevenue: "Os contratantes diretos não aparecem em Receita (preço por cliente).",
     overviewTitle: "Contratantes por período", overviewHint: "Cada barra é o período de 21 a 20 que termina nesse mês.",
     // lista
-    colClients: "Clientes", colHours: "Horas", colReceive: "A receber", colTrend: "Tendência", colChange: "Variação", colDates: "Faturação · Pagamento",
+    colClients: "Clientes", colHours: "Horas", colReceive: "A receber", colMargin: "Margem", colTrend: "Tendência", colChange: "Variação", colDates: "Faturação · Pagamento",
     clientsN: (n) => `${n} cliente${n === 1 ? "" : "s"}`,
     // detalhe
     back: "Contratantes", edit: "Editar", preview: "Pré-visualizar relatório",
@@ -52,7 +52,7 @@ const BASE = {
     metricAria: "What to show", tableView: "View as table", total: "Total", vsPrev: "vs previous period",
     noData: "No data in these periods.", directNoRevenue: "Direct contractors are not shown in Revenue (price per client).",
     overviewTitle: "Contractors by period", overviewHint: "Each bar is the 21st-to-20th period ending in that month.",
-    colClients: "Clients", colHours: "Hours", colReceive: "To receive", colTrend: "Trend", colChange: "Change", colDates: "Invoicing · Payment",
+    colClients: "Clients", colHours: "Hours", colReceive: "To receive", colMargin: "Margin", colTrend: "Trend", colChange: "Change", colDates: "Invoicing · Payment",
     clientsN: (n) => `${n} client${n === 1 ? "" : "s"}`,
     back: "Contractors", edit: "Edit", preview: "Preview report",
     tabSummary: "Summary", tabClients: "Clients", tabReports: "Hours reports", tabDocs: "Documents",
@@ -82,7 +82,7 @@ const BASE = {
     metricAria: "Que montrer", tableView: "Voir en tableau", total: "Total", vsPrev: "par rapport à la période précédente",
     noData: "Aucune donnée sur ces périodes.", directNoRevenue: "Les donneurs d'ordre directs n'apparaissent pas dans Revenus (prix par client).",
     overviewTitle: "Donneurs d'ordre par période", overviewHint: "Chaque barre est la période du 21 au 20 qui se termine ce mois-là.",
-    colClients: "Clients", colHours: "Heures", colReceive: "À recevoir", colTrend: "Tendance", colChange: "Variation", colDates: "Facturation · Paiement",
+    colClients: "Clients", colHours: "Heures", colReceive: "À recevoir", colMargin: "Marge", colTrend: "Tendance", colChange: "Variation", colDates: "Facturation · Paiement",
     clientsN: (n) => `${n} client${n === 1 ? "" : "s"}`,
     back: "Donneurs d'ordre", edit: "Modifier", preview: "Aperçu du rapport",
     tabSummary: "Résumé", tabClients: "Clients", tabReports: "Rapports d'heures", tabDocs: "Documents",

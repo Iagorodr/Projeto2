@@ -88,7 +88,8 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, today,
     const d = current.contractors.get(c.id);
     const pd = previous ? previous.contractors.get(c.id) : null;
     return {
-      c, hours: d ? d.hours : 0, value: d ? d.value : null, dates: contractorDates(c, current.end, today),
+      c, hours: d ? d.hours : 0, value: d ? d.value : null,
+      margin: d && d.value != null ? d.value - (d.pricedStaffCost || 0) : null, dates: contractorDates(c, current.end, today),
       change: changePct(d ? d.hours : 0, pd ? pd.hours : 0),
       trend: periods.slice(-6).map((p) => (p.contractors.get(c.id) ? p.contractors.get(c.id).hours : 0)),
       clientsN: clientsOfContractor(clients, c).length,
@@ -107,8 +108,8 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, today,
 
   const hdr = { fontSize: 12, fontWeight: 600, color: COLORS.ink3 };
   const cols = showTrend
-    ? "minmax(150px, 2fr) 0.7fr 0.9fr 1fr 0.8fr 0.9fr 1.3fr 1.3fr 24px"
-    : "minmax(160px, 2fr) 0.8fr 1fr 1.1fr 1.4fr 1.4fr 24px";
+    ? "minmax(150px, 2fr) 0.7fr 0.9fr 1fr 1fr 0.8fr 0.9fr 1.3fr 1.3fr 24px"
+    : "minmax(160px, 2fr) 0.8fr 1fr 1.1fr 1.1fr 1.4fr 1.4fr 24px";
 
   const stage = (r, key) => {
     const date = r.dates ? (key === "billing" ? r.dates.billing : r.dates.payment) : null;
@@ -189,7 +190,7 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, today,
         <div style={{ display: "flex", flexDirection: "column", gap: isPhone ? 10 : 0, background: isPhone ? "transparent" : COLORS.card, border: isPhone ? "none" : `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, overflow: "hidden" }}>
           {!isPhone && (
             <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "12px 18px", background: COLORS.headerTint, borderBottom: `1px solid ${COLORS.line}` }}>
-              <span style={hdr}>{T[lang].contratantes.colName}</span><span style={hdr}>{f.colClients}</span><span style={hdr}>{f.colHours}</span><span style={hdr}>{f.colReceive}</span>
+              <span style={hdr}>{T[lang].contratantes.colName}</span><span style={hdr}>{f.colClients}</span><span style={hdr}>{f.colHours}</span><span style={hdr}>{f.colReceive}</span><span style={hdr}>{f.colMargin}</span>
               {showTrend && <><span style={hdr}>{f.colTrend}</span><span style={hdr}>{f.colChange}</span></>}
               <span style={hdr}>{f.billing}</span><span style={hdr}>{f.payment}</span><span />
             </div>
@@ -205,9 +206,10 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, today,
                   {showTrend && <ChangeBadge pct={r.change} />}
                   <ChevronRight size={16} color={COLORS.ink3} aria-hidden="true" />
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: showTrend ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr", gap: 8, fontSize: 12, color: COLORS.ink3 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, fontSize: 12, color: COLORS.ink3 }}>
                   <div>{f.colHours}<div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{fmtHoursScreen(r.hours)}</div></div>
                   <div>{f.colReceive}<div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{r.value != null ? eur0(r.value) : "—"}</div></div>
+                  <div>{f.colMargin}<div style={{ fontSize: 15, fontWeight: 700, color: r.margin != null && r.margin < 0 ? COLORS.clayInk : COLORS.ink }}>{r.margin != null ? eur0(r.margin) : "—"}</div></div>
                   <div>{f.colClients}<div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{r.clientsN}</div></div>
                   {showTrend && <div>{f.colTrend}<div style={{ marginTop: 3 }}><Sparkline values={r.trend} color={r.c.color} width={60} /></div></div>}
                 </div>
@@ -228,6 +230,9 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, today,
                 <span>{r.clientsN}</span>
                 <span style={{ fontWeight: 600 }}>{fmtHoursScreen(r.hours)}</span>
                 <span style={{ fontFamily: FONT.heading, fontWeight: 700 }}>{r.value != null ? eur0(r.value) : <span style={{ color: COLORS.ink3, fontFamily: "inherit", fontWeight: 400 }}>—</span>}</span>
+                <span style={{ fontFamily: FONT.heading, fontWeight: 700, color: r.margin != null && r.margin < 0 ? COLORS.clayInk : COLORS.ink }}>
+                  {r.margin != null ? <>{eur0(r.margin)}{r.value > 0 && <span style={{ fontFamily: "inherit", fontWeight: 400, fontSize: 12, color: COLORS.ink3 }}> {Math.round((r.margin / r.value) * 100)}%</span>}</> : <span style={{ color: COLORS.ink3, fontFamily: "inherit", fontWeight: 400 }}>—</span>}
+                </span>
                 {showTrend && <><span><Sparkline values={r.trend} color={r.c.color} /></span><span><ChangeBadge pct={r.change} /></span></>}
                 <span>{stage(r, "billing")}</span>
                 <span>{stage(r, "payment")}</span>
