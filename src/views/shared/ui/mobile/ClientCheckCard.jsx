@@ -18,7 +18,7 @@ import { Pill } from "../Pill.jsx";
 
 function ClientCheckCard({
   name, subtitle, checked, onToggle, onExtraTime, extraTimeLabel = "Fiz mais tempo",
-  extraPill, readOnly, dimmed, dimmedNote, onAdjustSplit, adjustSplitLabel,
+  extraPill, extraPillVariant = "pending", soloHint, readOnly, dimmed, dimmedNote, onAdjustSplit, adjustSplitLabel,
   onSolo, soloLabel, soloActive, soloTag, soloUndoLabel, conflictTag, managerTag,
 }) {
   return (
@@ -51,7 +51,8 @@ function ClientCheckCard({
         <div style={{ fontSize: 12.5, color: COLORS.ink2, marginTop: 2 }}>
           {dimmed && dimmedNote ? dimmedNote : subtitle}
         </div>
-        {extraPill && <div style={{ marginTop: 6 }}><Pill variant="pending">{extraPill}</Pill></div>}
+        {soloHint && <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 2 }}>{soloHint}</div>}
+        {extraPill && <div style={{ marginTop: 6 }}><Pill variant={extraPillVariant}>{extraPill}</Pill></div>}
         {conflictTag && <div style={{ marginTop: 6 }}><Pill variant="pending">{conflictTag}</Pill></div>}
         {managerTag && <div style={{ marginTop: 6 }}><Pill variant="neutral">{managerTag}</Pill></div>}
         {soloActive && soloTag && <div style={{ marginTop: 6 }}><Pill variant="paid">{soloTag}</Pill></div>}

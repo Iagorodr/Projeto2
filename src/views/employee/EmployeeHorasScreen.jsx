@@ -416,7 +416,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             if (e !== extraTarget) return e;
             // Mesma regra já usada do lado da gerência: qualquer gravação
             // de um lançamento que fica com extra > 0 desfaz a aprovação.
-            return { ...e, extra: extraDraft > 0, extraMinutes: extraDraft, approved: extraDraft > 0 ? false : e.approved };
+            return { ...e, extra: extraDraft > 0, extraMinutes: extraDraft, approved: extraDraft > 0 ? false : e.approved };  // extraDraft < 0 = tempo a menos (sem aprovação)
           }),
         },
       };
@@ -515,7 +515,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       id: `sched-${client.id}`, clientId: client.id, name: client.name,
       subtitle: entry ? subtitleFor(entry) : expectedSubtitle(client),
       checked: !!entry, entry,
-      extraPill: entry && entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
+      extraPill: entry ? extraPillOf(entry) : undefined, extraPillVariant: entry && entry.extraMinutes < 0 ? "neutral" : "pending", soloHint: entry ? soloHintOf(entry) : undefined,
       soloAllowed: soloAllowedFor(entry), soloActive: !!(entry && entry.solo), conflict: !!(entry && entry.conflict),
     };
   });
@@ -524,11 +524,27 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     return {
       id: `adhoc-${entry.clientId}-${entry.date}-${ai}`, clientId: entry.clientId, name: entryClientName(clients, entry), isCustom,
       subtitle: isCustom ? `${subtitleFor(entry)} · ${t.customClientPending}` : subtitleFor(entry), checked: true, entry,
-      extraPill: entry.extra ? t.extraPillLabel(entry.extraMinutes) : undefined,
+      extraPill: extraPillOf(entry), extraPillVariant: entry.extraMinutes < 0 ? "neutral" : "pending", soloHint: soloHintOf(entry),
       soloAllowed: soloAllowedFor(entry), soloActive: !!entry.solo, conflict: !!entry.conflict,
     };
   });
   const dayCards = [...scheduledCards, ...adHocCards];
+
+  // Ajuste de tempo: + = hora extra (por aprovar), − = tempo a menos (só marcado, sem aprovação).
+  function extraPillOf(entry) {
+    const m = entry.extraMinutes || 0;
+    if (m > 0 && entry.extra) return t.extraPillLabel(m);
+    if (m < 0) return t.lessPillLabel(Math.abs(m));
+    return undefined;
+  }
+  // Cliente dividido: quanto contaria se, no fim, a visita ficar só comigo (o sistema só sabe no fim).
+  function soloHintOf(entry) {
+    if (!entry || !entry.clientId || !(entry.sharedCount > 1) || entry.solo) return undefined;
+    const cl = clients.find((c) => c.id === entry.clientId);
+    if (!cl) return undefined;
+    const full = (clientDurationOn(cl, visitDateOf(entry)) || 0) / 60 + (entry.extraMinutes || 0) / 60;
+    return t.soloHint(fmtHoursScreen(Math.max(0, full)));
+  }
 
   function subtitleFor(entry) {
     const baseHours = entry.hours - (entry.extraMinutes || 0) / 60;
@@ -855,7 +871,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                   dimmed={card.dimmed}
                   dimmedNote={card.dimmedNote}
                   readOnly={weekLockedFlag || card.readOnly}
-                  extraPill={card.extraPill}
+                  extraPill={card.extraPill} extraPillVariant={card.extraPillVariant} soloHint={card.soloHint}
                   onToggle={() => (card.isCustom ? removeEntryObj(card.entry) : toggleScheduledClient(card.clientId))}
                   onExtraTime={card.checked && card.entry ? () => openExtra(card.entry) : undefined}
                   onAdjustSplit={card.checked && card.entry && card.entry.sharedCount > 1 ? () => openSplit(card.entry) : undefined}
@@ -1122,12 +1138,24 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         open={!!extraTarget} onClose={() => setExtraTarget(null)} title={t.extraTitle} width={380}
         footer={<><Button variant="secondary" onClick={() => setExtraTarget(null)}>{t.cancel}</Button><Button variant="primary" onClick={saveExtra}>{t.save}</Button></>}
       >
-        <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 16 }}>{t.extraQuestion}</div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 14 }}>
-          <button type="button" onClick={() => setExtraDraft((v) => Math.max(0, v - 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Minus2 /></button>
-          <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.ink, minWidth: 80, textAlign: "center" }}>{extraDraft} {t.minutesUnit}</div>
-          <button type="button" onClick={() => setExtraDraft((v) => Math.min(240, v + 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Plus size={18} strokeWidth={2.4} /></button>
-        </div>
+        {(() => {
+          const baseMin = extraTarget ? Math.round((extraTarget.hours - (extraTarget.extraMinutes || 0) / 60) * 60) : 0;
+          const minDraft = -Math.max(0, Math.floor((baseMin - 15) / 15) * 15);
+          const draftLabel = extraDraft > 0 ? `+${extraDraft} ${t.minutesUnit}` : extraDraft < 0 ? `−${Math.abs(extraDraft)} ${t.minutesUnit}` : `0 ${t.minutesUnit}`;
+          return (
+            <>
+              <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 6 }}>{t.extraQuestion}</div>
+              <div style={{ fontSize: 13, color: COLORS.ink3, marginBottom: 16 }}>
+                {t.adjustBase}: <b style={{ color: COLORS.ink }}>{fmtHoursScreen(baseMin / 60)}</b> → <b style={{ color: extraDraft === 0 ? COLORS.ink : extraDraft > 0 ? COLORS.clayInk : COLORS.forest700 }}>{fmtHoursScreen((baseMin + extraDraft) / 60)}</b>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 14 }}>
+                <button type="button" onClick={() => setExtraDraft((v) => Math.max(minDraft, v - 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Minus2 /></button>
+                <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.ink, minWidth: 110, textAlign: "center" }}>{draftLabel}</div>
+                <button type="button" onClick={() => setExtraDraft((v) => Math.min(240, v + 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Plus size={18} strokeWidth={2.4} /></button>
+              </div>
+            </>
+          );
+        })()}
         <div style={{ fontSize: 12, color: COLORS.ink3 }}>{t.extraHint}</div>
       </Drawer>
 
