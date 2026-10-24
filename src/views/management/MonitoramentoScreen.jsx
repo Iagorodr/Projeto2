@@ -264,17 +264,17 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       // cortado (sem reticências, porque o `overflow: hidden` de
       // DataTable.jsx não aplica elipse a um filho em flex/bloco como um
       // `<Button>`, só a texto que estoura direto na célula).
-      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 330, allowOverflow: true, mobileFull: true,
+      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 300, allowOverflow: true, mobileFull: true,
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={(ev) => ev.stopPropagation()}>
           {row.totalGaps > 0 && <span style={{ fontWeight: 700, color: COLORS.alert, fontSize: 13 }}>{row.totalGaps}</span>}
           {row.totalGaps > 0 && setSentItems && (
-            <Button variant="secondary" style={{ padding: "0 12px" }} disabled={remindedIds.includes(row.staffMember.id)} onClick={() => remindStaff(row.staffMember.id, row.totalGaps)}>
+            <Button variant="secondary" style={{ padding: "0 12px", whiteSpace: "nowrap" }} disabled={remindedIds.includes(row.staffMember.id)} onClick={() => remindStaff(row.staffMember.id, row.totalGaps)}>
               {remindedIds.includes(row.staffMember.id) ? t.reminded : t.remind}
             </Button>
           )}
-          {setHorasData && <Button variant="secondary" style={{ padding: "0 12px" }} onClick={() => setFill({ staffId: row.staffMember.id, date: null })}>{t.fillHours}</Button>}
-          <Button variant="secondary" style={{ padding: "0 12px" }} onClick={() => setOpenStaffId(row.staffMember.id)}>{t.viewExtract}</Button>
+          {setHorasData && <Button variant="secondary" style={{ padding: "0 12px", whiteSpace: "nowrap" }} onClick={() => setFill({ staffId: row.staffMember.id, date: null })}>{t.fillHours}</Button>}
+          <Button variant="secondary" style={{ padding: "0 12px", whiteSpace: "nowrap" }} onClick={() => setOpenStaffId(row.staffMember.id)}>{t.viewExtract}</Button>
         </div>
       ),
     },

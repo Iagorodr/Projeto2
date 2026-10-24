@@ -594,7 +594,7 @@ const T = {
       // a mesma extração para o supervisor, mais compacta).
       summaryOk: "Em dia", summaryWithGaps: "Com dias em falta", summaryTotalGaps: "Dias em falta no total",
       chipOnlyGaps: "Só com dias em falta", chipAllStaff: "Todos",
-      fillHours: "Preencher horas", fillWeek: "Preencher", openWeek: "Abrir", fillBack: "Voltar ao Monitoramento", fillBanner: (n) => `A preencher as horas de ${n} como gerência. O que registar fica marcado «pela gerência»; o funcionário pode reabrir a semana normalmente.`, viewExtract: "Ver mês", cellOk: "Em dia",
+      fillHours: "Preencher", fillWeek: "Preencher", openWeek: "Abrir", fillBack: "Voltar ao Monitoramento", fillBanner: (n) => `A preencher as horas de ${n} como gerência. O que registar fica marcado «pela gerência»; o funcionário pode reabrir a semana normalmente.`, viewExtract: "Ver mês", cellOk: "Em dia",
       remind: "Lembrar", reminded: "Lembrado", remindText: (n) => n === 1 ? "Lembrete da gerência: falta preencher 1 dia nas Horas. Abra as Horas e feche o dia em falta." : `Lembrete da gerência: faltam preencher ${n} dias nas Horas. Abra as Horas e feche os dias em falta.`,
       tapToSeeDetail: "Toque num funcionário para ver o extrato.",
       summaryWithGapsCount: (n) => `${n} com dias em falta`,
@@ -1420,7 +1420,7 @@ const T = {
       // the same extract for supervisors, more compact).
       summaryOk: "Up to date", summaryWithGaps: "With missing days", summaryTotalGaps: "Total missing days",
       chipOnlyGaps: "Only with missing days", chipAllStaff: "All",
-      fillHours: "Fill in hours", fillWeek: "Fill in", openWeek: "Open", fillBack: "Back to Monitoring", fillBanner: (n) => `Filling in ${n}'s hours as management. Whatever you record is marked "by management"; the employee can reopen the week as usual.`, viewExtract: "View month", cellOk: "Up to date",
+      fillHours: "Fill in", fillWeek: "Fill in", openWeek: "Open", fillBack: "Back to Monitoring", fillBanner: (n) => `Filling in ${n}'s hours as management. Whatever you record is marked "by management"; the employee can reopen the week as usual.`, viewExtract: "View month", cellOk: "Up to date",
       remind: "Remind", reminded: "Reminded", remindText: (n) => n === 1 ? "Reminder from management: 1 day is missing in Hours. Open Hours and close the missing day." : `Reminder from management: ${n} days are missing in Hours. Open Hours and close the missing days.`,
       tapToSeeDetail: "Tap a staff member to see their extract.",
       summaryWithGapsCount: (n) => `${n} with missing days`,
@@ -2214,7 +2214,7 @@ const T = {
       // 5.8, le même relevé pour la superviseure, en plus compact).
       summaryOk: "À jour", summaryWithGaps: "Avec des jours manquants", summaryTotalGaps: "Jours manquants au total",
       chipOnlyGaps: "Seulement avec des jours manquants", chipAllStaff: "Tous",
-      fillHours: "Remplir les heures", fillWeek: "Remplir", openWeek: "Ouvrir", fillBack: "Retour au suivi", fillBanner: (n) => `Vous remplissez les heures de ${n} en tant que direction. Ce que vous saisissez est marqué « par la direction » ; l'employé peut rouvrir la semaine normalement.`, viewExtract: "Voir le mois", cellOk: "À jour",
+      fillHours: "Remplir", fillWeek: "Remplir", openWeek: "Ouvrir", fillBack: "Retour au suivi", fillBanner: (n) => `Vous remplissez les heures de ${n} en tant que direction. Ce que vous saisissez est marqué « par la direction » ; l'employé peut rouvrir la semaine normalement.`, viewExtract: "Voir le mois", cellOk: "À jour",
       remind: "Rappeler", reminded: "Rappelé", remindText: (n) => n === 1 ? "Rappel de la direction : 1 jour manque dans les Heures. Ouvrez les Heures et clôturez le jour manquant." : `Rappel de la direction : ${n} jours manquent dans les Heures. Ouvrez les Heures et clôturez les jours manquants.`,
       tapToSeeDetail: "Touchez un employé pour voir son relevé.",
       summaryWithGapsCount: (n) => `${n} avec des jours manquants`,
