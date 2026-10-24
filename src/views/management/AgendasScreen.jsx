@@ -215,7 +215,7 @@ function WeekPickerCalendar({ weekStart, lang, t, c0, onSelectWeek, onClose }) {
 // abre, com nomes+mini-avatares+duração de cada um, "Remover" sempre
 // visível (sem precisar de hover) e "Adicionar" pra juntar outro
 // funcionário a este cliente neste dia.
-function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, onAdd, onClose }) {
+function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, onAdd, onClose, onOpenClient }) {
   const [adding, setAdding] = useState(false);
   const [addSearch, setAddSearch] = useState("");
   const titleId = useId();
@@ -286,6 +286,14 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
           <span style={{ width: 18, height: 18, borderRadius: "50%", background: COLORS.vivo, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><Plus size={12} strokeWidth={3} /></span> {t.addPerson}
         </button>
       )}
+      {onOpenClient && (
+        <button
+          type="button" onClick={() => onOpenClient(client.id)}
+          style={{ display: "block", margin: "10px auto 0", padding: 0, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
+        >
+          {t.openClient}
+        </button>
+      )}
     </AgendaModal>
   );
 }
@@ -297,7 +305,7 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
 // 2026-10-06 -> "06/10" (datas curtas nos avisos de validade).
 function fmtDM(d) { return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`; }
 
-function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setCovers, clients, setClients, staff, assignments, setAssignments }) {
+function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setCovers, clients, setClients, staff, assignments, setAssignments, onOpenClient }) {
   const t = T[lang].agendas;
   const c0 = T[lang].common;
   const tc = T[lang].clientes;
@@ -668,7 +676,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
                           client={client} team={team} perPerson={perPerson} t={t} c0={c0} staff={staff}
                           onRemove={(staffId) => removeClient(staffId, day, cid)}
                           onAdd={(staffId) => mergeAdd(cellKey(staffId, day), cid)}
-                          onClose={() => setOpenTeam(null)}
+                          onClose={() => setOpenTeam(null)} onOpenClient={onOpenClient}
                         />
                       )}
                     </div>
@@ -684,9 +692,18 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
                       boxShadow: freqStyle ? `inset 3px 0 0 ${freqStyle.ink}` : "none",
                     }}
                   >
-                    <span style={{ flex: "1 1 64px", minWidth: 0, whiteSpace: "normal", overflowWrap: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.ink }}>
-                      {client.name}
-                    </span>
+                    {onOpenClient ? (
+                      <button
+                        type="button" onClick={() => onOpenClient(client.id)} aria-label={`${t.openClient}: ${client.name}`}
+                        style={{ flex: "1 1 64px", minWidth: 0, padding: 0, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", fontFamily: "inherit", fontSize: "inherit", whiteSpace: "normal", overflowWrap: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.ink }}
+                      >
+                        {client.name}
+                      </button>
+                    ) : (
+                      <span style={{ flex: "1 1 64px", minWidth: 0, whiteSpace: "normal", overflowWrap: "break-word", lineHeight: 1.2, fontWeight: 500, color: COLORS.ink }}>
+                        {client.name}
+                      </span>
+                    )}
                     {coverTag}
                     {getAutoIds(s.id, day).includes(cid) && (
                           <span title={t.autoChipTitle} style={{ flexShrink: 0, width: 8, height: 8, borderRadius: "50%", background: "#2F5FB3" }} />
@@ -807,7 +824,17 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
   });
 
   const dayColumns = [
-    { key: "client", label: t.colClient, width: 2, render: (r) => r.client.name },
+    {
+      key: "client", label: t.colClient, width: 2,
+      render: (r) => (onOpenClient ? (
+        <button
+          type="button" onClick={() => onOpenClient(r.client.id)} aria-label={`${t.openClient}: ${r.client.name}`}
+          style={{ padding: 0, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", fontFamily: "inherit", fontSize: "inherit", fontWeight: 600, color: COLORS.vivo, textDecoration: "underline", textUnderlineOffset: 3 }}
+        >
+          {r.client.name}
+        </button>
+      ) : r.client.name),
+    },
     {
       key: "duration", label: t.colDuration, width: 1.3,
       render: (r) => {

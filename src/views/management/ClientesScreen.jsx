@@ -160,7 +160,7 @@ function ClientesScreen({
   const [replacementFilterOn, setReplacementFilterOn] = useState(() => navIntent?.filter === "replacement");
   const [noCityFilterOn, setNoCityFilterOn] = useState(() => navIntent?.filter === "nocity"); // clientes cuja cidade não é reconhecida
 
-  const [openClientId, setOpenClientId] = useState(null); // id | "new" | null
+  const [openClientId, setOpenClientId] = useState(() => (navIntent?.clientId != null ? navIntent.clientId : null)); // id | "new" | null
   const [mode, setMode] = useState("view"); // "view" | "edit"
   const [copyOpen, setCopyOpen] = useState(false);
   const [draft, setDraft] = useState(EMPTY_CLIENT_FORM);
