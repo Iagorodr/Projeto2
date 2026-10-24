@@ -16,7 +16,7 @@ import { formatTodayLabel, T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js
 import { exportStaffHorasPdf, exportPeriodSummaryPdf } from "../../models/pdfExport.js";
 import {
   PageHeader, Card, SegmentedBar, FilterChip, SearchField, Button, Pill,
-  Avatar, DataTable, Drawer, ConfirmDialog, Toast, SharedWithBadge,
+  Avatar, DataTable, Drawer, ConfirmDialog, Toast, SharedWithBadge, InfoTip,
 } from "../shared/ui/index.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
@@ -622,6 +622,12 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                       })()}
                                       {pendingClient && <Pill variant="pending">{t.clientPendingTag}</Pill>}
                                       {e.conflict && <Pill variant="pending">{t.conflictTag}</Pill>}
+                                      {!e.voided && ((e.extra && !e.approved) || pendingClient || e.shareReview || e.conflict) && (
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                                          <Pill variant="pending">{t.attentionTag}</Pill>
+                                          <InfoTip text={t.attentionInfo} label={c0.moreInfoLabel} />
+                                        </span>
+                                      )}
                                       {e.solo && !e.conflict && <Pill variant="paid">{t.soloRowTag}</Pill>}
                                       {e.shareReview && (
                                         <>
