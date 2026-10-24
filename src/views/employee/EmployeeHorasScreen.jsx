@@ -286,7 +286,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // com metade). A dupla só é automática na montagem da agenda. As linhas
   // "automáticas" de antes aparecem como as outras (sem etiqueta nem botão
   // "Fiz sem <nome>" — decisão de 16/10/2026).
-  function addClientEntry(clientId, replacesDate, answer) {
+  function addClientEntry(clientId, replacesDate, answer, hoursOverride) {
     if (weekLockedFlag) return;
     const client = clientById(clients, clientId);
     if (!client) return;
@@ -300,7 +300,10 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     if (soloOthers.length > 0) showToast(t.conflictToastOther(namesOf(soloOthers), soloOthers.length));
     setHorasData((prev) => {
       const current = prev[staffId] || emptyHoras();
-      const entry = { date: selectedKey, clientId, hours: (clientDurationOn(client, replacesDate || selectedKey) || 60) / 60, extra: false, extraMinutes: 0, approved: false, voided: false };
+      const baseHours = (clientDurationOn(client, replacesDate || selectedKey) || 60) / 60;
+      // Horas escritas acima da duração normal do cliente entram como horas extras por aprovar.
+      const extraMin = hoursOverride > baseHours ? Math.round((hoursOverride - baseHours) * 60) : 0;
+      const entry = { date: selectedKey, clientId, hours: baseHours + extraMin / 60, extra: extraMin > 0, extraMinutes: extraMin, approved: false, voided: false };
       if (replacesDate) entry.replacesDate = replacesDate;
       if (answer === "no") entry.sameAnswer = "no";
       const withNew = { ...prev, [staffId]: { ...current, entries: [...current.entries, entry] } };
@@ -320,7 +323,19 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
   // Cliente fora da lista: nome (e cidade) escritos à mão, sem clientId; as
   // horas entram como pendentes e a gerência confirma o cliente certo.
   function addCustomEntry() {
-    if (weekLockedFlag || !customName.trim() || findByName(clients, customName)) return;
+    if (weekLockedFlag || !customName.trim()) return;
+    // O nome escrito já é um cliente da empresa (só não está na minha lista): se as horas escritas forem
+    // iguais ou maiores que as habituais, entra como cliente normal (o excesso vira horas extras por
+    // aprovar) e a gerência confere a visita; se forem menos, fica como pendente com as horas escritas
+    // (as horas de um cliente normal vêm da duração dele) e a gerência ajusta.
+    const match = findByName(clients, customName);
+    const mins = parseHoursInput(customHours);
+    if (match && mins && mins >= (clientDurationOn(match, selectedKey) || 60)) {
+      addClientEntry(match.id, undefined, undefined, mins / 60);
+      setCustomOpen(false); setAddClientOpen(false); setAddClientSearch("");
+      setCustomName(""); setCustomCity(""); setCustomHours(1);
+      return;
+    }
     const entry = {
       date: selectedKey, clientId: null, custom: { name: customName.trim(), city: customCity.trim() },
       hours: (parseHoursInput(customHours) ?? 60) / 60 || 1, extra: false, extraMinutes: 0, approved: false, voided: false,
@@ -1046,7 +1061,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
       {/* Folha: cliente fora da lista (nome escrito à mão) */}
       <Drawer
         open={customOpen} onClose={() => setCustomOpen(false)} title={t.customClientTitle} width={420}
-        footer={<><Button variant="secondary" onClick={() => setCustomOpen(false)}>{t.confirmNo}</Button><Button variant="primary" onClick={addCustomEntry} disabled={!customName.trim() || !!findByName(clients, customName)}>{t.customClientAdd}</Button></>}
+        footer={<><Button variant="secondary" onClick={() => setCustomOpen(false)}>{t.confirmNo}</Button><Button variant="primary" onClick={addCustomEntry} disabled={!customName.trim()}>{t.customClientAdd}</Button></>}
       >
         <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 14 }}>{t.customClientHint}</div>
         {[["customClientName", customName, setCustomName, "text"], ["customClientCity", customCity, setCustomCity, "text"], ["customClientHours", customHours, setCustomHours, "text"]].map(([k, v, set, type]) => (
@@ -1058,7 +1073,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
               style={{ width: "100%", boxSizing: "border-box", height: 48, borderRadius: RADIUS.control, border: `1px solid ${COLORS.line}`, padding: "0 12px", fontSize: 16, fontFamily: "inherit" }}
             />
             {k === "customClientName" && findByName(clients, customName) && (
-              <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: 4 }}>{T[lang].common.customClientExists}</div>
+              <div style={{ fontSize: 12.5, color: COLORS.okInk, marginTop: 4 }}>{T[lang].common.customClientExists}</div>
             )}
           </label>
         ))}
