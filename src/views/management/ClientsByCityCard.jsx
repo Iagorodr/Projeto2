@@ -109,7 +109,7 @@ function RegionMap({ geo, rows, max, view, widthPx, t, onOpenCity }) {
   );
 }
 
-function ClientsByCityCard({ clients, t, mobile, onOpenCity, onOpenClients, style }) {
+function ClientsByCityCard({ clients, t, mobile, wide, onOpenCity, onOpenClients, style }) {
   const { rows, noCity, total } = useMemo(() => {
     const map = new Map();
     let missing = 0;
@@ -191,9 +191,9 @@ function ClientsByCityCard({ clients, t, mobile, onOpenCity, onOpenClients, styl
       {rows.length === 0 ? (
         <div style={{ fontSize: 13, color: COLORS.ink2, marginTop: 10 }}>{t.citiesEmpty}</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 12 }}>
+        <div style={{ display: "flex", flexDirection: wide ? "row" : "column", alignItems: wide ? "center" : "stretch", gap: wide ? 24 : 14, marginTop: 12 }}>
           {!geoFailed && (
-            <div>
+            <div style={wide ? { flex: "1.25 1 0", minWidth: 0 } : undefined}>
               <div ref={boxRef} style={{ position: "relative", minHeight: geo ? 0 : 160 }}>
                 {geo && view ? (
                   <RegionMap geo={geo} rows={rows} max={max} view={view} widthPx={widthPx} t={t} onOpenCity={onOpenCity} />
@@ -205,7 +205,7 @@ function ClientsByCityCard({ clients, t, mobile, onOpenCity, onOpenClients, styl
             </div>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 9, ...(wide ? { flex: "1 1 0", minWidth: 0 } : null) }}>
             {ranking.map(({ place, count }, i) => (
               <button
                 key={place.name} type="button" onClick={() => onOpenCity && onOpenCity(place.name)}

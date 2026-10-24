@@ -302,12 +302,12 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     gap: isPhone ? 10 : 16, marginBottom: isPhone ? 12 : 20,
   };
 
-  const notesCard = (
-    <Card variant="warm" style={myNotes.length === 0 ? { padding: "10px 16px" } : undefined}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: myNotes.length === 0 ? 0 : 12 }}>
+  const renderNotesCard = (fill) => (
+    <Card variant="warm" style={fill ? { flex: "1 1 auto" } : (myNotes.length === 0 ? { padding: "10px 16px" } : undefined)}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: myNotes.length === 0 && !fill ? 0 : 12 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{tn.widgetTitle}</div>
-          {myNotes.length === 0 && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.notesEmpty}</div>}
+          {myNotes.length === 0 && !fill && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.notesEmpty}</div>}
         </div>
         <button
           type="button" onClick={() => onNavigate("notas")}
@@ -319,6 +319,7 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           {tn.seeAll} →
         </button>
       </div>
+      {myNotes.length === 0 && fill && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.notesEmpty}</div>}
       {myNotes.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {myNotes.slice(0, 3).map((n) => (
@@ -330,6 +331,64 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
         </div>
       )}
     </Card>
+  );
+  const notesCard = renderNotesCard(false);
+
+  // Cartões do Dashboard (a ordem muda no desktop: ver o bloco 3).
+  const pendCard = (
+    <Card style={{ flex: "0 0 auto" }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink, marginBottom: 4 }}>{t.pendingTitle}</div>
+      {pendingRows.length === 0 ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: COLORS.ok, fontWeight: 600, padding: "8px 0 2px" }}>
+          <Check size={16} /> {t.pendingNone}
+        </div>
+      ) : (
+        pendingRows.map((r, i) => (
+          <PendingRow key={r.key} icon={r.icon} label={r.label} count={r.count} amber={r.amber} onClick={r.onClick} okLabel={t.pendingAllOk} last={i === pendingRows.length - 1} />
+        ))
+      )}
+    </Card>
+  );
+  const highCard = (
+    <Card style={{ flex: "0 0 auto" }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{t.highlightsTitle}</div>
+      <div style={{ fontSize: 12, color: COLORS.ink3, margin: "2px 0 10px" }}>{highlightsSubtitle}</div>
+      {topStaff.length === 0 ? (
+        <div style={{ fontSize: 13, color: COLORS.ink2 }}>{highlightsEmptyText}</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {topStaff.map((s, i) => (
+            <div key={s.staffId} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 16, fontSize: 12, fontWeight: 700, color: COLORS.ink3 }}>{i + 1}</span>
+              <Avatar name={s.name} size={28} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                <div style={{ fontSize: 11.5, color: COLORS.ink3 }}>{fmtHM(Math.round(s.hours * 60))} h</div>
+              </div>
+              <span title={t.highlightsPraises} style={{ fontSize: 12, fontWeight: 700, color: COLORS.forest600 }}>★ {s.praises}</span>
+              <span title={t.highlightsComplaints} style={{ fontSize: 12, fontWeight: 700, color: s.complaints ? COLORS.clayInk : COLORS.ink3 }}>⚠ {s.complaints}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+  const reclCard = (
+    <ReclamacoesCard
+      compact
+      current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
+      recent={recentComplaints}
+      title={t.complaintsTitle} subtitle={t.complaintsSubtitle}
+      labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
+    />
+  );
+  const cityCard = (wide) => (
+    <ClientsByCityCard
+      clients={clients} t={t} mobile={tier === "mobile"}
+      style={{ flex: "0 0 auto" }} wide={wide}
+      onOpenCity={(city) => onNavigate("clientes", { city })}
+      onOpenClients={() => onNavigate("clientes", { filter: "nocity" })}
+    />
   );
 
   const evoData = evoMetric === "eur" ? valueChartData : hoursChartData;
@@ -357,63 +416,35 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
         <MiniStat icon={Clock} label={f.statHours} value={fmtHoursScreen(currentPeriodHours)} sub={currentPeriodLabel} onClick={() => onNavigate("horas")} style={tier === "desktop" ? undefined : { gridColumn: "1 / -1" }} />
       </div>
 
-      {/* 3 — Pendências + Destaques (esq.) e Clientes por cidade (dir.) */}
-      <div style={row}>
-        <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-          <Card style={{ flex: "0 0 auto" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink, marginBottom: 4 }}>{t.pendingTitle}</div>
-            {pendingRows.length === 0 ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: COLORS.ok, fontWeight: 600, padding: "8px 0 2px" }}>
-                <Check size={16} /> {t.pendingNone}
-              </div>
-            ) : (
-              pendingRows.map((r, i) => (
-                <PendingRow key={r.key} icon={r.icon} label={r.label} count={r.count} amber={r.amber} onClick={r.onClick} okLabel={t.pendingAllOk} last={i === pendingRows.length - 1} />
-              ))
-            )}
-          </Card>
-          <Card style={{ flex: "0 0 auto" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{t.highlightsTitle}</div>
-            <div style={{ fontSize: 12, color: COLORS.ink3, margin: "2px 0 10px" }}>{highlightsSubtitle}</div>
-            {topStaff.length === 0 ? (
-              <div style={{ fontSize: 13, color: COLORS.ink2 }}>{highlightsEmptyText}</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {topStaff.map((s, i) => (
-                  <div key={s.staffId} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ width: 16, fontSize: 12, fontWeight: 700, color: COLORS.ink3 }}>{i + 1}</span>
-                    <Avatar name={s.name} size={28} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
-                      <div style={{ fontSize: 11.5, color: COLORS.ink3 }}>{fmtHM(Math.round(s.hours * 60))} h</div>
-                    </div>
-                    <span title={t.highlightsPraises} style={{ fontSize: 12, fontWeight: 700, color: COLORS.forest600 }}>★ {s.praises}</span>
-                    <span title={t.highlightsComplaints} style={{ fontSize: 12, fontWeight: 700, color: s.complaints ? COLORS.clayInk : COLORS.ink3 }}>⚠ {s.complaints}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-          {notesCard}
+      {/* 3 — Desktop: Pendências + Reclamações (esq.) | Destaques + Notas a encher o resto (dir.), e depois
+          Clientes por cidade em faixa larga (mapa ao lado da lista). Telemóvel/tablet: colunas como antes. */}
+      {tier === "desktop" ? (
+        <>
+          <div style={{ ...row, alignItems: "stretch" }}>
+            <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+              {pendCard}
+              {reclCard}
+            </div>
+            <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+              {highCard}
+              {renderNotesCard(true)}
+            </div>
+          </div>
+          <div style={{ marginBottom: 20 }}>{cityCard(true)}</div>
+        </>
+      ) : (
+        <div style={row}>
+          <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+            {pendCard}
+            {highCard}
+            {notesCard}
+          </div>
+          <div style={{ flex: "1.4 1 440px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+            {reclCard}
+            {cityCard(false)}
+          </div>
         </div>
-
-        <div style={{ flex: "1.4 1 440px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Medidor de reclamações: sempre visível (também com zero, para mostrar "Excelente"). */}
-          <ReclamacoesCard
-            compact
-            current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
-            recent={recentComplaints}
-            title={t.complaintsTitle} subtitle={t.complaintsSubtitle}
-            labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
-          />
-          <ClientsByCityCard
-            clients={clients} t={t} mobile={tier === "mobile"}
-            style={{ flex: "0 0 auto" }}
-            onOpenCity={(city) => onNavigate("clientes", { city })}
-            onOpenClients={() => onNavigate("clientes", { filter: "nocity" })}
-          />
-        </div>
-      </div>
+      )}
 
       {/* 4 — um só gráfico de evolução, com alternador € | Horas */}
       <Card style={{ marginBottom: isPhone ? 12 : 20 }}>
