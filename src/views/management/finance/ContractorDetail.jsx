@@ -17,6 +17,8 @@ import { WindowFilter } from "./ContractorsOverview.jsx";
 import { Dot } from "./financeUi.jsx";
 import { ReportsTab, DocsTab } from "./ClosingTabs.jsx";
 import { ClosingWizard } from "./ClosingWizard.jsx";
+import { buildContractorReport } from "../../../models/contractorReport.js";
+import { ReportDetail } from "./ReportDetail.jsx";
 import { findClosing } from "../../../models/contractorClosings.js";
 import { getOpenPeriod, isoDateStr } from "../../../models/utils.js";
 import { TODAY } from "../../../models/data.js";
@@ -97,6 +99,8 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
   const rest = sorted.slice(7);
   const clientRows = rest.length ? [...top, { key: "other", other: true, count: rest.length, hours: rest.reduce((s, r) => s + r.hours, 0) }] : top;
 
+  const reportCtx = { staff, horasData, closedPeriods, assignments, today: TODAY };
+  const detailReport = buildContractorReport({ contractor: c, clients, ...reportCtx, period: current });
   const reportRows = [...cur.byClient.entries()].map(([id, hours]) => ({ id, name: (clientById(clients, id) || {}).name || "—", hours })).sort((a, b) => a.name.localeCompare(b.name));
   const tabs = [["summary", f.tabSummary], ["clients", f.tabClients], ["reports", f.tabReports], ["docs", f.tabDocs]];
 
@@ -195,7 +199,7 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
 
       {tab === "reports" && (
         <ReportsTab
-          lang={lang} tier={tier} contractor={c} periods={periods} closings={closings} clients={clients} today={TODAY} who={who} companyName={companyName}
+          lang={lang} tier={tier} contractor={c} periods={periods} closings={closings} clients={clients} today={TODAY} who={who} companyName={companyName} ctx={reportCtx}
           onCloseMonth={(p) => setWizardIso(p.iso)} onSave={onSaveClosing} onNotice={showNotice}
         />
       )}
@@ -212,7 +216,7 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
       )}
 
       <Drawer
-        open={previewOpen} onClose={() => setPreviewOpen(false)} width={480} closeLabel={f.close}
+        open={previewOpen} onClose={() => setPreviewOpen(false)} width={620} closeLabel={f.close}
         title={`${f.reportTitle} · ${c.name}`}
         footer={<><div style={{ flex: 1 }} /><Button variant="secondary" onClick={() => setPreviewOpen(false)}>{f.close}</Button></>}
       >
@@ -220,24 +224,22 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
         {reportRows.length === 0 ? (
           <div style={{ fontSize: 13, color: COLORS.ink3 }}>{f.reportEmpty}</div>
         ) : (
-          <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, overflow: "hidden" }}>
-            <div style={{ display: "flex", padding: "9px 14px", fontSize: 12, fontWeight: 600, color: COLORS.ink3, background: COLORS.headerTint }}>
-              <span style={{ flex: 1 }}>{f.reportClient}</span><span>{f.reportHours}</span>
-            </div>
-            {reportRows.map((r) => (
-              <div key={r.id} style={{ display: "flex", padding: "9px 14px", fontSize: 13.5, borderTop: `1px solid ${COLORS.lineSoft}` }}>
-                <span style={{ flex: 1, minWidth: 0 }}>{r.name}</span><span style={{ fontWeight: 600 }}>{fmtHoursScreen(r.hours)}</span>
+          <>
+            <ReportDetail lang={lang} report={detailReport} />
+            <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, overflow: "hidden", marginTop: 10 }}>
+              <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, background: COLORS.headerTint }}>
+                <span style={{ flex: 1 }}>{f.reportTotalVisits}</span><span>{detailReport.totals.visits}</span>
               </div>
-            ))}
-            <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, borderTop: `1px solid ${COLORS.line}`, background: COLORS.headerTint }}>
-              <span style={{ flex: 1 }}>{f.reportTotalHours}</span><span>{fmtHoursScreen(cur.hours)}</span>
+              <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, borderTop: `1px solid ${COLORS.line}`, background: COLORS.headerTint }}>
+                <span style={{ flex: 1 }}>{f.reportTotalHours}</span><span>{fmtHoursScreen(cur.hours)}</span>
+              </div>
+              <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, background: COLORS.headerTint }}>
+                <span style={{ flex: 1 }}>{f.reportToInvoice}</span><span>{priced ? fmtEuro(cur.value || 0) : "—"}</span>
+              </div>
             </div>
-            <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, background: COLORS.headerTint }}>
-              <span style={{ flex: 1 }}>{f.reportToInvoice}</span><span>{priced ? fmtEuro(cur.value || 0) : "—"}</span>
-            </div>
-          </div>
+          </>
         )}
-        <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 12 }}>{f.reportNote}</div>
+        <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 12 }}>{f.reportNoteDetail}</div>
       </Drawer>
     </div>
   );

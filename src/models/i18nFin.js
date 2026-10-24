@@ -30,7 +30,7 @@ const BASE = {
     colClient: "Cliente", colPaysEmployee: "Paga ao funcionário", colMarginHour: "Margem por hora",
     clientsEmpty: "Ainda nenhum cliente neste contratante.",
     // relatório
-    reportTitle: "Relatório de horas", reportPeriod: (p) => `Período ${p}`, reportClient: "Cliente", reportHours: "Horas", reportTotalHours: "Total de horas", reportToInvoice: "Total a faturar",
+    reportTitle: "Relatório de horas", reportPeriod: (p) => `Período ${p}`, reportClient: "Cliente", reportHours: "Horas", reportVisits: (d, e) => (e > 0 ? `${d} de ${e} ${e === 1 ? "visita" : "visitas"}` : `${d} ${d === 1 ? "visita" : "visitas"}`), reportMissedN: (n) => `${n} sem registo`, reportOutsideN: (n) => `${n} fora da agenda`, reportBy: "Feito por", reportExtraMin: (m) => `+${m}min extra`, reportLessMin: (m) => `−${m}min`, reportVisitsCol: "Visitas", reportDetailCol: "Dias, horas e quem fez", reportMissedDays: "Sem registo", reportNoteDetail: "Visitas feitas face às previstas na agenda e nos dados do cliente, só até hoje. As horas extra pedidas aparecem à parte.", reportTotalVisits: "Total de visitas", reportTotalHours: "Total de horas", reportToInvoice: "Total a faturar",
     reportNote: "Pré-visualização do período em curso. Mostra só horas por cliente, total de horas e total a faturar.", reportEmpty: "Sem horas neste período.", close: "Fechar",
     // dashboard
     evolution: "Evolução", statStaff: "Funcionários ativos", statClients: "Clientes", replacementN: (n) => `${n} replacement`, statHours: "Horas", statComplaints: "Reclamações",
@@ -61,7 +61,7 @@ const BASE = {
     valueDirect: "This contractor has a price per client; the total is not calculated yet.",
     colClient: "Client", colPaysEmployee: "Pays the employee", colMarginHour: "Margin per hour",
     clientsEmpty: "No clients under this contractor yet.",
-    reportTitle: "Hours report", reportPeriod: (p) => `Period ${p}`, reportClient: "Client", reportHours: "Hours", reportTotalHours: "Total hours", reportToInvoice: "Total to invoice",
+    reportTitle: "Hours report", reportPeriod: (p) => `Period ${p}`, reportClient: "Client", reportHours: "Hours", reportVisits: (d, e) => (e > 0 ? `${d} of ${e} ${e === 1 ? "visit" : "visits"}` : `${d} ${d === 1 ? "visit" : "visits"}`), reportMissedN: (n) => `${n} not logged`, reportOutsideN: (n) => `${n} off schedule`, reportBy: "Done by", reportExtraMin: (m) => `+${m}min extra`, reportLessMin: (m) => `−${m}min`, reportVisitsCol: "Visits", reportDetailCol: "Days, hours and who did it", reportMissedDays: "Not logged", reportNoteDetail: "Visits done versus those expected from the schedule and the client data, up to today. Extra hours requested are shown separately.", reportTotalVisits: "Total visits", reportTotalHours: "Total hours", reportToInvoice: "Total to invoice",
     reportNote: "Preview of the current period. Shows only hours per client, total hours and total to invoice.", reportEmpty: "No hours in this period.", close: "Close",
     evolution: "Trend", statStaff: "Active staff", statClients: "Clients", replacementN: (n) => `${n} replacement`, statHours: "Hours", statComplaints: "Complaints",
     notesEmpty: "No notes",
@@ -91,7 +91,7 @@ const BASE = {
     valueDirect: "Ce donneur d'ordre a un prix par client ; le total n'est pas encore calculé.",
     colClient: "Client", colPaysEmployee: "Paie l'employé", colMarginHour: "Marge par heure",
     clientsEmpty: "Aucun client pour ce donneur d'ordre.",
-    reportTitle: "Rapport d'heures", reportPeriod: (p) => `Période ${p}`, reportClient: "Client", reportHours: "Heures", reportTotalHours: "Total d'heures", reportToInvoice: "Total à facturer",
+    reportTitle: "Rapport d'heures", reportPeriod: (p) => `Période ${p}`, reportClient: "Client", reportHours: "Heures", reportVisits: (d, e) => (e > 0 ? `${d} sur ${e} ${e === 1 ? "visite" : "visites"}` : `${d} ${d === 1 ? "visite" : "visites"}`), reportMissedN: (n) => `${n} sans saisie`, reportOutsideN: (n) => `${n} hors planning`, reportBy: "Fait par", reportExtraMin: (m) => `+${m}min sup.`, reportLessMin: (m) => `−${m}min`, reportVisitsCol: "Visites", reportDetailCol: "Jours, heures et qui", reportMissedDays: "Sans saisie", reportNoteDetail: "Visites faites par rapport à celles prévues au planning et aux données du client, jusqu'à aujourd'hui. Les heures supplémentaires demandées sont indiquées à part.", reportTotalVisits: "Total des visites", reportTotalHours: "Total d'heures", reportToInvoice: "Total à facturer",
     reportNote: "Aperçu de la période en cours. N'affiche que les heures par client, le total d'heures et le total à facturer.", reportEmpty: "Aucune heure sur cette période.", close: "Fermer",
     evolution: "Évolution", statStaff: "Employés actifs", statClients: "Clients", replacementN: (n) => `${n} remplacement`, statHours: "Heures", statComplaints: "Réclamations",
     notesEmpty: "Aucune note",

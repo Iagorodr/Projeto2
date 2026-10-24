@@ -15,6 +15,8 @@ import { exportGenericTablePdf } from "../../../models/pdfExport.js";
 import { Card, Pill, Button, Drawer, StoredFile } from "../../shared/ui/index.js";
 import { styles } from "../../../styles/styles.js";
 import { fmtDay } from "./financeUi.jsx";
+import { buildContractorReport } from "../../../models/contractorReport.js";
+import { ReportDetail, reportPdfRows } from "./ReportDetail.jsx";
 
 const th = { fontSize: 12, fontWeight: 600, color: COLORS.ink3 };
 
@@ -53,7 +55,7 @@ function History({ lang, row }) {
 }
 
 // Mostra o relatório de um mês (valores congelados se fechado, na hora se não) + PDF + estados.
-function ReportDrawer({ lang, open, onClose, contractor: c, period, row, entry, clients, who, onSave, companyName }) {
+function ReportDrawer({ lang, open, onClose, contractor: c, period, row, entry, clients, who, onSave, companyName, ctx }) {
   const f = FIN[lang];
   const [invDate, setInvDate] = useState(isoDateStr(new Date()));
   const [recDate, setRecDate] = useState(isoDateStr(new Date()));
@@ -64,6 +66,7 @@ function ReportDrawer({ lang, open, onClose, contractor: c, period, row, entry, 
     ? (row.byClient || []).map((r) => ({ id: r.clientId, name: r.name, hours: r.hours }))
     : [...((entry && entry.byClient) || new Map()).entries()].map(([id, hours]) => ({ id, name: (clientById(clients, id) || {}).name || "—", hours }));
   rows.sort((a, b) => a.name.localeCompare(b.name));
+  const detail = ctx ? buildContractorReport({ contractor: c, clients, ...ctx, period }) : null;
   const hours = closed ? row.hours : (entry ? entry.hours : 0);
   const value = closed ? row.receivable : (entry ? entry.value : null);
 
@@ -75,10 +78,10 @@ function ReportDrawer({ lang, open, onClose, contractor: c, period, row, entry, 
   function pdf() {
     exportGenericTablePdf({
       companyName, reportTitle: `${f.reportTitle} · ${c.name}`, subtitle: period.rangeLabel,
-      columns: [f.reportClient, f.reportHours],
-      rows: rows.map((r) => [r.name, `${fmtHoursNum(r.hours)}h`]),
-      columnStyles: { 1: { halign: "right" } },
-      totals: [{ label: f.reportTotalHours, value: `${fmtHoursNum(hours)}h` }, { label: f.reportToInvoice, value: value != null ? fmtEuro(value) : "—" }],
+      columns: detail ? [f.reportClient, f.reportVisitsCol, f.reportDetailCol, f.reportHours] : [f.reportClient, f.reportHours],
+      rows: detail ? reportPdfRows(detail, lang) : rows.map((r) => [r.name, `${fmtHoursNum(r.hours)}h`]),
+      columnStyles: detail ? { 0: { cellWidth: 90 }, 1: { cellWidth: 70 }, 3: { halign: "right", cellWidth: 50 } } : { 1: { halign: "right" } },
+      totals: [...(detail ? [{ label: f.reportTotalVisits, value: String(detail.totals.visits) }] : []), { label: f.reportTotalHours, value: `${fmtHoursNum(hours)}h` }, { label: f.reportToInvoice, value: value != null ? fmtEuro(value) : "—" }],
       pdfT: T[lang].pdf, fileName: f.pdfFile(c.name, period.iso),
     });
   }
@@ -87,22 +90,28 @@ function ReportDrawer({ lang, open, onClose, contractor: c, period, row, entry, 
 
   return (
     <Drawer
-      open={open} onClose={onClose} width={520} closeLabel={f.close} title={`${f.reportTitle} · ${c.name}`}
+      open={open} onClose={onClose} width={620} closeLabel={f.close} title={`${f.reportTitle} · ${c.name}`}
       pill={closed ? <Pill variant="paid">{f.stClosed}</Pill> : null}
       footer={<><Button variant="secondary" icon={FileDown} onClick={pdf} disabled={rows.length === 0}>{f.downloadPdf}</Button><div style={{ flex: 1 }} /><Button variant="secondary" onClick={onClose}>{f.close}</Button></>}
     >
       <div style={{ fontSize: 13, color: COLORS.ink2, marginBottom: 14 }}>{f.reportPeriod(period.rangeLabel)}</div>
       {rows.length === 0 ? <div style={{ fontSize: 13, color: COLORS.ink3 }}>{f.reportEmpty}</div> : (
-        <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, overflow: "hidden" }}>
-          <div style={{ display: "flex", padding: "9px 14px", background: COLORS.headerTint }}><span style={{ ...th, flex: 1 }}>{f.reportClient}</span><span style={th}>{f.reportHours}</span></div>
-          {rows.map((r) => (
-            <div key={r.id} style={{ display: "flex", padding: "9px 14px", fontSize: 13.5, borderTop: `1px solid ${COLORS.lineSoft}` }}><span style={{ flex: 1, minWidth: 0 }}>{r.name}</span><span style={{ fontWeight: 600 }}>{fmtHoursScreen(r.hours)}</span></div>
-          ))}
-          <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, borderTop: `1px solid ${COLORS.line}`, background: COLORS.headerTint }}><span style={{ flex: 1 }}>{f.reportTotalHours}</span><span>{fmtHoursScreen(hours)}</span></div>
-          <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, background: COLORS.headerTint }}><span style={{ flex: 1 }}>{f.reportToInvoice}</span><span>{value != null ? fmtEuro(value) : "—"}</span></div>
-        </div>
+        <>
+          {detail ? <ReportDetail lang={lang} report={detail} /> : (
+            <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, overflow: "hidden" }}>
+              {rows.map((r) => (
+                <div key={r.id} style={{ display: "flex", padding: "9px 14px", fontSize: 13.5, borderTop: `1px solid ${COLORS.lineSoft}` }}><span style={{ flex: 1, minWidth: 0 }}>{r.name}</span><span style={{ fontWeight: 600 }}>{fmtHoursScreen(r.hours)}</span></div>
+              ))}
+            </div>
+          )}
+          <div style={{ border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, overflow: "hidden", marginTop: 10 }}>
+            {detail && <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, background: COLORS.headerTint }}><span style={{ flex: 1 }}>{f.reportTotalVisits}</span><span>{detail.totals.visits}</span></div>}
+            <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, borderTop: detail ? `1px solid ${COLORS.line}` : "none", background: COLORS.headerTint }}><span style={{ flex: 1 }}>{f.reportTotalHours}</span><span>{fmtHoursScreen(hours)}</span></div>
+            <div style={{ display: "flex", padding: "11px 14px", fontSize: 14, fontWeight: 700, background: COLORS.headerTint }}><span style={{ flex: 1 }}>{f.reportToInvoice}</span><span>{value != null ? fmtEuro(value) : "—"}</span></div>
+          </div>
+        </>
       )}
-      <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 12 }}>{f.reportNote}</div>
+      <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 12 }}>{detail ? f.reportNoteDetail : f.reportNote}</div>
 
       {closed && (
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -185,7 +194,7 @@ function ReopenDrawer({ lang, open, onClose, onConfirm }) {
   );
 }
 
-function ReportsTab({ lang, tier, contractor: c, periods, closings, clients, today, who, companyName, onCloseMonth, onSave, onNotice }) {
+function ReportsTab({ lang, tier, contractor: c, periods, closings, clients, today, who, companyName, onCloseMonth, onSave, onNotice, ctx }) {
   const f = FIN[lang];
   const isPhone = tier === "mobile";
   const [viewIso, setViewIso] = useState(null);
@@ -254,7 +263,7 @@ function ReportsTab({ lang, tier, contractor: c, periods, closings, clients, tod
 
       <ReportDrawer
         lang={lang} open={!!viewing} onClose={() => setViewIso(null)} contractor={c} period={viewing && viewing.p}
-        row={viewing && viewing.row} entry={viewing && viewing.entry} clients={clients} who={who} onSave={onSave} companyName={companyName}
+        row={viewing && viewing.row} entry={viewing && viewing.entry} clients={clients} who={who} onSave={onSave} companyName={companyName} ctx={ctx}
       />
       <ReopenDrawer lang={lang} open={!!reopening} onClose={() => setReopenIso(null)} onConfirm={doReopen} />
     </Card>
