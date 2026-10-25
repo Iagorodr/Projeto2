@@ -16,7 +16,13 @@ export const MANUAL_EN = {
         ["“Period ended” banner", "After the period ends there is a deadline (Settings) to finish it. Once it passes, the Dashboard and the entries are locked until you close the period in Hours."],
       ],
       howto: [
-        { q: "How do I see whether the month is going well?", steps: ["Look at the Result card: the estimated margin.", "Check the Pending items: everything with a number is work to do.", "Click the arrow on an item to go straight to resolving it."] },
+        { q: "How do I tell if the month is going well?", steps: ["On the Result card, look at the estimated Margin (in € and %).", "If “no price · left out” shows up, some contractors or clients have no price and the margin is incomplete (see below).", "In Trend, compare with the dashed average and the previous period.", "In Pending items, see whether there is work to deal with."] },
+        { q: "What do I do with the Pending items?", steps: ["Every line with a number is work waiting for you. Tap the arrow to go straight to the page where it is resolved (Hours, Contractors, Notices or Clients).", "Resolve what shows up there. When you come back to the Dashboard the number goes down.", "When there is nothing left it says “Up to date”."] },
+        { q: "The margin looks wrong. Why?", steps: ["Contractors or clients with no price are left out. Open Contractors (or the client in Clients) and fill in the hourly rate.", "Remember that while the period is open everything is an estimate: it is only final when you close the period.", "Overtime to approve, hour splits to review and expenses to approve can also change the amount. Deal with them in Pending items."] },
+        { q: "The “Period ended” banner appeared. What do I do?", steps: ["Go to Hours and finish the period within the deadline shown in the banner.", "It's best to deal with the hours Pending items first, so the closing comes out right.", "If the deadline passes, the Dashboard and the entries are locked until you close the period in Hours."] },
+        { q: "How do I fix clients without a valid city on the map?", steps: ["Under “Clients by city”, tap “N client(s) without a valid city — fix”.", "Open each client, pick the city from the list (don't type it by hand) and save."] },
+        { q: "How do I switch the chart between € and hours?", steps: ["On the Trend card, tap the € or Hours button."] },
+        { q: "Where do I change deadlines, alerts and limits?", steps: ["In Settings: the deadline to finish the period, the contracts-about-to-end alert, the complaint limits and what the Team highlights show."] },
       ],
     },
     clientes: {

@@ -16,7 +16,13 @@ export const MANUAL_FR = {
         ["Bandeau « Période terminée »", "Après la fin de la période, il y a un délai (Paramètres) pour la finaliser. Passé ce délai, le tableau de bord et les saisies sont bloqués jusqu'à la clôture de la période dans Heures."],
       ],
       howto: [
-        { q: "Comment voir si le mois se passe bien ?", steps: ["Regardez la carte Résultat : la marge estimée.", "Consultez les points en attente : tout ce qui a un nombre est du travail à faire.", "Cliquez sur la flèche d'un point pour aller directement le régler."] },
+        { q: "Comment savoir si le mois se passe bien ?", steps: ["Sur la carte Résultat, regardez la Marge estimée (en € et en %).", "Si « sans prix · hors calcul » apparaît, des donneurs d'ordre ou des clients n'ont pas de prix et la marge est incomplète (voir plus bas).", "Dans Évolution, comparez avec la moyenne en pointillé et la période précédente.", "Dans Points en attente, voyez s'il y a du travail à traiter."] },
+        { q: "Que faire des Points en attente ?", steps: ["Chaque ligne avec un nombre est du travail qui vous attend. Touchez la flèche pour aller directement à la page où on le règle (Heures, Donneurs d'ordre, Avis ou Clients).", "Réglez ce qui s'y trouve. En revenant au tableau de bord, le nombre baisse.", "Quand il ne reste rien, « À jour » s'affiche."] },
+        { q: "La marge semble fausse. Pourquoi ?", steps: ["Les donneurs d'ordre ou clients sans prix sont exclus du calcul. Ouvrez Donneurs d'ordre (ou le client dans Clients) et renseignez le tarif horaire.", "Rappel : tant que la période est ouverte, tout est une estimation : elle n'est définitive qu'à la clôture de la période.", "Les heures sup à approuver, partages d'heures à revoir et dépenses à approuver peuvent aussi changer le montant. Traitez-les dans Points en attente."] },
+        { q: "Le bandeau « Période terminée » est apparu. Que faire ?", steps: ["Allez dans Heures et finalisez la période dans le délai indiqué sur le bandeau.", "Mieux vaut traiter d'abord les Points en attente liés aux heures, pour que la clôture soit juste.", "Si le délai passe, le tableau de bord et les saisies sont bloqués jusqu'à la clôture de la période dans Heures."] },
+        { q: "Comment corriger les clients sans ville valide sur la carte ?", steps: ["Sous « Clients par ville », touchez « N client(s) sans ville valide — corriger ».", "Ouvrez chaque client, choisissez la ville dans la liste (ne l'écrivez pas à la main) et enregistrez."] },
+        { q: "Comment passer le graphique de € à heures ?", steps: ["Sur la carte Évolution, touchez le bouton € ou Heures."] },
+        { q: "Où modifier délais, alertes et limites ?", steps: ["Dans Paramètres : le délai pour finaliser la période, l'alerte des contrats bientôt échus, les limites des réclamations et ce qu'affichent les Temps forts de l'équipe."] },
       ],
     },
     clientes: {

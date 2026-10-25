@@ -18,7 +18,13 @@ export const MANUAL_PT = {
         ["Faixa “Período terminado”", "Depois do fim do período há um prazo (Definições) para o finalizar. Passado o prazo, o Dashboard e os lançamentos ficam bloqueados até fechares o período em Horas."],
       ],
       howto: [
-        { q: "Como vejo se o mês está a correr bem?", steps: ["Olha para o cartão Resultado: a margem estimada.", "Vê as Pendências: tudo o que tem número é trabalho por fazer.", "Carrega na seta de uma pendência para ir direto resolvê-la."] },
+        { q: "Como vejo se o mês está a correr bem?", steps: ["No cartão Resultado, olha para a Margem estimada (em € e em %).", "Se aparecer “sem preço · fora da conta”, há contratantes ou clientes sem preço e a margem está incompleta (ver abaixo).", "Em Evolução, compara com a média a tracejado e com o período anterior.", "Em Pendências, vê se há trabalho por tratar."] },
+        { q: "O que faço com as Pendências?", steps: ["Cada linha com número é trabalho à tua espera. Carrega na seta para ir direto à página onde se resolve (Horas, Contratantes, Avisos ou Clientes).", "Resolve lá o que aparece. Quando voltares ao Dashboard o número desce.", "Quando não houver nada, aparece “Em dia”."] },
+        { q: "A margem parece errada. Porquê?", steps: ["Contratantes ou clientes sem preço ficam fora da conta. Abre Contratantes (ou o cliente em Clientes) e preenche o valor/hora.", "Lembra-te de que, com o período aberto, tudo é estimativa: só fica definitivo quando fechas o período.", "Horas por aprovar, divisões por rever e despesas por aprovar também podem mudar o valor. Trata-as nas Pendências."] },
+        { q: "Apareceu a faixa “Período terminado”. O que faço?", steps: ["Vai a Horas e finaliza o período dentro do prazo indicado na faixa.", "Convém tratar antes as Pendências de horas, para o fecho sair certo.", "Se o prazo passar, o Dashboard e os lançamentos ficam bloqueados até fechares o período em Horas."] },
+        { q: "Como corrijo clientes sem cidade válida no mapa?", steps: ["Em “Clientes por cidade”, carrega em “N cliente(s) sem cidade válida — corrigir”.", "Abre cada cliente, escolhe a cidade da lista (não escrevas à mão) e guarda."] },
+        { q: "Como mudo o gráfico entre € e horas?", steps: ["No cartão Evolução, carrega no botão € ou Horas."] },
+        { q: "Onde mudo prazos, avisos e limites?", steps: ["Em Definições: o prazo para finalizar o período, o aviso de contratos a acabar, os limites das reclamações e o que mostram os Destaques da equipa."] },
       ],
     },
     clientes: {
