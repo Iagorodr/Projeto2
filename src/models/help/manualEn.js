@@ -194,5 +194,123 @@ export const MANUAL_EN = {
       ],
     },
   },
-  staff: {},
+  staff: {
+    menu: {
+      summary: "A summary of your day: what you have today, how the week is going and what needs your attention.",
+      means: [
+        ["This period · estimate", "What you will receive this period, based on the hours already logged. It is an estimate: the amount is only final when management closes the period."],
+        ["Today", "Today's clients and the Log hours button. If you have no clients it says “No clients today”."],
+        ["This week", "How many hours you've logged compared with the planned ones (“Logged X of Y”)."],
+        ["Needs your attention", "Days to log and unread notices (and, if you're a supervisor, missing days in the team). “All up to date” when nothing is missing."],
+        ["Notes", "Your dated reminders."],
+        ["Shortcuts", "Quick access to Hours, Schedule and Clients."],
+      ],
+      howto: [
+        { q: "How do I log today's hours?", steps: ["Tap Log hours on the “Today” card (or open Hours in the menu).", "Mark the clients you did and finish the day."] },
+      ],
+    },
+    horas: {
+      summary: "Where you log each day's hours, finish weeks and the month, and see how much you will receive.",
+      means: [
+        ["Week strip", "Each day shows as Filled in, Missing or No clients (dashed). “Today” is highlighted."],
+        ["Planned", "The hours the schedule expects for the day."],
+        ["Shared with N more", "The client was done by more people on the same day: the duration is split between whoever did it. You can adjust your share with Adjust my share."],
+        ["+min · to approve  /  −min", "More time than usual is overtime, which management approves. Less time is just marked with − and visible to management."],
+        ["I worked alone", "Use it only if you did the whole client without your colleague. If your colleague also logged it, “Under review” shows: management decides and, until then, it stays split."],
+        ["Day finished · Week finished · Month finished", "Once finished, that day, week or month is locked and can't be edited. “By management” = it was finished by management."],
+        ["Reopened for correction", "Management reopened your month for correction. You can change the hours again and finish it once more."],
+        ["To receive so far", "The value of the hours already logged. It's only final when management closes the period."],
+        ["Expenses to reimburse", "Only shows if management gives you that permission. Each expense is To approve, Approved or Rejected."],
+      ],
+      howto: [
+        { q: "How do I log a day?", steps: ["Choose the day on the week strip.", "Mark the clients you did.", "If you spent more or less time than usual, use Adjust hours.", "Tap Finish day and confirm the summary."] },
+        { q: "I had no clients today.", steps: ["Tap I had no clients today and confirm.", "If you did have some after all, use I did have clients."] },
+        { q: "I did a client from another day.", steps: ["Tap I did a client from another day and choose the client.", "It is logged today but counts as the visit of the day it was planned for."] },
+        { q: "I did a client that isn't on the list.", steps: ["Tap Client not on the list and type the name.", "Management confirms which client it is."] },
+        { q: "How do I finish the week and the month?", steps: ["At the end of the week, tap Finish week. If a day is missing, the app asks whether everything is right.", "When the period has ended and all weeks are finished, tap Finish month.", "After that only management can reopen it for correction."] },
+        { q: "I made a mistake in a week I already finished.", steps: ["Tap Reopen week: it becomes editable again.", "Correct it and finish it again."] },
+        { q: "The month is finished and something is wrong.", steps: ["Tap Request correction.", "Write what is wrong or missing and send the request.", "Management receives it in Notices."] },
+        { q: "How do I log an expense?", steps: ["In Hours, open Expenses to reimburse and tap Add expense.", "Choose the type, describe it, enter the amount and date (and the receipt photo, if you have one).", "Management approves it and the amount goes into your report, separate from hours."] },
+      ],
+    },
+    agenda: {
+      summary: "The clients you have on each day of the week.",
+      means: [
+        ["Today", "Today is highlighted."],
+        ["Duration", "It's your part of the visit. If the client is shared, it's the part that falls to you."],
+        ["Shared client · N people", "More people do this client on the same day and the duration is split between you."],
+        ["Biweekly · monthly · every other day", "Shows how often the client appears. “Every week” is the normal one."],
+        ["No clients on this day", "You have no clients on that day."],
+      ],
+      howto: [
+        { q: "How do I see another week?", steps: ["Use the Previous week and Next week arrows."] },
+        { q: "How do I see a client's details?", steps: ["Tap the client: it opens the client's record in Clients, with address and instructions."] },
+      ],
+    },
+    avisos: {
+      summary: "Management's messages to you and the place where you send notices and requests: absences, missing product, problems on site.",
+      means: [
+        ["Received", "Notices and replies from management. The reply to a notice of yours shows as “Reply from management”."],
+        ["Sent by me", "Everything you've already sent, so you can see the status."],
+        ["Subject", "Missing product, Problem on site or Other."],
+        ["Menu badge", "Counts the notices you haven't read yet."],
+        ["Resolved", "On a reported absence it means management has already sorted out who covers."],
+        ["Report about a colleague (supervisor)", "Supervisors can log a complaint, praise or notice about an employee."],
+      ],
+      howto: [
+        { q: "How do I report that I'll be absent?", steps: ["Tap Report absence.", "Choose the first day and, if it's more than one, the last (To day). The reason is optional.", "Send: management sees it right away and decides who covers.", "To undo, under My reported absences use Cancel notice."] },
+        { q: "How do I tell management about a problem?", steps: ["Tap New notice.", "Choose the subject and the client and write what's going on.", "You can add a photo. Send."] },
+        { q: "How do I see management's reply?", steps: ["Open Received, or the notice itself under Sent by me: the reply shows underneath."] },
+      ],
+    },
+    clientes: {
+      summary: "The details of the clients you serve: address, what to do, priorities and notes (such as the access code).",
+      means: [
+        ["Address", "Where the client is. You can open it on the map."],
+        ["Description", "What is to be done at this client."],
+        ["Priorities", "The points that need more attention."],
+        ["Note", "Practical information, such as access or the key."],
+        ["×/week", "How many times a week the client is visited."],
+      ],
+      howto: [
+        { q: "How do I find a client?", steps: ["Type the name in Search Client and pick it from the list."] },
+        { q: "How do I get there?", steps: ["Open the client and tap Open on map.", "Choose the maps app you prefer."] },
+        { q: "I can't see a client.", steps: ["Only the clients on your schedule show, unless management has given you access to all of them."] },
+      ],
+    },
+    historico: {
+      summary: "The months (periods) that have already been closed, with your hours and the amount received.",
+      means: [
+        ["Closed on · Total · Amount received", "When the period was closed, your hours and what you received."],
+        ["Under review by management", "You sent this period and management is still reviewing it. The amount may change until it is closed."],
+        ["Estimated amount", "The likely amount while the period hasn't been closed yet."],
+      ],
+      howto: [
+        { q: "How do I see a month's detail?", steps: ["Tap the period to see the hours day by day."] },
+        { q: "How do I save the report?", steps: ["Inside the period, tap Export PDF."] },
+      ],
+    },
+    monitoramento: {
+      summary: "For supervisors: shows who in the team has already filled in this week's hours and who has open days.",
+      means: [
+        ["Filled in · Forgot to fill in · Not yet", "Each day's status for the week: done, a day that has passed and is still empty, or a day that hasn't come yet."],
+        ["Up to date · With missing days", "Summary at the top: how many employees are up to date and how many have open days."],
+        ["Week OK", "The person has already finished the week."],
+        ["Inactive and replacement", "They don't show on this page."],
+      ],
+      howto: [
+        { q: "How do I see someone's statement?", steps: ["Tap the employee to see the period's statement."] },
+      ],
+    },
+    notas: {
+      summary: "Your personal reminders, with a date.",
+      means: [
+        ["Today · Overdue · This week · Later", "Notes are grouped by date. Overdue = the date has passed."],
+        ["Notifications", "If you turn them on for this device, you get the reminder even with the app closed."],
+      ],
+      howto: [
+        { q: "How do I create and delete a note?", steps: ["Tap New note, choose the date, write the reminder and save.", "To delete, use the bin: you have 5 seconds to Undo."] },
+      ],
+    },
+  },
 };

@@ -196,5 +196,123 @@ export const MANUAL_PT = {
       ],
     },
   },
-  staff: {},
+  staff: {
+    menu: {
+      summary: "O resumo do seu dia: o que tem hoje, como vai a semana e o que precisa da sua atenção.",
+      means: [
+        ["Neste período · estimativa", "O que vai receber neste período, com as horas já registadas. É uma estimativa: o valor só fica fechado quando a gerência fechar o período."],
+        ["Hoje", "Os clientes de hoje e o botão Registar horas. Se não tiver clientes, aparece “Hoje não tem clientes”."],
+        ["Esta semana", "Quantas horas já registou face às previstas (“Registado X de Y”)."],
+        ["Precisa da sua atenção", "Dias por registar e avisos por ler (e, se for supervisor, os dias em falta na equipa). “Está tudo em dia” quando não falta nada."],
+        ["Notas", "Os seus lembretes com data."],
+        ["Atalhos", "Acesso rápido a Horas, Agenda e Clientes."],
+      ],
+      howto: [
+        { q: "Como registo as horas de hoje?", steps: ["Carregue em Registar horas no cartão “Hoje” (ou abra Horas no menu).", "Marque os clientes que fez e finalize o dia."] },
+      ],
+    },
+    horas: {
+      summary: "Onde regista as horas de cada dia, finaliza as semanas e o mês e vê quanto vai receber.",
+      means: [
+        ["Faixa da semana", "Cada dia aparece como Preenchido, Em falta ou Sem clientes (tracejado). “Hoje” fica destacado."],
+        ["Previsto", "As horas que a agenda prevê para o dia."],
+        ["Dividido com mais N", "O cliente foi feito por mais pessoas no mesmo dia: a duração divide-se entre quem o fez. Pode ajustar a sua parte em Ajustar a minha parte."],
+        ["+min · por aprovar  /  −min", "Mais tempo do que o normal é hora extra, que a gerência aprova. Menos tempo fica só marcado com − e visível para a gerência."],
+        ["Trabalhei sozinho", "Use só se fez o cliente inteiro sem o colega. Se o colega também marcou, aparece “Em revisão”: a gerência decide e, até lá, fica dividido."],
+        ["Dia finalizado · Semana finalizada · Mês finalizado", "Depois de finalizado, esse dia, semana ou mês fica bloqueado e já não pode editar. “Pela gerência” = foi finalizado pela gerência."],
+        ["Reaberto para correção", "A gerência reabriu o seu mês para corrigir. Pode voltar a mexer nas horas e finalizar de novo."],
+        ["A receber até agora", "O valor das horas já registadas. Só fica fechado quando a gerência fechar o período."],
+        ["Despesas a reembolsar", "Só aparece se a gerência lhe der essa permissão. Cada despesa fica Por aprovar, Aprovada ou Recusada."],
+      ],
+      howto: [
+        { q: "Como registo um dia?", steps: ["Escolha o dia na faixa da semana.", "Marque os clientes que fez.", "Se fez mais ou menos tempo do que o normal, use Ajustar horas.", "Carregue em Finalizar dia e confirme o resumo."] },
+        { q: "Hoje não tive clientes.", steps: ["Carregue em Hoje não tive clientes e confirme.", "Se afinal teve, use Afinal tive clientes."] },
+        { q: "Fiz o cliente de outro dia.", steps: ["Carregue em Fiz o cliente de outro dia e escolha o cliente.", "Fica registado hoje, mas conta como a visita do dia em que estava prevista."] },
+        { q: "Fiz um cliente que não está na lista.", steps: ["Carregue em Cliente fora da lista e escreva o nome.", "A gerência confirma a que cliente corresponde."] },
+        { q: "Como finalizo a semana e o mês?", steps: ["No fim da semana, carregue em Finalizar semana. Se faltar algum dia, a app pergunta se está tudo certo.", "Quando o período terminar e todas as semanas estiverem finalizadas, carregue em Finalizar mês.", "Depois disso só a gerência pode reabrir para correção."] },
+        { q: "Enganei-me numa semana já finalizada.", steps: ["Carregue em Reabrir semana: ela volta a ficar editável.", "Corrija e finalize outra vez."] },
+        { q: "O mês já foi finalizado e algo está errado.", steps: ["Carregue em Solicitar correção.", "Escreva o que está errado ou em falta e envie o pedido.", "A gerência recebe-o em Avisos."] },
+        { q: "Como lanço uma despesa?", steps: ["Em Horas, abra Despesas a reembolsar e carregue em Adicionar despesa.", "Escolha o tipo, descreva, indique o valor e a data (e a foto do recibo, se tiver).", "A gerência aprova e o valor entra no seu relatório, à parte das horas."] },
+      ],
+    },
+    agenda: {
+      summary: "Os clientes que tem em cada dia da semana.",
+      means: [
+        ["Hoje", "O dia de hoje fica destacado."],
+        ["Duração", "É a sua parte da visita. Se o cliente é partilhado, é a parte que lhe cabe."],
+        ["Cliente partilhado · N pessoas", "Mais pessoas fazem este cliente no mesmo dia e a duração divide-se entre vocês."],
+        ["Quinzenal · mensal · dia sim, dia não", "Mostra de quanto em quanto tempo o cliente aparece. “Toda semana” é o normal."],
+        ["Sem clientes neste dia", "Não tem nenhum cliente nesse dia."],
+      ],
+      howto: [
+        { q: "Como vejo outra semana?", steps: ["Use as setas Semana anterior e Semana seguinte."] },
+        { q: "Como vejo os dados de um cliente?", steps: ["Toque no cliente: abre a ficha dele em Clientes, com endereço e instruções."] },
+      ],
+    },
+    avisos: {
+      summary: "As mensagens da gerência para si e o sítio onde envia avisos e pedidos: faltas, falta de produto, problemas no local.",
+      means: [
+        ["Recebidos", "Avisos e respostas da gerência. A resposta a um aviso seu aparece como “Resposta da gerência”."],
+        ["Enviados por mim", "Tudo o que já enviou, para ver o estado."],
+        ["Assunto", "Falta de produto, Problema no local ou Outro."],
+        ["Selo no menu", "Conta os avisos que ainda não leu."],
+        ["Resolvido", "Numa falta avisada, quer dizer que a gerência já tratou de quem cobre."],
+        ["Reportar sobre um colega (supervisor)", "Os supervisores podem registar uma reclamação, um elogio ou um aviso sobre um funcionário."],
+      ],
+      howto: [
+        { q: "Como aviso que vou faltar?", steps: ["Carregue em Avisar falta.", "Escolha o primeiro dia e, se for mais de um, o último (Até ao dia). O motivo é opcional.", "Envie: a gerência vê logo e decide quem cobre.", "Para desfazer, em As minhas faltas avisadas use Cancelar aviso."] },
+        { q: "Como aviso a gerência de um problema?", steps: ["Carregue em Novo aviso.", "Escolha o assunto e o cliente e escreva o que se passa.", "Pode juntar uma foto. Envie."] },
+        { q: "Como vejo a resposta da gerência?", steps: ["Abra Recebidos, ou o próprio aviso em Enviados por mim: a resposta aparece por baixo."] },
+      ],
+    },
+    clientes: {
+      summary: "Os dados dos clientes que atende: endereço, o que fazer, prioridades e observações (como o código de acesso).",
+      means: [
+        ["Endereço", "Onde fica o cliente. Pode abri-lo no mapa."],
+        ["Descrição", "O que é para fazer neste cliente."],
+        ["Prioridades", "Os pontos a que deve dar mais atenção."],
+        ["Observação", "Informações práticas, como o acesso ou a chave."],
+        ["×/semana", "Quantas vezes por semana o cliente é visitado."],
+      ],
+      howto: [
+        { q: "Como encontro um cliente?", steps: ["Escreva o nome em Pesquisar Cliente e escolha-o na lista."] },
+        { q: "Como vou até lá?", steps: ["Abra o cliente e carregue em Abrir no mapa.", "Escolha a app de mapas que prefere."] },
+        { q: "Não vejo um cliente.", steps: ["Só aparecem os clientes da sua agenda, a menos que a gerência lhe tenha dado acesso a todos."] },
+      ],
+    },
+    historico: {
+      summary: "Os meses (períodos) que já foram fechados, com as suas horas e o valor recebido.",
+      means: [
+        ["Fechado em · Total · Valor recebido", "Quando o período foi fechado, as suas horas e o que recebeu."],
+        ["Em análise pela gerência", "Enviou este período e a gerência ainda o está a rever. O valor pode mudar até ao fecho."],
+        ["Valor estimado", "O valor provável enquanto o período ainda não foi fechado."],
+      ],
+      howto: [
+        { q: "Como vejo o detalhe de um mês?", steps: ["Toque no período para ver as horas dia a dia."] },
+        { q: "Como guardo o relatório?", steps: ["Dentro do período, carregue em Exportar PDF."] },
+      ],
+    },
+    monitoramento: {
+      summary: "Para supervisores: mostra quem da equipa já preencheu as horas da semana e quem tem dias em aberto.",
+      means: [
+        ["Preenchido · Esqueceu de preencher · Ainda não chegou", "O estado de cada dia da semana: feito, dia que já passou e ficou vazio, ou dia que ainda não chegou."],
+        ["Em dia · Com dias em falta", "Resumo no topo: quantos funcionários estão em dia e quantos têm dias em aberto."],
+        ["Semana ok", "A pessoa já finalizou a semana."],
+        ["Inativos e replacement", "Não aparecem nesta página."],
+      ],
+      howto: [
+        { q: "Como vejo o extrato de alguém?", steps: ["Toque no funcionário para ver o extrato do período."] },
+      ],
+    },
+    notas: {
+      summary: "Os seus lembretes pessoais, com data.",
+      means: [
+        ["Hoje · Em atraso · Esta semana · Mais tarde", "As notas agrupam-se pela data. Em atraso = a data já passou."],
+        ["Notificações", "Se as ativar neste aparelho, recebe o lembrete mesmo com a app fechada."],
+      ],
+      howto: [
+        { q: "Como crio e apago uma nota?", steps: ["Carregue em Nova nota, escolha a data, escreva o lembrete e guarde.", "Para apagar, use o caixote: tem 5 segundos para Desfazer."] },
+      ],
+    },
+  },
 };

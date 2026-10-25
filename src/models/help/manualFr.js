@@ -194,5 +194,123 @@ export const MANUAL_FR = {
       ],
     },
   },
-  staff: {},
+  staff: {
+    menu: {
+      summary: "Le résumé de votre journée : ce que vous avez aujourd'hui, où en est la semaine et ce qui demande votre attention.",
+      means: [
+        ["Cette période · estimation", "Ce que vous allez recevoir sur cette période, d'après les heures déjà saisies. C'est une estimation : le montant n'est définitif que lorsque la direction clôture la période."],
+        ["Aujourd'hui", "Les clients du jour et le bouton Saisir les heures. Sans client, « Aucun client aujourd'hui » s'affiche."],
+        ["Cette semaine", "Combien d'heures vous avez saisies par rapport à celles prévues (« Saisi X sur Y »)."],
+        ["À votre attention", "Jours à saisir et avis non lus (et, si vous êtes superviseur, jours manquants dans l'équipe). « Tout est à jour » quand il ne manque rien."],
+        ["Notes", "Vos rappels datés."],
+        ["Raccourcis", "Accès rapide à Heures, Planning et Clients."],
+      ],
+      howto: [
+        { q: "Comment saisir les heures d'aujourd'hui ?", steps: ["Touchez Saisir les heures sur la carte « Aujourd'hui » (ou ouvrez Heures dans le menu).", "Cochez les clients faits et terminez la journée."] },
+      ],
+    },
+    horas: {
+      summary: "L'endroit où vous saisissez les heures de chaque jour, finalisez les semaines et le mois et voyez ce que vous allez recevoir.",
+      means: [
+        ["Bandeau de la semaine", "Chaque jour apparaît comme Rempli, Manquant ou Sans clients (en pointillé). « Aujourd'hui » est mis en évidence."],
+        ["Prévu", "Les heures que le planning prévoit pour la journée."],
+        ["Partagé avec N de plus", "Le client a été fait par plus de personnes le même jour : la durée se partage entre ceux qui l'ont fait. Vous pouvez ajuster votre part avec Ajuster ma part."],
+        ["+min · à approuver  /  −min", "Plus de temps que d'habitude = heures supplémentaires, que la direction approuve. Moins de temps est simplement marqué avec − et visible pour la direction."],
+        ["J'ai travaillé seul", "À utiliser seulement si vous avez fait tout le client sans votre collègue. Si votre collègue l'a aussi saisi, « En révision » s'affiche : la direction décide et, d'ici là, c'est partagé."],
+        ["Jour finalisé · Semaine finalisée · Mois finalisé", "Une fois finalisé, ce jour, cette semaine ou ce mois est verrouillé et ne peut plus être modifié. « Par la direction » = finalisé par la direction."],
+        ["Rouvert pour correction", "La direction a rouvert votre mois pour correction. Vous pouvez modifier de nouveau les heures et le finaliser encore."],
+        ["À recevoir jusqu'ici", "La valeur des heures déjà saisies. Elle n'est définitive que lorsque la direction clôture la période."],
+        ["Dépenses à rembourser", "N'apparaît que si la direction vous en donne la permission. Chaque dépense est À approuver, Approuvée ou Refusée."],
+      ],
+      howto: [
+        { q: "Comment saisir une journée ?", steps: ["Choisissez le jour dans le bandeau de la semaine.", "Cochez les clients faits.", "Si vous avez passé plus ou moins de temps que d'habitude, utilisez Ajuster les heures.", "Touchez Finaliser la journée et confirmez le résumé."] },
+        { q: "Je n'ai eu aucun client aujourd'hui.", steps: ["Touchez Je n'ai eu aucun client aujourd'hui et confirmez.", "Si finalement vous en avez eu, utilisez Finalement j'ai eu des clients."] },
+        { q: "J'ai fait le client d'un autre jour.", steps: ["Touchez J'ai fait le client d'un autre jour et choisissez le client.", "C'est saisi aujourd'hui mais compte comme la visite du jour où elle était prévue."] },
+        { q: "J'ai fait un client qui n'est pas dans la liste.", steps: ["Touchez Client hors liste et écrivez le nom.", "La direction confirme de quel client il s'agit."] },
+        { q: "Comment finaliser la semaine et le mois ?", steps: ["En fin de semaine, touchez Finaliser la semaine. S'il manque un jour, l'app demande si tout est correct.", "Quand la période est terminée et que toutes les semaines sont finalisées, touchez Finaliser le mois.", "Ensuite, seule la direction peut rouvrir pour correction."] },
+        { q: "Je me suis trompé dans une semaine déjà finalisée.", steps: ["Touchez Rouvrir la semaine : elle redevient modifiable.", "Corrigez et finalisez de nouveau."] },
+        { q: "Le mois est finalisé et quelque chose est faux.", steps: ["Touchez Demander une correction.", "Écrivez ce qui est faux ou manquant et envoyez la demande.", "La direction la reçoit dans Avis."] },
+        { q: "Comment saisir une dépense ?", steps: ["Dans Heures, ouvrez Dépenses à rembourser et touchez Ajouter une dépense.", "Choisissez le type, décrivez, indiquez le montant et la date (et la photo du reçu, si vous en avez une).", "La direction approuve et le montant va dans votre rapport, à part des heures."] },
+      ],
+    },
+    agenda: {
+      summary: "Les clients que vous avez chaque jour de la semaine.",
+      means: [
+        ["Aujourd'hui", "Le jour d'aujourd'hui est mis en évidence."],
+        ["Durée", "C'est votre part de la visite. Si le client est partagé, c'est la part qui vous revient."],
+        ["Client partagé · N personnes", "Plus de personnes font ce client le même jour et la durée se partage entre vous."],
+        ["Bimensuel · mensuel · un jour sur deux", "Indique à quelle fréquence le client apparaît. « Chaque semaine » est le cas normal."],
+        ["Aucun client ce jour-là", "Vous n'avez aucun client ce jour-là."],
+      ],
+      howto: [
+        { q: "Comment voir une autre semaine ?", steps: ["Utilisez les flèches Semaine précédente et Semaine suivante."] },
+        { q: "Comment voir les données d'un client ?", steps: ["Touchez le client : sa fiche s'ouvre dans Clients, avec l'adresse et les consignes."] },
+      ],
+    },
+    avisos: {
+      summary: "Les messages de la direction pour vous et l'endroit où vous envoyez avis et demandes : absences, produit manquant, problèmes sur place.",
+      means: [
+        ["Reçus", "Avis et réponses de la direction. La réponse à un de vos avis apparaît comme « Réponse de la direction »."],
+        ["Envoyés par moi", "Tout ce que vous avez déjà envoyé, pour voir l'état."],
+        ["Sujet", "Produit manquant, Problème sur place ou Autre."],
+        ["Pastille du menu", "Compte les avis que vous n'avez pas encore lus."],
+        ["Réglé", "Sur une absence signalée, cela veut dire que la direction a déjà réglé qui remplace."],
+        ["Signaler un collègue (superviseur)", "Les superviseurs peuvent enregistrer une réclamation, un compliment ou un avis sur un employé."],
+      ],
+      howto: [
+        { q: "Comment signaler que je serai absent ?", steps: ["Touchez Signaler une absence.", "Choisissez le premier jour et, si c'est plus d'un, le dernier (Jusqu'au jour). Le motif est facultatif.", "Envoyez : la direction le voit tout de suite et décide qui remplace.", "Pour annuler, dans Mes absences signalées utilisez Annuler l'avis."] },
+        { q: "Comment prévenir la direction d'un problème ?", steps: ["Touchez Nouvel avis.", "Choisissez le sujet et le client et écrivez ce qui se passe.", "Vous pouvez joindre une photo. Envoyez."] },
+        { q: "Comment voir la réponse de la direction ?", steps: ["Ouvrez Reçus, ou l'avis lui-même dans Envoyés par moi : la réponse s'affiche dessous."] },
+      ],
+    },
+    clientes: {
+      summary: "Les données des clients que vous servez : adresse, ce qu'il faut faire, priorités et remarques (comme le code d'accès).",
+      means: [
+        ["Adresse", "Où se trouve le client. Vous pouvez l'ouvrir sur la carte."],
+        ["Description", "Ce qu'il faut faire chez ce client."],
+        ["Priorités", "Les points qui demandent plus d'attention."],
+        ["Remarque", "Informations pratiques, comme l'accès ou la clé."],
+        ["×/semaine", "Combien de fois par semaine le client est visité."],
+      ],
+      howto: [
+        { q: "Comment trouver un client ?", steps: ["Écrivez le nom dans Rechercher un client et choisissez-le dans la liste."] },
+        { q: "Comment m'y rendre ?", steps: ["Ouvrez le client et touchez Ouvrir sur la carte.", "Choisissez l'app de cartes que vous préférez."] },
+        { q: "Je ne vois pas un client.", steps: ["Seuls les clients de votre planning apparaissent, sauf si la direction vous a donné accès à tous."] },
+      ],
+    },
+    historico: {
+      summary: "Les mois (périodes) déjà clôturés, avec vos heures et le montant reçu.",
+      means: [
+        ["Clôturé le · Total · Montant reçu", "Quand la période a été clôturée, vos heures et ce que vous avez reçu."],
+        ["En cours d'examen par la direction", "Vous avez envoyé cette période et la direction l'examine encore. Le montant peut changer jusqu'à la clôture."],
+        ["Montant estimé", "Le montant probable tant que la période n'est pas clôturée."],
+      ],
+      howto: [
+        { q: "Comment voir le détail d'un mois ?", steps: ["Touchez la période pour voir les heures jour par jour."] },
+        { q: "Comment enregistrer le rapport ?", steps: ["Dans la période, touchez Exporter en PDF."] },
+      ],
+    },
+    monitoramento: {
+      summary: "Pour les superviseurs : montre qui, dans l'équipe, a déjà rempli les heures de la semaine et qui a des jours ouverts.",
+      means: [
+        ["Rempli · A oublié de remplir · Pas encore", "L'état de chaque jour de la semaine : fait, jour passé resté vide, ou jour pas encore arrivé."],
+        ["À jour · Avec jours manquants", "Résumé en haut : combien d'employés sont à jour et combien ont des jours ouverts."],
+        ["Semaine ok", "La personne a déjà finalisé la semaine."],
+        ["Inactifs et remplacement", "Ils n'apparaissent pas sur cette page."],
+      ],
+      howto: [
+        { q: "Comment voir le relevé de quelqu'un ?", steps: ["Touchez l'employé pour voir le relevé de la période."] },
+      ],
+    },
+    notas: {
+      summary: "Vos rappels personnels, avec une date.",
+      means: [
+        ["Aujourd'hui · En retard · Cette semaine · Plus tard", "Les notes sont regroupées par date. En retard = la date est passée."],
+        ["Notifications", "Si vous les activez sur cet appareil, vous recevez le rappel même avec l'app fermée."],
+      ],
+      howto: [
+        { q: "Comment créer et supprimer une note ?", steps: ["Touchez Nouvelle note, choisissez la date, écrivez le rappel et enregistrez.", "Pour supprimer, utilisez la corbeille : vous avez 5 secondes pour Annuler."] },
+      ],
+    },
+  },
 };
