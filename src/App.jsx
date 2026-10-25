@@ -1,7 +1,7 @@
 // Camada "View" raiz: lê o estado do controller e decide qual tela mostrar.
 // Não guarda estado do negócio — só consome useAppController().
-import { useEffect, useState } from "react";
-import { MoreHorizontal, LogOut, Repeat, Download } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MoreHorizontal, LogOut, Repeat, Download, CircleHelp } from "lucide-react";
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { useAppController } from "./controllers/useAppController.js";
 import { styles } from "./styles/styles.js";
@@ -32,6 +32,8 @@ import AcessosScreen from "./views/management/AcessosScreen.jsx";
 import HistoricoScreen from "./views/management/HistoricoScreen.jsx";
 import DefinicoesScreen from "./views/management/DefinicoesScreen.jsx";
 import NotasScreen from "./views/shared/NotasScreen.jsx";
+import HelpScreen, { HelpDrawer, HelpFab } from "./views/shared/HelpScreen.jsx";
+import { helpTexts } from "./models/helpTexts.js";
 
 // EmployeeMenuScreen.jsx (a lista de botões sem casca nenhuma) ficou
 // substituído pelo EmployeeInicioScreen novo + a casca da Etapa 3 abaixo
@@ -58,6 +60,15 @@ export default function App() {
   // mudou, só a sidebar em volta).
   const empTier = useBreakpoint();
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  // Ajuda: no PC/tablet o botão "?" abre uma gaveta virada para a página atual; no telemóvel é uma
+  // página ("ajuda") — por isso guardamos a última página real, para o pedido dizer de onde veio.
+  const [helpOpen, setHelpOpen] = useState(false);
+  const lastPageRef = useRef({ m: "dashboard", e: "menu" });
+  useEffect(() => {
+    if (c.screen !== "ajuda") lastPageRef.current.m = c.screen;
+    if (c.empScreen !== "ajuda") lastPageRef.current.e = c.empScreen;
+    setHelpOpen(false);
+  }, [c.screen, c.empScreen]);
   // Ao trocar de ecrã volta ao topo (antes ficava na posição de rolagem do ecrã anterior).
   useEffect(() => { if (typeof window !== "undefined") window.scrollTo(0, 0); }, [c.screen, c.empScreen]);
   // styles.page tem minHeight fixo de 700px, pensado para desktop. Em telemóveis
@@ -208,6 +219,9 @@ export default function App() {
             {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} openPeriodStart={isoDateStr(openPeriodNow.start)} companyEmail={c.company.email} />}
             {c.screen === "contratantes" && <ContratantesScreen lang={c.lang} setLang={c.setLang} contractors={c.contractors} setContractors={c.setContractors} onDeleteContractor={c.deleteContractor} clients={c.clients} setClients={c.setClients} staff={c.staff} horasData={c.horasData} closedPeriods={c.closedPeriods} cutoffDay={c.cutoffDay} assignments={c.assignments} covers={c.covers} absences={c.absences} closings={c.contractorClosings} onSaveClosing={c.saveClosing} companyName={c.company.name} companyInfo={c.company} who={c.company.email} onNavigate={c.goTo} navIntent={c.navIntent} />}
             {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} companyEmail={c.company.email} />}
+            {c.screen === "ajuda" && (
+              <HelpScreen lang={c.lang} setLang={c.setLang} role="manager" reportKey={lastPageRef.current.m} userName={c.me?.name || c.company.name} onHome={() => c.setScreen(lastPageRef.current.m)} desktop={!mgmtMobile} />
+            )}
             {c.screen === "definicoes" && (
               <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} closeDeadlineDays={c.closeDeadlineDays} setCloseDeadlineDays={c.setCloseDeadlineDays} highlightsMonths={c.highlightsMonths} setHighlightsMonths={c.setHighlightsMonths} highlightsRealtime={c.highlightsRealtime} setHighlightsRealtime={c.setHighlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
             )}
@@ -223,6 +237,7 @@ export default function App() {
           const moreItems = [
             ...managementItems.filter((it) => !bottomKeys.includes(it.key)).map((it) => ({ ...it, onSelect: () => c.setScreen(it.key) })),
             ...(canSwitchToEmployee ? [{ key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsEmployee, onSelect: () => c.enterEmployee(c.loggedInStaffId) }] : []),
+            { key: "ajuda", icon: CircleHelp, label: helpTexts(c.lang).ui.title, onSelect: () => c.setScreen("ajuda") },
             ...(!install.installed ? [{
               key: "install", icon: Download, label: T[c.lang].common.installApp,
               onSelect: () => { if (install.canPromptNative) install.promptInstall(); else window.location.assign(`/instalar?lang=${c.lang}`); },
@@ -256,6 +271,8 @@ export default function App() {
             user={managementUser} onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
           />
           {mgmtContent}
+          {c.screen !== "ajuda" && <HelpFab lang={c.lang} onClick={() => setHelpOpen(true)} />}
+          <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role="manager" screenKey={c.screen} userName={c.me?.name || c.company.name} />
         </div>
         );
       })()}
@@ -322,6 +339,9 @@ export default function App() {
             {c.empScreen === "monitoramento" && (
               <MonitoramentoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} covers={c.covers} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} absences={c.absences} />
             )}
+            {c.empScreen === "ajuda" && (
+              <HelpScreen lang={c.lang} setLang={c.setLang} role={isSupervisor ? "supervisor" : "employee"} reportKey={lastPageRef.current.e} userName={c.me.name} onHome={() => c.setEmpScreen(lastPageRef.current.e)} desktop={empTier !== "mobile"} />
+            )}
             {c.empScreen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} ownerId={c.me.id} personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop={empTier !== "mobile"} />
             )}
@@ -371,6 +391,7 @@ export default function App() {
             // Ainda no navegador (não instalado): atalho para baixar o app.
             // Com o diálogo nativo (Chrome/Android) instala logo; nos outros
             // casos abre a página /instalar com o passo a passo.
+            { key: "ajuda", icon: CircleHelp, label: helpTexts(c.lang).ui.title, onSelect: () => c.setEmpScreen("ajuda") },
             ...(!install.installed ? [{
               key: "install", icon: Download, label: T[c.lang].common.installApp,
               onSelect: () => { if (install.canPromptNative) install.promptInstall(); else window.location.assign(`/instalar?lang=${c.lang}`); },
@@ -427,6 +448,8 @@ export default function App() {
                 {body}
               </div>
             </div>
+            {c.empScreen !== "ajuda" && <HelpFab lang={c.lang} onClick={() => setHelpOpen(true)} />}
+            <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role={isSupervisor ? "supervisor" : "employee"} screenKey={c.empScreen} userName={c.me.name} />
           </div>
         );
       })()}

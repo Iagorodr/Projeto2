@@ -14,6 +14,7 @@ import CompanyCard from "./CompanyCard.jsx";
 import CompanyFormDialog from "./CompanyFormDialog.jsx";
 import DeliveryDialog from "./DeliveryDialog.jsx";
 import DeleteForeverDialog from "./DeleteForeverDialog.jsx";
+import HelpReportsPanel from "./HelpReportsPanel.jsx";
 import { adminClient, adminConfigured } from "../../models/adminClient.js";
 import { isMissingRpc } from "../../models/horasSync.js";
 import { FILTERS, filterCompanies, sortCompanies, errorMessage, accessLink, formatIsoDate, isArchived } from "../../models/adminCompanies.js";
@@ -63,6 +64,9 @@ export default function AdminApp() {
   const [delivery, setDelivery] = useState(null); // null | { company, email, password?, error? }
   const [confirm, setConfirm] = useState(null);   // null | { title, text, label, danger, onConfirm }
   const [deleting, setDeleting] = useState(null); // null | empresa arquivada a excluir para sempre
+  const [tab, setTab] = useState("companies");    // companies | help
+  const [reports, setReports] = useState([]);     // pedidos de ajuda (ajuda.sql)
+  const [reportsError, setReportsError] = useState(null);
 
   const notify = useCallback((msg) => {
     setToast(msg);
@@ -80,6 +84,18 @@ export default function AdminApp() {
     return true;
   }, []);
 
+  // Pedidos de ajuda enviados pelas equipas (ajuda.sql). Um banco sem esse SQL só mostra o aviso.
+  const loadReports = useCallback(async () => {
+    const { data, error } = await adminClient.rpc("admin_list_help_reports");
+    if (error) {
+      setReportsError(isMissingRpc(error) ? "O SQL da Ajuda (ajuda.sql) ainda não foi aplicado neste projeto." : errorMessage(error));
+      return false;
+    }
+    setReportsError(null);
+    setReports(Array.isArray(data) ? data : []);
+    return true;
+  }, []);
+
   // Confirma que a conta é de administração e só então carrega a lista.
   const admit = useCallback(async (email) => {
     const { data, error } = await adminClient.rpc("is_platform_admin");
@@ -89,9 +105,10 @@ export default function AdminApp() {
     }
     setAdminEmail(email);
     await loadCompanies();
+    await loadReports();
     setPhase("ready");
     return null;
-  }, [loadCompanies]);
+  }, [loadCompanies, loadReports]);
 
   useEffect(() => {
     if (!adminConfigured) return;
@@ -118,13 +135,21 @@ export default function AdminApp() {
 
   async function logout() {
     await adminClient.auth.signOut();
-    setCompanies([]); setPhase("login");
+    setCompanies([]); setReports([]); setTab("companies"); setPhase("login");
   }
 
   // Executa uma ação com o botão "ocupado" e mostra o erro (se houver).
   async function run(fn) {
     setBusy(true);
     try { return await fn(); } catch (err) { notify(errorMessage(err)); return null; } finally { setBusy(false); }
+  }
+
+  async function setReportStatus(id, status) {
+    await run(async () => {
+      const { error } = await adminClient.rpc("admin_set_help_report_status", { p_id: id, p_status: status });
+      if (error) throw error;
+      setReports((list) => list.map((r) => (r.id === id ? { ...r, status, handledAt: status === "new" ? null : new Date().toISOString() } : r)));
+    });
   }
 
   const replaceCompany = (updated) => setCompanies((list) => list.map((c) => (c.id === updated.id ? updated : c)));
@@ -236,12 +261,28 @@ export default function AdminApp() {
         <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 18 }}>Servix <span style={{ color: COLORS.navIconActive }}>·</span> Administração</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 13 }}>
           <span style={{ opacity: 0.85, overflowWrap: "anywhere" }}>{adminEmail}</span>
-          <button type="button" onClick={() => run(loadCompanies)} disabled={busy} aria-label="Atualizar" style={headerBtn}><RefreshCw size={16} /> Atualizar</button>
+          <button type="button" onClick={() => run(async () => { await loadCompanies(); await loadReports(); })} disabled={busy} aria-label="Atualizar" style={headerBtn}><RefreshCw size={16} /> Atualizar</button>
           <button type="button" onClick={logout} style={headerBtn}><LogOut size={16} /> Sair</button>
         </div>
       </header>
 
       <main style={{ maxWidth: 1180, margin: "0 auto", padding: "20px 16px 60px", boxSizing: "border-box" }}>
+        <div role="tablist" style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          {[{ key: "companies", label: "Empresas" }, { key: "help", label: "Pedidos de ajuda", badge: reports.filter((r) => r.status === "new").length }].map((t) => {
+            const on = tab === t.key;
+            return (
+              <button key={t.key} type="button" role="tab" aria-selected={on} onClick={() => setTab(t.key)}
+                style={{ height: 40, padding: "0 16px", borderRadius: 10, border: `1px solid ${on ? COLORS.forest800 : COLORS.line}`, background: on ? COLORS.forest800 : COLORS.card, color: on ? "#fff" : COLORS.ink, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                {t.label}
+                {t.badge > 0 && <span style={{ background: COLORS.clay || "#E8743B", color: "#fff", borderRadius: 999, minWidth: 20, height: 20, padding: "0 6px", fontSize: 12, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{t.badge}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === "help" && <HelpReportsPanel reports={reports} error={reportsError} busy={busy} onSetStatus={setReportStatus} />}
+
+        {tab === "companies" && (<>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
           <div style={{ fontFamily: FONT.heading, fontSize: 24, fontWeight: 600 }}>Empresas <span style={{ color: COLORS.ink3, fontWeight: 500, fontSize: 18 }}>({companies.filter((c) => !isArchived(c)).length})</span></div>
           <Button type="button" variant="primary" onClick={() => setForm({ mode: "create" })} icon={Plus}>Nova empresa</Button>
@@ -276,6 +317,7 @@ export default function AdminApp() {
             ))}
           </div>
         )}
+        </>)}
       </main>
 
       {form && (
