@@ -1077,7 +1077,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
                     <div
                       key={day}
                       style={{
-                        height: 44, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, minWidth: 0,
+                        height: 44, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, minWidth: 0, overflow: "hidden",
                         background: isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
                       }}
                     >

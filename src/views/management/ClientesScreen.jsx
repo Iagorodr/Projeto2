@@ -381,26 +381,15 @@ function ClientesScreen({
       render: (c) => {
         const logged = clientTotalHours(horasData, c.id, period);
         const exp = clientExpectedHours(c, period, hoursCtx, TODAY);
-        const TOL = 0.5; // meia hora de margem
         if (exp.whole <= 0 && logged <= 0) return <span style={{ fontSize: 12, color: COLORS.ink3 }}>{t.hoursNoPlan}</span>;
-        const late = exp.toYesterday - logged;
-        const over = logged - exp.toToday;
-        const status = late > TOL
-          ? <Pill variant="pending">{t.hoursLate(fmtHoursScreen(late))}</Pill>
-          : over > TOL
-            ? <Pill variant="owed">{t.hoursOver(fmtHoursScreen(over))}</Pill>
-            : <Pill variant="paid">{t.hoursOnTrack}</Pill>;
+        // Só a barra: horas feitas / horas previstas para o período todo.
         return (
-          <div title={t.hoursToDateHint} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <div title={t.hoursToDateHint}>
             <ProgressBar
-              value={logged} max={Math.max(exp.toToday, logged)}
-              label={t.hoursToDateLabel(fmtHoursScreen(logged), fmtHoursScreen(exp.toToday))}
+              value={logged} max={Math.max(exp.whole, logged)}
+              label={t.hoursToDateLabel(fmtHoursScreen(logged), fmtHoursScreen(exp.whole))}
               style={{ minWidth: 150 }}
             />
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {status}
-              <span style={{ fontSize: 11.5, color: COLORS.ink3 }}>{t.hoursPlanTotal(fmtHoursScreen(exp.whole))}</span>
-            </div>
           </div>
         );
       },
