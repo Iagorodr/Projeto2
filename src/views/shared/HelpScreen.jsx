@@ -31,16 +31,35 @@ function pageName(lang, role, key) {
   return names[key] || "";
 }
 
-// O manual de uma página: para que serve, o que cada etiqueta/cor significa e como fazer o mais comum.
+// Linha que abre/fecha (título + seta), usada para as secções do manual e para cada pergunta.
+function Fold({ title, count, open, onToggle, children, strong }) {
+  return (
+    <div style={{ borderTop: `1px solid ${COLORS.lineSoft}` }}>
+      <button
+        type="button" onClick={onToggle} aria-expanded={open}
+        style={{ width: "100%", minHeight: 44, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "transparent", border: "none", padding: "6px 2px", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+      >
+        <span style={{ fontSize: strong ? 14 : 13.5, fontWeight: strong ? 700 : 600, color: COLORS.ink }}>
+          {title}{count != null && <span style={{ color: COLORS.ink3, fontWeight: 500 }}> · {count}</span>}
+        </span>
+        <ChevronDown size={18} color={COLORS.ink3} style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform .15s ease" }} />
+      </button>
+      {open && <div style={{ padding: "2px 2px 12px" }}>{children}</div>}
+    </div>
+  );
+}
+
+// O manual de uma página: a frase do que serve fica sempre à vista; "o que cada coisa significa" e
+// "como fazer" (cada pergunta à parte) só abrem quando se carrega, para não ocupar o ecrã.
 function ManualView({ lang, manual }) {
   const h = helpTexts(lang).ui;
-  const sub = { fontSize: 11.5, fontWeight: 700, color: COLORS.ink3, textTransform: "uppercase", letterSpacing: "0.03em", margin: "16px 0 8px" };
+  const [open, setOpen] = useState({});
+  const toggle = (k) => setOpen((o) => ({ ...o, [k]: !o[k] }));
   return (
     <div>
-      <div style={{ fontSize: 14, color: COLORS.ink, lineHeight: 1.55 }}>{manual.summary}</div>
+      <div style={{ fontSize: 14, color: COLORS.ink, lineHeight: 1.55, marginBottom: 6 }}>{manual.summary}</div>
       {manual.means?.length > 0 && (
-        <>
-          <div style={sub}>{h.means}</div>
+        <Fold strong title={h.means} count={manual.means.length} open={!!open.means} onToggle={() => toggle("means")}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {manual.means.map(([term, text]) => (
               <div key={term} style={{ fontSize: 13.5, lineHeight: 1.5, color: COLORS.ink2 }}>
@@ -49,22 +68,20 @@ function ManualView({ lang, manual }) {
               </div>
             ))}
           </div>
-        </>
+        </Fold>
       )}
       {manual.howto?.length > 0 && (
-        <>
-          <div style={sub}>{h.howto}</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {manual.howto.map((item) => (
-              <div key={item.q}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>{item.q}</div>
+        <Fold strong title={h.howto} count={manual.howto.length} open={!!open.howto} onToggle={() => toggle("howto")}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {manual.howto.map((item, idx) => (
+              <Fold key={item.q} title={item.q} open={!!open[`q${idx}`]} onToggle={() => toggle(`q${idx}`)}>
                 <ol style={{ margin: 0, paddingLeft: 20, fontSize: 13.5, lineHeight: 1.55, color: COLORS.ink2 }}>
                   {item.steps.map((st, i) => <li key={i} style={{ marginBottom: 2 }}>{st}</li>)}
                 </ol>
-              </div>
+              </Fold>
             ))}
           </div>
-        </>
+        </Fold>
       )}
     </div>
   );
@@ -163,7 +180,7 @@ function HelpBody({ lang, role, contextKey, contextLabel, reportKey, userName, s
       {ctxManual && ctxName && (
         <Card variant="tintOk" style={{ padding: 18 }}>
           <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.vivoInk, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 4 }}>{contextLabel || h.thisPage}</div>
-          <div style={{ fontFamily: FONT.heading, fontSize: 20, fontWeight: 600, color: COLORS.ink, marginBottom: 8 }}>{ctxName}</div>
+          <div style={{ fontFamily: FONT.heading, fontSize: 20, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>{ctxName}</div>
           <ManualView lang={lang} manual={ctxManual} />
         </Card>
       )}
