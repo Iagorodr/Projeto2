@@ -2,11 +2,17 @@
 // do app. Os resumos (`pages`) são o ponto de partida dos manuais: cada página pode ganhar mais
 // secções em `items` ([{ h, p }]) sem mexer no ecrã. Chaves de `manager` = ecrãs da gerência
 // (`screen`); chaves de `staff` = ecrãs do funcionário/supervisor (`empScreen`).
+import { MANUAL_PT } from "./help/manualPt.js";
+import { MANUAL_EN } from "./help/manualEn.js";
+import { MANUAL_FR } from "./help/manualFr.js";
+
+const MANUALS = { pt: MANUAL_PT, en: MANUAL_EN, fr: MANUAL_FR };
+
 export const HELP_TEXTS = {
   pt: {
     ui: {
       title: "Ajuda", fabLabel: "Ajuda", close: "Fechar", back: "Voltar",
-      thisPage: "Esta página", guides: "Guias por página", guidesHint: "Toque numa página para ver o que ela faz.",
+      thisPage: "Esta página", prevPage: "Página onde estava", otherPages: "Outras páginas", means: "O que cada coisa significa", howto: "Como fazer", guides: "Guias por página", guidesHint: "Toque numa página para ver o que ela faz.",
       openAll: "Ver todas as páginas", noGuide: "Ainda não há guia para esta página.",
       reportTitle: "Precisa de ajuda?",
       reportIntro: "Conte-nos o que se passa. A mensagem chega à equipa do Servix já com a página onde está, o seu nome e a empresa.",
@@ -51,7 +57,7 @@ export const HELP_TEXTS = {
   en: {
     ui: {
       title: "Help", fabLabel: "Help", close: "Close", back: "Back",
-      thisPage: "This page", guides: "Guides by page", guidesHint: "Tap a page to see what it does.",
+      thisPage: "This page", prevPage: "Page you were on", otherPages: "Other pages", means: "What everything means", howto: "How to", guides: "Guides by page", guidesHint: "Tap a page to see what it does.",
       openAll: "See all pages", noGuide: "There is no guide for this page yet.",
       reportTitle: "Need help?",
       reportIntro: "Tell us what's going on. The message reaches the Servix team together with the page you're on, your name and your company.",
@@ -96,7 +102,7 @@ export const HELP_TEXTS = {
   fr: {
     ui: {
       title: "Aide", fabLabel: "Aide", close: "Fermer", back: "Retour",
-      thisPage: "Cette page", guides: "Guides par page", guidesHint: "Touchez une page pour voir à quoi elle sert.",
+      thisPage: "Cette page", prevPage: "Page où vous étiez", otherPages: "Autres pages", means: "Ce que signifie chaque élément", howto: "Comment faire", guides: "Guides par page", guidesHint: "Touchez une page pour voir à quoi elle sert.",
       openAll: "Voir toutes les pages", noGuide: "Il n'y a pas encore de guide pour cette page.",
       reportTitle: "Besoin d'aide ?",
       reportIntro: "Dites-nous ce qui se passe. Le message arrive à l'équipe Servix avec la page où vous êtes, votre nom et votre entreprise.",
@@ -141,3 +147,13 @@ export const HELP_TEXTS = {
 };
 
 export function helpTexts(lang) { return HELP_TEXTS[lang] || HELP_TEXTS.pt; }
+
+// Manual de uma página: { summary, means: [[termo, texto]], howto: [{ q, steps }] }.
+// Páginas sem manual completo (ainda) devolvem só o resumo.
+export function manualFor(lang, role, key) {
+  const group = role === "manager" ? "manager" : "staff";
+  const full = (MANUALS[lang] || MANUALS.pt)[group]?.[key];
+  if (full) return full;
+  const summary = helpTexts(lang).pages[group][key];
+  return summary ? { summary, means: [], howto: [] } : null;
+}

@@ -11,7 +11,7 @@ import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { T } from "../../models/i18n.js";
-import { helpTexts } from "../../models/helpTexts.js";
+import { helpTexts, manualFor } from "../../models/helpTexts.js";
 import { submitHelpReport, HELP_KINDS } from "../../models/helpApi.js";
 import { Card, Button, PageHeader, MobileHeader, Drawer, SegmentedControl } from "./ui/index.js";
 
@@ -26,16 +26,51 @@ function pageList(lang, role) {
   return order.map((key) => ({ key, name: names[key] })).filter((p) => p.name);
 }
 
-function pageSummary(h, role, key) {
-  return h.pages[role === "manager" ? "manager" : "staff"][key] || "";
-}
-
 function pageName(lang, role, key) {
   const names = role === "manager" ? T[lang].sidebar : T[lang].supervisorSidebar;
   return names[key] || "";
 }
 
-function GuideRow({ page, summary, open, onToggle }) {
+// O manual de uma página: para que serve, o que cada etiqueta/cor significa e como fazer o mais comum.
+function ManualView({ lang, manual }) {
+  const h = helpTexts(lang).ui;
+  const sub = { fontSize: 11.5, fontWeight: 700, color: COLORS.ink3, textTransform: "uppercase", letterSpacing: "0.03em", margin: "16px 0 8px" };
+  return (
+    <div>
+      <div style={{ fontSize: 14, color: COLORS.ink, lineHeight: 1.55 }}>{manual.summary}</div>
+      {manual.means?.length > 0 && (
+        <>
+          <div style={sub}>{h.means}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {manual.means.map(([term, text]) => (
+              <div key={term} style={{ fontSize: 13.5, lineHeight: 1.5, color: COLORS.ink2 }}>
+                <div style={{ fontWeight: 700, color: COLORS.ink }}>{term}</div>
+                {text}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {manual.howto?.length > 0 && (
+        <>
+          <div style={sub}>{h.howto}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {manual.howto.map((item) => (
+              <div key={item.q}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>{item.q}</div>
+                <ol style={{ margin: 0, paddingLeft: 20, fontSize: 13.5, lineHeight: 1.55, color: COLORS.ink2 }}>
+                  {item.steps.map((st, i) => <li key={i} style={{ marginBottom: 2 }}>{st}</li>)}
+                </ol>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function GuideRow({ lang, page, manual, open, onToggle }) {
   return (
     <div style={{ borderTop: `1px solid ${COLORS.lineSoft}` }}>
       <button
@@ -45,7 +80,7 @@ function GuideRow({ page, summary, open, onToggle }) {
         <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{page.name}</span>
         <ChevronDown size={18} color={COLORS.ink3} style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform .15s ease" }} />
       </button>
-      {open && <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, padding: "0 2px 12px" }}>{summary}</div>}
+      {open && manual && <div style={{ padding: "2px 2px 14px" }}><ManualView lang={lang} manual={manual} /></div>}
     </div>
   );
 }
@@ -113,37 +148,38 @@ function ReportForm({ lang, role, reportKey, userName, small }) {
   );
 }
 
-// Corpo da Ajuda (usado na página do telemóvel e na gaveta do PC).
-//  contextKey = página em que a pessoa está (cartão "Esta página"); reportKey = o que vai no pedido.
-function HelpBody({ lang, role, contextKey, reportKey, userName, small }) {
+// Corpo da Ajuda (usado na página do telemóvel e na gaveta do PC): primeiro o manual da página em que
+// se está, depois as outras páginas e, no fim, o formulário para pedir apoio.
+//  contextKey = página em que a pessoa está; reportKey = o que vai no pedido.
+function HelpBody({ lang, role, contextKey, contextLabel, reportKey, userName, small }) {
   const h = helpTexts(lang).ui;
   const pages = pageList(lang, role);
   const [openKey, setOpenKey] = useState(null);
-  const ctxSummary = contextKey ? pageSummary(helpTexts(lang), role, contextKey) : "";
+  const ctxManual = contextKey ? manualFor(lang, role, contextKey) : null;
   const ctxName = contextKey ? pageName(lang, role, contextKey) : "";
-  const others = pages;
+  const others = pages.filter((p) => p.key !== contextKey);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {contextKey && ctxName && (
-        <Card variant="tintOk" style={{ padding: 16 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.vivoInk, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 4 }}>{h.thisPage}</div>
-          <div style={{ fontFamily: FONT.heading, fontSize: 18, fontWeight: 600, color: COLORS.ink, marginBottom: 4 }}>{ctxName}</div>
-          <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5 }}>{ctxSummary || h.noGuide}</div>
+      {ctxManual && ctxName && (
+        <Card variant="tintOk" style={{ padding: 18 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.vivoInk, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 4 }}>{contextLabel || h.thisPage}</div>
+          <div style={{ fontFamily: FONT.heading, fontSize: 20, fontWeight: 600, color: COLORS.ink, marginBottom: 8 }}>{ctxName}</div>
+          <ManualView lang={lang} manual={ctxManual} />
         </Card>
       )}
+
+      <Card style={{ padding: "14px 16px 4px" }}>
+        <div style={{ fontFamily: FONT.heading, fontSize: 16, fontWeight: 600, color: COLORS.ink }}>{ctxManual ? h.otherPages : h.guides}</div>
+        <div style={{ fontSize: 12.5, color: COLORS.ink3, margin: "2px 0 8px" }}>{h.guidesHint}</div>
+        {others.map((p) => (
+          <GuideRow key={p.key} lang={lang} page={p} manual={manualFor(lang, role, p.key)} open={openKey === p.key} onToggle={() => setOpenKey(openKey === p.key ? null : p.key)} />
+        ))}
+      </Card>
 
       <Card style={{ padding: 16 }}>
         <div style={{ fontFamily: FONT.heading, fontSize: 16, fontWeight: 600, color: COLORS.ink }}>{h.reportTitle}</div>
         <div style={{ height: 10 }} />
         <ReportForm key={lang} lang={lang} role={role} reportKey={reportKey} userName={userName} small={small} />
-      </Card>
-
-      <Card style={{ padding: "14px 16px 4px" }}>
-        <div style={{ fontFamily: FONT.heading, fontSize: 16, fontWeight: 600, color: COLORS.ink }}>{h.guides}</div>
-        <div style={{ fontSize: 12.5, color: COLORS.ink3, margin: "2px 0 8px" }}>{h.guidesHint}</div>
-        {others.map((p) => (
-          <GuideRow key={p.key} page={p} summary={pageSummary(helpTexts(lang), role, p.key) || h.noGuide} open={openKey === p.key} onToggle={() => setOpenKey(openKey === p.key ? null : p.key)} />
-        ))}
       </Card>
     </div>
   );
@@ -152,7 +188,7 @@ function HelpBody({ lang, role, contextKey, reportKey, userName, small }) {
 // Página "Ajuda" inteira (telemóvel; no PC também funciona se se chegar aqui).
 export default function HelpScreen({ lang, setLang, role, reportKey, userName, onHome, desktop }) {
   const h = helpTexts(lang).ui;
-  const body = <HelpBody lang={lang} role={role} contextKey={desktop ? reportKey : null} reportKey={reportKey} userName={userName} small={!desktop} />;
+  const body = <HelpBody lang={lang} role={role} contextKey={reportKey} contextLabel={desktop ? h.thisPage : h.prevPage} reportKey={reportKey} userName={userName} small={!desktop} />;
   if (desktop) {
     return (
       <div style={styles.content}>
