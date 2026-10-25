@@ -39,7 +39,7 @@ const T = {
     pdf: {
       colDate: "Data", colClient: "Cliente", colHours: "Horas", colValueHour: "Valor/hora", colTotal: "Total",
       colStaff: "Funcionário", colStatus: "Status", colTotalHours: "Total de horas", colTotalPay: "Total a pagar",
-      totalHoursLabel: "Total de horas", totalValueLabel: "Valor a receber", generatedOn: "Gerado em",
+      totalHoursLabel: "Total de horas", totalValueLabel: "Valor a receber", generatedOn: "Gerado em", companyVat: "NIF/IVA", companyPhone: "Tel",
       reportTitleStaff: "Relatório de horas", reportTitleGeneral: "Resumo do período",
       provisionalStamp: "PROVISÓRIO", extraPendingLegend: "* hora extra por aprovar",
       expensesTitle: "Reembolsos", colExpenseDesc: "Descrição", colExpenseStatus: "Estado", expenseTotalLabel: "Reembolsos", grandTotalLabel: "Total a receber", expensePendingLegend: "† despesa por aprovar (não soma)", colExpenses: "Reembolsos",
@@ -612,6 +612,8 @@ const T = {
     definicoes: {
       title: "Definições",
       navProfile: "Perfil", navPayment: "Pagamento", navAlerts: "Alertas", navDanger: "Zona de risco",
+      companyDataTitle: "Dados da empresa", companyDataHint: "Aparecem no cabeçalho dos relatórios em PDF (contratantes e histórico).",
+      fAddress: "Morada", fVat: "Nº de empresa / IVA", fIban: "IBAN", fPhone: "Telefone",
       companyProfile: "Perfil da empresa", companyName: "Nome da empresa", email: "Email", newPassword: "Nova palavra-passe",
       keepPasswordHint: "Deixe em branco para manter a palavra-passe atual.",
       changePhoto: "Alterar foto", removePhoto: "Remover foto", photoHint: "PNG ou JPG",
@@ -895,7 +897,7 @@ const T = {
     pdf: {
       colDate: "Date", colClient: "Client", colHours: "Hours", colValueHour: "Value/hour", colTotal: "Total",
       colStaff: "Staff", colStatus: "Status", colTotalHours: "Total hours", colTotalPay: "Total to pay",
-      totalHoursLabel: "Total hours", totalValueLabel: "Amount to receive", generatedOn: "Generated on",
+      totalHoursLabel: "Total hours", totalValueLabel: "Amount to receive", generatedOn: "Generated on", companyVat: "VAT", companyPhone: "Tel",
       reportTitleStaff: "Hours report", reportTitleGeneral: "Period summary",
       provisionalStamp: "PROVISIONAL", extraPendingLegend: "* overtime pending approval",
       expensesTitle: "Reimbursements", colExpenseDesc: "Description", colExpenseStatus: "Status", expenseTotalLabel: "Reimbursements", grandTotalLabel: "Total to receive", expensePendingLegend: "† expense pending approval (not counted)", colExpenses: "Reimbursements",
@@ -1443,6 +1445,8 @@ const T = {
     definicoes: {
       title: "Settings",
       navProfile: "Profile", navPayment: "Payment", navAlerts: "Alerts", navDanger: "Danger zone",
+      companyDataTitle: "Company details", companyDataHint: "Shown in the header of PDF reports (contractors and history).",
+      fAddress: "Address", fVat: "Company / VAT number", fIban: "IBAN", fPhone: "Phone",
       companyProfile: "Company profile", companyName: "Company name", email: "Email", newPassword: "New password",
       keepPasswordHint: "Leave blank to keep the current password.",
       changePhoto: "Change photo", removePhoto: "Remove photo", photoHint: "PNG or JPG",
@@ -1694,7 +1698,7 @@ const T = {
     pdf: {
       colDate: "Date", colClient: "Client", colHours: "Heures", colValueHour: "Valeur/heure", colTotal: "Total",
       colStaff: "Employé", colStatus: "Statut", colTotalHours: "Total d'heures", colTotalPay: "Total à payer",
-      totalHoursLabel: "Total d'heures", totalValueLabel: "Montant à recevoir", generatedOn: "Généré le",
+      totalHoursLabel: "Total d'heures", totalValueLabel: "Montant à recevoir", generatedOn: "Généré le", companyVat: "TVA", companyPhone: "Tél",
       reportTitleStaff: "Rapport d'heures", reportTitleGeneral: "Résumé de la période",
       provisionalStamp: "PROVISOIRE", extraPendingLegend: "* heure supplémentaire en attente d'approbation",
       expensesTitle: "Remboursements", colExpenseDesc: "Description", colExpenseStatus: "Statut", expenseTotalLabel: "Remboursements", grandTotalLabel: "Total à recevoir", expensePendingLegend: "† dépense en attente d'approbation (non comptée)", colExpenses: "Remboursements",
@@ -2242,6 +2246,8 @@ const T = {
     definicoes: {
       title: "Paramètres",
       navProfile: "Profil", navPayment: "Paiement", navAlerts: "Alertes", navDanger: "Zone à risque",
+      companyDataTitle: "Données de l'entreprise", companyDataHint: "Affichées dans l'en-tête des rapports PDF (donneurs d'ordre et historique).",
+      fAddress: "Adresse", fVat: "N° d'entreprise / TVA", fIban: "IBAN", fPhone: "Téléphone",
       companyProfile: "Profil de l'entreprise", companyName: "Nom de l'entreprise", email: "Email", newPassword: "Nouveau mot de passe",
       keepPasswordHint: "Laissez vide pour conserver le mot de passe actuel.",
       changePhoto: "Changer la photo", removePhoto: "Supprimer la photo", photoHint: "PNG ou JPG",

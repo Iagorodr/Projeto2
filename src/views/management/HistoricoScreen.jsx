@@ -220,6 +220,7 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
     const rows = open.staffSummaries.map((s) => [s.name, `${fmtHoursNum(s.hours)}h`, fmtEuro(s.euros), s.paid ? c0.paid : c0.unpaid]);
     exportGenericTablePdf({
       companyName: company?.name,
+      companyInfo: company,
       reportTitle: t.title,
       subtitle: `${open.periodLabel} · ${t.closedAt} ${fmtNoteDate(open.closedAt)}`,
       columns: [T[lang].funcionarios.colName, pdfT.colTotalHours, pdfT.colTotalPay, pdfT.colStatus],

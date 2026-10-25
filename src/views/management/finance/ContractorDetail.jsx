@@ -64,7 +64,7 @@ function ClientHoursBars({ rows, color, lang }) {
   );
 }
 
-function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, closings, horasData, staff, assignments, covers, absences, cutoffDay, closedPeriods, onSaveClosing, companyName, who, onNavigate, onSetClientPrice, initialTab, onBack, onEdit }) {
+function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, closings, horasData, staff, assignments, covers, absences, cutoffDay, closedPeriods, onSaveClosing, companyName, companyInfo, who, onNavigate, onSetClientPrice, initialTab, onBack, onEdit }) {
   const f = FIN[lang];
   const tc = T[lang].contratantes;
   const isPhone = tier === "mobile";
@@ -201,7 +201,7 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
 
       {tab === "reports" && (
         <ReportsTab
-          lang={lang} tier={tier} contractor={c} periods={periods} closings={closings} clients={clients} today={TODAY} who={who} companyName={companyName} ctx={reportCtx}
+          lang={lang} tier={tier} contractor={c} periods={periods} closings={closings} clients={clients} today={TODAY} who={who} companyName={companyName} companyInfo={companyInfo} ctx={reportCtx}
           onCloseMonth={(p) => setWizardIso(p.iso)} onSave={onSaveClosing} onNotice={showNotice}
         />
       )}

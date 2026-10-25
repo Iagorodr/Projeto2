@@ -11,6 +11,7 @@ import {
   monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews, inReviewWindow, pendingExpenseList, staffExpensesApproved, uniqueSentCount, groupSentItems,
 } from "../../models/utils.js";
 import { formatTodayLabel, T } from "../../models/i18n.js";
+import { upcomingHolidays } from "../../models/holidays.js";
 import ClientsByCityCard from "./ClientsByCityCard.jsx";
 import { contractorPeriods, periodFinance } from "../../models/contractorStats.js";
 import { FIN } from "../../models/i18nFin.js";
@@ -243,6 +244,8 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
     .map((i) => ({ client: clientById(clients, i.clientId)?.name || "—", date: i.date }));
 
   const myNotes = notesForOwner(personalNotes, "management");
+  // Lembretes automáticos: feriados nos próximos 45 dias (só informativo, não mexe na agenda).
+  const holidayReminders = upcomingHolidays(TODAY, 45, lang).slice(0, 3);
 
   // Gráficos de 6 períodos (documento, 2.14): os 5 períodos FECHADOS mais
   // recentes (ordem cronológica) + o período ABERTO agora como 6º/último
@@ -304,10 +307,10 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
 
   const renderNotesCard = (fill) => (
     <Card variant="warm" style={fill ? { flex: "1 1 auto" } : (myNotes.length === 0 ? { padding: "10px 16px" } : undefined)}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: myNotes.length === 0 && !fill ? 0 : 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: myNotes.length === 0 && holidayReminders.length === 0 && !fill ? 0 : 12 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{tn.widgetTitle}</div>
-          {myNotes.length === 0 && !fill && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.notesEmpty}</div>}
+          {myNotes.length === 0 && holidayReminders.length === 0 && !fill && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.notesEmpty}</div>}
         </div>
         <button
           type="button" onClick={() => onNavigate("notas")}
@@ -319,13 +322,21 @@ function DashboardScreen({ lang, setLang, company, clients, staff, horasData, mi
           {tn.seeAll} →
         </button>
       </div>
-      {myNotes.length === 0 && fill && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.notesEmpty}</div>}
-      {myNotes.length > 0 && (
+      {myNotes.length === 0 && holidayReminders.length === 0 && fill && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.notesEmpty}</div>}
+      {(myNotes.length > 0 || holidayReminders.length > 0) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {myNotes.slice(0, 3).map((n) => (
             <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <NoteDateTile iso={n.date} lang={lang} />
               <div style={{ fontSize: 13, color: COLORS.ink, lineHeight: 1.35 }}>{n.text}</div>
+            </div>
+          ))}
+          {holidayReminders.map((h) => (
+            <div key={h.iso} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <NoteDateTile iso={h.iso} lang={lang} />
+              <div style={{ fontSize: 13, color: COLORS.ink, lineHeight: 1.35 }}>
+                {h.name} <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: COLORS.clayInk, background: COLORS.clayTint, borderRadius: 999, padding: "1px 8px" }}>{f.holidayTag}</span>
+              </div>
             </div>
           ))}
         </div>

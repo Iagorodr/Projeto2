@@ -72,7 +72,7 @@ export function useAppController() {
   const [loggedInStaffId, setLoggedInStaffId] = useState(null);
   const [lang, setLang] = useState("pt");
 
-  const [company, setCompany] = useState({ name: "Empresa X", email: "empresax@login1.gmail.com", password: "", photoUrl: null });
+  const [company, setCompany] = useState({ name: "Empresa X", email: "empresax@login1.gmail.com", password: "", photoUrl: null, address: "", vatNumber: "", iban: "", phone: "" });
   const [cutoffDay, setCutoffDay] = useState(20);
   const [contractAlertDays, setContractAlertDays] = useState(30);
   const [closeDeadlineDays, setCloseDeadlineDays] = useState(7);

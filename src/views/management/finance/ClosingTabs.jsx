@@ -55,7 +55,7 @@ function History({ lang, row }) {
 }
 
 // Mostra o relatório de um mês (valores congelados se fechado, na hora se não) + PDF + estados.
-function ReportDrawer({ lang, open, onClose, contractor: c, period, row, entry, clients, who, onSave, companyName, ctx }) {
+function ReportDrawer({ lang, open, onClose, contractor: c, period, row, entry, clients, who, onSave, companyName, companyInfo, ctx }) {
   const f = FIN[lang];
   const [invDate, setInvDate] = useState(isoDateStr(new Date()));
   const [recDate, setRecDate] = useState(isoDateStr(new Date()));
@@ -77,10 +77,10 @@ function ReportDrawer({ lang, open, onClose, contractor: c, period, row, entry, 
   }
   function pdf() {
     exportGenericTablePdf({
-      companyName, reportTitle: `${f.reportTitle} · ${c.name}`, subtitle: period.rangeLabel,
+      companyName, companyInfo, reportTitle: `${f.reportTitle} · ${c.name}`, subtitle: period.rangeLabel,
       columns: detail ? [f.reportClient, f.reportVisitsCol, f.reportDetailCol, f.reportHours] : [f.reportClient, f.reportHours],
       rows: detail ? reportPdfRows(detail, lang) : rows.map((r) => [r.name, `${fmtHoursNum(r.hours)}h`]),
-      columnStyles: detail ? { 0: { cellWidth: 90 }, 1: { cellWidth: 70 }, 3: { halign: "right", cellWidth: 50 } } : { 1: { halign: "right" } },
+      columnStyles: detail ? { 0: { cellWidth: 90 }, 1: { cellWidth: 70 }, 3: { halign: "right", cellWidth: 75 } } : { 1: { halign: "right" } },
       totals: [...(detail ? [{ label: f.reportTotalVisits, value: String(detail.totals.visits) }] : []), { label: f.reportTotalHours, value: `${fmtHoursNum(hours)}h` }, { label: f.reportToInvoice, value: value != null ? fmtEuro(value) : "—" }],
       pdfT: T[lang].pdf, fileName: f.pdfFile(c.name, period.iso),
     });
@@ -194,7 +194,7 @@ function ReopenDrawer({ lang, open, onClose, onConfirm }) {
   );
 }
 
-function ReportsTab({ lang, tier, contractor: c, periods, closings, clients, today, who, companyName, onCloseMonth, onSave, onNotice, ctx }) {
+function ReportsTab({ lang, tier, contractor: c, periods, closings, clients, today, who, companyName, companyInfo, onCloseMonth, onSave, onNotice, ctx }) {
   const f = FIN[lang];
   const isPhone = tier === "mobile";
   const [viewIso, setViewIso] = useState(null);
@@ -263,7 +263,7 @@ function ReportsTab({ lang, tier, contractor: c, periods, closings, clients, tod
 
       <ReportDrawer
         lang={lang} open={!!viewing} onClose={() => setViewIso(null)} contractor={c} period={viewing && viewing.p}
-        row={viewing && viewing.row} entry={viewing && viewing.entry} clients={clients} who={who} onSave={onSave} companyName={companyName} ctx={ctx}
+        row={viewing && viewing.row} entry={viewing && viewing.entry} clients={clients} who={who} onSave={onSave} companyName={companyName} companyInfo={companyInfo} ctx={ctx}
       />
       <ReopenDrawer lang={lang} open={!!reopening} onClose={() => setReopenIso(null)} onConfirm={doReopen} />
     </Card>

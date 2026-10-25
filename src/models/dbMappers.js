@@ -236,6 +236,10 @@ function toDbCompanySettings({ company, cutoffDay, contractAlertDays, closeDeadl
     name: company.name,
     email: company.email,
     photo_url: company.photoUrl || null,
+    address: company.address || null,
+    vat_number: company.vatNumber || null,
+    iban: company.iban || null,
+    phone: company.phone || null,
     cutoff_day: cutoffDay,
     contract_alert_days: contractAlertDays,
     close_deadline_days: closeDeadlineDays,
@@ -249,7 +253,7 @@ function toDbCompanySettings({ company, cutoffDay, contractAlertDays, closeDeadl
 
 function fromDbCompanySettings(row) {
   return {
-    company: { name: row.name, email: row.email, photoUrl: row.photo_url || null },
+    company: { name: row.name, email: row.email, photoUrl: row.photo_url || null, address: row.address || "", vatNumber: row.vat_number || "", iban: row.iban || "", phone: row.phone || "" },
     cutoffDay: row.cutoff_day,
     contractAlertDays: row.contract_alert_days,
     closeDeadlineDays: row.close_deadline_days ?? 7,

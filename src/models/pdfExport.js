@@ -61,8 +61,20 @@ function drawServixLogo(doc, rightX, topY, size = 26) {
 
 // Monta o cabeçalho comum (nome da empresa, título do relatório, subtítulo
 // com o período/funcionário) e devolve o doc + o Y onde a tabela deve começar.
-function buildHeader(doc, { companyName, reportTitle, subtitle, pdfT }) {
+function buildHeader(doc, { companyName, reportTitle, subtitle, pdfT, companyInfo }) {
   drawServixLogo(doc, doc.internal.pageSize.getWidth() - 40, 22);
+  // Dados da empresa (Definições): pequenos, alinhados à direita por baixo da marca.
+  if (companyInfo) {
+    const lines = [
+      companyInfo.address,
+      [companyInfo.vatNumber && `${pdfT.companyVat || "VAT"}: ${companyInfo.vatNumber}`, companyInfo.phone && `${pdfT.companyPhone || "Tel"}: ${companyInfo.phone}`].filter(Boolean).join("  ·  "),
+      companyInfo.iban && `IBAN: ${companyInfo.iban}`,
+    ].filter(Boolean);
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...TEXT_SOFT);
+    lines.forEach((ln, i) => doc.text(String(ln), doc.internal.pageSize.getWidth() - 40, 62 + i * 11, { align: "right" }));
+  }
   doc.setFontSize(16);
   doc.setTextColor(...BRAND_DARK);
   doc.text(companyName || "", 40, 42);
@@ -250,9 +262,9 @@ function exportPeriodSummaryPdf({ companyName, periodLabel, rows, totalHours, to
 // Relatório genérico de tabela + caixa de totais — usado pelo Histórico da
 // gerência (auditoria de um período já fechado: horas por funcionário +
 // contagens de reclamações/elogios/avisos/solicitações daquele período).
-function exportGenericTablePdf({ companyName, reportTitle, subtitle, columns, rows, totals, columnStyles, fileName, pdfT }) {
+function exportGenericTablePdf({ companyName, companyInfo, reportTitle, subtitle, columns, rows, totals, columnStyles, fileName, pdfT }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const startY = buildHeader(doc, { companyName, reportTitle, subtitle, pdfT });
+  const startY = buildHeader(doc, { companyName, reportTitle, subtitle, pdfT, companyInfo });
 
   autoTable(doc, {
     startY,

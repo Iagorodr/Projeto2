@@ -66,7 +66,9 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
   const [nameDraft, setNameDraft] = useState(company.name);
   const [photoDraft, setPhotoDraft] = useState(company.photoUrl || null);
   const fileInputRef = useRef(null);
-  const profileDirty = nameDraft !== company.name || photoDraft !== (company.photoUrl || null);
+  const [dataDraft, setDataDraft] = useState({ address: company.address || "", vatNumber: company.vatNumber || "", iban: company.iban || "", phone: company.phone || "" });
+  const dataDirty = ["address", "vatNumber", "iban", "phone"].some((k) => (dataDraft[k] || "") !== (company[k] || ""));
+  const profileDirty = nameDraft !== company.name || photoDraft !== (company.photoUrl || null) || dataDirty;
 
   function handlePhotoPick(e) {
     const file = e.target.files && e.target.files[0];
@@ -80,10 +82,11 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
     // O email NÃO é gravado daqui: é o email de login da conta principal (o app
     // compara-o com o login do Supabase), mudá-lo só na tabela deixava todos
     // sem conseguir entrar.
-    setCompany((c) => ({ ...c, name: nameDraft, photoUrl: photoDraft }));
+    setCompany((c) => ({ ...c, name: nameDraft, photoUrl: photoDraft, address: dataDraft.address.trim(), vatNumber: dataDraft.vatNumber.trim(), iban: dataDraft.iban.trim(), phone: dataDraft.phone.trim() }));
   }
   function handleDiscard() {
     setNameDraft(company.name); setPhotoDraft(company.photoUrl || null);
+    setDataDraft({ address: company.address || "", vatNumber: company.vatNumber || "", iban: company.iban || "", phone: company.phone || "" });
   }
 
   // --- Trocar palavra-passe real da empresa (já ligado à Edge Function) ---
@@ -205,6 +208,21 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                     <Button variant="secondary" onClick={openPwModal}>{t.changePasswordButton}</Button>
                   </div>
                 </div>
+              </div>
+            </Card>
+            <Card style={{ marginTop: 16 }}>
+              <div style={styles.sectionTitle}>{t.companyDataTitle}</div>
+              <div style={{ ...styles.defSettingHint, marginTop: 0, marginBottom: 12 }}>{t.companyDataHint}</div>
+              <div style={{ display: "grid", gridTemplateColumns: phone ? "1fr" : "1fr 1fr", gap: 14 }}>
+                {[["address", t.fAddress, true], ["vatNumber", t.fVat], ["phone", t.fPhone], ["iban", t.fIban, true]].map(([k, label, wide]) => (
+                  <div key={k} style={wide && !phone ? { gridColumn: "1 / -1" } : undefined}>
+                    <div style={styles.defSettingLabel}>{label}</div>
+                    <input
+                      style={{ ...styles.defTextInput, maxWidth: wide ? "100%" : 340 }} value={dataDraft[k]}
+                      onChange={(e) => setDataDraft((d) => ({ ...d, [k]: e.target.value }))}
+                    />
+                  </div>
+                ))}
               </div>
             </Card>
           </div>

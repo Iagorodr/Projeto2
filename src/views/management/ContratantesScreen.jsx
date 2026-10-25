@@ -24,7 +24,7 @@ const eur = (v) => (v === "" || v === null || v === undefined || Number.isNaN(Nu
 // funcionários). Cada contratante tem o seu valor/hora, o valor/hora padrão
 // pago ao funcionário (pré-preenche os clientes novos), o dia de faturação e
 // o prazo de pagamento; os clientes ligam-se a ele pelo nome (origem).
-function ContratantesScreen({ lang, setLang, contractors, setContractors, onDeleteContractor, clients, setClients, staff, horasData, closedPeriods, cutoffDay, assignments, covers, absences, closings, onSaveClosing, companyName, who, onNavigate, navIntent }) {
+function ContratantesScreen({ lang, setLang, contractors, setContractors, onDeleteContractor, clients, setClients, staff, horasData, closedPeriods, cutoffDay, assignments, covers, absences, closings, onSaveClosing, companyName, companyInfo, who, onNavigate, navIntent }) {
   const t = T[lang].contratantes;
   const tier = useBreakpoint();
   const [detailId, setDetailId] = useState(navIntent && navIntent.contractorId != null ? navIntent.contractorId : null);
@@ -119,7 +119,7 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
           lang={lang} tier={tier} contractor={detail} clients={clients} periods={detailPeriods} has12={has12}
           initialTab={detailTab} onSetClientPrice={(id, v) => setClients((prev) => prev.map((cl) => (cl.id === id ? { ...cl, sellPrice: v } : cl)))}
           closings={closings} horasData={horasData} staff={staff} assignments={assignments} covers={covers} absences={absences}
-          cutoffDay={cutoffDay} closedPeriods={closedPeriods} onSaveClosing={onSaveClosing} companyName={companyName} who={who} onNavigate={onNavigate}
+          cutoffDay={cutoffDay} closedPeriods={closedPeriods} onSaveClosing={onSaveClosing} companyName={companyName} companyInfo={companyInfo} who={who} onNavigate={onNavigate}
           onBack={() => { setDetailId(null); setDetailTab(null); }} onEdit={() => openEdit(detail)}
         />
       ) : (
