@@ -34,6 +34,7 @@ import DefinicoesScreen from "./views/management/DefinicoesScreen.jsx";
 import NotasScreen from "./views/shared/NotasScreen.jsx";
 import HelpScreen, { HelpDrawer, HelpFab } from "./views/shared/HelpScreen.jsx";
 import { helpTexts } from "./models/helpTexts.js";
+import Tutorial from "./views/tutorial/Tutorial.jsx";
 
 // EmployeeMenuScreen.jsx (a lista de botões sem casca nenhuma) ficou
 // substituído pelo EmployeeInicioScreen novo + a casca da Etapa 3 abaixo
@@ -63,6 +64,9 @@ export default function App() {
   // Ajuda: no PC/tablet o botão "?" abre uma gaveta virada para a página atual; no telemóvel é uma
   // página ("ajuda") — por isso guardamos a última página real, para o pedido dizer de onde veio.
   const [helpOpen, setHelpOpen] = useState(false);
+  // Tutorial de boas-vindas: aparece sozinho no primeiro acesso (c.tutorialPending) e pode ser revisto no Ajuda.
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const openTutorial = () => { setHelpOpen(false); setTutorialOpen(true); };
   const lastPageRef = useRef({ m: "dashboard", e: "menu" });
   useEffect(() => {
     if (c.screen !== "ajuda") lastPageRef.current.m = c.screen;
@@ -220,7 +224,7 @@ export default function App() {
             {c.screen === "contratantes" && <ContratantesScreen lang={c.lang} setLang={c.setLang} contractors={c.contractors} setContractors={c.setContractors} onDeleteContractor={c.deleteContractor} clients={c.clients} setClients={c.setClients} staff={c.staff} horasData={c.horasData} closedPeriods={c.closedPeriods} cutoffDay={c.cutoffDay} assignments={c.assignments} covers={c.covers} absences={c.absences} closings={c.contractorClosings} onSaveClosing={c.saveClosing} companyName={c.company.name} companyInfo={c.company} who={c.company.email} onNavigate={c.goTo} navIntent={c.navIntent} />}
             {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} companyEmail={c.company.email} />}
             {c.screen === "ajuda" && (
-              <HelpScreen lang={c.lang} setLang={c.setLang} role="manager" reportKey={lastPageRef.current.m} userName={c.me?.name || c.company.name} onHome={() => c.setScreen(lastPageRef.current.m)} desktop={!mgmtMobile} />
+              <HelpScreen lang={c.lang} setLang={c.setLang} role="manager" reportKey={lastPageRef.current.m} userName={c.me?.name || c.company.name} onHome={() => c.setScreen(lastPageRef.current.m)} desktop={!mgmtMobile} onTutorial={openTutorial} />
             )}
             {c.screen === "definicoes" && (
               <DefinicoesScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} cutoffDay={c.cutoffDay} setCutoffDay={c.setCutoffDay} contractAlertDays={c.contractAlertDays} setContractAlertDays={c.setContractAlertDays} closeDeadlineDays={c.closeDeadlineDays} setCloseDeadlineDays={c.setCloseDeadlineDays} highlightsMonths={c.highlightsMonths} setHighlightsMonths={c.setHighlightsMonths} highlightsRealtime={c.highlightsRealtime} setHighlightsRealtime={c.setHighlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} setReclamacaoBaseClients={c.setReclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} setReclamacaoExcelenteCount={c.setReclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} setReclamacaoRazoavelCount={c.setReclamacaoRazoavelCount} clients={c.clients} onFormatData={c.formatAllData} onVerifyPassword={c.verifyPassword} />
@@ -272,7 +276,7 @@ export default function App() {
           />
           {mgmtContent}
           {c.screen !== "ajuda" && <HelpFab lang={c.lang} onClick={() => setHelpOpen(true)} />}
-          <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role="manager" screenKey={c.screen} userName={c.me?.name || c.company.name} />
+          <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role="manager" screenKey={c.screen} userName={c.me?.name || c.company.name} onTutorial={openTutorial} />
         </div>
         );
       })()}
@@ -340,7 +344,7 @@ export default function App() {
               <MonitoramentoScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staff={c.staff} clients={c.clients} horasData={c.horasData} assignments={c.assignments} covers={c.covers} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} absences={c.absences} />
             )}
             {c.empScreen === "ajuda" && (
-              <HelpScreen lang={c.lang} setLang={c.setLang} role={isSupervisor ? "supervisor" : "employee"} reportKey={lastPageRef.current.e} userName={c.me.name} onHome={() => c.setEmpScreen(lastPageRef.current.e)} desktop={empTier !== "mobile"} />
+              <HelpScreen lang={c.lang} setLang={c.setLang} role={isSupervisor ? "supervisor" : "employee"} reportKey={lastPageRef.current.e} userName={c.me.name} onHome={() => c.setEmpScreen(lastPageRef.current.e)} desktop={empTier !== "mobile"} onTutorial={openTutorial} />
             )}
             {c.empScreen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} ownerId={c.me.id} personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop={empTier !== "mobile"} />
@@ -449,10 +453,20 @@ export default function App() {
               </div>
             </div>
             {c.empScreen !== "ajuda" && <HelpFab lang={c.lang} onClick={() => setHelpOpen(true)} />}
-            <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role={isSupervisor ? "supervisor" : "employee"} screenKey={c.empScreen} userName={c.me.name} />
+            <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role={isSupervisor ? "supervisor" : "employee"} screenKey={c.empScreen} userName={c.me.name} onTutorial={openTutorial} />
           </div>
         );
       })()}
+
+      {(c.tutorialPending || tutorialOpen) && (c.perspective === "management" || (c.perspective === "employee" && c.me)) && (
+        <Tutorial
+          lang={c.lang}
+          role={c.perspective === "management" ? "manager" : isSupervisorRole(c.me.role) ? "supervisor" : "employee"}
+          userName={c.me?.name || ""}
+          companyName={c.company?.name || ""}
+          onClose={() => { setTutorialOpen(false); if (c.tutorialPending) c.finishTutorial(); }}
+        />
+      )}
     </div>
   );
 }

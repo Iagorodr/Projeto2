@@ -63,6 +63,9 @@ export function useAppController() {
   const [navIntent, setNavIntent] = useState(null);
   // null | "temporary" (palavra-passe gerada pela gerência) | "recovery" (link do email): obriga a escolher palavra-passe nova antes de usar o app.
   const [passwordGate, setPasswordGate] = useState(null);
+  // Tutorial de primeiro acesso: fica pendente na conta (user_metadata.tutorial_pending) desde que a
+  // pessoa escolhe a palavra-passe até ver/saltar os cartões, para sobreviver a fechar a app a meio.
+  const [tutorialPending, setTutorialPending] = useState(false);
   const setScreen = (s) => { setNavIntent(null); setScreenRaw(s); };
   const goTo = (s, intent = null) => { setNavIntent(intent); setScreenRaw(s); };
   const [empScreen, setEmpScreen] = useState("menu");
@@ -585,6 +588,7 @@ export function useAppController() {
             await doLogout({ type: "inactive" });
             return;
           } else if (routed && session.user.user_metadata?.must_change_password) setPasswordGate("temporary");
+          else if (routed && session.user.user_metadata?.tutorial_pending) setTutorialPending(true);
           if (!routed) {
             console.error("Sessão sem correspondência em funcionários/empresa — a terminar sessão.");
             await doLogout({ type: ok ? "no_account" : "generic" });
@@ -651,6 +655,7 @@ export function useAppController() {
         await doLogout({ type: "inactive" });
         return;
       } else if (routed && data.user.user_metadata?.must_change_password) setPasswordGate("temporary");
+      else if (routed && data.user.user_metadata?.tutorial_pending) setTutorialPending(true);
       if (!routed) {
         await doLogout({ type: ok ? "no_account" : "generic" });
         return;
@@ -668,10 +673,22 @@ export function useAppController() {
   }
 
   async function setNewPassword(newPassword) {
-    const { error } = await supabase.auth.updateUser({ password: newPassword, data: { must_change_password: false } });
+    // Só quem entrou com a palavra-passe temporária (primeiro acesso) vê o tutorial; quem recupera a
+    // palavra-passe ("esqueci") já conhece a app.
+    const firstAccess = passwordGate === "temporary";
+    const data = firstAccess ? { must_change_password: false, tutorial_pending: true } : { must_change_password: false };
+    const { error } = await supabase.auth.updateUser({ password: newPassword, data });
     if (error) return false;
     setPasswordGate(null);
+    if (firstAccess) setTutorialPending(true);
     return true;
+  }
+
+  // Terminou ou saltou o tutorial: deixa de estar pendente (melhor esforço; se falhar, aparece de novo).
+  async function finishTutorial() {
+    setTutorialPending(false);
+    if (!isSupabaseConfigured) return;
+    try { await supabase.auth.updateUser({ data: { tutorial_pending: false } }); } catch { /* aparece de novo no próximo acesso */ }
   }
 
   useEffect(() => {
@@ -688,6 +705,7 @@ export function useAppController() {
   // vencida…); com razão, só termina a sessão deste aparelho.
   async function doLogout(flash) {
     setPasswordGate(null);
+    setTutorialPending(false);
     if (isSupabaseConfigured) {
       await flushAllBestEffort();
       await endSessionLocally(flash ? "local" : "global");
@@ -1076,7 +1094,7 @@ export function useAppController() {
     personalNotes, setPersonalNotes, absences, setAbsences, covers, setCovers,
     enterManagement, enterEmployee, deleteClient, deleteStaff,
     formatAllData, verifyPassword,
-    authLoading, authError, loginWithPassword, logout, passwordGate, requestPasswordReset, setNewPassword,
+    authLoading, authError, loginWithPassword, logout, passwordGate, requestPasswordReset, setNewPassword, tutorialPending, finishTutorial,
     me, myUnreadBadge, loadError,
     // Várias empresas
     companyCode, submitCompanyCode, changeCompany, legacyDb, companyGateReady,

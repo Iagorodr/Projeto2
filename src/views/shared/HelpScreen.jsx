@@ -4,7 +4,7 @@
 //  • PC/tablet: botão fixo "?" (HelpFab) abre `HelpDrawer`, já virado para a página em que se está.
 //  • Telemóvel: sem botão fixo — "Ajuda" é uma página (HelpScreen) no menu "Mais".
 import { useState } from "react";
-import { ChevronDown, CircleHelp, Send, CheckCircle2 } from "lucide-react";
+import { ChevronDown, CircleHelp, Send, CheckCircle2, PlayCircle } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -12,6 +12,7 @@ import { RADIUS, FONT, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
 import { T } from "../../models/i18n.js";
 import { helpTexts, manualFor } from "../../models/helpTexts.js";
+import { TUTORIAL_UI } from "../../models/tutorialTexts.js";
 import { submitHelpReport, HELP_KINDS } from "../../models/helpApi.js";
 import { Card, Button, PageHeader, MobileHeader, Drawer, SegmentedControl } from "./ui/index.js";
 
@@ -168,7 +169,7 @@ function ReportForm({ lang, role, reportKey, userName, small }) {
 // Corpo da Ajuda (usado na página do telemóvel e na gaveta do PC): primeiro o manual da página em que
 // se está, depois as outras páginas e, no fim, o formulário para pedir apoio.
 //  contextKey = página em que a pessoa está; reportKey = o que vai no pedido.
-function HelpBody({ lang, role, contextKey, contextLabel, reportKey, userName, small }) {
+function HelpBody({ lang, role, contextKey, contextLabel, reportKey, userName, small, onTutorial }) {
   const h = helpTexts(lang).ui;
   const pages = pageList(lang, role);
   const [openKey, setOpenKey] = useState(null);
@@ -183,6 +184,20 @@ function HelpBody({ lang, role, contextKey, contextLabel, reportKey, userName, s
           <div style={{ fontFamily: FONT.heading, fontSize: 20, fontWeight: 600, color: COLORS.ink, marginBottom: 6 }}>{ctxName}</div>
           <ManualView lang={lang} manual={ctxManual} />
         </Card>
+      )}
+
+      {onTutorial && (
+        <button type="button" onClick={onTutorial} style={{
+          display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", cursor: "pointer",
+          background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card,
+          padding: "12px 16px", fontFamily: "inherit",
+        }}>
+          <PlayCircle size={22} color={COLORS.vivoInk} aria-hidden="true" />
+          <span style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontFamily: FONT.heading, fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{(TUTORIAL_UI[lang] || TUTORIAL_UI.pt).review}</span>
+            <span style={{ fontSize: 12.5, color: COLORS.ink3 }}>{(TUTORIAL_UI[lang] || TUTORIAL_UI.pt).reviewHint}</span>
+          </span>
+        </button>
       )}
 
       <Card style={{ padding: "14px 16px 4px" }}>
@@ -203,9 +218,9 @@ function HelpBody({ lang, role, contextKey, contextLabel, reportKey, userName, s
 }
 
 // Página "Ajuda" inteira (telemóvel; no PC também funciona se se chegar aqui).
-export default function HelpScreen({ lang, setLang, role, reportKey, userName, onHome, desktop }) {
+export default function HelpScreen({ lang, setLang, role, reportKey, userName, onHome, desktop, onTutorial }) {
   const h = helpTexts(lang).ui;
-  const body = <HelpBody lang={lang} role={role} contextKey={reportKey} contextLabel={desktop ? h.thisPage : h.prevPage} reportKey={reportKey} userName={userName} small={!desktop} />;
+  const body = <HelpBody lang={lang} role={role} contextKey={reportKey} contextLabel={desktop ? h.thisPage : h.prevPage} reportKey={reportKey} userName={userName} small={!desktop} onTutorial={onTutorial} />;
   if (desktop) {
     return (
       <div style={styles.content}>
@@ -223,11 +238,11 @@ export default function HelpScreen({ lang, setLang, role, reportKey, userName, o
 }
 
 // Gaveta do PC/tablet, aberta pelo botão "?" na página atual.
-export function HelpDrawer({ open, onClose, lang, role, screenKey, userName }) {
+export function HelpDrawer({ open, onClose, lang, role, screenKey, userName, onTutorial }) {
   const h = helpTexts(lang).ui;
   return (
     <Drawer open={open} onClose={onClose} icon={CircleHelp} title={h.title} closeLabel={h.close}>
-      <HelpBody lang={lang} role={role} contextKey={screenKey} reportKey={screenKey} userName={userName} small />
+      <HelpBody lang={lang} role={role} contextKey={screenKey} reportKey={screenKey} userName={userName} small onTutorial={onTutorial} />
     </Drawer>
   );
 }
