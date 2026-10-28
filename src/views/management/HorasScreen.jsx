@@ -34,14 +34,15 @@ function parseISODate(str) {
 // Agrupa os lançamentos de um funcionário pelos blocos do período aberto
 // (documento, 6.1 — "28 set – 4 out", etc.), mantendo o índice ORIGINAL de
 // cada entrada em `_idx` (as funções de aprovar/editar/anular operam por
-// índice no array `entries` tal como já estava). Uma entrada que caia fora
-// de todos os blocos do período (ex.: adiantada bem para a frente) cai num
-// grupo à parte pela sua própria semana civil, para nunca desaparecer da
-// gaveta.
-function groupEntriesByBlock(entries, payPeriodChunks, lang) {
+// índice no array `entries` tal como já estava). SÓ entram lançamentos deste
+// período: num fecho atrasado (o período já acabou e outro já começou) os dias
+// do período seguinte não aparecem aqui nem entram na soma — tratam-se quando
+// esse período for fechado.
+function groupEntriesByBlock(entries, payPeriodChunks, lang, period) {
   const blocks = payPeriodChunks.map((chunk) => ({ chunk, items: [] }));
   const leftovers = new Map();
   entries.forEach((entry, idx) => {
+    if (period && !dateStrInPeriod(entry.date, period)) return;
     const d = parseISODate(entry.date);
     const block = blocks.find((b) => d >= b.chunk.start && d <= b.chunk.end);
     if (block) {
@@ -227,7 +228,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       companyName: company?.name,
       staffName: openStaff.name,
       periodLabel,
-      entries: openHoras.entries,
+      entries: openHoras.entries.filter((e) => dateStrInPeriod(e.date, period)),
       clients,
       totalHours: staffTotalHours(openHoras, period),
       totalValue: staffTotalPay(openHoras, clients, period),
@@ -371,7 +372,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       key: "extras", label: t.miniExtrasLabel, width: 1,
       render: (s) => {
         const h = horasData[s.id] || { entries: [] };
-        const n = h.entries.filter((e) => (e.extra && !e.approved && !e.voided) || isPendingClientEntry(e) || (e.shareReview && !e.voided)).length;
+        const n = h.entries.filter((e) => dateStrInPeriod(e.date, period) && ((e.extra && !e.approved && !e.voided) || isPendingClientEntry(e) || (e.shareReview && !e.voided))).length;
         return n > 0 ? <Pill variant="pending">{n}</Pill> : <span style={{ color: COLORS.ink3 }}>–</span>;
       },
     },
@@ -506,8 +507,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       >
         {openStaff && openHoras && (() => {
           const locked = openHoras.paid;
-          const pendingExtras = openHoras.entries.filter((e) => e.extra && !e.approved && !e.voided).length;
-          const groups = groupEntriesByBlock(openHoras.entries, payPeriodChunks, lang);
+          const pendingExtras = openHoras.entries.filter((e) => e.extra && !e.approved && !e.voided && dateStrInPeriod(e.date, period)).length;
+          const groups = groupEntriesByBlock(openHoras.entries, payPeriodChunks, lang, period);
           return (
             <>
               <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
