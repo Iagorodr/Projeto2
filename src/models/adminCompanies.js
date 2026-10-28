@@ -114,6 +114,48 @@ export function filterCompanies(list, filterKey, query) {
   return list.filter((c) => f.test(c) && (!q || [c.name, c.code, c.managerEmail].some((v) => String(v || "").toLowerCase().includes(q))));
 }
 
+// Backup manual por empresa (backup.sql). Sem backup há mais de BACKUP_STALE_DAYS
+// dias (ou nunca) o cartão avisa; a regra combinada é um backup por mês.
+export const BACKUP_STALE_DAYS = 30;
+
+// "28/10/2026 18:20" no fuso da empresa.
+export function formatBackupWhen(iso, timezone = "Europe/Brussels") {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return "—";
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(d);
+    const g = (t) => parts.find((p) => p.type === t).value;
+    return `${g("day")}/${g("month")}/${g("year")} ${g("hour")}:${g("minute")}`;
+  } catch {
+    return d.toISOString().slice(0, 16).replace("T", " ");
+  }
+}
+
+export function formatBytes(n) {
+  const b = Number(n) || 0;
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`;
+  return `${(b / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+}
+
+// Estado do backup de uma empresa para o cartão. `b` é o item de admin_backup_status
+// (ou undefined se nunca houve backup); `now` só existe para os testes.
+//   tone: "ok" | "warn"
+export function backupInfo(b, timezone = "Europe/Brussels", now = new Date()) {
+  if (!b || !b.dataAt) return { tone: "warn", stale: true, title: "Sem backup", lines: ["Ainda nunca foi feito um backup desta empresa."] };
+  const days = Math.floor((now.getTime() - new Date(b.dataAt).getTime()) / 86400000);
+  const stale = days >= BACKUP_STALE_DAYS;
+  const lines = [`Dados: ${formatBackupWhen(b.dataAt, timezone)} · ${b.dataRows} ${b.dataRows === 1 ? "registo" : "registos"}`];
+  if (b.filesAt) {
+    const n = Number(b.filesCount) || 0;
+    lines.push(`Ficheiros: ${formatBackupWhen(b.filesAt, timezone)} · ${n} ${n === 1 ? "ficheiro" : "ficheiros"}${n > 0 ? ` (${formatBytes(b.filesBytes)})` : ""}`);
+  } else {
+    lines.push("Ficheiros: ainda sem cópia");
+  }
+  if (stale) lines.push(`Já passaram ${days} dias — convém fazer um novo backup.`);
+  return { tone: stale || !b.filesAt ? "warn" : "ok", stale, title: `Último backup: ${formatBackupWhen(b.dataAt, timezone)}`, lines };
+}
+
 // Erros do banco / da função (mensagens fixas) → português.
 const ERRORS = {
   code_taken: "Já existe uma empresa com este código.",
@@ -129,6 +171,7 @@ const ERRORS = {
   protected_company: "Esta empresa está protegida e não pode ser excluída.",
   confirm_mismatch: "O código digitado não é o da empresa.",
   archived: "A empresa está arquivada: restaure-a antes de a alterar.",
+  sql_backup_em_falta: "O SQL do backup (backup.sql) ainda não foi aplicado neste projeto.",
   sql_arquivo_em_falta: "O SQL de arquivar empresas (multi_empresa_arquivo.sql) ainda não foi aplicado neste projeto.",
   forbidden: "Esta conta não pode fazer isto.",
   "sem permissão": "Esta conta não tem acesso à administração.",

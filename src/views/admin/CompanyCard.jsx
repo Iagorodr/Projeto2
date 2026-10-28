@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Link2, KeyRound, Pencil, PauseCircle, PlayCircle, CalendarPlus, Users, Building2, Trash2, ArchiveRestore } from "lucide-react";
+import { Link2, KeyRound, Pencil, PauseCircle, PlayCircle, CalendarPlus, Users, Building2, Trash2, ArchiveRestore, DatabaseBackup } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW, FONT } from "../../styles/tokens.js";
 import { Badge } from "./AdminUi.jsx";
-import { stateInfo, renewedUntil, todayIso, formatIsoDate, isArchived, canArchive } from "../../models/adminCompanies.js";
+import { stateInfo, renewedUntil, todayIso, formatIsoDate, isArchived, canArchive, backupInfo } from "../../models/adminCompanies.js";
 
 const RENEW_OPTIONS = [1, 3, 6, 12];
 
@@ -16,7 +16,7 @@ const actionBtn = {
 };
 
 // Um cartão por empresa. Todas as ações sobem para a página (`on...`).
-export default function CompanyCard({ company: c, busy, onRenew, onEdit, onCopyLink, onResetLogin, onToggleSuspend, onArchive, onRestore, onDeleteForever }) {
+export default function CompanyCard({ company: c, busy, backup, backupReady, backingUp, onBackup, onRenew, onEdit, onCopyLink, onResetLogin, onToggleSuspend, onArchive, onRestore, onDeleteForever }) {
   const [renewOpen, setRenewOpen] = useState(false);
   const info = stateInfo(c);
   const archived = isArchived(c);
@@ -41,6 +41,17 @@ export default function CompanyCard({ company: c, busy, onRenew, onEdit, onCopyL
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Building2 size={14} /> {c.clientsCount} {c.clientsCount === 1 ? "cliente" : "clientes"}</span>
       </div>
       {c.notes && <div style={{ fontSize: 12.5, color: COLORS.ink2, background: COLORS.headerTint, borderRadius: 8, padding: "7px 10px", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{c.notes}</div>}
+
+      {!archived && backupReady && (() => {
+        const bi = backupInfo(backup, c.timezone);
+        const warn = bi.tone === "warn";
+        return (
+          <div role="group" aria-label="Backup" style={{ fontSize: 12.5, lineHeight: 1.5, borderRadius: 8, padding: "8px 10px", background: warn ? COLORS.alertTint : COLORS.headerTint, color: warn ? COLORS.alert : COLORS.ink2 }}>
+            <div style={{ fontWeight: 700, color: warn ? COLORS.alert : COLORS.ink }}>{bi.title}</div>
+            {bi.lines.map((l) => <div key={l}>{l}</div>)}
+          </div>
+        );
+      })()}
 
       {archived ? (
         <>
@@ -75,6 +86,9 @@ export default function CompanyCard({ company: c, busy, onRenew, onEdit, onCopyL
               </>
             )}
           </div>
+          {backupReady && (
+            <button type="button" style={actionBtn} onClick={() => onBackup(c)} disabled={busy || backingUp}><DatabaseBackup size={15} /> {backingUp ? "A guardar…" : "Fazer backup agora"}</button>
+          )}
           <button type="button" style={actionBtn} onClick={() => onEdit(c)} disabled={busy}><Pencil size={15} /> Editar</button>
           <button type="button" style={actionBtn} onClick={() => onCopyLink(c)}><Link2 size={15} /> Link</button>
           <button type="button" style={actionBtn} onClick={() => onResetLogin(c)} disabled={busy || !c.managerEmail}><KeyRound size={15} /> Nova senha</button>

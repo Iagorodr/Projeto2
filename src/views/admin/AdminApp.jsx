@@ -17,7 +17,7 @@ import DeleteForeverDialog from "./DeleteForeverDialog.jsx";
 import HelpReportsPanel from "./HelpReportsPanel.jsx";
 import { adminClient, adminConfigured } from "../../models/adminClient.js";
 import { isMissingRpc } from "../../models/horasSync.js";
-import { FILTERS, filterCompanies, sortCompanies, errorMessage, accessLink, formatIsoDate, isArchived } from "../../models/adminCompanies.js";
+import { FILTERS, filterCompanies, sortCompanies, errorMessage, accessLink, formatIsoDate, isArchived, formatBytes } from "../../models/adminCompanies.js";
 
 // Pede à Edge Function a palavra-passe temporária da gerência de uma empresa.
 async function fetchManagerLogin(email) {
@@ -67,6 +67,9 @@ export default function AdminApp() {
   const [tab, setTab] = useState("companies");    // companies | help
   const [reports, setReports] = useState([]);     // pedidos de ajuda (ajuda.sql)
   const [reportsError, setReportsError] = useState(null);
+  const [backups, setBackups] = useState({});     // companyId → estado do backup (backup.sql)
+  const [backupError, setBackupError] = useState(null);
+  const [backingUp, setBackingUp] = useState(null); // id da empresa cujo backup está a correr
 
   const notify = useCallback((msg) => {
     setToast(msg);
@@ -96,6 +99,18 @@ export default function AdminApp() {
     return true;
   }, []);
 
+  // Estado dos backups por empresa (backup.sql). Num banco sem esse SQL os botões ficam escondidos.
+  const loadBackups = useCallback(async () => {
+    const { data, error } = await adminClient.rpc("admin_backup_status");
+    if (error) {
+      setBackupError(isMissingRpc(error) ? "O SQL do backup (backup.sql) ainda não foi aplicado neste projeto." : errorMessage(error));
+      return false;
+    }
+    setBackupError(null);
+    setBackups(Object.fromEntries((Array.isArray(data) ? data : []).map((b) => [b.companyId, b])));
+    return true;
+  }, []);
+
   // Confirma que a conta é de administração e só então carrega a lista.
   const admit = useCallback(async (email) => {
     const { data, error } = await adminClient.rpc("is_platform_admin");
@@ -106,9 +121,10 @@ export default function AdminApp() {
     setAdminEmail(email);
     await loadCompanies();
     await loadReports();
+    await loadBackups();
     setPhase("ready");
     return null;
-  }, [loadCompanies, loadReports]);
+  }, [loadCompanies, loadReports, loadBackups]);
 
   useEffect(() => {
     if (!adminConfigured) return;
@@ -135,7 +151,7 @@ export default function AdminApp() {
 
   async function logout() {
     await adminClient.auth.signOut();
-    setCompanies([]); setReports([]); setTab("companies"); setPhase("login");
+    setCompanies([]); setReports([]); setBackups({}); setTab("companies"); setPhase("login");
   }
 
   // Executa uma ação com o botão "ocupado" e mostra o erro (se houver).
@@ -240,6 +256,33 @@ export default function AdminApp() {
     }),
   });
 
+  // Backup manual: 1) fotografia dos dados (RPC); 2) cópia dos ficheiros (Edge Function).
+  // Os dados ficam guardados mesmo que a função dos ficheiros ainda não esteja publicada.
+  async function backupNow(c) {
+    setBackingUp(c.id);
+    try {
+      const { data: snap, error } = await adminClient.rpc("admin_backup_company", { p_company: c.id });
+      if (error) throw isMissingRpc(error) ? new Error("sql_backup_em_falta") : error;
+      let filesText = "";
+      const { data: files, error: fnErr } = await adminClient.functions.invoke("admin-backup-files", { body: { companyId: c.id } });
+      if (fnErr) {
+        let detail = "";
+        try { const j = await fnErr.context.json(); detail = j.detail ? `${j.error}: ${j.detail}` : j.error; } catch { /* sem corpo */ }
+        if (!detail) detail = /not found|404/i.test(fnErr.message || "") ? "a função admin-backup-files ainda não está publicada neste projeto" : (fnErr.message || "erro desconhecido");
+        filesText = ` Mas os ficheiros NÃO foram copiados: ${detail}.`;
+      } else if (files) {
+        filesText = files.filesCount > 0
+          ? ` ${files.filesCount} ${files.filesCount === 1 ? "ficheiro guardado" : "ficheiros guardados"} (${formatBytes(files.filesBytes)}${files.filesCopied > 0 ? `, ${files.filesCopied} ${files.filesCopied === 1 ? "novo" : "novos"}` : ", nenhum novo"}).`
+          : " A empresa ainda não tem ficheiros.";
+        if (files.partial) filesText += " Ficaram ficheiros por copiar: clique outra vez.";
+      }
+      await loadBackups();
+      notify(`Backup de ${c.name} feito: ${snap?.dataRows ?? 0} ${snap?.dataRows === 1 ? "registo" : "registos"}.${filesText}`);
+    } catch (err) {
+      notify(`Backup de ${c.name} não concluído: ${errorMessage(err)}`);
+    } finally { setBackingUp(null); }
+  }
+
   async function copyLink(c) {
     const link = accessLink(window.location.origin, c.code);
     try { await navigator.clipboard.writeText(link); notify(`Link copiado: ${link}`); } catch { notify(link); }
@@ -261,7 +304,7 @@ export default function AdminApp() {
         <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 18 }}>Servix <span style={{ color: COLORS.navIconActive }}>·</span> Administração</div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 13 }}>
           <span style={{ opacity: 0.85, overflowWrap: "anywhere" }}>{adminEmail}</span>
-          <button type="button" onClick={() => run(async () => { await loadCompanies(); await loadReports(); })} disabled={busy} aria-label="Atualizar" style={headerBtn}><RefreshCw size={16} /> Atualizar</button>
+          <button type="button" onClick={() => run(async () => { await loadCompanies(); await loadReports(); await loadBackups(); })} disabled={busy} aria-label="Atualizar" style={headerBtn}><RefreshCw size={16} /> Atualizar</button>
           <button type="button" onClick={logout} style={headerBtn}><LogOut size={16} /> Sair</button>
         </div>
       </header>
@@ -288,6 +331,7 @@ export default function AdminApp() {
           <Button type="button" variant="primary" onClick={() => setForm({ mode: "create" })} icon={Plus}>Nova empresa</Button>
         </div>
 
+        {backupError && <div role="alert" style={{ background: COLORS.alertTint, color: COLORS.alert, borderRadius: 10, padding: "10px 14px", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>{backupError}</div>}
         {listError && <div role="alert" style={{ background: COLORS.alertTint, color: COLORS.alert, borderRadius: 10, padding: "10px 14px", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>{listError}</div>}
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
@@ -313,7 +357,7 @@ export default function AdminApp() {
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 360px), 1fr))", gap: 14 }}>
             {visible.map((c) => (
-              <CompanyCard key={c.id} company={c} busy={busy} onRenew={renew} onEdit={(co) => setForm({ mode: "edit", company: co })} onCopyLink={copyLink} onResetLogin={resetLogin} onToggleSuspend={toggleSuspend} onArchive={archive} onRestore={restore} onDeleteForever={setDeleting} />
+              <CompanyCard key={c.id} company={c} busy={busy} backup={backups[c.id]} backupReady={!backupError} backingUp={backingUp === c.id} onBackup={backupNow} onRenew={renew} onEdit={(co) => setForm({ mode: "edit", company: co })} onCopyLink={copyLink} onResetLogin={resetLogin} onToggleSuspend={toggleSuspend} onArchive={archive} onRestore={restore} onDeleteForever={setDeleting} />
             ))}
           </div>
         )}
