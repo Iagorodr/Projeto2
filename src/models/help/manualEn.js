@@ -220,7 +220,7 @@ export const MANUAL_EN = {
       means: [
         ["Week strip", "Each day shows as Filled in, Missing or No clients (dashed). “Today” is highlighted."],
         ["Planned", "The hours the schedule expects for the day."],
-        ["Shared with N more", "The client was done by more people on the same day: the duration is split between whoever did it. You can adjust your share with Adjust my share."],
+        ["Your share (N people)", "The client was done by more people on the same day: the duration is split equally between whoever did it. If you did different parts, set your own time with Adjust hours: management checks that the total matches the client."],
         ["+min · to approve  /  −min", "More time than usual is overtime, which management approves. Less time is just marked with − and visible to management."],
         ["I worked alone", "Use it only if you did the whole client without your colleague. If your colleague also logged it, “Under review” shows: management decides and, until then, it stays split."],
         ["Day finished · Week finished · Month finished", "Once finished, that day, week or month is locked and can't be edited. “By management” = it was finished by management."],
@@ -230,7 +230,7 @@ export const MANUAL_EN = {
       ],
       howto: [
         { q: "How do I log a day?", steps: ["Choose the day on the week strip.", "Mark the clients you did.", "If you spent more or less time than usual, use Adjust hours.", "Tap Finish day and confirm the summary."] },
-        { q: "I had no clients today.", steps: ["Tap I had no clients today and confirm.", "If you did have some after all, use I did have clients."] },
+        { q: "I had no clients on a day.", steps: ["Pick the day in the week strip.", "Tap I had no clients on this day and confirm.", "If you did have some after all, use Actually I had clients."] },
         { q: "I did a client from another day.", steps: ["Tap I did a client from another day and choose the client.", "It is logged today but counts as the visit of the day it was planned for."] },
         { q: "I did a client that isn't on the list.", steps: ["Tap Client not on the list and type the name.", "Management confirms which client it is."] },
         { q: "How do I finish the week and the month?", steps: ["At the end of the week, tap Finish week. If a day is missing, the app asks whether everything is right.", "When the period has ended and all weeks are finished, tap Finish month.", "After that only management can reopen it for correction."] },

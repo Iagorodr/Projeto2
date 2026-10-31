@@ -222,7 +222,7 @@ export const MANUAL_PT = {
       means: [
         ["Faixa da semana", "Cada dia aparece como Preenchido, Em falta ou Sem clientes (tracejado). “Hoje” fica destacado."],
         ["Previsto", "As horas que a agenda prevê para o dia."],
-        ["Dividido com mais N", "O cliente foi feito por mais pessoas no mesmo dia: a duração divide-se entre quem o fez. Pode ajustar a sua parte em Ajustar a minha parte."],
+        ["A sua parte (N pessoas)", "O cliente foi feito por mais pessoas no mesmo dia: a duração divide-se por igual entre quem o fez. Se fizeram partes diferentes, acerte o seu tempo em Ajustar horas: a gerência confere se a soma bate com o total do cliente."],
         ["+min · por aprovar  /  −min", "Mais tempo do que o normal é hora extra, que a gerência aprova. Menos tempo fica só marcado com − e visível para a gerência."],
         ["Trabalhei sozinho", "Use só se fez o cliente inteiro sem o colega. Se o colega também marcou, aparece “Em revisão”: a gerência decide e, até lá, fica dividido."],
         ["Dia finalizado · Semana finalizada · Mês finalizado", "Depois de finalizado, esse dia, semana ou mês fica bloqueado e já não pode editar. “Pela gerência” = foi finalizado pela gerência."],
@@ -232,7 +232,7 @@ export const MANUAL_PT = {
       ],
       howto: [
         { q: "Como registo um dia?", steps: ["Escolha o dia na faixa da semana.", "Marque os clientes que fez.", "Se fez mais ou menos tempo do que o normal, use Ajustar horas.", "Carregue em Finalizar dia e confirme o resumo."] },
-        { q: "Hoje não tive clientes.", steps: ["Carregue em Hoje não tive clientes e confirme.", "Se afinal teve, use Afinal tive clientes."] },
+        { q: "Num dia não tive clientes.", steps: ["Escolha o dia na faixa da semana.", "Carregue em Neste dia não tive clientes e confirme.", "Se afinal teve, use Afinal tive clientes."] },
         { q: "Fiz o cliente de outro dia.", steps: ["Carregue em Fiz o cliente de outro dia e escolha o cliente.", "Fica registado hoje, mas conta como a visita do dia em que estava prevista."] },
         { q: "Fiz um cliente que não está na lista.", steps: ["Carregue em Cliente fora da lista e escreva o nome.", "A gerência confirma a que cliente corresponde."] },
         { q: "Como finalizo a semana e o mês?", steps: ["No fim da semana, carregue em Finalizar semana. Se faltar algum dia, a app pergunta se está tudo certo.", "Quando o período terminar e todas as semanas estiverem finalizadas, carregue em Finalizar mês.", "Depois disso só a gerência pode reabrir para correção."] },

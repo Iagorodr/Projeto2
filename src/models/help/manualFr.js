@@ -220,7 +220,7 @@ export const MANUAL_FR = {
       means: [
         ["Bandeau de la semaine", "Chaque jour apparaît comme Rempli, Manquant ou Sans clients (en pointillé). « Aujourd'hui » est mis en évidence."],
         ["Prévu", "Les heures que le planning prévoit pour la journée."],
-        ["Partagé avec N de plus", "Le client a été fait par plus de personnes le même jour : la durée se partage entre ceux qui l'ont fait. Vous pouvez ajuster votre part avec Ajuster ma part."],
+        ["Votre part (N personnes)", "Le client a été fait par plus de personnes le même jour : la durée se partage à parts égales entre ceux qui l'ont fait. Si vous avez fait des parties différentes, indiquez votre temps avec Ajuster les heures : la direction vérifie que le total correspond au client."],
         ["+min · à approuver  /  −min", "Plus de temps que d'habitude = heures supplémentaires, que la direction approuve. Moins de temps est simplement marqué avec − et visible pour la direction."],
         ["J'ai travaillé seul", "À utiliser seulement si vous avez fait tout le client sans votre collègue. Si votre collègue l'a aussi saisi, « En révision » s'affiche : la direction décide et, d'ici là, c'est partagé."],
         ["Jour finalisé · Semaine finalisée · Mois finalisé", "Une fois finalisé, ce jour, cette semaine ou ce mois est verrouillé et ne peut plus être modifié. « Par la direction » = finalisé par la direction."],
@@ -230,7 +230,7 @@ export const MANUAL_FR = {
       ],
       howto: [
         { q: "Comment saisir une journée ?", steps: ["Choisissez le jour dans le bandeau de la semaine.", "Cochez les clients faits.", "Si vous avez passé plus ou moins de temps que d'habitude, utilisez Ajuster les heures.", "Touchez Finaliser la journée et confirmez le résumé."] },
-        { q: "Je n'ai eu aucun client aujourd'hui.", steps: ["Touchez Je n'ai eu aucun client aujourd'hui et confirmez.", "Si finalement vous en avez eu, utilisez Finalement j'ai eu des clients."] },
+        { q: "Je n'ai eu aucun client un jour.", steps: ["Choisissez le jour dans la bande de la semaine.", "Touchez Je n'ai eu aucun client ce jour-là et confirmez.", "Si finalement vous en avez eu, utilisez En fait j'ai eu des clients."] },
         { q: "J'ai fait le client d'un autre jour.", steps: ["Touchez J'ai fait le client d'un autre jour et choisissez le client.", "C'est saisi aujourd'hui mais compte comme la visite du jour où elle était prévue."] },
         { q: "J'ai fait un client qui n'est pas dans la liste.", steps: ["Touchez Client hors liste et écrivez le nom.", "La direction confirme de quel client il s'agit."] },
         { q: "Comment finaliser la semaine et le mois ?", steps: ["En fin de semaine, touchez Finaliser la semaine. S'il manque un jour, l'app demande si tout est correct.", "Quand la période est terminée et que toutes les semaines sont finalisées, touchez Finaliser le mois.", "Ensuite, seule la direction peut rouvrir pour correction."] },
