@@ -6,7 +6,7 @@ import { RADIUS, FONT } from "../../styles/tokens.js";
 import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { TODAY } from "../../models/data.js";
 import {
-  clientById, entryClientName, isPendingClientEntry, recomputeSharedHours, visitDateOf, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
+  clientById, clientDurationOn, entryClientName, isPendingClientEntry, recomputeSharedHours, visitDateOf, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
   weekBlocksOfPayPeriod, calPeriodLabel, boardStaff, countReviews,
@@ -339,9 +339,26 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     const list = [];
     staff.forEach((s) => {
       const other = ((horasData[s.id] && horasData[s.id].entries) || []).find((x) => visitDateOf(x) === visitDateOf(e) && x.clientId === e.clientId && !x.voided);
-      if (other) list.push({ id: s.id, name: s.name, self: openStaff && s.id === openStaff.id, hoursLabel: fmtHoursScreen(other.hours) });
+      if (other) {
+        const em = other.extraMinutes || 0;
+        list.push({ id: s.id, name: s.name, self: openStaff && s.id === openStaff.id, hours: other.hours, hoursLabel: fmtHoursScreen(other.hours) + (em ? ` (${em > 0 ? "+" : "−"}${Math.abs(em)}min)` : "") });
+      }
     });
     return list.length > 1 ? list : [];
+  }
+  // Linha de conferência do selo: total do cliente nesse dia × soma do que cada um marcou.
+  function sharedSummary(e, people) {
+    const client = clientById(clients, e.clientId);
+    if (!client || client.hoursMode === "individual") return undefined;
+    const total = clientDurationOn(client, visitDateOf(e)) / 60;
+    const sum = people.reduce((a, p) => a + (p.hours || 0), 0);
+    const diff = Math.round((sum - total) * 60) / 60;
+    const ok = Math.abs(diff) < 0.01;
+    return {
+      line: t.sharedTotalLine(fmtHoursScreen(total), fmtHoursScreen(sum)),
+      verdict: ok ? t.sharedTotalOk : diff < 0 ? t.sharedTotalLess(fmtHoursScreen(-diff)) : t.sharedTotalMore(fmtHoursScreen(diff)),
+      ok,
+    };
   }
 
   const columns = [
@@ -618,6 +635,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                             title={t.sharedBadgeTitle(people.length)}
                                             heading={t.sharedBadgeHeading}
                                             note={client && client.hoursMode === "individual" ? t.sharedIndividualNote : undefined}
+                                            summary={sharedSummary(e, people)}
                                           />
                                         );
                                       })()}

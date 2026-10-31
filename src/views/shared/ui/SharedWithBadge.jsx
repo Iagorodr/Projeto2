@@ -7,10 +7,10 @@ import { Users } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";
 import { RADIUS } from "../../../styles/tokens.js";
 
-const POPOVER_WIDTH = 240;
+const POPOVER_WIDTH = 270;
 
 // people: [{ id, name, hoursLabel }]
-function SharedWithBadge({ people, title, heading, note }) {
+function SharedWithBadge({ people, title, heading, note, summary }) {
   const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -89,6 +89,12 @@ function SharedWithBadge({ people, title, heading, note }) {
               <span style={{ color: COLORS.ink2 }}>{p.hoursLabel}</span>
             </div>
           ))}
+          {summary && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${COLORS.line}`, fontSize: 11.5, lineHeight: 1.4 }}>
+              <div style={{ color: COLORS.ink2 }}>{summary.line}</div>
+              <div style={{ marginTop: 2, fontWeight: 700, color: summary.ok ? COLORS.okInk : COLORS.amberInk }}>{summary.ok ? "✓ " : "⚠ "}{summary.verdict}</div>
+            </div>
+          )}
           {note && <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 6 }}>{note}</div>}
         </div>
       )}

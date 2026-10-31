@@ -543,7 +543,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
     const cl = clients.find((c) => c.id === entry.clientId);
     if (!cl) return undefined;
     const full = (clientDurationOn(cl, visitDateOf(entry)) || 0) / 60 + (entry.extraMinutes || 0) / 60;
-    return t.soloHint(fmtHoursScreen(Math.max(0, full)));
+    return fmtHoursScreen(Math.max(0, full));
   }
 
   function subtitleFor(entry) {
@@ -871,13 +871,11 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
                   dimmed={card.dimmed}
                   dimmedNote={card.dimmedNote}
                   readOnly={weekLockedFlag || card.readOnly}
-                  extraPill={card.extraPill} extraPillVariant={card.extraPillVariant} soloHint={card.soloHint}
+                  extraPill={card.extraPill} extraPillVariant={card.extraPillVariant}
                   onToggle={() => (card.isCustom ? removeEntryObj(card.entry) : toggleScheduledClient(card.clientId))}
                   onExtraTime={card.checked && card.entry ? () => openExtra(card.entry) : undefined}
-                  onAdjustSplit={card.checked && card.entry && card.entry.sharedCount > 1 ? () => openSplit(card.entry) : undefined}
-                  adjustSplitLabel={t.adjustSplit}
                   onSolo={card.checked && card.soloAllowed ? () => toggleSolo(card.entry) : undefined}
-                  soloLabel={t.soloButton} soloUndoLabel={t.soloUndo} soloActive={card.soloActive} soloTag={t.soloTag}
+                  soloLabel={card.soloHint ? `${t.soloButton} (${card.soloHint})` : t.soloButton} soloUndoLabel={t.soloUndo} soloActive={card.soloActive} soloTag={t.soloTag}
                   conflictTag={card.conflict ? t.conflictTag : undefined}
                   managerTag={card.entry && card.entry.byManagement ? t.byManagerShort : undefined}
                   extraTimeLabel={t.extraTimeButton}

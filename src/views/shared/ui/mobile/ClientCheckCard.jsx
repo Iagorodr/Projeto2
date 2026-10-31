@@ -18,18 +18,18 @@ import { Pill } from "../Pill.jsx";
 
 function ClientCheckCard({
   name, subtitle, checked, onToggle, onExtraTime, extraTimeLabel = "Fiz mais tempo",
-  extraPill, extraPillVariant = "pending", soloHint, readOnly, dimmed, dimmedNote, onAdjustSplit, adjustSplitLabel,
+  extraPill, extraPillVariant = "pending", readOnly, dimmed, dimmedNote, onAdjustSplit, adjustSplitLabel,
   onSolo, soloLabel, soloActive, soloTag, soloUndoLabel, conflictTag, managerTag,
 }) {
   return (
     <div
       style={{
-        display: "flex", alignItems: "center", gap: 12, minHeight: 72,
-        borderRadius: 18, boxShadow: SHADOW.sh1, background: dimmed ? COLORS.lineSoft : COLORS.card,
+        minHeight: 72, borderRadius: 18, boxShadow: SHADOW.sh1, background: dimmed ? COLORS.lineSoft : COLORS.card,
         border: `1px solid ${COLORS.line}`, padding: "12px 14px", opacity: dimmed ? 0.75 : 1,
-        boxSizing: "border-box",
+        boxSizing: "border-box", display: "flex", flexDirection: "column", justifyContent: "center",
       }}
     >
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <button
         type="button"
         onClick={readOnly ? undefined : onToggle}
@@ -51,27 +51,10 @@ function ClientCheckCard({
         <div style={{ fontSize: 12.5, color: COLORS.ink2, marginTop: 2 }}>
           {dimmed && dimmedNote ? dimmedNote : subtitle}
         </div>
-        {soloHint && <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 2 }}>{soloHint}</div>}
         {extraPill && <div style={{ marginTop: 6 }}><Pill variant={extraPillVariant}>{extraPill}</Pill></div>}
         {conflictTag && <div style={{ marginTop: 6 }}><Pill variant="pending">{conflictTag}</Pill></div>}
         {managerTag && <div style={{ marginTop: 6 }}><Pill variant="neutral">{managerTag}</Pill></div>}
         {soloActive && soloTag && <div style={{ marginTop: 6 }}><Pill variant="paid">{soloTag}</Pill></div>}
-        {!readOnly && !dimmed && onAdjustSplit && (
-          <button
-            type="button" onClick={onAdjustSplit}
-            style={{ marginTop: 6, marginRight: 14, padding: 0, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
-          >
-            {adjustSplitLabel}
-          </button>
-        )}
-        {!readOnly && !dimmed && onSolo && (
-          <button
-            type="button" onClick={onSolo}
-            style={{ marginTop: 6, marginRight: 14, padding: 0, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
-          >
-            {soloActive ? soloUndoLabel : soloLabel}
-          </button>
-        )}
       </div>
 
       {!readOnly && !dimmed && onExtraTime && (
@@ -86,6 +69,18 @@ function ClientCheckCard({
         >
           {extraTimeLabel}
         </button>
+      )}
+      </div>
+
+      {!readOnly && !dimmed && ((onAdjustSplit && adjustSplitLabel) || onSolo) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px", marginTop: 10, marginLeft: 46 }}>
+          {onAdjustSplit && adjustSplitLabel && (
+            <button type="button" onClick={onAdjustSplit} style={{ padding: 0, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 13, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{adjustSplitLabel}</button>
+          )}
+          {onSolo && (
+            <button type="button" onClick={onSolo} style={{ padding: 0, border: "none", background: "transparent", color: COLORS.vivo, fontSize: 13, fontWeight: 600, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>{soloActive ? soloUndoLabel : soloLabel}</button>
+          )}
+        </div>
       )}
     </div>
   );
