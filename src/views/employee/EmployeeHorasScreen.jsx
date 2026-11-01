@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Lock, Plus, X, AlertTriangle } from "lucide-react";
+import { Lock, Plus, X, AlertTriangle, Info } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
@@ -23,6 +23,12 @@ import {
   MobileHeader, WeekStrip, DayPanel, ClientCheckCard, BottomActionBar, PeriodCalendar,
   Card, ConfirmDialog, Drawer, Button, Pill, SearchField, Toast, ProgressBar, SaveChip, OfflineBar,
 } from "../shared/ui/index.js";
+
+// "2026-09-20" -> Date local (meia-noite).
+function parseISODate(str) {
+  const [y, m, d] = String(str).slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
 
 function emptyHoras() {
   return { status: "pendente", paid: false, entries: [], lockedWeeks: {}, noClientDays: [] };
@@ -1162,21 +1168,39 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           const baseMin = extraTarget ? Math.round((extraTarget.hours - (extraTarget.extraMinutes || 0) / 60) * 60) : 0;
           const minDraft = -Math.max(0, Math.floor((baseMin - 15) / 15) * 15);
           const draftLabel = extraDraft > 0 ? `+${extraDraft} ${t.minutesUnit}` : extraDraft < 0 ? `−${Math.abs(extraDraft)} ${t.minutesUnit}` : `0 ${t.minutesUnit}`;
+          const tone = extraDraft > 0 ? "#8A5A0B" : extraDraft < 0 ? "var(--p2)" : COLORS.ink;
+          const step = (d) => setExtraDraft((v) => Math.min(240, Math.max(minDraft, v + d)));
+          const bigBtn = { width: 72, height: 72, borderRadius: 20, border: "none", background: COLORS.card, boxShadow: "0 2px 8px rgba(21,24,22,.1)", color: COLORS.ink, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
           return (
             <>
-              <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 6 }}>{t.extraQuestion}</div>
-              <div style={{ fontSize: 13, color: COLORS.ink3, marginBottom: 16 }}>
-                {t.adjustBase}: <b style={{ color: COLORS.ink }}>{fmtHoursScreen(baseMin / 60)}</b> → <b style={{ color: extraDraft === 0 ? COLORS.ink : extraDraft > 0 ? COLORS.clayInk : COLORS.forest700 }}>{fmtHoursScreen((baseMin + extraDraft) / 60)}</b>
+              {extraTarget && <div style={{ fontSize: 14, color: COLORS.ink2, marginTop: -6, marginBottom: 10 }}>{entryClientName(clients, extraTarget)} · {weekdayFull[parseISODate(extraTarget.date).getDay()]}, {dmOf(parseISODate(extraTarget.date))}</div>}
+              <div style={{ fontSize: 15, color: COLORS.ink, marginBottom: 12 }}>{t.extraQuestion}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#F3F4F1", borderRadius: 24, padding: 10 }}>
+                <button type="button" aria-label="−15" onClick={() => step(-15)} style={bigBtn}><Minus2 /></button>
+                <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
+                  <div style={{ fontFamily: FONT.heading, fontSize: 32, lineHeight: 1.05, color: tone }}>{draftLabel}</div>
+                  <div style={{ fontSize: 14, color: COLORS.ink2, marginTop: 4 }}>
+                    {fmtHoursScreen(baseMin / 60)} → <b style={{ color: COLORS.ink }}>{fmtHoursScreen((baseMin + extraDraft) / 60)}</b>
+                  </div>
+                </div>
+                <button type="button" aria-label="+15" onClick={() => step(15)} style={bigBtn}><Plus size={26} strokeWidth={2.4} /></button>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 14 }}>
-                <button type="button" onClick={() => setExtraDraft((v) => Math.max(minDraft, v - 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Minus2 /></button>
-                <div style={{ fontSize: 22, fontWeight: 700, color: COLORS.ink, minWidth: 110, textAlign: "center" }}>{draftLabel}</div>
-                <button type="button" onClick={() => setExtraDraft((v) => Math.min(240, v + 15))} style={{ width: 44, height: 44, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card, color: COLORS.vivo, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Plus size={18} strokeWidth={2.4} /></button>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginTop: 12 }}>
+                {[-30, -15, 30, 60].map((d) => {
+                  const on = extraDraft === d;
+                  return (
+                    <button key={d} type="button" onClick={() => setExtraDraft(Math.min(240, Math.max(minDraft, d)))} style={{ height: 48, borderRadius: 14, border: "none", background: on ? "#151816" : "#F3F4F1", color: on ? "#fff" : COLORS.ink, fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                      {d === 60 ? "+1h" : d > 0 ? `+${d}` : `−${-d}`}
+                    </button>
+                  );
+                })}
               </div>
             </>
           );
         })()}
-        <div style={{ fontSize: 12, color: COLORS.ink3 }}>{t.extraHint}</div>
+        <div style={{ display: "flex", gap: 8, fontSize: 13.5, color: COLORS.ink2, background: "#F3F4F1", borderRadius: 16, padding: "12px 14px", marginTop: 14, lineHeight: 1.45 }}>
+          <Info size={17} style={{ flexShrink: 0, marginTop: 1 }} /><span>{t.extraHint}</span>
+        </div>
       </Drawer>
 
       {/* Folha: confirmação de "Finalizar dia" com resumo */}

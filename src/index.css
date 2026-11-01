@@ -99,6 +99,10 @@ h1, h2, h3 { font-stretch: 112%; }
 @keyframes b1-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes b1-grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes b1-spin { to { transform: rotate(360deg); } }
+@keyframes b1-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes b1-sheet-left { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Folha do telemóvel: botões do rodapé dividem a largura (Cancelar | Guardar). */
+.b1-sheet-footer > * { flex: 1 1 0; min-height: 56px; }
 .b1-rise { animation: b1-rise .45s var(--ease) both; }
 .b1-fade { animation: b1-fade .28s var(--ease) both; }
 .b1-pop { animation: b1-pop .35s var(--ease) both; }

@@ -89,7 +89,7 @@ function DrawerBody({ open, onRequestClose, width, icon: Icon, avatar, title, pi
   return (
     <div
       style={{
-        position: "fixed", inset: 0, background: "rgba(15,49,41,.45)", zIndex: 85,
+        position: "fixed", inset: 0, background: "rgba(21,24,22,.45)", zIndex: 85, animation: "b1-fade .2s ease both",
         display: "flex", justifyContent: isNarrow ? "center" : "flex-end", alignItems: isNarrow ? "flex-end" : "stretch",
       }}
       onClick={onRequestClose}
@@ -100,8 +100,11 @@ function DrawerBody({ open, onRequestClose, width, icon: Icon, avatar, title, pi
           background: COLORS.card, boxShadow: SHADOW.sh2,
           display: "flex", flexDirection: "column",
           width: isNarrow ? "100%" : width,
-          height: isNarrow ? "92%" : "100%",
-          borderRadius: isNarrow ? `${RADIUS.sheetMobile}px ${RADIUS.sheetMobile}px 0 0` : 0,
+          // Redesign B1: no telemóvel a folha sobe de baixo e só ocupa o que precisa;
+          // no PC a gaveta desliza da direita.
+          height: isNarrow ? "auto" : "100%", maxHeight: isNarrow ? "92%" : undefined,
+          borderRadius: isNarrow ? "30px 30px 0 0" : 0,
+          animation: isNarrow ? "b1-sheet-up .32s var(--ease) both" : "b1-sheet-left .32s var(--ease) both",
         }}
       >
         {isNarrow && (
@@ -112,8 +115,8 @@ function DrawerBody({ open, onRequestClose, width, icon: Icon, avatar, title, pi
 
         <div
           style={{
-            display: "flex", alignItems: "center", gap: 10, padding: "16px 20px",
-            borderBottom: `1px solid ${COLORS.line}`, flexShrink: 0,
+            display: "flex", alignItems: "center", gap: 10, padding: isNarrow ? "8px 22px 6px" : "18px 22px",
+            borderBottom: isNarrow ? "none" : `1px solid ${COLORS.line}`, flexShrink: 0,
           }}
         >
           {avatar}
@@ -124,7 +127,7 @@ function DrawerBody({ open, onRequestClose, width, icon: Icon, avatar, title, pi
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+              <div style={{ fontFamily: "'Archivo Variable', 'Archivo Display', sans-serif", fontSize: isNarrow ? 24 : 19, lineHeight: 1.15, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: isNarrow ? "normal" : "nowrap" }}>{title}</div>
               {pill}
             </div>
           </div>
@@ -141,12 +144,12 @@ function DrawerBody({ open, onRequestClose, width, icon: Icon, avatar, title, pi
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+        <div style={{ flex: isNarrow ? "0 1 auto" : 1, overflowY: "auto", padding: isNarrow ? "8px 22px 18px" : 22 }}>
           {children}
         </div>
 
         {footer && (
-          <div style={{ flexShrink: 0, padding: 16, borderTop: `1px solid ${COLORS.line}`, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <div className={isNarrow ? "b1-sheet-footer" : undefined} style={{ flexShrink: 0, padding: isNarrow ? "4px 22px calc(env(safe-area-inset-bottom, 0px) + 18px)" : 16, borderTop: isNarrow ? "none" : `1px solid ${COLORS.line}`, display: "flex", justifyContent: "flex-end", gap: 10 }}>
             {footer}
           </div>
         )}
