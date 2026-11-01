@@ -17,10 +17,10 @@ const BASE = {
 // "Herói": degradê + brilho radial branco no canto sup. direito + riscas
 // diagonais finas a 4.5% de branco — as três camadas empilhadas num único
 // `background` (a primeira listada fica por cima).
+// Redesign B1: o "herói" passa a ser o cartão ESCURO (tinta #151816), com um
+// brilho muito leve da cor da empresa no canto.
 const HERO_BACKGROUND =
-  "radial-gradient(circle at 88% 12%, rgba(255,255,255,.18), transparent 55%), " +
-  "repeating-linear-gradient(45deg, rgba(255,255,255,.045) 0 2px, transparent 2px 10px), " +
-  "linear-gradient(140deg, #2A8A73 0%, #1F6F5C 42%, #143F35 100%)";
+  "radial-gradient(circle at 92% 0%, var(--p1-shadow), transparent 48%), #151816";
 
 function variantStyle(variant) {
   switch (variant) {
@@ -31,18 +31,18 @@ function variantStyle(variant) {
       };
     case "tintOk": // estado positivo
       return {
-        background: "linear-gradient(165deg, #EFF9F3, #D3ECDF)",
-        border: `1px solid #BCDFCB`, boxShadow: SHADOW.sh1, color: COLORS.ink,
+        background: "#E3F4EA",
+        border: `1px solid #C7E6D3`, boxShadow: SHADOW.sh1, color: COLORS.ink,
       };
     case "warm": // notas
       return {
-        background: "linear-gradient(180deg, #FFF9F4, #FDEEE2)",
-        border: `1px solid #F3D9CB`, boxShadow: SHADOW.sh1, color: COLORS.ink,
+        background: COLORS.card,
+        border: `1px solid ${COLORS.line}`, boxShadow: SHADOW.sh1, color: COLORS.ink,
       };
     case "alert": // aviso de página
       return {
-        background: COLORS.alertTint, border: `1px solid #F0CDBF`,
-        boxShadow: SHADOW.sh1, color: "#7A3520",
+        background: COLORS.alertTint, border: `1px solid #F5C9CB`,
+        boxShadow: SHADOW.sh1, color: "#8E2A2F",
       };
     case "default":
     default:

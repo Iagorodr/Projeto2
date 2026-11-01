@@ -12,11 +12,11 @@ import { COLORS } from "../../../styles/colors.js";
 
 const VARIANTS = {
   pending: { bg: COLORS.amberBg, ink: COLORS.amberInk }, // pendente / por tratar
-  owed: { bg: COLORS.mint, ink: COLORS.forest800 }, // por pagar (finalizado, ainda não pago)
-  paid: { bg: "#D9F1E3", ink: "#17703F" }, // pago / OK / em dia
-  reopened: { bg: "#FBE4D6", ink: "#A5481F" }, // reaberto para correção
-  missing: { bg: "#FBDDD6", ink: "#B3392A" }, // em falta / erro
-  neutral: { bg: "#E8EDEA", ink: "#5B6F67" }, // neutro / inativo
+  owed: { bg: "var(--p1-12)", ink: "var(--p2)" }, // por pagar (finalizado, ainda não pago)
+  paid: { bg: COLORS.okTint, ink: COLORS.ok }, // pago / OK / em dia
+  reopened: { bg: COLORS.reopenedBg, ink: COLORS.reopened }, // reaberto para correção
+  missing: { bg: COLORS.alertTint, ink: "#B8343A" }, // em falta / erro
+  neutral: { bg: COLORS.infoBg, ink: COLORS.info }, // neutro / inativo
 };
 
 function Pill({ variant = "neutral", icon: Icon, children }) {

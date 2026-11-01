@@ -37,7 +37,7 @@ function PeriodBarChart({ data, valueFormatter = (v) => `${v}`, title, currentVa
       />
       <svg width="100%" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={title}>
         {/* eixos: base sólida, restantes tracejadas */}
-        <line x1={padL} y1={baseY} x2={w - padR} y2={baseY} stroke="#CBD8D2" strokeWidth={1} />
+        <line x1={padL} y1={baseY} x2={w - padR} y2={baseY} stroke="#D3D8D1" strokeWidth={1} />
         {[0.25, 0.5, 0.75].map((f) => (
           <line key={f} x1={padL} y1={baseY - (h - padBottom - padTop) * f} x2={w - padR} y2={baseY - (h - padBottom - padTop) * f} stroke={COLORS.line} strokeDasharray="3 4" strokeWidth={1} />
         ))}
@@ -49,10 +49,10 @@ function PeriodBarChart({ data, valueFormatter = (v) => `${v}`, title, currentVa
           const isCurrent = i === n - 1;
           const isHover = hoverIdx === i;
           const fill = isHover
-            ? "#7DB5A2"
+            ? "var(--p1-60)"
             : isCurrent
               ? `url(#servix-bar-gradient)`
-              : "#CDE2D9";
+              : "var(--p1-20)";
           return (
             <g key={i} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx((v) => (v === i ? null : v))} style={{ cursor: "default" }}>
               <path d={roundedTopBarPath(x, y, barW, barH, 10)} fill={fill} />
@@ -73,8 +73,8 @@ function PeriodBarChart({ data, valueFormatter = (v) => `${v}`, title, currentVa
 
         <defs>
           <linearGradient id="servix-bar-gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#2E8570" />
-            <stop offset="100%" stopColor="#185A4A" />
+            <stop offset="0%" stopColor="var(--p1)" />
+            <stop offset="100%" stopColor="var(--p2)" />
           </linearGradient>
         </defs>
       </svg>

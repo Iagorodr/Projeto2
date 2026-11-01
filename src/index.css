@@ -4,34 +4,25 @@
    nesses objetos) — estas variáveis ficam disponíveis para qualquer CSS
    "de verdade" (este ficheiro, ou <style> futuros) sem duplicar valores. */
 :root {
-  --page: #F3F6F4;
+  /* Redesign B1: neutros fixos; o acento (--p1, --p2 e tons) é posto pelo
+     styles/theme.js conforme a cor da empresa. Valores por defeito = Verde. */
+  --p1: #1E8C5A; --p2: #166B45; --p3: #104D32;
+  --p1-90: #359869; --p1-60: #78BA9C; --p1-35: #B4DAC8; --p1-20: #D2E8DE;
+  --p1-12: #E4F1EB; --p1-8: #EDF6F2; --p1-4: #F6FAF8; --p1-shadow: rgba(30,140,90,.28);
+  --page: #ECEEE9;
   --card: #FFFFFF;
-  --line: #E3EAE6;
-  --line-soft: #EEF3F0;
-  --line-input: #D5E0DA;
-  --forest-900: #0F3129;
-  --forest-800: #143F35;
-  --forest-700: #185A4A;
-  --forest-600: #1F6F5C;
-  --forest-500: #2E8570;
-  --forest-200: #B5D5C9;
-  --forest-100: #D8E9E2;
-  --forest-50: #EDF4F1;
-  --clay: #E28A65;
-  --clay-ink: #9A4A26;
-  --clay-tint: #FBE9DF;
-  --alert: #B3492E;
-  --alert-tint: #FBE4DC;
-  --ok: #2F9E64;
-  --ok-ink: #14684A;
-  --ok-tint: #DDF1E6;
-  --amber-bg: #FCF3DF;
-  --amber-ink: #8A5A0B;
-  --ink: #1A2B26;
-  --ink-2: #4F635C;
-  --ink-3: #66786F;
-  --header-tint: #F6F9F7;
-  --segment-bg: #E4ECE8;
+  --line: #E2E5DF;
+  --line-soft: #EEF0EC;
+  --line-input: #D3D8D1;
+  --ink: #151816;
+  --ink-2: #5A625C;
+  --ink-3: #6F776F;
+  --attention: #C98A12; --attention-bg: #FBF0D9;
+  --urgent: #D6454A; --urgent-bg: #FCE5E5;
+  --ok: #167049; --ok-bg: #E3F4EA;
+  --info: #5A625C; --info-bg: #EEF0EC;
+  --reopened: #6B44B8; --reopened-bg: #EEE9FA;
+  --ease: cubic-bezier(.2,.8,.2,1);
 
   /* Forma, sombra e espaço (secção 1.3). Raios em pixels: cartão / gaveta
      mobile (só cantos de cima) / controlo-botão gerência / controlo-botão
@@ -86,7 +77,44 @@ button {
 body {
   margin: 0;
   /* Fonte do app em TODO o lado, mesmo em ecrãs fora do contentor principal (ex.: nova palavra-passe). */
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Archivo Variable', 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  background: #ECEEE9;
+  color: #151816;
+}
+
+/* Redesign B1: tudo o que usa FONT.heading (marca "Archivo Display") fica na
+   versão larga e pesada da Archivo — títulos, números e valores grandes. */
+[style*="Archivo Display"] {
+  font-stretch: 118%;
+  font-weight: 800 !important;
+  letter-spacing: -0.01em;
+}
+h1, h2, h3 { font-stretch: 112%; }
+
+/* Movimento base (curto; desligado com "reduzir movimento"). */
+@keyframes b1-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes b1-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes b1-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes b1-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes b1-grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes b1-spin { to { transform: rotate(360deg); } }
+.b1-rise { animation: b1-rise .45s var(--ease) both; }
+.b1-fade { animation: b1-fade .28s var(--ease) both; }
+.b1-pop { animation: b1-pop .35s var(--ease) both; }
+.b1-cascade > * { animation: b1-rise .45s var(--ease) both; }
+.b1-cascade > *:nth-child(2) { animation-delay: .04s; }
+.b1-cascade > *:nth-child(3) { animation-delay: .08s; }
+.b1-cascade > *:nth-child(4) { animation-delay: .12s; }
+.b1-cascade > *:nth-child(5) { animation-delay: .16s; }
+.b1-cascade > *:nth-child(6) { animation-delay: .2s; }
+.b1-cascade > *:nth-child(n+7) { animation-delay: .24s; }
+.b1-lift { transition: transform .2s var(--ease), box-shadow .2s var(--ease); }
+@media (hover: hover) {
+  .b1-lift:hover { transform: translateY(-2px); box-shadow: 0 2px 6px rgba(21,24,22,.08), 0 24px 44px -20px rgba(21,24,22,.38); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .b1-rise, .b1-fade, .b1-pop, .b1-cascade > *, .b1-lift { animation: none !important; transition: none !important; }
 }
 input, select, textarea {
   font-family: inherit;

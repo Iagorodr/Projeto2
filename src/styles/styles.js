@@ -14,7 +14,7 @@ const styles = {
   // da tela. Não era preciso "fechar e abrir de novo" pra corrigir —
   // só não havia como sair desse estado pela interface, já que o
   // próprio layout tinha quebrado.
-  page: { background: COLORS.bg, minHeight: "700px", display: "flex", flexDirection: "column", justifyContent: "center", padding: "20px", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", color: COLORS.text },
+  page: { background: COLORS.bg, minHeight: "700px", display: "flex", flexDirection: "column", justifyContent: "center", padding: "20px", fontFamily: "'Archivo Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", color: COLORS.text },
   // Lote 4, 4.2 (achado da Marta): era `overflow: "hidden"` — isso faz
   // deste `shell` a "janela de rolagem" de referência para qualquer
   // `position: sticky` lá dentro (mesmo sem overflow real, por ser
@@ -87,7 +87,7 @@ const styles = {
   saveButton: { padding: "10px 18px", borderRadius: 10, border: "none", background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", letterSpacing: "0.1px", boxShadow: "0 10px 20px -8px rgba(31,122,95,.7), inset 0 1px 0 rgba(255,255,255,.3)" },
 
   sectionTitle: { fontSize: 13, fontWeight: 700, color: COLORS.primaryDark, marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.4px" },
-  title: { fontFamily: "'Poppins', sans-serif", fontSize: 23, fontWeight: 600, margin: "4px 0 20px", letterSpacing: "0.1px" },
+  title: { fontFamily: "'Archivo Variable', 'Archivo Display', sans-serif", fontSize: 23, fontWeight: 600, margin: "4px 0 20px", letterSpacing: "0.1px" },
   periodNav: { display: "flex", alignItems: "center", gap: 10 },
   navButton: { width: 30, height: 30, borderRadius: "50%", border: "none", background: COLORS.mint, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.vivo },
   periodLabel: { fontSize: 15, fontWeight: 700, minWidth: 150, textAlign: "center" },
@@ -97,10 +97,10 @@ const styles = {
   loginLeft: { flex: 1, background: COLORS.primaryDark, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "40px 40px 36px" },
   loginLeftContent: { position: "relative", zIndex: 1, display: "flex", flexDirection: "column", gap: 14 },
   loginTagline: { fontSize: 15.5, fontWeight: 500, color: "#FFFFFF", lineHeight: 1.5, maxWidth: "30ch" },
-  loginLeftFoot: { position: "relative", zIndex: 1, marginTop: 28, fontSize: 11, color: COLORS.primaryTint, letterSpacing: "0.5px", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", fontWeight: 600 },
+  loginLeftFoot: { position: "relative", zIndex: 1, marginTop: 28, fontSize: 11, color: COLORS.primaryTint, letterSpacing: "0.5px", textTransform: "uppercase", fontFamily: "'Archivo Variable', sans-serif", fontWeight: 600 },
   loginRight: { flex: 1, padding: "40px 48px", display: "flex", flexDirection: "column" },
   loginFields: { display: "flex", flexDirection: "column", gap: 12, marginTop: "auto", marginBottom: "auto" },
-  loginCompanyName: { fontFamily: "'Poppins', sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 10, color: COLORS.text },
+  loginCompanyName: { fontFamily: "'Archivo Variable', 'Archivo Display', sans-serif", fontSize: 20, fontWeight: 600, marginBottom: 10, color: COLORS.text },
   loginInput: { border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "13px 14px", fontSize: 14, background: COLORS.bg, color: COLORS.text },
   forgotRow: { display: "flex", justifyContent: "flex-end" },
   forgotLink: { fontSize: 12, fontWeight: 700, color: COLORS.vivo, textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4, cursor: "pointer", background: "none", border: "none" },

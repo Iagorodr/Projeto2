@@ -241,15 +241,15 @@ function InstallPage() {
 }
 
 const S = {
-  page: { minHeight: "100vh", background: COLORS.bg, fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", color: COLORS.text, padding: "16px 16px 40px" },
+  page: { minHeight: "100vh", background: COLORS.bg, fontFamily: "'Archivo Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", color: COLORS.text, padding: "16px 16px 40px" },
   wrap: { maxWidth: 520, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 },
   topRow: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
   brand: { display: "flex", alignItems: "center", gap: 10 },
-  brandName: { fontFamily: "'Poppins', 'Inter', sans-serif", fontWeight: 700, fontSize: 20, color: COLORS.primaryDark },
+  brandName: { fontFamily: "'Archivo Variable', 'Archivo Display', sans-serif", fontWeight: 700, fontSize: 20, color: COLORS.primaryDark },
   langRow: { display: "flex", gap: 4 },
   langBtn: { border: `1px solid ${COLORS.border}`, background: COLORS.surface, color: COLORS.textSoft, borderRadius: 8, padding: "6px 9px", fontSize: 12, fontWeight: 600, cursor: "pointer" },
   langBtnOn: { background: COLORS.primaryDark, color: "#fff", borderColor: COLORS.primaryDark },
-  h1: { fontFamily: "'Poppins', 'Inter', sans-serif", fontSize: 28, lineHeight: 1.15, margin: "8px 0 0", color: COLORS.primaryDark },
+  h1: { fontFamily: "'Archivo Variable', 'Archivo Display', sans-serif", fontSize: 28, lineHeight: 1.15, margin: "8px 0 0", color: COLORS.primaryDark },
   sub: { margin: 0, fontSize: 16, lineHeight: 1.45, color: COLORS.textSoft },
   card: { background: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 18 },
   okCard: { display: "flex", gap: 14, alignItems: "center", background: COLORS.okTint, borderColor: COLORS.ok },

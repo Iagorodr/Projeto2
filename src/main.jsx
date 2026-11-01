@@ -2,7 +2,12 @@ import React, { Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import InstallPage from "./views/InstallPage.jsx";
+import "@fontsource-variable/archivo/wdth.css";
 import "./index.css";
+import { applyStoredTheme } from "./styles/theme.js";
+
+// Cor da empresa: a última usada neste aparelho, logo no arranque (a da empresa chega depois do login).
+applyStoredTheme();
 
 // Página de administração da plataforma (/admin): carregada só quando preciso,
 // para não pesar no app das empresas.

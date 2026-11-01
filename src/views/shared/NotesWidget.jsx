@@ -20,7 +20,7 @@ function NotesTeaser({ notes, todayIso, lang, onSeeAll }) {
       style={{
         flex: 1.15, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 10,
         textAlign: "left", cursor: "pointer", border: "none", borderRadius: 14, padding: "14px 16px",
-        color: "#F4F1EC", background: `linear-gradient(155deg, ${COLORS.primaryDark}, #0C2B23)`,
+        color: "#F4F1EC", background: "#151816",
         boxShadow: "0 4px 14px rgba(20,63,53,0.18)", minHeight: 0,
       }}
     >

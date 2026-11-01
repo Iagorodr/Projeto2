@@ -21,7 +21,7 @@ function CloseDeadlineBanner({ lang, info, role, finalized, onGoHours }) {
     <div role="alert" style={{
       margin: "0 0 14px", padding: "12px 16px", borderRadius: 14, boxSizing: "border-box",
       background: overdue ? COLORS.alertTint : COLORS.amberBg,
-      border: `1px solid ${overdue ? COLORS.alert : "#EBD9A8"}`,
+      border: `1px solid ${overdue ? COLORS.alert : "#EED9A6"}`,
       color: overdue ? COLORS.alert : COLORS.amberInk,
       display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
     }}>

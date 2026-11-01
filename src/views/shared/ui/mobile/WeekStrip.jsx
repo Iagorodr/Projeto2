@@ -18,7 +18,7 @@ import { COLORS } from "../../../../styles/colors.js";
 function tileStyle(state, isToday) {
   switch (state) {
     case "selected":
-      return { background: "linear-gradient(150deg, #2A8A73, #185A4A)", color: "#fff", border: "none" };
+      return { background: "#151816", color: "#fff", border: "none" };
     case "missing":
       return { background: COLORS.card, color: COLORS.ink, border: `2px solid ${COLORS.alert}` };
     case "noClients":

@@ -35,7 +35,7 @@ export function AuthShell({ lang, setLang, children, cardStyle }) {
     <div
       style={{
         minHeight: "100dvh", flex: 1, width: "100%", position: "relative", boxSizing: "border-box",
-        background: "linear-gradient(155deg, #E3F2EA 0%, #A9D9C2 45%, #4D9D7E 85%, #2E8570 100%)",
+        background: "linear-gradient(160deg, var(--p1-12) 0%, var(--p1-35) 45%, var(--p1) 100%)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
       }}
     >

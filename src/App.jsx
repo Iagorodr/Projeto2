@@ -35,6 +35,7 @@ import NotasScreen from "./views/shared/NotasScreen.jsx";
 import HelpScreen, { HelpDrawer, HelpFab } from "./views/shared/HelpScreen.jsx";
 import { helpTexts } from "./models/helpTexts.js";
 import Tutorial from "./views/tutorial/Tutorial.jsx";
+import { applyTheme } from "./styles/theme.js";
 
 // EmployeeMenuScreen.jsx (a lista de botões sem casca nenhuma) ficou
 // substituído pelo EmployeeInicioScreen novo + a casca da Etapa 3 abaixo
@@ -53,6 +54,9 @@ import EmployeeInicioScreen from "./views/employee/EmployeeInicioScreen.jsx";
 
 export default function App() {
   const c = useAppController();
+  // Cor da empresa (redesign B1): aplica-se assim que as definições da empresa chegam.
+  const companyTheme = c.company && c.company.theme;
+  useEffect(() => { if (companyTheme) applyTheme(companyTheme); }, [companyTheme]);
   const install = useInstallPrompt();
   const isMobile = useIsMobile();
   // Casca nova da Etapa 3 (sidebar/rail/barra inferior); a gerência
@@ -120,7 +124,7 @@ export default function App() {
         // Enquanto se descobre se o banco já tem várias empresas, só o fundo (sem piscar o ecrã errado).
         c.companyGateReady
           ? <CompanyGateScreen lang={c.lang} setLang={c.setLang} onSubmit={c.submitCompanyCode} />
-          : <div style={{ minHeight: "100dvh", flex: 1, background: "linear-gradient(155deg, #E3F2EA 0%, #A9D9C2 45%, #4D9D7E 85%, #2E8570 100%)" }} />
+          : <div style={{ minHeight: "100dvh", flex: 1, background: "linear-gradient(160deg, var(--p1-12) 0%, var(--p1-35) 45%, var(--p1) 100%)" }} />
       )}
       {c.perspective === "login" && !c.companyBlock && (!isSupabaseConfigured || c.companyCode || c.legacyDb) && (
         <LoginScreen

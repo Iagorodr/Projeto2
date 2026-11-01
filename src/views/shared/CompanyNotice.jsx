@@ -20,7 +20,7 @@ export default function CompanyNotice({ lang, notice, audience, companyName, com
     : manager ? t.noticeGraceManager(notice.daysLeft, date) : t.noticeGraceEmployee(notice.daysLeft);
   const palette = strong
     ? { bg: COLORS.dangerSolid, ink: "#FFFFFF", border: COLORS.dangerSolid }
-    : { bg: COLORS.amberBg, ink: COLORS.amberInk, border: "#F0DDAE" };
+    : { bg: COLORS.amberBg, ink: COLORS.amberInk, border: "#EED9A6" };
   const Icon = strong ? AlertTriangle : Clock;
   return (
     <div

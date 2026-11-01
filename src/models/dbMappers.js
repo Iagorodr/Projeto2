@@ -240,6 +240,8 @@ function toDbCompanySettings({ company, cutoffDay, contractAlertDays, closeDeadl
     vat_number: company.vatNumber || null,
     iban: company.iban || null,
     phone: company.phone || null,
+    // Cor da empresa (redesign_b1.sql). Só vai quando existe: um banco sem a coluna não falha.
+    ...(company.theme ? { theme: company.theme } : {}),
     cutoff_day: cutoffDay,
     contract_alert_days: contractAlertDays,
     close_deadline_days: closeDeadlineDays,
@@ -253,7 +255,7 @@ function toDbCompanySettings({ company, cutoffDay, contractAlertDays, closeDeadl
 
 function fromDbCompanySettings(row) {
   return {
-    company: { name: row.name, email: row.email, photoUrl: row.photo_url || null, address: row.address || "", vatNumber: row.vat_number || "", iban: row.iban || "", phone: row.phone || "" },
+    company: { name: row.name, email: row.email, photoUrl: row.photo_url || null, address: row.address || "", vatNumber: row.vat_number || "", iban: row.iban || "", phone: row.phone || "", theme: row.theme || undefined },
     cutoffDay: row.cutoff_day,
     contractAlertDays: row.contract_alert_days,
     closeDeadlineDays: row.close_deadline_days ?? 7,

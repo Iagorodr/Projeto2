@@ -2,7 +2,7 @@
 import { COLORS } from "./colors.js";
 
 const mobStyles = {
-  page: { background: COLORS.bg, minHeight: "700px", display: "flex", justifyContent: "center", padding: "24px 16px", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", color: COLORS.text },
+  page: { background: COLORS.bg, minHeight: "700px", display: "flex", justifyContent: "center", padding: "24px 16px", fontFamily: "'Archivo Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", color: COLORS.text },
   // QA (achado do Iago, 3ª volta — "só a página Horas não tem o fundo
   // branco atrás"): era o contrário do que parecia — Horas (ecrã mais
   // novo) não embrulha tudo numa caixa branca sólida, só deixa o fundo
@@ -30,7 +30,7 @@ const mobStyles = {
   sairRow: { textAlign: "center", marginTop: 28 },
   sairLink: { fontSize: 13, color: COLORS.textSoft, textDecoration: "underline", background: "none", border: "none", cursor: "pointer" },
 
-  title: { textAlign: "center", fontFamily: "'Poppins', sans-serif", fontSize: 21, fontWeight: 600, margin: "6px 0 14px", letterSpacing: "0.1px" },
+  title: { textAlign: "center", fontFamily: "'Archivo Variable', 'Archivo Display', sans-serif", fontSize: 21, fontWeight: 600, margin: "6px 0 14px", letterSpacing: "0.1px" },
   periodRow: { display: "flex", alignItems: "center", gap: 8 },
   periodNav: { width: 28, height: 28, borderRadius: 8, border: `1px solid ${COLORS.border}`, background: COLORS.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.textSoft, flexShrink: 0 },
   weekLabel: { fontSize: 22, color: COLORS.text, fontWeight: 700, letterSpacing: "0.1px" },

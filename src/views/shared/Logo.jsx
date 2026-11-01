@@ -6,7 +6,7 @@ import { COLORS } from "../../styles/colors.js";
 
 const TONES = {
   default: { a: COLORS.extra, b: COLORS.primary },
-  reversed: { a: "#E28A65", b: "#FFFFFF" },
+  reversed: { a: "rgba(255,255,255,.7)", b: "#FFFFFF" },
   mono: { a: COLORS.primaryDark, b: COLORS.primaryDark },
 };
 
@@ -37,11 +37,11 @@ function LogoBadge({ size = 44, tone = "dark" }) {
 
 function LogoLockup({ size = 28, tone = "default", textColor, gap }) {
   const color = textColor || (tone === "reversed" ? "#FFFFFF" : COLORS.primaryDark);
-  const accent = tone === "reversed" ? "#E28A65" : COLORS.extra;
+  const accent = tone === "reversed" ? "rgba(255,255,255,.7)" : "var(--p1)";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: gap ?? size * 0.34 }}>
       <LogoMark size={size} tone={tone} />
-      <span style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600, fontSize: size * 0.82, color, letterSpacing: "0.1px", lineHeight: 1 }}>
+      <span style={{ fontFamily: "'Archivo Variable', 'Archivo Display', sans-serif", fontWeight: 600, fontSize: size * 0.82, color, letterSpacing: "0.1px", lineHeight: 1 }}>
         Servi<span style={{ color: accent }}>x</span>
       </span>
     </div>

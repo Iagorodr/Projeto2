@@ -109,7 +109,7 @@ function AppSidebar({
                   <span
                     style={{
                       position: "absolute", top: -6, right: -8, minWidth: 15, height: 15, borderRadius: 999,
-                      background: COLORS.clay, color: "#3A1A0D", fontSize: 9.5, fontWeight: 700,
+                      background: COLORS.clay, color: "#FFFFFF", fontSize: 9.5, fontWeight: 700,
                       display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", lineHeight: 1,
                     }}
                   >

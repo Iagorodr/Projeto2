@@ -75,7 +75,7 @@ function MobileBottomBar({ items, activeKey, onNavigate }) {
                 <span
                   style={{
                     position: "absolute", top: -4, right: -6, minWidth: 14, height: 14, borderRadius: 999,
-                    background: COLORS.clay, color: "#3A1A0D", fontSize: 9, fontWeight: 700,
+                    background: COLORS.clay, color: "#FFFFFF", fontSize: 9, fontWeight: 700,
                     display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", lineHeight: 1,
                     border: `1.5px solid ${COLORS.forest900}`,
                   }}

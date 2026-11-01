@@ -6,13 +6,33 @@ import { ILLUSTRATIONS } from "./illustrations.js";
 import { TUTORIAL_SLIDES, TUTORIAL_UI, ILLUS, WEEKDAY_INITIALS } from "../../models/tutorialTexts.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 
-const FOREST = "#143F35";
-const GREEN = "#1F7A5F";
-const MINT = "#E4EFEA";
-const TEXT = "#3E524B";
-const SKIP = "#4F635C";
-const DOT = "#C3D4CC";
-const PAPER = "#F7FAF8";
+// Redesign B1: acento = cor da empresa; o resto neutro.
+const FOREST = "#151816";
+const GREEN = "var(--p1)";
+const MINT = "var(--p1-12)";
+const TEXT = "#3E4540";
+const SKIP = "#5A625C";
+const DOT = "#D3D8D1";
+const PAPER = "#F7F8F5";
+
+// Os desenhos são SVG com cores escritas por extenso: troca-as pelas do tema atual.
+function themeColors() {
+  let cs = null;
+  try { cs = getComputedStyle(document.documentElement); } catch { /* sem DOM */ }
+  const v = (n, d) => ((cs && cs.getPropertyValue(n).trim()) || d);
+  const p1 = v("--p1", "#1E8C5A"), p2 = v("--p2", "#166B45"), p12 = v("--p1-12", "#E4F1EB");
+  return {
+    "#1F7A5F": p1, "#238A69": p1, "#1A6F56": p2, "#185A4A": p2, "#2A8A73": p1, "#143F35": "#151816",
+    "#E4EFEA": p12, "#E28A65": "#C98A12", "#5B6F67": "#5A625C", "#1A2B26": "#151816", "#9FB3AA": "#B4BAB5", "#C3D4CC": "#D3D8D1",
+  };
+}
+function recolor(svg) {
+  const map = themeColors();
+  return svg
+    .replace(/#[0-9A-Fa-f]{6}\b/g, (h) => map[h.toUpperCase()] || h)
+    .replace(/font-family="Poppins"/g, 'font-family="Archivo Variable, Archivo, sans-serif" font-stretch="118%"')
+    .replace(/font-family="Inter"/g, 'font-family="Archivo Variable, Archivo, sans-serif"');
+}
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
@@ -96,13 +116,13 @@ export default function Tutorial({ lang = "pt", role = "employee", userName = ""
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
   };
 
-  const html = localize(art[Math.min(i, art.length - 1)], lang, { userName, companyName });
+  const html = recolor(localize(art[Math.min(i, art.length - 1)], lang, { userName, companyName }));
   const slide = slides[i];
   const anim = { animation: "tutIn .28s ease both", ["--tut-dx"]: dir > 0 ? "24px" : "-24px" };
 
   const skip = (
     <button type="button" onClick={() => onClose?.()} style={{
-      border: "none", background: "transparent", color: SKIP, font: "600 15px Inter, sans-serif",
+      border: "none", background: "transparent", color: SKIP, font: "600 15px 'Archivo Variable', sans-serif",
       minHeight: 48, minWidth: 48, padding: "0 8px", cursor: "pointer", borderRadius: 12,
     }}>{ui.skip}</button>
   );
@@ -111,7 +131,7 @@ export default function Tutorial({ lang = "pt", role = "employee", userName = ""
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
       <button type="button" onClick={() => go(-1)} disabled={i === 0} aria-hidden={i === 0 ? "true" : undefined} style={{
         height: 56, padding: wide ? "0 14px" : "0 18px", borderRadius: 18, background: "#fff", border: `2px solid ${GREEN}`,
-        color: GREEN, font: `600 ${wide ? 15 : 16}px Inter, sans-serif`, cursor: i === 0 ? "default" : "pointer",
+        color: GREEN, font: `600 ${wide ? 15 : 16}px 'Archivo Variable', sans-serif`, cursor: i === 0 ? "default" : "pointer",
         opacity: i === 0 ? 0.35 : 1, flexShrink: 0,
       }}>{ui.prev}</button>
       <div role="img" aria-label={ui.step(i + 1, n)} style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -124,14 +144,14 @@ export default function Tutorial({ lang = "pt", role = "employee", userName = ""
       </div>
       <button type="button" onClick={() => go(1)} style={{
         height: 56, padding: wide ? "0 14px" : "0 18px", borderRadius: 18, border: "none", color: "#fff",
-        background: "linear-gradient(135deg, #238A69, #1A6F56)", font: `600 ${wide ? 15 : 16}px Inter, sans-serif`,
-        cursor: "pointer", boxShadow: "0 8px 18px rgba(31,122,95,.28)", flexShrink: 0, minWidth: 96,
+        background: "var(--p1)", font: `600 ${wide ? 15 : 16}px 'Archivo Variable', sans-serif`,
+        cursor: "pointer", boxShadow: "0 8px 18px var(--p1-shadow)", flexShrink: 0, minWidth: 96,
       }}>{last ? ui.start : ui.next}</button>
     </div>
   );
 
-  const titleStyle = { margin: 0, font: "600 28px/1.2 Poppins, sans-serif", color: FOREST };
-  const bodyStyle = { margin: "10px 0 0", font: "400 17px/1.5 Inter, sans-serif", color: TEXT, minHeight: 104 };
+  const titleStyle = { margin: 0, font: "800 28px/1.2 'Archivo Variable', 'Archivo Display', sans-serif", color: FOREST };
+  const bodyStyle = { margin: "10px 0 0", font: "400 17px/1.5 'Archivo Variable', sans-serif", color: TEXT, minHeight: 104 };
 
   const art2 = (
     <div key={i} className="tut-anim" style={{ ...anim, width: "100%", height: "100%" }} dangerouslySetInnerHTML={{ __html: html }} />

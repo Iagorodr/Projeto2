@@ -88,7 +88,7 @@ function MoreSheet({ open, onClose, items, user, variant, activeKey, lang, setLa
                       <span style={{ width: 40, height: 40, borderRadius: 12, background: COLORS.rowIconBg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
                         <Icon size={20} strokeWidth={1.9} color={COLORS.rowIconInk} />
                         {item.badge != null && item.badge > 0 && (
-                          <span style={{ position: "absolute", top: -4, right: -6, minWidth: 16, height: 16, borderRadius: 999, background: COLORS.clay, color: "#3A1A0D", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{item.badge}</span>
+                          <span style={{ position: "absolute", top: -4, right: -6, minWidth: 16, height: 16, borderRadius: 999, background: COLORS.clay, color: "#FFFFFF", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{item.badge}</span>
                         )}
                       </span>
                       <span style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink, textAlign: "center", lineHeight: 1.2, overflowWrap: "anywhere" }}>{item.label}</span>
@@ -129,7 +129,7 @@ function MoreSheet({ open, onClose, items, user, variant, activeKey, lang, setLa
                     <span
                       style={{
                         position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 999,
-                        background: COLORS.clay, color: "#3A1A0D", fontSize: 10, fontWeight: 700,
+                        background: COLORS.clay, color: "#FFFFFF", fontSize: 10, fontWeight: 700,
                         display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", lineHeight: 1,
                       }}
                     >

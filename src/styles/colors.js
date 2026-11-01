@@ -11,42 +11,44 @@
 // divergem um pouco (ex.: alertTint vs extraTint), o valor do documento é
 // o que conta a partir de agora; a troca de uso nos componentes/ecrãs fica
 // para as Etapas 2-4, não aqui.
+// Redesign B1 (2026-11): neutros novos + o ACENTO vem da cor da empresa
+// (variáveis CSS --p1/--p2 e tons claros, ver styles/theme.js). Todas as chaves
+// antigas continuam a existir (nenhum ecrã partiu); só mudaram de valor. As cores
+// com significado (atenção, urgente, ok, informação, reaberto) são fixas.
+const P1 = "var(--p1)", P2 = "var(--p2)", P3 = "var(--p3)";
 const COLORS = {
-  bg: "#F3F6F4", surface: "#FFFFFF", primary: "#1F6F5C", primaryDark: "#143F35", primaryTint: "#E5F1EC",
-  extra: "#B3492E", extraTint: "#FBEBE6", success: "#2F9E64", successTint: "#E4F3EA",
-  accent: "#E28A65", accentTint: "#FBEADF",
-  text: "#16211D", textSoft: "#5B6961", border: "#E1E8E3", sidebarBg: "#EDF2EF",
+  bg: "#ECEEE9", surface: "#FFFFFF", primary: P1, primaryDark: P2, primaryTint: "var(--p1-12)",
+  extra: "#D6454A", extraTint: "#FCE5E5", success: "#167049", successTint: "#E3F4EA",
+  accent: "#C98A12", accentTint: "#FBF0D9",
+  text: "#151816", textSoft: "#5A625C", border: "#E2E5DF", sidebarBg: "#EEF0EC",
 
-  // --- Tokens do documento de design, secção 1.1 (novos, aditivos) ---
-  page: "#F3F6F4", card: "#FFFFFF",
-  line: "#E3EAE6", lineSoft: "#EEF3F0", lineInput: "#D5E0DA",
-  forest900: "#0F3129", forest800: "#143F35", forest700: "#185A4A",
-  forest600: "#1F6F5C", forest500: "#2E8570",
-  forest200: "#B5D5C9", forest100: "#D8E9E2", forest50: "#EDF4F1",
-  clay: "#E28A65", clayInk: "#9A4A26", clayTint: "#FBE9DF",
-  alert: "#B3492E", alertTint: "#FBE4DC",
-  ok: "#2F9E64", okInk: "#14684A", okTint: "#DDF1E6",
-  amberBg: "#FCF3DF", amberInk: "#8A5A0B",
-  ink: "#1A2B26", ink2: "#4F635C", ink3: "#66786F",
-  headerTint: "#F6F9F7", segmentBg: "#E4ECE8",
+  page: "#ECEEE9", card: "#FFFFFF",
+  line: "#E2E5DF", lineSoft: "#EEF0EC", lineInput: "#D3D8D1",
+  forest900: P3, forest800: P2, forest700: P2,
+  forest600: P1, forest500: "var(--p1-90)",
+  forest200: "var(--p1-35)", forest100: "var(--p1-20)", forest50: "var(--p1-8)",
+  // "clay" era o laranja de destaque; no B1 passa a ser a cor de ATENÇÃO (fixa).
+  clay: "#C98A12", clayInk: "#8A5A0B", clayTint: "#FBF0D9",
+  alert: "#D6454A", alertTint: "#FCE5E5",
+  ok: "#167049", okInk: "#167049", okTint: "#E3F4EA",
+  amberBg: "#FBF0D9", amberInk: "#8A5A0B", amber: "#C98A12",
+  ink: "#151816", ink2: "#5A625C", ink3: "#6F776F",
+  headerTint: "#F5F6F3", segmentBg: "#E6E9E3",
 
-  // Par "aço/ardósia" usado na pílula de Supervisor (2.3) e no ciclo de
-  // cores do Avatar (2.4) — aparece nas duas secções de Componentes mas
-  // não tem nome na tabela de cores 1.1, por isso ganha um aqui (Etapa 2).
-  steelBg: "#E4EDF1", steelInk: "#3F5A66",
+  steelBg: "#EEF0EC", steelInk: "#5A625C",
+  // Informação / neutro e Reaberto (fixas).
+  info: "#5A625C", infoBg: "#EEF0EC", reopened: "#6B44B8", reopenedBg: "#EEE9FA",
+  // Botão escuro: confirmar ações sensíveis.
+  dark: "#151816",
 
-  // Direção "Verde vivo" (Tomás, botões e ícones): o verde passa a ser a cor
-  // de ação em todo o app. Valores com contraste verificado no documento.
-  vivo: "#1F7A5F", vivoLight: "#2A8A73", vivoInk: "#185A4A",
-  vivoBtnTop: "#238A69", vivoBtnBottom: "#1A6F56", vivoToggleOn: "#27916F",
-  mint: "#D4E8DF", mintBg: "#F2FAF6", iconBorder: "#B6D4C8", fieldBorder: "#7A9A8C",
-  disabledBg: "#DCE8E2", disabledInk: "#4F6B5F",
-  navDeep: "#0F3129",
-  // Fundo padrão dos dois menus (lateral no PC/tablet e inferior no telemóvel):
-  // mesmo gradiente nos dois, para ficarem sempre iguais.
-  navGradient: "radial-gradient(circle at 10% 8%, rgba(226,138,101,.18), transparent 45%), linear-gradient(180deg, #1F6F5C 0%, #143F35 100%)", navText: "#EAF5EF", navIcon: "#BDE6D5", navIconActive: "#F6AE8B", navBottomText: "#E2F1EA",
-  dangerInk: "#B3392A", dangerBg: "#FCE6E1", dangerSolid: "#C8442F",
-  rowIconBg: "#FBE4DC", rowIconInk: "#B3492E", onClay: "#3A1A0D",
+  vivo: P1, vivoLight: "var(--p1-90)", vivoInk: P2,
+  vivoBtnTop: P1, vivoBtnBottom: P1, vivoToggleOn: P1,
+  mint: "var(--p1-20)", mintBg: "var(--p1-8)", iconBorder: "var(--p1-35)", fieldBorder: "#8A918C",
+  disabledBg: "#E3E6E0", disabledInk: "#6F776F",
+  navDeep: P2,
+  navGradient: P1, navText: "#FFFFFF", navIcon: "rgba(255,255,255,.82)", navIconActive: "#FFFFFF", navBottomText: "#FFFFFF",
+  dangerInk: "#B8343A", dangerBg: "#FCE5E5", dangerSolid: "#D6454A",
+  rowIconBg: "#FBF0D9", rowIconInk: "#8A5A0B", onClay: "#FFFFFF",
 };
 
 export { COLORS };

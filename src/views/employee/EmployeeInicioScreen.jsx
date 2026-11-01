@@ -312,7 +312,7 @@ function EmployeeInicioScreen({
       <div>
         <div
           style={{
-            background: "linear-gradient(160deg, #2A8A73 0%, #1F6F5C 45%, #0F3129 100%)",
+            background: "var(--p1)",
             borderRadius: RADIUS.card, padding: "18px 20px 34px", color: "#fff",
           }}
         >
@@ -321,7 +321,7 @@ function EmployeeInicioScreen({
               <span
                 style={{
                   display: "inline-flex", alignItems: "center", height: 24, padding: "3px 10px",
-                  borderRadius: 999, fontSize: 12, fontWeight: 600, background: COLORS.clay, color: "#3A1A0D",
+                  borderRadius: 999, fontSize: 12, fontWeight: 600, background: COLORS.clay, color: "#FFFFFF",
                 }}
               >
                 {T[lang].acessos.roleSupervisor}

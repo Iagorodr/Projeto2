@@ -6,7 +6,7 @@
 // tokens aos componentes existentes é trabalho de Etapa 2 (componentes) e
 // Etapa 4 (ecrãs), não desta etapa de fundação.
 const RADIUS = {
-  card: 20,
+  card: 22,
   sheetMobile: 28, // só os cantos de cima, no CSS de quem usar
   control: 12, // gerência
   controlMobile: 16, // supervisor / mobile (14-16 no documento; 16 escolhido)
@@ -15,8 +15,8 @@ const RADIUS = {
 };
 
 const SHADOW = {
-  sh1: "0 1px 2px rgba(20,63,53,.06), 0 8px 20px -12px rgba(20,63,53,.16)", // cartões
-  sh2: "0 2px 4px rgba(20,63,53,.10), 0 22px 40px -18px rgba(20,63,53,.45)", // herói, hover, popovers
+  sh1: "0 1px 2px rgba(21,24,22,.05), 0 8px 22px -14px rgba(21,24,22,.18)", // cartões
+  sh2: "0 2px 6px rgba(21,24,22,.08), 0 24px 44px -20px rgba(21,24,22,.38)", // herói, hover, popovers
 };
 
 // Espaço em múltiplos de 4.
@@ -34,7 +34,7 @@ const MOTION = { fast: "120ms", slow: "150ms" };
 // isso a cada ícone existente é trabalho visual de ecrã/componente (Etapa
 // 2/4), não desta etapa.
 const ICON = {
-  strokeWidth: 1.8,
+  strokeWidth: 2,
   size: 20, // por defeito
   sizeBottomBar: 24, // barras inferiores (mobile)
 };
@@ -68,8 +68,10 @@ const ICON = {
 // vários sítios — ver styles.js — isso não muda aqui, é só pros
 // componentes novos da Etapa 2 em diante).
 const FONT = {
-  heading: "'Poppins', sans-serif", // títulos e números grandes (peso 600; 500 só em rótulos de marca)
-  body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  // Redesign B1: Archivo (variável). "Archivo Display" é só uma MARCA: o index.css
+  // aplica largura 118% e peso 800 a tudo o que usa FONT.heading (títulos e números).
+  heading: "'Archivo Variable', 'Archivo Display', 'Archivo', sans-serif",
+  body: "'Archivo Variable', 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
 };
 
 export { RADIUS, SHADOW, SPACE, MOTION, ICON, FONT };
