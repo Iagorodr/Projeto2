@@ -36,3 +36,4 @@ export { PeriodNav, RoundArrow } from "./PeriodNav.jsx";
 export { Toggle } from "./Toggle.jsx";
 export { ChevronCircle } from "./ChevronCircle.jsx";
 export { SharedWithBadge } from "./SharedWithBadge.jsx";
+export { SaveChip, OfflineBar } from "./SaveStatus.jsx";

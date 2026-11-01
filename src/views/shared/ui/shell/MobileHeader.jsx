@@ -89,8 +89,34 @@ function CompactLangSwitcher({ lang, setLang, langNames }) {
 // título"); a Agenda, que na 1ª rodada também tinha perdido o título
 // (interpretação errada do "seguir o estilo de Horas" como igual ao
 // título incluso), voltou a passar `title` de novo no caller.
-function MobileHeader({ onBack, backLabel = "Voltar", title, lang, setLang, langNames }) {
+// Redesign B1: `heading` ({ title, subtitle }) põe o título à esquerda, ao lado
+// do botão de voltar, e `right` (ex.: estado de gravação) substitui o seletor de
+// língua (no telemóvel a língua vive no "Mais").
+function MobileHeader({ onBack, backLabel = "Voltar", title, lang, setLang, langNames, heading, right }) {
   const { minTap: backDim } = useControlSize();
+  if (heading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        {onBack && (
+          <button
+            type="button" onClick={onBack} aria-label={backLabel}
+            style={{
+              width: 48, height: 48, borderRadius: 16, border: "none", background: COLORS.card, flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink2,
+              boxShadow: "0 1px 2px rgba(21,24,22,.06)",
+            }}
+          >
+            <ChevronLeft size={22} strokeWidth={2.2} />
+          </button>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: FONT.heading, fontSize: 30, lineHeight: 1.05, color: COLORS.ink }}>{heading.title}</div>
+          {heading.subtitle && <div style={{ fontSize: 14, color: COLORS.ink2, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{heading.subtitle}</div>}
+        </div>
+        {right || (lang && setLang && langNames && <CompactLangSwitcher lang={lang} setLang={setLang} langNames={langNames} />)}
+      </div>
+    );
+  }
   return (
     <div style={{ marginBottom: title ? 18 : 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -98,17 +124,18 @@ function MobileHeader({ onBack, backLabel = "Voltar", title, lang, setLang, lang
           <button
             type="button" onClick={onBack} aria-label={backLabel}
             style={{
-              width: backDim, height: backDim, borderRadius: "50%", border: `1.5px solid ${COLORS.iconBorder}`, background: COLORS.card,
-              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.vivo,
+              width: backDim, height: backDim, borderRadius: 14, border: "none", background: COLORS.card,
+              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.ink2,
+              boxShadow: "0 1px 2px rgba(21,24,22,.06)",
             }}
           >
             <ChevronLeft size={20} strokeWidth={2.2} />
           </button>
         ) : <span />}
-        {lang && setLang && langNames && <CompactLangSwitcher lang={lang} setLang={setLang} langNames={langNames} />}
+        {right || (lang && setLang && langNames && <CompactLangSwitcher lang={lang} setLang={setLang} langNames={langNames} />)}
       </div>
       {title && (
-        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 28, color: COLORS.ink, textAlign: "center", marginTop: 14 }}>
+        <div style={{ fontFamily: FONT.heading, fontSize: 28, color: COLORS.ink, textAlign: "center", marginTop: 14 }}>
           {title}
         </div>
       )}

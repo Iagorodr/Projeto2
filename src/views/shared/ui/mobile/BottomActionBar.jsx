@@ -31,6 +31,7 @@ import { Button } from "../Button.jsx";
 function BottomActionBar({
   totalLabel, primaryLabel, onPrimary, primaryDisabled, primaryDisabledReason,
   secondaryLabel, onSecondary, floatAboveMobileBar,
+  totalCaption, totalValue, totalSub,
 }) {
   return (
     <div
@@ -43,11 +44,13 @@ function BottomActionBar({
         // segura, a mesma altura da MobileBottomBar), na largura toda.
         // Fora do telemóvel (tablet) continua `sticky` como antes.
         position: floatAboveMobileBar ? "fixed" : "sticky",
-        bottom: floatAboveMobileBar ? "calc(env(safe-area-inset-bottom, 0px) + 100px)" : 0,
-        left: 0, right: 0, background: COLORS.card,
-        borderTop: `1px solid ${COLORS.line}`, padding: "12px 16px",
+        bottom: floatAboveMobileBar ? "calc(env(safe-area-inset-bottom, 0px) + 92px)" : 0,
+        left: floatAboveMobileBar ? 10 : 0, right: floatAboveMobileBar ? 10 : 0,
+        // Redesign B1: barra escura e arredondada, com o total à esquerda e a ação na cor da empresa.
+        background: "#151816", color: "#fff", borderRadius: 22,
+        padding: "12px 12px 12px 18px",
         display: "flex", flexDirection: "column", gap: 10,
-        boxShadow: "0 -4px 16px rgba(20,63,53,.08)",
+        boxShadow: "0 12px 30px -12px rgba(21,24,22,.5)",
         zIndex: 20,
       }}
     >
@@ -69,9 +72,17 @@ function BottomActionBar({
           pouco de tamanho (22, vinha de 26); botão ganha
           `flexShrink:0` pra nunca perder a própria largura. */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 22, color: COLORS.ink, whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-          {totalLabel}
-        </div>
+        {totalValue != null ? (
+          <div style={{ minWidth: 0 }}>
+            {totalCaption && <div style={{ fontSize: 12.5, opacity: 0.75 }}>{totalCaption}</div>}
+            <div style={{ fontFamily: FONT.heading, fontSize: 28, lineHeight: 1.05, whiteSpace: "nowrap" }}>{totalValue}</div>
+            {totalSub && <div style={{ fontSize: 12, opacity: 0.65, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{totalSub}</div>}
+          </div>
+        ) : (
+          <div style={{ fontFamily: FONT.heading, fontSize: 22, color: "#fff", whiteSpace: "nowrap", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {totalLabel}
+          </div>
+        )}
         <Button
           variant="primary" size="actionBarPrimary" onClick={onPrimary}
           disabled={primaryDisabled} disabledReason={primaryDisabledReason} disabledReasonBelow

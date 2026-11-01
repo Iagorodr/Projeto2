@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Lock, Plus, X } from "lucide-react";
+import { Lock, Plus, X, AlertTriangle } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
@@ -21,7 +21,7 @@ import { removeFile } from "../../models/fileStorage.js";
 import { tagManagerChanges } from "../../models/managerTag.js";
 import {
   MobileHeader, WeekStrip, DayPanel, ClientCheckCard, BottomActionBar, PeriodCalendar,
-  Card, ConfirmDialog, Drawer, Button, Pill, SearchField, Toast, ProgressBar,
+  Card, ConfirmDialog, Drawer, Button, Pill, SearchField, Toast, ProgressBar, SaveChip, OfflineBar,
 } from "../shared/ui/index.js";
 
 function emptyHoras() {
@@ -47,7 +47,23 @@ function emptyHoras() {
 // (5.2.8/5.2.9, fora do período ou já finalizado) continuam de coluna
 // única em qualquer tamanho — o documento só descreve as duas colunas
 // para a vista normal/editável.
-function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [], covers = [], asManager = false, startDate = null }) {
+// Aviso de dia em falta (redesign B1): faixa âmbar com a ação escura ao lado.
+function MissingBanner({ title, subtitle, action, onAction }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#FBF0D9", borderRadius: 18, padding: "12px 12px 12px 14px" }}>
+      <AlertTriangle size={22} color="#C98A12" strokeWidth={2.2} style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: "#8A5A0B", lineHeight: 1.25 }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 13, color: "#8A5A0B", marginTop: 2 }}>{subtitle}</div>}
+      </div>
+      <button type="button" onClick={onAction} style={{ height: 44, padding: "0 14px", borderRadius: 14, border: "none", background: "#151816", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", flexShrink: 0, fontFamily: "inherit" }}>
+        {action}
+      </button>
+    </div>
+  );
+}
+
+function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [], covers = [], asManager = false, startDate = null, saveState = "saved", onRetrySave }) {
   const t = T[lang].employeeHoras;
   const pdfT = T[lang].pdf;
   const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang];
@@ -702,7 +718,14 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             sem o título a fileira de troca de semana sobe, ficando mais
             perto do cabeçalho (voltar + idioma). Mesmo tratamento da
             Agenda, pro par de telas ficar igual. */}
-        {!asManager && <MobileHeader onBack={onHome} backLabel={t.backLabel} lang={lang} setLang={setLang} langNames={LANG_NAMES} />}
+        {!asManager && (
+          <MobileHeader
+            onBack={onHome} backLabel={t.backLabel}
+            heading={{ title: t.title, subtitle: calPeriodLabel(payPeriod, lang) }}
+            right={<SaveChip state={saveState} lang={lang} />}
+          />
+        )}
+        {!asManager && <OfflineBar state={saveState} lang={lang} onRetry={onRetrySave} style={{ marginBottom: 12 }} />}
 
         {!showFinalizedView && chunkZone === "within" && myHoras.reopened && (
           <div style={{ marginBottom: 10 }}><Pill variant="reopened">{t.reopenedPill}</Pill></div>
@@ -814,21 +837,17 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             <WeekStrip days={weekStripDays} onSelectDay={setSelectedDateKey} legend={t.weekStripLegend} legendItems={t.weekLegend} />
 
             {missingDaysInChunk.length === 1 && (
-              <Card variant="alert">
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
-                  {t.missingOneTitle(weekdayFull[missingDaysInChunk[0].getDay()], dmOf(missingDaysInChunk[0]))}
-                </div>
-                <div style={{ fontSize: 12.5, marginBottom: 10 }}>
-                  {t.missingOneSubtitle(scheduledIfActive(missingDaysInChunk[0]).length)}
-                </div>
-                <Button variant="secondary" onClick={() => setSelectedDateKey(isoDateStr(missingDaysInChunk[0]))}>{t.registerNowAction}</Button>
-              </Card>
+              <MissingBanner
+                title={t.missingOneTitle(weekdayFull[missingDaysInChunk[0].getDay()], dmOf(missingDaysInChunk[0]))}
+                subtitle={t.missingOneSubtitle(scheduledIfActive(missingDaysInChunk[0]).length)}
+                action={t.registerNowAction} onAction={() => setSelectedDateKey(isoDateStr(missingDaysInChunk[0]))}
+              />
             )}
             {missingDaysInChunk.length > 1 && (
-              <Card variant="alert">
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>{t.missingManyTitle(missingDaysInChunk.length)}</div>
-                <Button variant="secondary" onClick={() => setSelectedDateKey(isoDateStr(missingDaysInChunk[0]))}>{t.missingManyAction}</Button>
-              </Card>
+              <MissingBanner
+                title={t.missingManyTitle(missingDaysInChunk.length)}
+                action={t.missingManyAction} onAction={() => setSelectedDateKey(isoDateStr(missingDaysInChunk[0]))}
+              />
             )}
 
             {canReopenWeek && (
@@ -838,7 +857,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
             )}
 
             <DayPanel
-              title={`${weekdayFull[selectedDate.getDay()]}, ${dmOf(selectedDate)}`}
+              title={t.which(weekdayFull[selectedDate.getDay()], dmOf(selectedDate))}
               forecastLabel={hasAgendaToday && !weekLockedFlag ? t.forecast(fmtHoursScreen(scheduledToday.reduce((s, c) => s + expectedShare(sharedCtx, c, selectedKey, staffId).minutes / 60, 0))) : undefined}
               lockBadge={weekLockedFlag ? `🔒 ${t.weekDoneTag}` : undefined}
               emptyState={
@@ -1029,9 +1048,12 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
         // pelo menos uma marcação.
         <BottomActionBar
           totalLabel={`${t.dayTotalLabel} · ${fmtHoursScreen(dayTotalHours(selectedKey))}`}
+          totalCaption={t.dayTotalLabel} totalValue={fmtHoursScreen(dayTotalHours(selectedKey))}
+          totalSub={dayCards.length ? t.clientsMarkedLabel(dayCards.filter((c) => c.checked).length, dayCards.length) : undefined}
           primaryLabel={entriesForDay.length === 0 ? t.markClientButton : t.finalizeDay}
           onPrimary={() => (entriesForDay.length === 0 ? setAddClientOpen(true) : setFinalizeDaySheetOpen(true))}
-          primaryDisabled={weekLockedFlag}
+          primaryDisabled={weekLockedFlag || (saveState === "offline" && entriesForDay.length > 0)}
+          primaryDisabledReason={saveState === "offline" && !weekLockedFlag && entriesForDay.length > 0 ? T[lang].common.saveBlocked : undefined}
           secondaryLabel={weekEligible ? t.finalizeWeek : undefined}
           onSecondary={weekEligible ? () => setConfirmWeekOpen(true) : undefined}
           floatAboveMobileBar={isMobileTier}

@@ -20,10 +20,10 @@ import { RADIUS } from "../../../../styles/tokens.js";
 function DayPanel({ title, forecastLabel, lockBadge, children, emptyState, onAddClient, addClientLabel = "Adicionar outro cliente" }) {
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.ink }}>{title}</div>
-          {forecastLabel && <div style={{ fontSize: 12.5, color: COLORS.ink2, marginTop: 2 }}>{forecastLabel}</div>}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <span style={{ fontFamily: "'Archivo Variable', 'Archivo Display', sans-serif", fontSize: 20, lineHeight: 1.2, color: COLORS.ink }}>{title}</span>
+          {forecastLabel && <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink2, marginLeft: 8, whiteSpace: "nowrap" }}>{forecastLabel}</span>}
         </div>
         {lockBadge && (
           <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.ink2, background: COLORS.lineSoft, borderRadius: 999, padding: "4px 10px" }}>
@@ -45,9 +45,9 @@ function DayPanel({ title, forecastLabel, lockBadge, children, emptyState, onAdd
           type="button"
           onClick={onAddClient}
           style={{
-            width: "100%", height: 58, marginTop: 10, borderRadius: RADIUS.controlMobile,
-            border: `1.5px dashed ${COLORS.lineInput}`, background: "transparent", color: COLORS.forest700,
-            fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            width: "100%", height: 58, marginTop: 10, borderRadius: 18,
+            border: `1.5px dashed ${COLORS.lineInput}`, background: "transparent", color: "var(--p2)",
+            fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
             fontFamily: "inherit",
           }}
         >

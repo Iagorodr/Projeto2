@@ -327,10 +327,11 @@ export default function App() {
                 lang={c.lang} setLang={c.setLang} me={c.me} onNavigate={c.setEmpScreen}
                 avisosBadge={c.myUnreadBadge} clients={c.clients} staff={c.staff} assignments={c.assignments}
                 horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} covers={c.covers}
+                contractors={c.contractors} saveState={c.saveState} onRetrySave={c.retrySave}
               />
             )}
             {c.empScreen === "horas" && (
-              <EmployeeHorasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setMissingItems={c.setMissingItems} absences={c.absences} covers={c.covers} />
+              <EmployeeHorasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setMissingItems={c.setMissingItems} absences={c.absences} covers={c.covers} saveState={c.saveState} onRetrySave={c.retrySave} />
             )}
             {c.empScreen === "avisos" && (
               <EmployeeAvisosScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} absences={c.absences} setAbsences={c.setAbsences} isSupervisor={isSupervisor} desktop={empTier !== "mobile"} />

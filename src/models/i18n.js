@@ -6,6 +6,7 @@ import { TODAY } from "./data.js";
 const T = {
   pt: {
     common: {
+      saveSaving: "A guardar…", saveSaved: "Guardado", saveOffline: "Sem rede", saveOfflineBar: "Sem rede: as alterações ainda não foram guardadas. Gravam sozinhas quando a rede voltar.", saveRetry: "Tentar de novo", saveBlocked: "Espere até ficar guardado",
       cdEmpTitle: (d) => `Período terminado: finalize até ${d}`, cdEmpOverdueTitle: "Prazo terminou: período por fechar", cdEmpBody: (n) => `Faltam ${n} dia(s). Finalize o seu mês nas Horas.`, cdEmpOverdueBody: "O prazo acabou. Finalize o seu mês agora; pode continuar a registar o período novo.", cdMgmtBody: (n) => `Faltam ${n} dia(s) para fechar o período. Feche em Horas.`, cdMgmtOverdueTitle: "Fecho em atraso", cdMgmtLockBody: (p) => `O período ${p} terminou e passou do prazo. Feche-o para voltar a usar o Dashboard.`, cdGoHours: "Ir para Horas", cdMgmtOverdueBanner: "Prazo de fecho terminou. Feche o período em Horas.",
       cancel: "Cancelar", save: "Guardar", saveChanges: "Guardar alterações", discard: "Descartar",
       recipAll: "Todos", recipWholeTeam: "Toda a equipa", recipCount: (n) => `${n} pessoas`, recipChooseReason: "Escolha pelo menos uma pessoa", recipAlsoTo: "Para",
@@ -658,6 +659,18 @@ const T = {
     },
     // Etapa 4b (secção 5.1 do documento) — Início do funcionário/supervisor.
     employeeInicio: {
+      // Redesign B1 (Início 1 e 1b)
+      todaySummary: (n, h) => `${n} ${n === 1 ? "cliente" : "clientes"} · ${h}`,
+      withNames: (names) => `com ${names}`,
+      weekDaysLabel: (done, total) => `Esta semana · registado ${done} de ${total} ${total === 1 ? "dia" : "dias"}`,
+      tapToOpen: "Toque para abrir",
+      gainsTitle: "Os meus ganhos", gainsLast: (n) => `últimos ${n} períodos`,
+      gainsSoFar: (label) => `${label} até hoje`, gainsSameDay: (label) => `${label}, no mesmo dia`,
+      gainsNote: (avg, end) => `O período ainda está a decorrer: a caixa tracejada mostra o habitual (~${avg}) e enche-se até ao fecho, a ${end}.`,
+      nextDaysTitle: "Próximos dias", seeAgenda: "ver agenda", tomorrow: "Amanhã", noClientsDay: "Sem clientes",
+      myPeriodTitle: "O meu período", closesOn: (d) => `fecha a ${d}`,
+      weeksDone: "semanas finalizadas", extraPending: "extra por aprovar", expensesPending: (n) => n === 1 ? "despesa por aprovar" : "despesas por aprovar",
+      dayOfPeriod: (x, y) => `dia ${x} de ${y} do período`,
       earningsTitle: "Neste período", earningsSub: (h) => `${h} · estimativa`,
       heroTitle: "Hoje",
       heroEmptyTitle: "Hoje não tem clientes. Bom descanso.",
@@ -868,6 +881,7 @@ const T = {
 
   en: {
     common: {
+      saveSaving: "Saving…", saveSaved: "Saved", saveOffline: "No connection", saveOfflineBar: "No connection: your changes are not saved yet. They save by themselves when the connection is back.", saveRetry: "Try again", saveBlocked: "Wait until it is saved",
       cdEmpTitle: (d) => `Period ended: finalize by ${d}`, cdEmpOverdueTitle: "Deadline passed: period not closed", cdEmpBody: (n) => `${n} day(s) left. Finalize your month in Hours.`, cdEmpOverdueBody: "The deadline has passed. Finalize your month now; you can keep logging the new period.", cdMgmtBody: (n) => `${n} day(s) left to close the period. Close it in Hours.`, cdMgmtOverdueTitle: "Close overdue", cdMgmtLockBody: (p) => `Period ${p} has ended and is past the deadline. Close it to use the Dashboard again.`, cdGoHours: "Go to Hours", cdMgmtOverdueBanner: "Close deadline passed. Close the period in Hours.",
       cancel: "Cancel", save: "Save", saveChanges: "Save changes", discard: "Discard",
       recipAll: "Everyone", recipWholeTeam: "Whole team", recipCount: (n) => `${n} people`, recipChooseReason: "Choose at least one person", recipAlsoTo: "To",
@@ -1490,6 +1504,18 @@ const T = {
       report: "REPORT", monitoring: "MONITORING", myNotes: "NOTES",
     },
     employeeInicio: {
+      // B1 redesign (Home 1 and 1b)
+      todaySummary: (n, h) => `${n} ${n === 1 ? "client" : "clients"} · ${h}`,
+      withNames: (names) => `with ${names}`,
+      weekDaysLabel: (done, total) => `This week · logged ${done} of ${total} ${total === 1 ? "day" : "days"}`,
+      tapToOpen: "Tap to open",
+      gainsTitle: "My earnings", gainsLast: (n) => `last ${n} periods`,
+      gainsSoFar: (label) => `${label} so far`, gainsSameDay: (label) => `${label}, same day`,
+      gainsNote: (avg, end) => `The period is still running: the dashed box shows the usual (~${avg}) and fills up until it closes on ${end}.`,
+      nextDaysTitle: "Next days", seeAgenda: "see schedule", tomorrow: "Tomorrow", noClientsDay: "No clients",
+      myPeriodTitle: "My period", closesOn: (d) => `closes on ${d}`,
+      weeksDone: "weeks finished", extraPending: "overtime to approve", expensesPending: (n) => n === 1 ? "expense to approve" : "expenses to approve",
+      dayOfPeriod: (x, y) => `day ${x} of ${y} of the period`,
       earningsTitle: "This period", earningsSub: (h) => `${h} · estimate`,
       heroTitle: "Today",
       heroEmptyTitle: "No clients today. Enjoy the rest.",
@@ -1669,6 +1695,7 @@ const T = {
 
   fr: {
     common: {
+      saveSaving: "Enregistrement…", saveSaved: "Enregistré", saveOffline: "Pas de réseau", saveOfflineBar: "Pas de réseau : vos modifications ne sont pas encore enregistrées. Elles s'enregistrent toutes seules au retour du réseau.", saveRetry: "Réessayer", saveBlocked: "Attendez que ce soit enregistré",
       cdEmpTitle: (d) => `Période terminée : finalisez avant le ${d}`, cdEmpOverdueTitle: "Délai dépassé : période non clôturée", cdEmpBody: (n) => `Il reste ${n} jour(s). Finalisez votre mois dans Heures.`, cdEmpOverdueBody: "Le délai est dépassé. Finalisez votre mois maintenant ; vous pouvez continuer à saisir la nouvelle période.", cdMgmtBody: (n) => `Il reste ${n} jour(s) pour clôturer la période. Clôturez-la dans Heures.`, cdMgmtOverdueTitle: "Clôture en retard", cdMgmtLockBody: (p) => `La période ${p} est terminée et le délai est dépassé. Clôturez-la pour réutiliser le tableau de bord.`, cdGoHours: "Aller à Heures", cdMgmtOverdueBanner: "Délai de clôture dépassé. Clôturez la période dans Heures.",
       cancel: "Annuler", save: "Enregistrer", saveChanges: "Enregistrer les modifications", discard: "Ignorer",
       recipAll: "Tout le monde", recipWholeTeam: "Toute l'équipe", recipCount: (n) => `${n} personnes`, recipChooseReason: "Choisissez au moins une personne", recipAlsoTo: "À",
@@ -2291,6 +2318,18 @@ const T = {
       report: "SIGNALER", monitoring: "SURVEILLANCE", myNotes: "NOTES",
     },
     employeeInicio: {
+      // Refonte B1 (Accueil 1 et 1b)
+      todaySummary: (n, h) => `${n} ${n === 1 ? "client" : "clients"} · ${h}`,
+      withNames: (names) => `avec ${names}`,
+      weekDaysLabel: (done, total) => `Cette semaine · ${done} sur ${total} ${total === 1 ? "jour saisi" : "jours saisis"}`,
+      tapToOpen: "Touchez pour ouvrir",
+      gainsTitle: "Mes gains", gainsLast: (n) => `${n} dernières périodes`,
+      gainsSoFar: (label) => `${label} à ce jour`, gainsSameDay: (label) => `${label}, même jour`,
+      gainsNote: (avg, end) => `La période est en cours : la case en pointillés montre l'habituel (~${avg}) et se remplit jusqu'à la clôture, le ${end}.`,
+      nextDaysTitle: "Prochains jours", seeAgenda: "voir l'agenda", tomorrow: "Demain", noClientsDay: "Pas de clients",
+      myPeriodTitle: "Ma période", closesOn: (d) => `clôture le ${d}`,
+      weeksDone: "semaines terminées", extraPending: "heures sup à approuver", expensesPending: (n) => n === 1 ? "dépense à approuver" : "dépenses à approuver",
+      dayOfPeriod: (x, y) => `jour ${x} sur ${y} de la période`,
       earningsTitle: "Sur cette période", earningsSub: (h) => `${h} · estimation`,
       heroTitle: "Aujourd'hui",
       heroEmptyTitle: "Pas de client aujourd'hui. Bon repos.",

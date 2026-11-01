@@ -31,60 +31,58 @@
 import { COLORS } from "../../../../styles/colors.js";
 import { RADIUS } from "../../../../styles/tokens.js";
 
+// Redesign B1: barra branca; o separador ativo leva uma pílula clara da cor da
+// empresa e o ícone/rótulo nessa cor. Selos de contagem a vermelho.
 function MobileBottomBar({ items, activeKey, onNavigate }) {
   return (
     <div
       style={{
-        // QA (achado do Iago, print): a `pageStyle` do App.jsx dá 14px de
-        // margem em volta de tudo no telemóvel e esta barra vive DENTRO
-        // dela — ficava com vão nos dois lados e 14px acima do fundo.
-        // Margem negativa faz sangrar até as bordas sem trocar o elemento
-        // sticky por um wrapper (que quebraria o `position:sticky`).
+        // Sangra até às bordas (a `pageStyle` do App dá 14px de margem no telemóvel).
         margin: "0 -14px -14px",
         position: "sticky", bottom: 0, zIndex: 30,
-        background: COLORS.navGradient,
+        background: "#FFFFFF", borderTop: `1px solid ${COLORS.line}`,
         display: "flex", justifyContent: "space-around",
-        padding: "18px 4px",
-        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)",
+        padding: "10px 4px",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)",
       }}
     >
       {items.map((item) => {
         const active = item.key === activeKey;
         const Icon = item.icon;
-        const iconColor = active ? COLORS.onClay : COLORS.navBottomText;
-        const labelColor = active ? "#fff" : COLORS.navBottomText;
+        const color = active ? "var(--p1)" : COLORS.ink3;
         return (
           <button
             key={item.key}
             type="button"
             onClick={() => onNavigate(item.key)}
+            aria-current={active ? "page" : undefined}
             style={{
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
-              width: 66, height: 64, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit",
+              width: 70, height: 60, border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit",
               position: "relative",
             }}
           >
             <span
               style={{
-                width: 48, height: 32, borderRadius: RADIUS.chip, display: "flex", alignItems: "center", justifyContent: "center",
-                background: active ? COLORS.clay : "transparent", position: "relative",
+                width: 60, height: 34, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center",
+                background: active ? "var(--p1-12)" : "transparent", position: "relative", transition: "background .2s",
               }}
             >
-              <Icon size={28} strokeWidth={2} color={iconColor} />
+              <Icon size={24} strokeWidth={2} color={color} />
               {item.badge != null && item.badge > 0 && (
                 <span
                   style={{
-                    position: "absolute", top: -4, right: -6, minWidth: 14, height: 14, borderRadius: 999,
-                    background: COLORS.clay, color: "#FFFFFF", fontSize: 9, fontWeight: 700,
-                    display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", lineHeight: 1,
-                    border: `1.5px solid ${COLORS.forest900}`,
+                    position: "absolute", top: -4, right: 6, minWidth: 18, height: 18, borderRadius: 999,
+                    background: COLORS.dangerSolid, color: "#FFFFFF", fontSize: 10.5, fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", lineHeight: 1,
+                    border: "2px solid #fff",
                   }}
                 >
                   {item.badge}
                 </span>
               )}
             </span>
-            <span style={{ fontSize: 13.5, fontWeight: active ? 700 : 600, color: labelColor }}>
+            <span style={{ fontSize: 13, fontWeight: active ? 800 : 600, color: active ? COLORS.ink : COLORS.ink3 }}>
               {item.label}
             </span>
           </button>

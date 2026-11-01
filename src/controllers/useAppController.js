@@ -115,6 +115,10 @@ export function useAppController() {
   const slicePushingRef = useRef({});
   const slicePushAgainRef = useRef({});
   const rpcMissingSliceRef = useRef({});   // RPC ainda inexistente neste projeto Supabase
+  // Estado de gravação sempre visível (redesign B1): "saved" | "saving" | "offline".
+  // "offline" = a última tentativa falhou (sem rede ou erro): tenta de novo sozinho.
+  const [saveState, setSaveState] = useState("saved");
+  const saveFailedRef = useRef(false);
   const setHorasData = useCallback((updater) => {
     const prev = horasRef.current;
     const next = typeof updater === "function" ? updater(prev) : updater;
@@ -210,6 +214,7 @@ export function useAppController() {
     if (dirty.length === 0 && !fullWriteRef.current) return;
     pushingRef.current = true;
     pushAgainRef.current = false;
+    setSaveState("saving");
     const snapshot = horasRef.current;
     const wasFull = fullWriteRef.current;
     let ok = false;
@@ -234,6 +239,7 @@ export function useAppController() {
       console.error("Erro ao gravar horas:", err);
     } finally {
       pushingRef.current = false;
+      noteSaveResult(ok);
       if (ok && (pushAgainRef.current || dirtyRef.current.size > 0)) flushHoras();
     }
   }
@@ -307,6 +313,7 @@ export function useAppController() {
     const rpcName = cfg.kind === "map" ? "patch_assignments" : "patch_app_list";
     slicePushingRef.current[col] = true;
     slicePushAgainRef.current[col] = false;
+    setSaveState("saving");
     let ok = false;
     try {
       if (d && !rpcMissingSliceRef.current[rpcName]) {
@@ -331,8 +338,26 @@ export function useAppController() {
       console.error(`Erro ao gravar ${col}:`, err);
     } finally {
       slicePushingRef.current[col] = false;
+      noteSaveResult(ok);
       if (ok && (slicePushAgainRef.current[col] || sliceValRef.current[col] !== sliceBaseRef.current[col])) flushSlice(col);
     }
+  }
+  // Resultado de uma escrita: falhou → "offline" (tenta de novo sozinho); correu bem
+  // e não sobra nada → "saved".
+  function noteSaveResult(ok) {
+    if (!ok) { saveFailedRef.current = true; setSaveState("offline"); return; }
+    saveFailedRef.current = false;
+    setTimeout(() => {
+      if (saveFailedRef.current) return;
+      setSaveState(pushingRef.current || anySlicePushing() ? "saving" : hasUnsavedWrites() ? "saving" : "saved");
+    }, 0);
+  }
+  // "Tentar de novo" (botão) e quando a rede volta.
+  async function retrySave() {
+    if (!isSupabaseConfigured) return;
+    setSaveState("saving");
+    await Promise.all([flushHoras(), ...SLICE_COLS.map((c) => flushSlice(c))]);
+    if (!saveFailedRef.current) setSaveState(hasUnsavedWrites() ? "saving" : "saved");
   }
   function anySlicePushing() { return SLICE_COLS.some((c) => slicePushingRef.current[c]); }
 
@@ -871,6 +896,16 @@ export function useAppController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, readOk, assignments]);
 
+  // Sem rede: grava sozinho quando a rede volta, e vai tentando de 15 em 15 s.
+  useEffect(() => {
+    if (saveState !== "offline") return undefined;
+    const onOnline = () => retrySave();
+    window.addEventListener("online", onOnline);
+    const timer = setInterval(() => { if (navigator.onLine !== false) retrySave(); }, 15000);
+    return () => { window.removeEventListener("online", onOnline); clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveState]);
+
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk) return;
     flushHoras();
@@ -1081,6 +1116,7 @@ export function useAppController() {
   const companyNoticeValue = isSupabaseConfigured && perspective !== "login" ? companyNotice(companyStatus, isManagerSession) : null;
 
   return {
+    saveState: isSupabaseConfigured ? saveState : "saved", retrySave,
     perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen, empClientFocus, setEmpClientFocus, openEmpClient,
     loggedInStaffId, setLoggedInStaffId, lang, setLang,
     company, setCompany, cutoffDay, setCutoffDay, contractAlertDays, setContractAlertDays, closeDeadlineDays, setCloseDeadlineDays, highlightsMonths, setHighlightsMonths, highlightsRealtime, setHighlightsRealtime,
