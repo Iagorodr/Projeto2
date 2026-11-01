@@ -4,6 +4,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES } from "../../models/data.js";
+import { THEMES, DEFAULT_THEME, applyTheme } from "../../styles/theme.js";
 import { T } from "../../models/i18n.js";
 import { PageHeader, Card, Button, ConfirmDialog, SegmentedBar, InfoTip } from "../shared/ui/index.js";
 import { Toggle } from "../shared/ui/Toggle.jsx";
@@ -223,6 +224,25 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                     />
                   </div>
                 ))}
+              </div>
+            </Card>
+            <Card style={{ marginTop: 16 }}>
+              <div style={styles.sectionTitle}>{t.themeTitle}</div>
+              <div style={{ ...styles.defSettingHint, marginTop: 0, marginBottom: 14 }}>{t.themeHint}</div>
+              <div role="radiogroup" aria-label={t.themeTitle} style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                {THEMES.map((th) => {
+                  const on = (company.theme || DEFAULT_THEME) === th.key;
+                  return (
+                    <button key={th.key} type="button" role="radio" aria-checked={on} title={th.label[lang] || th.label.pt}
+                      onClick={() => { applyTheme(th.key); setCompany((c) => ({ ...c, theme: th.key })); }}
+                      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, border: "none", background: "transparent", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+                      <span style={{ width: 44, height: 44, borderRadius: 14, background: th.p1, boxShadow: on ? `0 0 0 3px #fff, 0 0 0 5px ${th.p1}` : "none", display: "flex", alignItems: "center", justifyContent: "center", transition: "box-shadow .2s" }}>
+                        {on && <Check size={20} color="#fff" strokeWidth={3} />}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: on ? 700 : 500, color: on ? COLORS.ink : COLORS.ink2 }}>{th.label[lang] || th.label.pt}</span>
+                    </button>
+                  );
+                })}
               </div>
             </Card>
           </div>
