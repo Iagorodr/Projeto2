@@ -173,18 +173,61 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, closin
 
   return (
     <>
-      <Card style={{ marginBottom: isPhone ? 12 : 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
-          <div style={{ flex: "1 1 200px", fontFamily: FONT.heading, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{f.overviewTitle}</div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <SegmentedControl options={[{ value: "hours", label: f.hours }, { value: "eur", label: f.revenue }]} value={metric} onChange={setMetric} />
-            <SegmentedControl options={[{ value: 6, label: f.months6 }, { value: 12, label: f.months12 }]} value={months} onChange={setMonths} />
-          </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "minmax(0, 1fr) minmax(0, 1.15fr)", gap: isPhone ? 18 : 36, alignItems: "start" }}>
-          {left}{right}
-        </div>
-      </Card>
+      {(() => {
+        // Topo B1: a receber no mês e margem estimada; uma linha por contratante com a
+        // receita dividida entre equipa (cinzento) e margem (cor do contratante).
+        const mrows = rows.filter((r) => r.hours > 0 || r.value != null);
+        const recv = mrows.reduce((s, r) => s + (r.value || 0), 0);
+        const marg = mrows.reduce((s, r) => s + (r.margin || 0), 0);
+        const maxV = Math.max(1, ...mrows.map((r) => r.value || 0));
+        const shareOf = (r) => (recv > 0 && r.value ? Math.round((r.value / recv) * 100) : null);
+        const trendOf = (c) => periods.slice(-months).map((p) => { const e = p.contractors.get(c.id); return e ? (e.value != null ? e.value : e.hours) : 0; });
+        const lm = (r) => (r.value > 0 ? Math.round((r.margin / r.value) * 100) : null);
+        return (
+          <Card style={{ marginBottom: isPhone ? 12 : 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+              <div style={{ flex: "1 1 200px", fontFamily: FONT.heading, fontWeight: 700, fontSize: 17, color: COLORS.ink }}>{f.marginTitle}</div>
+              <SegmentedControl options={[{ value: 6, label: f.months6 }, { value: 12, label: f.months12 }]} value={months} onChange={setMonths} />
+            </div>
+            <div style={{ display: "flex", gap: isPhone ? 20 : 40, flexWrap: "wrap", marginBottom: 18 }}>
+              <div><div style={{ fontSize: 12.5, color: COLORS.ink2, fontWeight: 600 }}>{f.toReceiveMonth} · {current.rangeLabel}</div><div style={{ fontFamily: FONT.heading, fontSize: isPhone ? 30 : 36, lineHeight: 1.1 }}>{recv > 0 ? eur0(recv) : "—"}</div></div>
+              <div><div style={{ fontSize: 12.5, color: COLORS.ink2, fontWeight: 600 }}>{f.estMargin}</div><div style={{ fontFamily: FONT.heading, fontSize: isPhone ? 30 : 36, lineHeight: 1.1, color: "var(--p1)" }}>{recv > 0 ? <>{eur0(marg)} <span style={{ fontSize: 18, color: COLORS.ink3 }}>{Math.round((marg / recv) * 100)}%</span></> : "—"}</div></div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {mrows.map((r, i) => {
+                const pct = lm(r);
+                const low = pct != null && pct < 25;
+                return (
+                  <div key={r.c.id} role="button" tabIndex={0} onClick={() => onOpen(r.c)} onKeyDown={(e) => rowKey(e, r)} className="b1-rise"
+                    style={{ animationDelay: `${i * 50}ms`, display: "grid", gridTemplateColumns: isPhone ? "1fr auto" : "minmax(130px, 1.2fr) minmax(0, 2fr) 0.8fr 0.5fr 0.9fr 80px 60px", gap: isPhone ? "6px 12px" : 14, alignItems: "center", padding: "10px 8px", borderRadius: 14, cursor: "pointer", borderTop: i ? `1.5px dashed ${COLORS.line}` : "none" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, fontWeight: 800, fontSize: 14 }}><Dot color={r.c.color} size={11} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.c.name}</span></span>
+                    {isPhone && <span style={{ fontFamily: FONT.heading, fontSize: 16 }}>{r.value != null ? eur0(r.value) : "—"}</span>}
+                    <div style={{ gridColumn: isPhone ? "1 / -1" : undefined, height: 14, borderRadius: 8, background: "#F1F3EF", overflow: "hidden" }}>
+                      {r.value != null ? (
+                        <div className="b1-grow-x-anim" style={{ display: "flex", width: `${((r.value || 0) / maxV) * 100}%`, height: "100%", transformOrigin: "left" }}>
+                          <div title={f.staffShare} style={{ flex: `${Math.max(0, r.value - (r.margin || 0))} 1 0`, background: "#C9CEC7" }} />
+                          <div title={f.colMargin} style={{ flex: `${Math.max(0, r.margin || 0)} 1 0`, background: r.c.color }} />
+                        </div>
+                      ) : <div style={{ fontSize: 11, color: COLORS.ink3, padding: "0 8px", lineHeight: "14px" }}>{f.noPriceShort}</div>}
+                    </div>
+                    {!isPhone && <span style={{ fontFamily: FONT.heading, fontSize: 15 }}>{r.value != null ? eur0(r.value) : "—"}</span>}
+                    {!isPhone && <span style={{ color: COLORS.ink2, fontSize: 13 }}>{shareOf(r) != null ? `${shareOf(r)}%` : "—"}</span>}
+                    <span style={{ fontWeight: 800, fontSize: 13.5, color: low ? "#C98A12" : COLORS.ink }}>{r.margin != null ? `${eur0(r.margin)}${pct != null ? ` · ${pct}%` : ""}` : "—"}</span>
+                    {!isPhone && <span><Sparkline values={trendOf(r.c)} color={r.c.color} /></span>}
+                    {!isPhone && <span><ChangeBadge pct={r.change} /></span>}
+                  </div>
+                );
+              })}
+              {mrows.length === 0 && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.noData}</div>}
+            </div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: COLORS.ink3, marginTop: 12 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 12, height: 8, borderRadius: 3, background: "#C9CEC7", display: "inline-block" }} />{f.staffShare}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 12, height: 8, borderRadius: 3, background: "var(--p1)", display: "inline-block" }} />{f.colMargin}</span>
+              <span>{f.marginFormula}</span>
+            </div>
+          </Card>
+        );
+      })()}
 
       {rows.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: isPhone ? 10 : 0, background: isPhone ? "transparent" : COLORS.card, border: isPhone ? "none" : `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, overflow: "hidden" }}>

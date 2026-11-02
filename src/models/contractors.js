@@ -18,10 +18,18 @@ export function normalizeContractorColor(hex) {
   return LEGACY_COLORS[h] || (h || CONTRACTOR_COLORS[0]);
 }
 
+// Cor de contratante demasiado parecida com a cor da empresa (tema): fica bloqueada
+// na escolha, para o acento da app e o contratante não se confundirem.
+function rgb(hex) { const h = String(hex || "").replace("#", ""); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) || 0); }
+export function colorTooClose(a, b) {
+  const [r1, g1, b1] = rgb(a); const [r2, g2, b2] = rgb(b);
+  return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2) < 70;
+}
+
 // Contratante novo: a primeira cor da paleta ainda não usada (se as 8 estiverem usadas, recomeça na 1).
-export function nextContractorColor(contractors) {
+export function nextContractorColor(contractors, companyColor) {
   const used = new Set((contractors || []).map((c) => String(c.color || "").toUpperCase()));
-  return CONTRACTOR_COLORS.find((c) => !used.has(c)) || CONTRACTOR_COLORS[(contractors || []).length % CONTRACTOR_COLORS.length];
+  return CONTRACTOR_COLORS.find((c) => !used.has(c) && !(companyColor && colorTooClose(c, companyColor))) || CONTRACTOR_COLORS[(contractors || []).length % CONTRACTOR_COLORS.length];
 }
 
 export const EMPTY_CONTRACTOR = {

@@ -13,7 +13,7 @@ import { Field } from "../shared/Layout.jsx";
 import { formatPeriodLabel } from "../../models/utils.js";
 import { PageHeader, Pill, Drawer, Button, ConfirmDialog, Card } from "../shared/ui/index.js";
 import {
-  CONTRACTOR_COLORS, CONTRACTOR_COLOR_NAMES, nextContractorColor, EMPTY_CONTRACTOR, normName, contractorNameTaken, clientsOfContractor,
+  CONTRACTOR_COLORS, CONTRACTOR_COLOR_NAMES, nextContractorColor, colorTooClose, EMPTY_CONTRACTOR, normName, contractorNameTaken, clientsOfContractor,
   clientsWithoutContractor, marginPerHour, cycleConfig,
 } from "../../models/contractors.js";
 
@@ -24,6 +24,11 @@ const eur = (v) => (v === "" || v === null || v === undefined || Number.isNaN(Nu
 // funcionários). Cada contratante tem o seu valor/hora, o valor/hora padrão
 // pago ao funcionário (pré-preenche os clientes novos), o dia de faturação e
 // o prazo de pagamento; os clientes ligam-se a ele pelo nome (origem).
+// Cor da empresa (tema atual, posto em :root por styles/theme.js).
+function companyAccent() {
+  try { return getComputedStyle(document.documentElement).getPropertyValue("--p1").trim() || "#1E8C5A"; } catch { return "#1E8C5A"; }
+}
+
 function ContratantesScreen({ lang, setLang, contractors, setContractors, onDeleteContractor, clients, setClients, staff, horasData, closedPeriods, cutoffDay, assignments, covers, absences, closings, onSaveClosing, companyName, companyInfo, who, onNavigate, navIntent }) {
   const t = T[lang].contratantes;
   const tier = useBreakpoint();
@@ -54,7 +59,7 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
   const editing = editingId && editingId !== "new" ? contractors.find((c) => c.id === editingId) : null;
   const unassigned = clientsWithoutContractor(clients, contractors);
 
-  function openNew() { setDraft({ ...EMPTY_CONTRACTOR, color: nextContractorColor(contractors) }); setCycleCustom(false); setErrors({}); setEditingId("new"); }
+  function openNew() { setDraft({ ...EMPTY_CONTRACTOR, color: nextContractorColor(contractors, companyAccent()) }); setCycleCustom(false); setErrors({}); setEditingId("new"); }
   function openEdit(c) { setDraft({ ...EMPTY_CONTRACTOR, ...c }); setCycleCustom(!!cycleConfig(c)); setErrors({}); setEditingId(c.id); }
   function close() { setEditingId(null); setDraft(null); setErrors({}); setDeleteOpen(false); }
   function update(field, value) { setErrors((e) => ({ ...e, [field]: undefined })); setDraft((d) => ({ ...d, [field]: value })); }
@@ -188,14 +193,19 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
 
             <Field label={t.fColor} full>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {CONTRACTOR_COLORS.map((col, ci) => (
-                  <button
-                    key={col} type="button" aria-label={(CONTRACTOR_COLOR_NAMES[lang] || CONTRACTOR_COLOR_NAMES.pt)[ci]} title={(CONTRACTOR_COLOR_NAMES[lang] || CONTRACTOR_COLOR_NAMES.pt)[ci]} aria-pressed={draft.color === col} onClick={() => update("color", col)}
-                    style={{ width: 32, height: 32, borderRadius: 99, background: col, border: draft.color === col ? `3px solid ${COLORS.ink}` : `2px solid ${COLORS.line}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-                  >
-                    {draft.color === col && <Check size={14} color="#fff" />}
-                  </button>
-                ))}
+                {CONTRACTOR_COLORS.map((col, ci) => {
+                  const locked = colorTooClose(col, companyAccent()) && draft.color !== col;
+                  const name = (CONTRACTOR_COLOR_NAMES[lang] || CONTRACTOR_COLOR_NAMES.pt)[ci];
+                  return (
+                    <button
+                      key={col} type="button" aria-label={locked ? `${name} · ${t.fColorLocked}` : name} title={locked ? t.fColorLocked : name} aria-pressed={draft.color === col} disabled={locked} onClick={() => update("color", col)}
+                      style={{ width: 32, height: 32, borderRadius: 99, background: col, border: draft.color === col ? `3px solid ${COLORS.ink}` : `2px solid ${COLORS.line}`, cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.3 : 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                    >
+                      {draft.color === col && <Check size={14} color="#fff" />}
+                      {locked && <span style={{ color: "#fff", fontSize: 14, fontWeight: 900 }}>×</span>}
+                    </button>
+                  );
+                })}
               </div>
             </Field>
 
