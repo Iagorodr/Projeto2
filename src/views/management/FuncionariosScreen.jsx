@@ -126,7 +126,7 @@ function StatusBlock({ s, t, c0 }) {
 // `isStaffActive` (Etapa 4j) refletida na lista e na gaveta. `onNavigate`
 // é opcional (liga "Clientes atribuídos" à tela de Agendas, mesmo padrão
 // já usado em ClientesScreen.jsx).
-function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate, openPeriodStart, companyEmail }) {
+function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate, openPeriodStart, companyEmail }) {
   const t = T[lang].funcionarios;
   const ta = T[lang].acessos;
   const c0 = T[lang].common;
@@ -134,7 +134,7 @@ function FuncionariosScreen({ lang, setLang, staff, setStaff, clients, assignmen
 
   const [search, setSearch] = useState("");
   const [chip, setChip] = useState("todos");
-  const [openId, setOpenId] = useState(null); // id | "new" | null
+  const [openId, setOpenId] = useState(() => (navIntent?.staffId != null ? navIntent.staffId : null)); // id | "new" | null
   const [mode, setMode] = useState("view"); // "view" | "edit" | "created"
   const [draft, setDraft] = useState(EMPTY_STAFF);
   const [formErrors, setFormErrors] = useState({});

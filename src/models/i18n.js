@@ -84,7 +84,7 @@ const T = {
     },
     sidebar: {
       dashboard: "Dashboard", clientes: "Clientes", contratantes: "Contratantes", agendas: "Agendas", horas: "Horas",
-      historico: "Histórico", monitoramento: "Monitoramento", avisos: "Avisos", notas: "Notas", funcionarios: "Funcionários", acessos: "Acessos", definicoes: "Definições",
+      historico: "Histórico", monitoramento: "Monitoramento", avisos: "Avisos", notas: "Notas", funcionarios: "Funcionários", acessos: "Acessos", definicoes: "Definições", ajuda: "Ajuda", groupDay: "Dia a dia", groupRecords: "Cadastros", groupMoney: "Dinheiro", groupSystem: "Sistema", collapse: "Recolher menu", expand: "Abrir menu", search: "Pesquisar", searchPlaceholder: "Procurar cliente, funcionário ou contratante…", searchEmpty: "Nada encontrado.", searchClients: "Clientes", searchStaff: "Funcionários", searchContractors: "Contratantes", searchHint: "Escreva pelo menos 2 letras.", searchKeys: "↑↓ para escolher · Enter para abrir · Esc para fechar",
     },
     login: {
       isManagement: "Sou gerência", isEmployee: "Sou funcionário",
@@ -955,7 +955,7 @@ const T = {
     },
     sidebar: {
       dashboard: "Dashboard", clientes: "Clients", contratantes: "Contractors", agendas: "Schedules", horas: "Hours",
-      historico: "History", monitoramento: "Monitoring", avisos: "Notices", notas: "Notes", funcionarios: "Staff", acessos: "Access", definicoes: "Settings",
+      historico: "History", monitoramento: "Monitoring", avisos: "Notices", notas: "Notes", funcionarios: "Staff", acessos: "Access", definicoes: "Settings", ajuda: "Help", groupDay: "Day to day", groupRecords: "Records", groupMoney: "Money", groupSystem: "System", collapse: "Collapse menu", expand: "Open menu", search: "Search", searchPlaceholder: "Find a client, employee or contractor…", searchEmpty: "Nothing found.", searchClients: "Clients", searchStaff: "Staff", searchContractors: "Contractors", searchHint: "Type at least 2 letters.", searchKeys: "↑↓ to choose · Enter to open · Esc to close",
     },
     login: {
       isManagement: "I'm management", isEmployee: "I'm staff",
@@ -1769,7 +1769,7 @@ const T = {
     },
     sidebar: {
       dashboard: "Tableau de bord", clientes: "Clients", contratantes: "Donneurs d'ordre", agendas: "Plannings", horas: "Heures",
-      historico: "Historique", monitoramento: "Surveillance", avisos: "Avis", notas: "Notes", funcionarios: "Employés", acessos: "Accès", definicoes: "Paramètres",
+      historico: "Historique", monitoramento: "Surveillance", avisos: "Avis", notas: "Notes", funcionarios: "Employés", acessos: "Accès", definicoes: "Paramètres", ajuda: "Aide", groupDay: "Au quotidien", groupRecords: "Fiches", groupMoney: "Argent", groupSystem: "Système", collapse: "Réduire le menu", expand: "Ouvrir le menu", search: "Rechercher", searchPlaceholder: "Chercher un client, un employé ou un donneur d'ordre…", searchEmpty: "Aucun résultat.", searchClients: "Clients", searchStaff: "Employés", searchContractors: "Donneurs d'ordre", searchHint: "Tapez au moins 2 lettres.", searchKeys: "↑↓ pour choisir · Entrée pour ouvrir · Échap pour fermer",
     },
     login: {
       isManagement: "Je suis la direction", isEmployee: "Je suis employé",

@@ -5,10 +5,11 @@ import { MoreHorizontal, LogOut, Repeat, Download, CircleHelp } from "lucide-rea
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { useAppController } from "./controllers/useAppController.js";
 import { styles } from "./styles/styles.js";
-import { AppSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.js";
+import { AppSidebar, GroupedSidebar, MobileBottomBar, MoreSheet } from "./views/shared/ui/index.js";
+import { GlobalSearchProvider } from "./views/shared/GlobalSearch.jsx";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useBreakpoint } from "./hooks/useBreakpoint.js";
-import { MENU_ITEMS, SUPERVISOR_MENU_ITEMS, TODAY, LANG_NAMES } from "./models/data.js";
+import { MENU_ITEMS, MENU_GROUPS, SUPERVISOR_MENU_ITEMS, TODAY, LANG_NAMES } from "./models/data.js";
 import { CloseDeadlineBanner, CloseLockPanel } from "./views/shared/CloseDeadlineBanner.jsx";
 import { formatPeriodLabel, closeDeadlineInfo, isoDateStr } from "./models/utils.js";
 import { isSupervisorRole, getOpenPeriod, weekBlocksOfPayPeriod, staffWithGapsCount, unseenAvisosCount, countReviews, inReviewWindow } from "./models/utils.js";
@@ -167,6 +168,20 @@ export default function App() {
             : item.key === "avisos" ? (pendingRequests || undefined)
             : undefined,
         }));
+        managementItems.push({ key: "ajuda", icon: CircleHelp, label: tSidebar.ajuda });
+        const itemByKey = Object.fromEntries(managementItems.map((it) => [it.key, it]));
+        const menuGroups = MENU_GROUPS.map((g) => ({ key: g.key, label: tSidebar[g.key], items: g.items.map((k) => itemByKey[k]).filter(Boolean) }));
+        const searchLabels = tSidebar;
+        const pickSearch = (r) => {
+          if (r.kind === "client") c.goTo("clientes", { clientId: r.id });
+          else if (r.kind === "staff") c.goTo("funcionarios", { staffId: r.id });
+          else c.goTo("contratantes", { contractorId: r.id });
+        };
+        const withSearch = (node) => (
+          <GlobalSearchProvider enabled clients={c.clients} staff={c.staff} contractors={c.contractors || []} labels={searchLabels} onPick={pickSearch}>
+            {node}
+          </GlobalSearchProvider>
+        );
         const canSwitchToEmployee = c.staff.find((s) => s.id === c.loggedInStaffId)?.role === "gerencia_supervisor";
         const mgmtItemsFull = canSwitchToEmployee
           ? [...managementItems, { key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsEmployee }]
@@ -196,7 +211,7 @@ export default function App() {
         const mgmtMobile = empTier === "mobile";
         const padX = mgmtMobile ? 14 : 24;
         const mgmtContent = (
-          <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+          <div key={`${c.screen}:${c.navIntent ? JSON.stringify(c.navIntent) : ""}`} className="sx-page" style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
             {c.companyNotice && (
               <div style={{ padding: `16px ${padX}px 0` }}>
                 <CompanyNotice lang={c.lang} notice={c.companyNotice} audience="management" companyName={c.company.name} companyCode={c.companyCode} />
@@ -224,7 +239,7 @@ export default function App() {
             {c.screen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />
             )}
-            {c.screen === "funcionarios" && <FuncionariosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} openPeriodStart={isoDateStr(openPeriodNow.start)} companyEmail={c.company.email} />}
+            {c.screen === "funcionarios" && <FuncionariosScreen navIntent={c.navIntent} lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} openPeriodStart={isoDateStr(openPeriodNow.start)} companyEmail={c.company.email} />}
             {c.screen === "contratantes" && <ContratantesScreen lang={c.lang} setLang={c.setLang} contractors={c.contractors} setContractors={c.setContractors} onDeleteContractor={c.deleteContractor} clients={c.clients} setClients={c.setClients} staff={c.staff} horasData={c.horasData} closedPeriods={c.closedPeriods} cutoffDay={c.cutoffDay} assignments={c.assignments} covers={c.covers} absences={c.absences} closings={c.contractorClosings} onSaveClosing={c.saveClosing} companyName={c.company.name} companyInfo={c.company} who={c.company.email} onNavigate={c.goTo} navIntent={c.navIntent} />}
             {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} companyEmail={c.company.email} />}
             {c.screen === "ajuda" && (
@@ -242,10 +257,12 @@ export default function App() {
             ...bottomKeys.map((k) => byKey[k]).filter(Boolean),
             { key: "__more", icon: MoreHorizontal, label: T[c.lang].common.more },
           ];
+          const moreGroups = menuGroups
+            .map((g) => ({ key: g.key, label: g.label, items: g.items.filter((it) => !bottomKeys.includes(it.key)).map((it) => ({ ...it, onSelect: () => c.setScreen(it.key) })) }))
+            .filter((g) => g.items.length > 0);
           const moreItems = [
-            ...managementItems.filter((it) => !bottomKeys.includes(it.key)).map((it) => ({ ...it, onSelect: () => c.setScreen(it.key) })),
+            ...moreGroups.flatMap((g) => g.items.map((it, i) => ({ ...it, groupLabel: i === 0 ? g.label : undefined }))),
             ...(canSwitchToEmployee ? [{ key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsEmployee, onSelect: () => c.enterEmployee(c.loggedInStaffId) }] : []),
-            { key: "ajuda", icon: CircleHelp, label: helpTexts(c.lang).ui.title, onSelect: () => c.setScreen("ajuda") },
             ...(!install.installed ? [{
               key: "install", icon: Download, label: T[c.lang].common.installApp,
               onSelect: () => { if (install.canPromptNative) install.promptInstall(); else window.location.assign(`/instalar?lang=${c.lang}`); },
@@ -253,7 +270,7 @@ export default function App() {
             { key: "logout", icon: LogOut, label: T[c.lang].common.logout, logout: true, onSelect: () => c.logout() },
           ];
           const moreActive = !bottomKeys.includes(c.screen);
-          return (
+          return withSearch(
             <div style={{ minHeight: "calc(100dvh - 14px)", display: "flex", flexDirection: "column", width: "100%" }}>
               <div style={{ flex: 1, margin: "-14px -14px 0", minWidth: 0, display: "flex", flexDirection: "column" }}>
                 {mgmtContent}
@@ -267,15 +284,18 @@ export default function App() {
                 open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} items={moreItems} variant="grid"
                 activeKey={c.screen} user={{ name: managementUser.name, photoUrl: managementUser.photoUrl }}
                 lang={c.lang} setLang={c.setLang} langNames={LANG_NAMES}
+                searchLabel={tSidebar.search}
               />
             </div>
           );
         }
-        return (
+        return withSearch(
         <div style={shellStyle}>
-          <AppSidebar
-            items={mgmtItemsFull} activeKey={c.screen} onNavigate={(k) => (k === "__switch" ? c.enterEmployee(c.loggedInStaffId) : c.setScreen(k))}
-            density="gerencia" collapsed={managementCollapsed}
+          <GroupedSidebar
+            groups={menuGroups} activeKey={c.screen}
+            onNavigate={(k) => (k === "__switch" ? c.enterEmployee(c.loggedInStaffId) : c.setScreen(k))}
+            extraItems={canSwitchToEmployee ? [{ key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsEmployee }] : []}
+            defaultCollapsed={managementCollapsed === "icons"} labels={tSidebar}
             user={managementUser} onLogout={c.logout} logoutLabel={T[c.lang].common.logout}
           />
           {mgmtContent}

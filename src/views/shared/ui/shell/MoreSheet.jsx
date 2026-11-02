@@ -14,7 +14,8 @@
 // O item com `logout: true` (sempre o último, ver App.jsx `moreItems`)
 // não mostra a seta — é uma ação que encerra a sessão, não uma navegação.
 import { useEffect } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
+import { useGlobalSearch } from "../../GlobalSearch.jsx";
 import { COLORS } from "../../../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../../../styles/tokens.js";
 import { Avatar } from "../Avatar.jsx";
@@ -22,7 +23,8 @@ import { Avatar } from "../Avatar.jsx";
 // `variant="grid"` (gerência no telemóvel, muitos itens): grelha de 3 colunas
 // em vez de linhas de 70px, para caber sem rolar; o "Sair" fica numa linha à
 // parte no fim. `lang/setLang/langNames` (opcionais): seletor de língua no topo.
-function MoreSheet({ open, onClose, items, user, variant, activeKey, lang, setLang, langNames }) {
+function MoreSheet({ open, onClose, items, user, variant, activeKey, lang, setLang, langNames, searchLabel }) {
+  const search = useGlobalSearch();
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e) { if (e.key === "Escape") onClose?.(); }
@@ -72,11 +74,20 @@ function MoreSheet({ open, onClose, items, user, variant, activeKey, lang, setLa
           const logout = items.find((it) => it.logout);
           return (
             <div style={{ maxHeight: "70dvh", overflowY: "auto" }}>
+              {search && (
+                <div style={{ padding: "0 14px 10px" }}>
+                  <button type="button" onClick={() => { onClose?.(); search.open(); }}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", height: 48, padding: "0 14px", borderRadius: 14, border: `1px solid ${COLORS.line}`, background: COLORS.lineSoft, color: COLORS.ink2, fontSize: 15, fontFamily: "inherit", cursor: "pointer" }}>
+                    <Search size={18} /> {searchLabel || search.label}
+                  </button>
+                </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, padding: "4px 14px 10px", borderTop: `1px solid ${COLORS.lineSoft}`, paddingTop: 12 }}>
-                {tiles.map((item) => {
+                {tiles.flatMap((item) => {
                   const Icon = item.icon;
                   const active = item.key === activeKey;
-                  return (
+                  const head = item.groupLabel ? [<div key={`g-${item.key}`} style={{ gridColumn: "1 / -1", fontSize: 11, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: COLORS.ink3, padding: "6px 2px 0" }}>{item.groupLabel}</div>] : [];
+                  return [...head, (
                     <button
                       key={item.key} type="button" onClick={() => { item.onSelect?.(); onClose?.(); }}
                       style={{
@@ -85,15 +96,15 @@ function MoreSheet({ open, onClose, items, user, variant, activeKey, lang, setLa
                         border: `1px solid ${active ? COLORS.forest200 : COLORS.lineSoft}`, background: active ? COLORS.forest50 : COLORS.card,
                       }}
                     >
-                      <span style={{ width: 40, height: 40, borderRadius: 12, background: COLORS.rowIconBg, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                        <Icon size={20} strokeWidth={1.9} color={COLORS.rowIconInk} />
+                      <span style={{ width: 40, height: 40, borderRadius: 12, background: "var(--p1-12)", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                        <Icon size={20} strokeWidth={1.9} color="var(--p2)" />
                         {item.badge != null && item.badge > 0 && (
                           <span style={{ position: "absolute", top: -4, right: -6, minWidth: 16, height: 16, borderRadius: 999, background: COLORS.clay, color: "#FFFFFF", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{item.badge}</span>
                         )}
                       </span>
                       <span style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink, textAlign: "center", lineHeight: 1.2, overflowWrap: "anywhere" }}>{item.label}</span>
                     </button>
-                  );
+                  )];
                 })}
               </div>
               {logout && (

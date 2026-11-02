@@ -23,6 +23,7 @@ import { ChevronDown } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
 import { FONT } from "../../../../styles/tokens.js";
 import { useControlSize, useBreakpoint } from "../../../../hooks/useBreakpoint.js";
+import { SearchButton } from "../../GlobalSearch.jsx";
 
 // Lote 4, 4.4 (achado da Marta: "seletor de idioma hoje 104×30" — este é
 // o que a Horas realmente usa via PageHeader; "Como conferir" pede a
@@ -91,6 +92,7 @@ function PageHeader({ title, subtitle, titleInfo, actions, lang, setLang, langNa
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: mobile ? 8 : 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
         {actions}
+        {!mobile && <SearchButton />}
         {showLang && <LangSwitcher lang={lang} setLang={setLang} langNames={langNames} />}
       </div>
     </div>

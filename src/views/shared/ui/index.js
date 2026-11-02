@@ -23,6 +23,7 @@ export { ChartHeader } from "./charts/ChartHeader.jsx";
 export { PeriodBarChart } from "./charts/PeriodBarChart.jsx";
 export { PeriodLineChart } from "./charts/PeriodLineChart.jsx";
 export { AppSidebar } from "./shell/AppSidebar.jsx";
+export { GroupedSidebar } from "./shell/GroupedSidebar.jsx";
 export { MobileBottomBar } from "./shell/MobileBottomBar.jsx";
 export { MoreSheet } from "./shell/MoreSheet.jsx";
 export { MobileHeader } from "./shell/MobileHeader.jsx";

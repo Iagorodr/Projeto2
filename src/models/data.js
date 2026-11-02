@@ -33,6 +33,14 @@ const MENU_ITEMS = [
 // ou tablet (ver App.jsx) — mesmas páginas já combinadas pro supervisor no
 // mobile, só que dentro do layout de gerência (barra lateral) em vez do
 // menu em cartões do telemóvel. As chaves batem com os valores de `empScreen`.
+// Menu da gerência por grupos (redesign B1): nenhuma página sai nem muda de nome.
+const MENU_GROUPS = [
+  { key: "groupDay", items: ["dashboard", "monitoramento", "agendas", "avisos", "notas"] },
+  { key: "groupRecords", items: ["clientes", "funcionarios", "contratantes"] },
+  { key: "groupMoney", items: ["horas", "historico"] },
+  { key: "groupSystem", items: ["acessos", "definicoes", "ajuda"] },
+];
+
 const SUPERVISOR_MENU_ITEMS = [
   { key: "menu", icon: LayoutDashboard, label: "Painel" },
   { key: "horas", icon: Clock, label: "Horas" },
@@ -224,4 +232,4 @@ const WEEKDAY_FULL_PT = ["domingo", "segunda-feira", "terça-feira", "quarta-fei
 
 const DAY_ABBR_SUN0_PT = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
-export { LANG_NAMES, TYPE_ICONS, MONTHS_ABBR_PT, DAY_LABELS_1_7, AGENDA_DAYS, TODAY, MENU_ITEMS, SUPERVISOR_MENU_ITEMS, INITIAL_CLIENTS, INITIAL_STAFF, INITIAL_ASSIGNMENTS, INITIAL_HORAS, INITIAL_MISSING, INITIAL_SENT, EMPTY_CLIENT, CLIENT_TYPES, FREQS, EMPTY_STAFF, WEEKDAY_FULL_PT, DAY_ABBR_SUN0_PT };
+export { LANG_NAMES, TYPE_ICONS, MONTHS_ABBR_PT, DAY_LABELS_1_7, AGENDA_DAYS, TODAY, MENU_ITEMS, MENU_GROUPS, SUPERVISOR_MENU_ITEMS, INITIAL_CLIENTS, INITIAL_STAFF, INITIAL_ASSIGNMENTS, INITIAL_HORAS, INITIAL_MISSING, INITIAL_SENT, EMPTY_CLIENT, CLIENT_TYPES, FREQS, EMPTY_STAFF, WEEKDAY_FULL_PT, DAY_ABBR_SUN0_PT };

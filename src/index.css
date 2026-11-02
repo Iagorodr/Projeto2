@@ -117,6 +117,14 @@ h1, h2, h3 { font-stretch: 112%; }
 @media (hover: hover) {
   .b1-lift:hover { transform: translateY(-2px); box-shadow: 0 2px 6px rgba(21,24,22,.08), 0 24px 44px -20px rgba(21,24,22,.38); }
 }
+@keyframes sx-pop-in { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
+.sx-pop { animation: sx-pop-in .22s var(--ease) both; }
+@keyframes sx-nav-in { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+.sx-navitem { animation: sx-nav-in .3s var(--ease) both; transition: background .15s var(--ease); }
+@media (hover: hover) { .sx-navitem:hover { background: rgba(255,255,255,.12) !important; } .sx-navitem[aria-current="page"]:hover { background: rgba(255,255,255,.22) !important; } }
+/* Troca de página: a área de conteúdo esmorece e volta. */
+.sx-page { animation: b1-fade .28s var(--ease) both; }
+@media (prefers-reduced-motion: reduce) { .sx-pop, .sx-navitem, .sx-page { animation: none !important; } }
 @media (prefers-reduced-motion: reduce) {
   .b1-rise, .b1-fade, .b1-pop, .b1-cascade > *, .b1-lift { animation: none !important; transition: none !important; }
 }
