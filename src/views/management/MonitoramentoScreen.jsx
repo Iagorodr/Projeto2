@@ -27,6 +27,8 @@ import EmployeeHorasScreen from "../employee/EmployeeHorasScreen.jsx";
 // redesenhar só um deles deixaria o outro com um visual completamente
 // desencontrado (tabela/gaveta novas dum lado, cartões antigos do outro).
 // Optei por redesenhar os dois já nesta leva.
+const fmtH = (h) => { const m = Math.round(h * 60); const hh = Math.floor(m / 60); const mm = m % 60; return mm ? `${hh}h${String(mm).padStart(2, "0")}` : `${hh}h`; };
+
 function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignments, covers, cutoffDay, closedPeriods, absences, sentItems, setSentItems, onHome, company, setHorasData, setMissingItems }) {
   const t = T[lang].monitoramento;
   const th = T[lang].horas;
@@ -54,6 +56,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
     return () => ro.disconnect();
   }, []);
   const isSupervisorView = !!onHome;
+  const [weekIdx, setWeekIdx] = useState(null); // aba da semana (gerência); null = a semana de hoje
 
   // Período aberto pelo histórico real de fechamentos (não por TODAY puro —
   // ver getOpenPeriod), em blocos "opção B" (6.1): normalmente 4, dois deles
@@ -279,7 +282,26 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       ),
     },
   ];
-  const tableColumns = narrow ? allColumns.filter((c) => !c.key.startsWith("block-")) : allColumns;
+  // Aba da semana: por defeito a de hoje (ou a última já começada).
+  const todayIdx = Math.max(0, blocks.reduce((a, ch, i) => (ch.start <= TODAY ? i : a), 0));
+  const wi = weekIdx == null ? todayIdx : Math.min(weekIdx, blocks.length - 1);
+  const weekDays = blocks[wi] ? calPeriodDays(blocks[wi]) : [];
+  const hoursOn = (sid, iso) => ((horasData[sid] && horasData[sid].entries) || []).filter((e) => !e.voided && e.date === iso).reduce((sum, e) => sum + (e.hours || 0), 0);
+  const dayColumns = weekDays.map((d, di) => ({
+    key: `day-${di}`, label: `${dayAbbr[d.getDay()]} ${d.getDate()}`, width: 0.8, minWidth: 64,
+    render: (row) => {
+      const w = row.weeksInfo[wi];
+      const st = w ? w.dayStatuses[di] : "no-agenda";
+      if (w && w.locked) return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: COLORS.ink3, fontSize: 12.5 }}><Lock size={12} />{st === "filled" ? fmtH(hoursOn(row.staffMember.id, isoDateStr(d))) : ""}</span>;
+      if (st === "filled") { const h = hoursOn(row.staffMember.id, isoDateStr(d)); return <span style={{ fontWeight: 700, color: COLORS.ink }}>{h > 0 ? fmtH(h) : "✓"}</span>; }
+      if (st === "missed") return <span style={{ display: "inline-block", fontSize: 11.5, fontWeight: 800, color: "#B8343A", background: "#FCE5E5", borderRadius: 8, padding: "3px 7px", whiteSpace: "nowrap" }}>{t.dayMissingShort}</span>;
+      if (st === "future") return <span style={{ color: "#C3C8C2" }}>·</span>;
+      return <span style={{ color: COLORS.ink3 }}>–</span>;
+    },
+  }));
+  const tableColumns = narrow
+    ? allColumns.filter((c) => !c.key.startsWith("block-"))
+    : [allColumns[0], ...dayColumns, ...allColumns.filter((c) => c.key === "gaps")];
 
   // ---------------------------------------------------------------------
   // Gerência a preencher as horas de um funcionário: o mesmo ecrã de Horas do funcionário (dias, semanas,
@@ -366,6 +388,24 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
           <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
         </div>
 
+        {!narrow && (
+          <div role="tablist" aria-label={t.weeksAria} className="chip-row" style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            {blocks.map((ch, i) => {
+              const started = ch.start <= TODAY;
+              const missing = monitored.reduce((sum, m) => sum + (m.weeksInfo[i] ? m.weeksInfo[i].gaps : 0), 0);
+              const on = i === wi;
+              return (
+                <button key={i} type="button" role="tab" aria-selected={on} onClick={() => setWeekIdx(i)} className="b1-rise"
+                  style={{ animationDelay: `${i * 60}ms`, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, minWidth: 120, padding: "10px 14px", borderRadius: 16, border: `1.5px solid ${on ? "var(--p1)" : COLORS.line}`, background: on ? "var(--p1)" : COLORS.card, color: on ? "#fff" : COLORS.ink, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                  <span style={{ fontSize: 13, fontWeight: 800 }}>S{i + 1} · {calPeriodLabel(ch, lang)}</span>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, opacity: on ? 0.9 : 1, color: on ? "#fff" : !started ? COLORS.ink3 : missing > 0 ? "#B8343A" : "#167049" }}>
+                    {!started ? t.weekNotStarted : missing > 0 ? t.staffDaysMissing(missing) : `✓ ${t.weekUpToDate}`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         <DataTable
           columns={tableColumns}
           rows={visibleMonitored}
