@@ -91,7 +91,7 @@ export default function App() {
   // qualquer tamanho.
   const pageStyle = c.perspective === "login"
     ? { ...basePageStyle, padding: 0, minHeight: "100dvh", justifyContent: "flex-start", alignItems: "stretch" }
-    : basePageStyle;
+    : (!isMobile ? { ...basePageStyle, padding: 0, justifyContent: "flex-start", minHeight: "100dvh" } : basePageStyle);
 
   if (c.passwordGate) {
     return <SetNewPasswordScreen lang={c.lang} mode={c.passwordGate} onSave={c.setNewPassword} onLogout={c.logout} />;
@@ -224,7 +224,7 @@ export default function App() {
               <div style={{ padding: `16px ${padX}px 0` }}><CloseDeadlineBanner lang={c.lang} info={closeInfo} role="management" onGoHours={c.screen === "horas" ? undefined : () => c.setScreen("horas")} /></div>
             )}
             {c.screen === "dashboard" && !closeInfo.overdue && (
-              <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} highlightsMonths={c.highlightsMonths} highlightsRealtime={c.highlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} assignments={c.assignments} covers={c.covers} contractors={c.contractors} closings={c.contractorClosings} onNavigate={c.goTo} />
+              <DashboardScreen lang={c.lang} setLang={c.setLang} company={c.company} setCompany={c.setCompany} setSentItems={c.setSentItems} userName={c.me?.name || ""} clients={c.clients} staff={c.staff} horasData={c.horasData} missingItems={c.missingItems} sentItems={c.sentItems} contractAlertDays={c.contractAlertDays} highlightsMonths={c.highlightsMonths} highlightsRealtime={c.highlightsRealtime} reclamacaoBaseClients={c.reclamacaoBaseClients} reclamacaoExcelenteCount={c.reclamacaoExcelenteCount} reclamacaoRazoavelCount={c.reclamacaoRazoavelCount} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} assignments={c.assignments} covers={c.covers} contractors={c.contractors} closings={c.contractorClosings} onNavigate={c.goTo} />
             )}
             {c.screen === "clientes" && <ClientesScreen lang={c.lang} setLang={c.setLang} contractors={c.contractors} clients={c.clients} setClients={c.setClients} onDeleteClient={c.deleteClient} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} contractAlertDays={c.contractAlertDays} onNavigate={c.setScreen} sentItems={c.sentItems} navIntent={c.navIntent} covers={c.covers} absences={c.absences} />}
             {c.screen === "agendas" && <AgendasScreen lang={c.lang} setLang={c.setLang} absences={c.absences} setAbsences={c.setAbsences} covers={c.covers} setCovers={c.setCovers} clients={c.clients} setClients={c.setClients} staff={c.staff} assignments={c.assignments} setAssignments={c.setAssignments} onOpenClient={(id) => c.goTo("clientes", { clientId: id })} />}

@@ -24,7 +24,8 @@ const styles = {
   // cantos arredondados (mesmo efeito do `hidden` aqui, já que nada
   // dentro do shell hoje precisa de scroll programático), mas não cria
   // essa "janela de rolagem" — então o sticky escapa até ao `body`.
-  shell: { width: "100%", maxWidth: 1200, minHeight: 680, background: COLORS.surface, borderRadius: 16, border: `1px solid ${COLORS.border}`, display: "flex", overflow: "clip" },
+  // Redesign B1: a app ocupa a janela toda; fundo neutro e cartões brancos por cima.
+  shell: { width: "100%", maxWidth: "none", minHeight: "100dvh", background: COLORS.page, display: "flex", overflow: "clip" },
   sidebar: { width: 220, background: COLORS.sidebarBg, padding: "22px 18px", display: "flex", flexDirection: "column", borderRight: `1px solid ${COLORS.border}`, borderTop: `3px solid ${COLORS.extra}` },
   sidebarProductRow: { marginBottom: 18, background: COLORS.extraTint, borderRadius: 10, padding: "9px 12px" },
   brand: { display: "flex", alignItems: "center", gap: 10, marginBottom: 28, paddingBottom: 18, borderBottom: `1px solid ${COLORS.border}` },

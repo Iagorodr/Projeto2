@@ -1,510 +1,587 @@
-import { useMemo, useState } from "react";
-import { Users, Building2, Clock, Undo2, Bell, Calendar, CalendarX, Check } from "lucide-react";
-import { styles } from "../../styles/styles.js";
+// Dashboard da gerência — redesign B1 (protótipo "Servix Dashboard B1").
+// Mesmos números de antes (as contas vêm das mesmas funções de utils.js); muda a
+// apresentação: cabeçalho compacto com atalhos, régua do período, 4 números com
+// mini-linha, e blocos que se podem reordenar/ocultar (Personalizar, guardado por
+// pessoa). No telemóvel: 3 abas (Hoje · Período · Empresa).
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, MessageSquare, Home, Pencil, GripVertical, EyeOff, Bell, Check, AlertTriangle } from "lucide-react";
+import "./dashboard.css";
 import { COLORS } from "../../styles/colors.js";
-import { RADIUS, FONT } from "../../styles/tokens.js";
-import { useBreakpoint, useControlSize } from "../../hooks/useBreakpoint.js";
+import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, parseDMY, getOpenPeriod, unseenAvisosCount, formatPeriodLabel, staffTotalHours, staffTotalPay,
-  recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, fmtEuro, compactEuro, fmtHoursScreen,
-  monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod, fmtHM, countReviews, inReviewWindow, pendingExpenseList, staffExpensesApproved, uniqueSentCount, groupSentItems,
+  notesForOwner, fmtEuro, fmtHoursScreen, monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod,
+  fmtHM, countReviews, inReviewWindow, pendingExpenseList, staffExpensesApproved, uniqueSentCount, groupSentItems,
+  addDays, weekBlocksOfPayPeriod, staffWithGaps, clientExpectedHours, dayScheduledClients, absenceOn, parseClientDate,
 } from "../../models/utils.js";
-import { formatTodayLabel, T } from "../../models/i18n.js";
+import { T } from "../../models/i18n.js";
+import { DASH } from "../../models/i18nDash.js";
 import { upcomingHolidays } from "../../models/holidays.js";
 import ClientsByCityCard from "./ClientsByCityCard.jsx";
 import { contractorPeriods, periodFinance } from "../../models/contractorStats.js";
 import { FIN } from "../../models/i18nFin.js";
-import { FinanceBlock } from "./finance/FinanceBlock.jsx";
-import {
-  PageHeader, Card, Avatar, ReclamacoesCard, PeriodBarChart, PeriodLineChart, ChevronCircle, SegmentedControl,
-} from "../shared/ui/index.js";
+import { Avatar } from "../shared/ui/index.js";
+import { SearchButton } from "../shared/GlobalSearch.jsx";
+import { THEMES, DEFAULT_THEME, applyTheme } from "../../styles/theme.js";
+import { localPrefs, loadPrefs, savePrefs } from "../../models/userPrefs.js";
 
-// Pequeno "tile" de data (documento, 4.1 — cartão de Notas): 46×46, dia
-// grande + mês em maiúsculas, clay-ink. Nenhum dos formatadores que já
-// existiam (`fmtNoteDate`, que devolve "DD/MM" numa única linha) desenha
-// isto — por isso um componente novo, só para este cartão.
-function NoteDateTile({ iso, lang }) {
-  const [, m, d] = iso.split("-");
+const LOCALE = { pt: "pt-PT", en: "en-GB", fr: "fr-BE" };
+const DAY_MS = 86400000;
+const BLOCKS = ["pend", "monit", "hoje", "mapa", "fin", "recl", "notas", "horas", "dest"];
+const LAYOUT = { pend: "c1 r2", monit: "c1", hoje: "c1", mapa: "c2 r2", fin: "c2", recl: "c1", notas: "c1", horas: "c4", dest: "c2" };
+const TAB_OF = { hero: "periodo", kpis: "periodo", pend: "hoje", monit: "hoje", hoje: "hoje", mapa: "empresa", fin: "periodo", recl: "periodo", notas: "empresa", horas: "periodo", dest: "periodo" };
+
+const reduceMotion = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
+
+// Número que conta até ao valor (≈1,2 s).
+function CountUp({ value, format = (v) => Math.round(v).toLocaleString("pt-PT"), className }) {
+  const [shown, setShown] = useState(reduceMotion() ? value : 0);
+  useEffect(() => {
+    if (reduceMotion()) { setShown(value); return undefined; }
+    let raf; const t0 = performance.now(); const from = 0; const d = 1200;
+    const step = (t) => { let p = Math.min(1, (t - t0) / d); p = 1 - Math.pow(1 - p, 3); setShown(from + (value - from) * p); if (p < 1) raf = requestAnimationFrame(step); };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <span className={className}>{format(shown)}</span>;
+}
+
+function Spark({ values }) {
+  if (!values || values.length < 2) return null;
+  const max = Math.max(...values), min = Math.min(...values);
+  const span = max - min || 1;
+  const pts = values.map((v, i) => [4 + (i * 112) / (values.length - 1), 30 - ((v - min) / span) * 22]);
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  const last = pts[pts.length - 1];
   return (
-    <div
-      style={{
-        width: 46, height: 46, borderRadius: RADIUS.chip, background: COLORS.clayTint,
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0,
-      }}
-    >
-      <div style={{ fontFamily: FONT.heading, fontWeight: 700, fontSize: 17, lineHeight: 1, color: COLORS.clayInk }}>
-        {Number(d)}
-      </div>
-      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: COLORS.clayInk, marginTop: 3 }}>
-        {monthAbbr(lang, Number(m) - 1)}
-      </div>
-    </div>
+    <svg className="dsh-spark" viewBox="0 0 120 36" width="120" height="36" aria-hidden="true">
+      <path className="sa" d={`${line} L116 36 L4 36Z`} />
+      <path className="sl" d={line} pathLength="1" />
+      <circle className="sd" cx={last[0]} cy={last[1]} r="3.5" />
+    </svg>
   );
 }
 
-// Linha de "Pendências" (documento, 4.1): bloco de ícone 38, texto,
-// contagem em quadrado 34 — ou, quando a contagem é 0, a linha inteira
-// esbatida com "✓ Em dia" no lugar do quadrado. A cor âmbar (documento:
-// só a linha "Horas extra por aprovar") só aparece quando há mesmo
-// alguma coisa pendente — com contagem 0 fica neutra como as outras,
-// pela mesma regra de QA geral do documento ("nenhuma cor de alerta em
-// elementos que não sejam erro ou falta").
-function PendingRow({ icon: Icon, label, count, amber, onClick, okLabel, last }) {
-  const isZero = count === 0;
-  const useAmber = amber && !isZero;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "7px 2px",
-        border: "none", borderBottom: last ? "none" : `1px solid ${COLORS.line}`, background: "transparent",
-        cursor: "pointer", textAlign: "left", fontFamily: "inherit", opacity: isZero ? 0.55 : 1,
-      }}
-    >
-      <div
-        style={{
-          width: 34, height: 34, borderRadius: RADIUS.chip, flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: useAmber ? COLORS.amberBg : COLORS.forest50,
-          color: useAmber ? COLORS.amberInk : COLORS.forest600,
-        }}
-      >
-        <Icon size={18} strokeWidth={1.8} />
-      </div>
-      <div style={{ flex: 1, fontSize: 13.5, color: COLORS.ink }}>{label}</div>
-      {isZero ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 700, color: COLORS.ok, flexShrink: 0 }}>
-          <Check size={14} /> {okLabel}
-        </div>
-      ) : (
-        <div
-          style={{
-            width: 30, height: 30, borderRadius: RADIUS.chip, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: useAmber ? COLORS.amberBg : COLORS.lineSoft,
-            color: useAmber ? COLORS.amberInk : COLORS.ink,
-            fontWeight: 700, fontSize: 14,
-          }}
-        >
-          {count}
-        </div>
-      )}
-      <ChevronCircle size={26} />
-    </button>
-  );
-}
-
-// Dashboard (documento de design, secção 4.1) — "dizer em 5 segundos
-// quanto há a pagar, o que precisa de atenção e como vai o mês". A lógica
-// de negócio por trás de cada número já estava correta (Etapas 0/4b) —
-// aqui só muda a apresentação: cartão herói + 3 KPIs na mesma linha,
-// Pendências com o novo comportamento "contagem 0 = em dia", o
-// componente de Reclamações (2.13) no lugar do velocímetro, um único
-// cartão de Notas (o documento pede explicitamente que o duplicado
-// desapareça) e os dois gráficos de 6 períodos (2.14) no lugar dos SVGs
-// antigos.
-function DashboardScreen({ lang, setLang, company, clients, staff, horasData, missingItems, sentItems, contractAlertDays, highlightsMonths = 3, highlightsRealtime = false, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount, cutoffDay, closedPeriods, personalNotes, absences, assignments, covers, contractors, closings, onNavigate }) {
+function DashboardScreen({
+  lang, setLang, company, setCompany, userName, clients, staff, horasData, missingItems, sentItems, setSentItems, contractAlertDays,
+  highlightsMonths = 3, highlightsRealtime = false, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount,
+  cutoffDay, closedPeriods, personalNotes, absences, assignments, covers, contractors, closings, onNavigate,
+}) {
   const t = T[lang].dashboard;
   const tAbs = T[lang].absences;
-  const absencesPending = (absences || []).filter((a) => !a.handled && a.date >= isoDateStr(TODAY)).length;
-  const tn = T[lang].notas;
-  // Lote 4, 4.4 (achado da Marta, item "Ver todas →" 87×19): usado abaixo
-  // no link "Ver todas" do cartão de Notas — mesma régua do resto.
-  const { height: seeAllHeight } = useControlSize();
-  // Lote 4, 4.7 (achado da Marta): a Linha 1 (herói + 3 KPIs) usava
-  // `flex-wrap`, e a 922px o Replacement quebrava pra uma 2ª linha sozinho
-  // e esticava (922×172 — 172 é o `minHeight` do próprio KpiCard). Grade
-  // fixa por `tier` em vez disso: nunca quebra dentro de um nível.
+  const tm = T[lang].monitoramento;
+  const d = DASH[lang] || DASH.pt;
+  const f = FIN[lang];
   const tier = useBreakpoint();
-  // Etapa 4j (4.9): usa o mesmo auxiliar isStaffActive de todo o app, em
-  // vez de só `s.status === "ativo"` — uma conta Replacement cuja validade
-  // já passou deixa de contar aqui também, coerente com a pílula "Inativo"
-  // que já mostra em Funcionários e com o facto de já não aparecer em
-  // Agendas/Monitoramento. Antes desta etapa não havia essa distinção.
+  const isPhone = tier === "mobile";
+  const loc = LOCALE[lang] || "pt-PT";
+  const ctx = { staff, assignments, covers, absences };
+
+  // ── período ──
+  const period = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
+  const totalDays = Math.round((period.end - period.start) / DAY_MS) + 1;
+  const dayN = Math.min(totalDays, Math.max(1, Math.round((TODAY - period.start) / DAY_MS) + 1));
+  const daysLeft = Math.round((period.end - TODAY) / DAY_MS);
+  const pos = (date) => Math.max(0, Math.min(100, ((Math.round((date - period.start) / DAY_MS)) / Math.max(1, totalDays - 1)) * 100));
+  const fmtDM = (date) => date.toLocaleDateString(loc, { day: "numeric", month: "short" }).replace(".", "");
+  const periodMonth = period.end.toLocaleDateString(loc, { month: "long" });
+  const holidaysInPeriod = upcomingHolidays(period.start, totalDays - 1, lang);
+
+  // ── horas ──
+  const periodHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }, period), 0);
+  const expectedHours = useMemo(
+    () => clients.reduce((s, c) => s + clientExpectedHours(c, period, ctx, TODAY).whole, 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [clients, period.start.getTime(), period.end.getTime(), staff, assignments, covers, absences],
+  );
+  const hoursPct = expectedHours > 0 ? Math.round((periodHours / expectedHours) * 100) : 0;
+  const periodPay = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, period) + staffExpensesApproved(horasData[st.id], period), 0);
+
+  // ── números ──
   const activeStaff = staff.filter((s) => isStaffActive(s, TODAY));
-  const currentPeriod = getOpenPeriod(closedPeriods, cutoffDay, TODAY);
-  const currentPeriodLabel = formatPeriodLabel(currentPeriod, lang);
+  const recentClosed = (closedPeriods || []).slice(0, 5).reverse();
+  const hoursSeries = [...recentClosed.map((p) => p.totalHours || 0), periodHours];
+  const staffSeries = [...recentClosed.map((p) => (p.staffSummaries || []).filter((x) => (x.hours || 0) > 0).length), activeStaff.length];
+  const replacementActive = clients.filter((c) => c.clientType === "replacement" && (!c.clientValidUntil || new Date(c.clientValidUntil) >= TODAY)).length;
+  const newClients = clients.filter((c) => { const s = parseClientDate(c.contractStart); return s && s >= period.start && s <= period.end; }).length;
 
-  // Mesma fórmula do cartão herói de Horas (4.4) — os dois ecrãs mostram
-  // literalmente os mesmos números (total a receber, horas, pagos/por
-  // pagar/pendentes), por isso o cálculo tem de bater certo nos dois.
-  const currentPeriodHours = staff.reduce((s, st) => s + staffTotalHours(horasData[st.id] || { entries: [] }, currentPeriod), 0);
-  // Horas + reembolsos aprovados (o que realmente se paga no período).
-  const currentExpensesApproved = staff.reduce((s, st) => s + staffExpensesApproved(horasData[st.id], currentPeriod), 0);
-  const currentPeriodEuros = staff.reduce((s, st) => s + staffTotalPay(horasData[st.id] || { entries: [] }, clients, currentPeriod) + staffExpensesApproved(horasData[st.id], currentPeriod), 0);
-  // QA pós-auditoria (Lote 1): mesmo `board` do cartão herói de Horas (ver
-  // `boardStaff` em utils.js) — antes este cartão contava `staff` inteiro
-  // (incluindo inativos e contas de teste), por isso pagos+por
-  // pagar+pendentes não batia com "Funcionários ativos" nem com o mesmo
-  // cartão em Horas.
-  const board = boardStaff(staff, horasData, currentPeriod, TODAY);
-  const kpiCounts = board.reduce((acc, s) => {
-    const h = horasData[s.id] || { status: "pendente", paid: false };
-    if (h.status === "pendente") acc.pending += 1;
-    if (h.paid) acc.paid += 1;
-    if (h.status === "finalizado" && !h.paid) acc.unpaid += 1;
-    return acc;
-  }, { pending: 0, paid: 0, unpaid: 0 });
-
-  // Visitas por conferir (agenda × registos da equipa) — ver Horas > Revisões. O aviso só
-  // aparece na última semana do período (a lista fica sempre aberta em Horas). Clientes
-  // fora da lista já têm a sua própria linha, por isso não entram aqui.
-  const hoursReviews = countReviews(horasData, clients, currentPeriod, { staff, assignments, covers, absences }, isoDateStr(TODAY));
-  const visitReviewsPending = inReviewWindow(currentPeriod, TODAY) ? hoursReviews.attention : 0;
-  const repassPending = hoursReviews.repass;
+  // ── pendências (mesmas contas de antes) ──
+  const board = boardStaff(staff, horasData, period, TODAY);
+  const hoursReviews = countReviews(horasData, clients, period, ctx, isoDateStr(TODAY));
+  const visitReviewsPending = inReviewWindow(period, TODAY) ? hoursReviews.attention : 0;
   const expensesPending = pendingExpenseList(horasData).length;
   let overtimePending = 0, reopenedCount = 0, customClientPending = 0, shareReviewPending = 0;
-  // Só conta funcionários que existem: sobras de contas antigas (ids que já não estão
-  // na equipa) deixavam "reabertos" fantasma que ninguém consegue abrir nem resolver.
   const staffIdSet = new Set(staff.map((s) => String(s.id)));
   Object.entries(horasData).forEach(([sid, data]) => {
     if (!data || !staffIdSet.has(String(sid))) return;
     if (data.reopened) reopenedCount += 1;
     data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; if (!e.voided && !e.clientId && e.custom) customClientPending += 1; if (!e.voided && e.shareReview) shareReviewPending += 1; });
   });
-  // "Avisos e pedidos por ler" (documento, 4.1): só o que a gerência ainda
-  // não abriu (`seenByManagement`, marcado ao abrir a tela de Avisos) — a
-  // mesma contagem do selo do menu. Pedidos já vistos mas ainda por resolver
-  // não contam aqui (continuam visíveis na própria tela de Avisos).
-  const pendingRequests = unseenAvisosCount(missingItems, sentItems, getOpenPeriod(closedPeriods, cutoffDay, TODAY));
+  const pendingRequests = unseenAvisosCount(missingItems, sentItems, period);
+  const absencesPending = (absences || []).filter((a) => !a.handled && a.date >= isoDateStr(TODAY)).length;
+  const contractDiff = (c) => (parseDMY(c.contractEnd) - TODAY) / DAY_MS;
+  const contractsNearExpiry = clients.filter((c) => { const x = contractDiff(c); return x >= 0 && x <= contractAlertDays; }).length;
+  const contractsExpired = clients.filter((c) => contractDiff(c) < 0).length;
 
-  const contractsNearExpiry = clients.filter((c) => {
-    const end = parseDMY(c.contractEnd);
-    const diffDays = (end - TODAY) / (24 * 60 * 60 * 1000);
-    return diffDays >= 0 && diffDays <= contractAlertDays;
-  }).length;
-  // QA pós-auditoria (Lote 3, "Contratos a vencer"): a conta acima
-  // (`diffDays >= 0`) sempre ignorou os contratos JÁ vencidos — por isso o
-  // cartão de Pendências dizia "Em dia" mesmo havendo vencidos (hoje 4).
-  // Conta nova, à parte (mesma regra de `kind: "expired"` de
-  // `contractStatus`, ClientesScreen.jsx), com a sua própria linha —
-  // somar às "a vencer" escondia de volta a urgência maior dos vencidos.
-  const contractsExpired = clients.filter((c) => {
-    const end = parseDMY(c.contractEnd);
-    const diffDays = (end - TODAY) / (24 * 60 * 60 * 1000);
-    return diffDays < 0;
-  }).length;
+  const financePeriod = useMemo(
+    () => contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, today: TODAY, lang, count: 6 }),
+    [closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, lang],
+  );
+  const curFin = financePeriod[financePeriod.length - 1];
+  const finance = useMemo(() => periodFinance(curFin, contractors), [curFin, contractors]);
+  const finEnded = isoDateStr(TODAY) > curFin.iso;
+  const closingsToDo = finance.cards.filter((cd) => finEnded && !(cd.closing && cd.closing.status === "closed")).length
+    + (closings || []).filter((r) => r.status === "reopened" && r.periodEnd !== curFin.iso).length;
+  const outstanding = (closings || []).filter((r) => r.status === "closed" && !r.receivedOn && r.periodEnd !== curFin.iso)
+    .reduce((s, r) => s + (Number(r.receivable) || 0), 0);
 
-  // Destaques: top 5 por horas. Dois modos (Definições):
-  //  - tempo real: só o período aberto, atualizado a cada lançamento;
-  //  - fechados (padrão): soma dos N últimos períodos já fechados (Histórico).
+  const pendingRows = [
+    { key: "overtime", tone: "warn", label: t.pendingOvertime, count: overtimePending, go: () => onNavigate("horas") },
+    { key: "custom", tone: "warn", label: t.pendingCustomClient, count: customClientPending, go: () => onNavigate("horas") },
+    { key: "share", tone: "warn", label: t.pendingShareReview, count: shareReviewPending, go: () => onNavigate("horas") },
+    { key: "visits", tone: "warn", label: t.pendingVisitReviews, count: visitReviewsPending, go: () => onNavigate("horas") },
+    { key: "repass", tone: "warn", label: t.pendingRepass, count: hoursReviews.repass, go: () => onNavigate("horas", { openReviews: true, tab: "repass" }) },
+    { key: "expenses", tone: "warn", label: t.pendingExpenses, count: expensesPending, go: () => onNavigate("horas", { openExpenses: true }) },
+    { key: "closings", tone: "warn", label: f.pendingClosings(closingsToDo), count: closingsToDo, go: () => onNavigate("contratantes") },
+    { key: "reopened", tone: "re", label: t.pendingReopened, count: reopenedCount, go: () => onNavigate("horas") },
+    { key: "unread", tone: "acc", label: t.pendingUnread, count: pendingRequests, go: () => onNavigate("avisos") },
+    { key: "absence", tone: "warn", label: tAbs.pendency, count: absencesPending, go: () => onNavigate("agendas") },
+    { key: "contracts", tone: "warn", label: t.pendingContracts, count: contractsNearExpiry, go: () => onNavigate("clientes") },
+    { key: "expired", tone: "bad", label: t.pendingContractsExpired, count: contractsExpired, go: () => onNavigate("clientes") },
+  ].filter((r) => r.count > 0);
+  const pendingTotal = pendingRows.reduce((s, r) => s + r.count, 0);
+
+  // ── monitoramento ──
+  const chunks = weekBlocksOfPayPeriod(period, cutoffDay);
+  const gaps = useMemo(
+    () => staffWithGaps(staff, horasData, clients, assignments, period, chunks, cutoffDay, TODAY, absences, covers),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [staff, horasData, clients, assignments, period.start.getTime(), cutoffDay, absences, covers],
+  );
+  const monitored = staff.filter((s) => isStaffActive(s, TODAY) && s.accountType === "fixo");
+  const onTrack = Math.max(0, monitored.length - gaps.length);
+  const lastDay = daysLeft <= 0;
+  const notFinalized = lastDay ? monitored.filter((s) => (horasData[s.id] || {}).status !== "finalizado") : [];
+  const [reminded, setReminded] = useState(false);
+  function remindAll() {
+    if (!setSentItems || gaps.length === 0) return;
+    const today = isoDateStr(TODAY);
+    setSentItems((prev) => [...gaps.map((g, i) => ({ id: Date.now() + i, type: "aviso", staffId: g.id, clientId: null, text: tm.remindText(g.days), date: today, hasPhoto: false, seenByManagement: true })), ...prev]);
+    setReminded(true);
+  }
+
+  // ── hoje ──
+  const todayInfo = useMemo(() => {
+    const iso = isoDateStr(TODAY);
+    const byClient = new Map(); const absentClients = new Set(); let people = 0;
+    staff.filter((s) => isStaffActive(s, TODAY)).forEach((s) => {
+      const list = dayScheduledClients(clients, assignments, s.id, TODAY, covers);
+      if (list.length === 0) return;
+      if (absenceOn(absences, s.id, iso)) { list.forEach((c) => absentClients.add(c.id)); return; }
+      people += 1;
+      list.forEach((c) => byClient.set(c.id, (byClient.get(c.id) || 0) + 1));
+    });
+    const uncovered = [...absentClients].filter((id) => !byClient.has(id)).map((id) => clientById(clients, id)).filter(Boolean);
+    const week = [];
+    const dow = TODAY.getDay() === 0 ? 7 : TODAY.getDay();
+    const monday = addDays(TODAY, 1 - dow);
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(monday, i); const set = new Set();
+      staff.filter((s) => isStaffActive(s, day)).forEach((s) => dayScheduledClients(clients, assignments, s.id, day, covers).forEach((c) => set.add(c.id)));
+      week.push({ n: set.size, on: i === dow - 1, label: day.toLocaleDateString(loc, { weekday: "narrow" }).toUpperCase() });
+    }
+    return { clients: byClient.size + uncovered.length, people, pairs: [...byClient.values()].filter((n) => n >= 2).length, uncovered, week };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff, clients, assignments, covers, absences, lang]);
+  const weekMax = Math.max(1, ...todayInfo.week.map((w) => w.n));
+
+  // ── reclamações ──
+  const periodComplaints = (sentItems || []).filter((i) => i.type === "reclamacao" && dateStrInPeriod(i.date, period));
+  const complaintsNow = uniqueSentCount(periodComplaints);
+  const prevComplaints = closedPeriods && closedPeriods[0] ? uniqueSentCount(closedPeriods[0].reclamacoesItems || []) : null;
+  const excelente = Math.max(0, Math.round((clients.length / (reclamacaoBaseClients || 10)) * (reclamacaoExcelenteCount ?? 1)));
+  const razoavel = Math.max(excelente + 1, Math.round((clients.length / (reclamacaoBaseClients || 10)) * (reclamacaoRazoavelCount ?? 3)));
+  const scaleX = (n) => {
+    if (n == null) return 0;
+    if (n <= excelente) return (n / Math.max(1, excelente)) * 31;
+    if (n <= razoavel) return 34 + ((n - excelente) / Math.max(1, razoavel - excelente)) * 31;
+    return Math.min(97, 67 + ((n - razoavel) / Math.max(1, razoavel)) * 30);
+  };
+  const recentComplaints = groupSentItems(periodComplaints).slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 3)
+    .map((i) => ({ client: clientById(clients, i.clientId)?.name || "—", date: i.date, key: i.id ?? `${i.clientId}-${i.date}` }));
+
+  // ── notas ──
+  const myNotes = notesForOwner(personalNotes, "management").filter((n) => n.date >= isoDateStr(addDays(TODAY, -1))).slice(0, 3);
+  const holidaysSoon = upcomingHolidays(TODAY, 45, lang).slice(0, 3);
+  const isoTile = (iso) => { const [, m, dd] = iso.split("-"); return { day: Number(dd), mon: monthAbbr(lang, Number(m) - 1) }; };
+
+  // ── destaques (mesma regra de antes) ──
   const usedClosed = highlightsRealtime ? [] : (closedPeriods || []).slice(0, Math.max(1, highlightsMonths));
-  const hoursByStaff = {};
-  const feedbackItems = new Map();
-  const addFeedback = (i) => feedbackItems.set(i.id ?? JSON.stringify(i), i);
+  const hoursByStaff = {}; const feedback = new Map();
   if (highlightsRealtime) {
-    board.forEach((s) => { hoursByStaff[s.id] = staffTotalHours(horasData[s.id] || { entries: [] }, currentPeriod); });
-    (sentItems || []).filter((i) => dateStrInPeriod(i.date, currentPeriod)).forEach(addFeedback);
+    board.forEach((s) => { hoursByStaff[s.id] = staffTotalHours(horasData[s.id] || { entries: [] }, period); });
+    (sentItems || []).filter((i) => dateStrInPeriod(i.date, period)).forEach((i) => feedback.set(i.id ?? JSON.stringify(i), i));
   } else {
     usedClosed.forEach((cp) => {
       (cp.staffSummaries || []).forEach((ss) => { hoursByStaff[ss.staffId] = (hoursByStaff[ss.staffId] || 0) + (ss.hours || 0); });
-      [...(cp.elogiosItems || []), ...(cp.reclamacoesItems || [])].forEach(addFeedback);
+      [...(cp.elogiosItems || []), ...(cp.reclamacoesItems || [])].forEach((i) => feedback.set(i.id ?? JSON.stringify(i), i));
     });
   }
-  const topStaff = board
-    .map((s) => ({ staffId: s.id, name: s.name, hours: hoursByStaff[s.id] || 0 }))
-    .filter((s) => s.hours > 0)
-    .map((s) => {
-      const mine = [...feedbackItems.values()].filter((i) => i.staffId === s.staffId);
-      return { ...s, praises: mine.filter((i) => i.type === "elogio").length, complaints: mine.filter((i) => i.type === "reclamacao").length };
-    })
-    .sort((a, b) => b.hours - a.hours)
-    .slice(0, 5);
-  const highlightsSubtitle = highlightsRealtime ? t.highlightsSubtitleRealtime : t.highlightsSubtitleClosed(usedClosed.length || highlightsMonths);
-  const highlightsEmptyText = highlightsRealtime ? t.highlightsEmptyRealtime : t.highlightsEmptyClosed;
+  const topStaff = board.map((s) => ({ id: s.id, name: s.name, hours: hoursByStaff[s.id] || 0 })).filter((s) => s.hours > 0)
+    .map((s) => { const mine = [...feedback.values()].filter((i) => i.staffId === s.id); return { ...s, praises: mine.filter((i) => i.type === "elogio").length, complaints: mine.filter((i) => i.type === "reclamacao").length }; })
+    .sort((a, b) => b.hours - a.hours).slice(0, 5);
 
-  const replacementClientsActive = clients.filter((c) => {
-    if (c.clientType !== "replacement") return false;
-    if (!c.clientValidUntil) return true;
-    return new Date(c.clientValidUntil) >= TODAY;
-  }).length;
+  // ── horas por contratante ──
+  const ctColor = (key) => (key === "none" ? "#151816" : (contractors || []).find((c) => c.id === key)?.color || "#8A918C");
+  const ctName = (key) => (key === "none" ? d.noContractor : (contractors || []).find((c) => c.id === key)?.name || "—");
+  const ctKeys = []; financePeriod.forEach((p) => p.contractors.forEach((v, k) => { if (v.hours > 0 && !ctKeys.includes(k)) ctKeys.push(k); }));
+  ctKeys.sort((a, b) => (a === "none") - (b === "none"));
+  const chartMax = Math.max(1, expectedHours, ...financePeriod.map((p) => p.totalHours || 0));
 
-  // Só as reclamações do período ABERTO agora — o cartão diz "este mês". Itens
-  // antigos que ficaram em `sentItems` (de antes de um fecho, por exemplo) não
-  // contam; os do período já fechado vivem no Histórico.
-  const periodComplaints = (sentItems || []).filter((i) => i.type === "reclamacao" && dateStrInPeriod(i.date, currentPeriod));
-  const complaintsCurrent = uniqueSentCount(periodComplaints); // um envio a várias pessoas conta 1
-  // Limites escalam com o tamanho da carteira de clientes (configurado em
-  // Definições como "reclamações a cada N clientes"), em vez de um valor fixo.
-  const excelenteThreshold = Math.max(0, Math.round((clients.length / (reclamacaoBaseClients || 10)) * (reclamacaoExcelenteCount ?? 1)));
-  const razoavelThreshold = Math.max(excelenteThreshold + 1, Math.round((clients.length / (reclamacaoBaseClients || 10)) * (reclamacaoRazoavelCount ?? 3)));
-  // `sentItems[].date` nem sempre é ISO: dados-exemplo antigos usam
-  // "DD/MM", lançamentos novos (AvisosScreen.jsx) usam isoDateStr (ex.:
-  // "2026-09-26") — o resto do app já mostra este campo em bruto, sem
-  // formatar (AvisosWidgets.jsx, `{it.date}`); reaproveitado aqui do mesmo
-  // jeito. (QA pós-auditoria: `fmtNoteDate` já entende os dois formatos —
-  // deixou de ser o motivo de não o usar aqui; manter em bruto continua
-  // sendo o comportamento certo, só não é mais por causa do bug antigo.)
-  const recentComplaints = groupSentItems(periodComplaints)
-    .slice()
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 2)
-    .map((i) => ({ client: clientById(clients, i.clientId)?.name || "—", date: i.date }));
-
-  const myNotes = notesForOwner(personalNotes, "management");
-  // Lembretes automáticos: feriados nos próximos 45 dias (só informativo, não mexe na agenda).
-  const holidayReminders = upcomingHolidays(TODAY, 45, lang).slice(0, 3);
-
-  // Gráficos de 6 períodos (documento, 2.14): os 5 períodos FECHADOS mais
-  // recentes (ordem cronológica) + o período ABERTO agora como 6º/último
-  // item — é esse último item que os componentes de gráfico tratam como
-  // "o período atual" (destacado, gradiente/ponto). Com menos de 5
-  // fechados, o gráfico simplesmente mostra menos barras/pontos — nunca
-  // inventa períodos vazios.
-  const recentClosed = recentClosedPeriodsChronological(closedPeriods, 5);
-  const currentLabel = monthAbbr(lang, currentPeriod.end.getMonth());
-  const valueChartData = [
-    ...recentClosed.map((p) => ({ label: shortMonthFromIso(p.periodEnd, lang), value: p.totalEuros + (p.totalExpenses || 0), dateRangeLabel: p.periodLabel })),
-    { label: currentLabel, value: currentPeriodEuros, dateRangeLabel: currentPeriodLabel },
-  ];
-  const hoursChartData = [
-    ...recentClosed.map((p) => ({ label: shortMonthFromIso(p.periodEnd, lang), value: p.totalHours, dateRangeLabel: p.periodLabel })),
-    { label: currentLabel, value: currentPeriodHours, dateRangeLabel: currentPeriodLabel },
-  ];
-
-  // Financeiro: só o período aberto (horas × valor do contratante, calculado na hora).
-  const financePeriod = useMemo(
-    () => contractorPeriods({ closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, today: TODAY, lang, count: 1 })[0],
-    [closedPeriods, horasData, staff, clients, contractors, closings, cutoffDay, lang],
-  );
-  const finance = useMemo(() => periodFinance(financePeriod, contractors), [financePeriod, contractors]);
-  // Meses por fechar (o período aberto já terminou) + meses reabertos; e o que falta receber de meses já fechados.
-  const finEnded = isoDateStr(TODAY) > financePeriod.iso;
-  const closingsToDo = finance.cards.filter((cd) => finEnded && !(cd.closing && cd.closing.status === "closed")).length
-    + (closings || []).filter((r) => r.status === "reopened" && r.periodEnd !== financePeriod.iso).length;
-  const outstanding = (closings || [])
-    .filter((r) => r.status === "closed" && !r.receivedOn && r.periodEnd !== financePeriod.iso)
-    .map((r) => { const ct = (contractors || []).find((x) => String(x.id) === String(r.contractorId)); return ct ? { key: r.id, name: ct.name, color: ct.color, label: r.periodLabel, value: r.receivable, invoiced: !!r.invoicedOn } : null; })
-    .filter(Boolean);
-
-  // Só o que realmente está pendente (contagem > 0) aparece no cartão.
-  const pendingRows = [
-    { key: "overtime", icon: Clock, label: t.pendingOvertime, count: overtimePending, amber: true, onClick: () => onNavigate("horas") },
-    { key: "custom", icon: Clock, label: t.pendingCustomClient, count: customClientPending, amber: true, onClick: () => onNavigate("horas") },
-    { key: "share", icon: Clock, label: t.pendingShareReview, count: shareReviewPending, amber: true, onClick: () => onNavigate("horas") },
-    { key: "visits", icon: Clock, label: t.pendingVisitReviews, count: visitReviewsPending, amber: true, onClick: () => onNavigate("horas") },
-    { key: "repass", icon: Clock, label: t.pendingRepass, count: repassPending, amber: true, onClick: () => onNavigate("horas", { openReviews: true, tab: "repass" }) },
-    { key: "expenses", icon: Clock, label: t.pendingExpenses, count: expensesPending, amber: true, onClick: () => onNavigate("horas", { openExpenses: true }) },
-    { key: "closings", icon: Clock, label: FIN[lang].pendingClosings(closingsToDo), count: closingsToDo, amber: true, onClick: () => onNavigate("contratantes") },
-    { key: "reopened", icon: Undo2, label: t.pendingReopened, count: reopenedCount, onClick: () => onNavigate("horas") },
-    { key: "unread", icon: Bell, label: t.pendingUnread, count: pendingRequests, onClick: () => onNavigate("avisos") },
-    { key: "absence", icon: CalendarX, label: tAbs.pendency, count: absencesPending, amber: true, onClick: () => onNavigate("agendas") },
-    { key: "contracts", icon: Calendar, label: t.pendingContracts, count: contractsNearExpiry, onClick: () => onNavigate("clientes") },
-    { key: "expired", icon: Calendar, label: t.pendingContractsExpired, count: contractsExpired, amber: true, onClick: () => onNavigate("clientes") },
-  ].filter((r) => r.count > 0);
-  const f = FIN[lang];
-  const [evoMetric, setEvoMetric] = useState("eur");
-  const isPhone = tier === "mobile";
-  const row = { display: "flex", flexWrap: "wrap", gap: isPhone ? 12 : 20, marginBottom: isPhone ? 12 : 20 };
-
-
-  const statsRow = {
-    display: "grid", gridTemplateColumns: tier === "desktop" ? "repeat(3, 1fr)" : "1fr 1fr",
-    gap: isPhone ? 10 : 16, marginBottom: isPhone ? 12 : 20,
+  // ── personalizar (ordem e ocultos por pessoa) ──
+  const [prefs, setPrefs] = useState(() => (localPrefs().dash || {}));
+  useEffect(() => { let alive = true; loadPrefs().then((p) => { if (alive && p && p.dash) setPrefs(p.dash); }); return () => { alive = false; }; }, []);
+  const order = [...(prefs.order || []).filter((k) => BLOCKS.includes(k)), ...BLOCKS.filter((k) => !(prefs.order || []).includes(k))];
+  const hidden = (prefs.hidden || []).filter((k) => BLOCKS.includes(k));
+  const updatePrefs = (next) => { setPrefs(next); savePrefs({ dash: next }); };
+  const [edit, setEdit] = useState(false);
+  const dragKey = useRef(null);
+  const [overKey, setOverKey] = useState(null);
+  const moveBlock = (from, to, after) => {
+    if (from === to) return;
+    const list = order.filter((k) => k !== from);
+    let i = list.indexOf(to); if (after) i += 1;
+    list.splice(i, 0, from);
+    updatePrefs({ ...prefs, order: list });
   };
 
-  const renderNotesCard = (fill) => (
-    <Card variant="warm" style={fill ? { flex: "1 1 auto" } : (myNotes.length === 0 ? { padding: "10px 16px" } : undefined)}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: myNotes.length === 0 && holidayReminders.length === 0 && !fill ? 0 : 12 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{tn.widgetTitle}</div>
-          {myNotes.length === 0 && holidayReminders.length === 0 && !fill && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.notesEmpty}</div>}
+  const [tab, setTab] = useState("hoje");
+  const blockTitle = { pend: d.pendTitle, monit: d.monitTitle, hoje: d.todayTitle(""), mapa: t.citiesTitle || "Mapa", fin: d.finTitle(""), recl: d.reclTitle, notas: d.notesTitle, horas: d.hoursCtTitle, dest: d.highlights };
+  const hr = new Date().getHours();
+  const firstName = String(userName || "").trim().split(/\s+/)[0];
+
+  const wrap = (key, i, content, extraClass = "") => {
+    if (hidden.includes(key)) return null;
+    const cls = ["dw", LAYOUT[key], "mv", extraClass, TAB_OF[key] === tab ? "show" : "", overKey === key ? "over" : ""].filter(Boolean).join(" ");
+    return (
+      <section
+        key={key} className={cls} data-tab={TAB_OF[key]} style={{ "--i": i + 2 }}
+        draggable={edit && !isPhone}
+        onDragStart={(e) => { dragKey.current = key; e.dataTransfer.effectAllowed = "move"; e.currentTarget.classList.add("dragging"); }}
+        onDragEnd={(e) => { e.currentTarget.classList.remove("dragging"); dragKey.current = null; setOverKey(null); }}
+        onDragOver={(e) => { if (edit && dragKey.current && dragKey.current !== key) { e.preventDefault(); setOverKey(key); } }}
+        onDragLeave={() => setOverKey((k) => (k === key ? null : k))}
+        onDrop={(e) => {
+          e.preventDefault(); setOverKey(null);
+          const r = e.currentTarget.getBoundingClientRect();
+          moveBlock(dragKey.current, key, (e.clientY - r.top) > r.height / 2 || (e.clientX - r.left) > r.width * 0.66);
+        }}
+      >
+        <div className="dsh-wctl">
+          <span className="dsh-grip"><GripVertical size={14} /> {blockTitle[key]}</span>
+          <button type="button" className="dsh-hide" onClick={() => updatePrefs({ ...prefs, order, hidden: [...hidden, key] })}><EyeOff size={13} /> {d.hide}</button>
         </div>
-        <button
-          type="button" onClick={() => onNavigate("notas")}
-          style={{
-            border: "none", background: "transparent", color: COLORS.vivo, fontSize: 12.5, fontWeight: 700, textDecoration: "underline", textDecorationThickness: 2, textUnderlineOffset: 4,
-            cursor: "pointer", fontFamily: "inherit", height: seeAllHeight, padding: "0 4px", display: "inline-flex", alignItems: "center", flexShrink: 0,
-          }}
-        >
-          {tn.seeAll} →
-        </button>
-      </div>
-      {myNotes.length === 0 && holidayReminders.length === 0 && fill && <div style={{ fontSize: 13, color: COLORS.ink2 }}>{f.notesEmpty}</div>}
-      {(myNotes.length > 0 || holidayReminders.length > 0) && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {myNotes.slice(0, 3).map((n) => (
-            <div key={n.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <NoteDateTile iso={n.date} lang={lang} />
-              <div style={{ fontSize: 13, color: COLORS.ink, lineHeight: 1.35 }}>{n.text}</div>
-            </div>
-          ))}
-          {holidayReminders.map((h) => (
-            <div key={h.iso} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <NoteDateTile iso={h.iso} lang={lang} />
-              <div style={{ fontSize: 13, color: COLORS.ink, lineHeight: 1.35 }}>
-                {h.name} <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: COLORS.clayInk, background: COLORS.clayTint, borderRadius: 999, padding: "1px 8px" }}>{f.holidayTag}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-  const notesCard = renderNotesCard(false);
+        {content}
+      </section>
+    );
+  };
 
-  // Cartões do Dashboard (a ordem muda no desktop: ver o bloco 3).
-  const pendCard = (
-    <Card style={{ flex: "0 0 auto" }}>
-      <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink, marginBottom: 4 }}>{t.pendingTitle}</div>
-      {pendingRows.length === 0 ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: COLORS.ok, fontWeight: 600, padding: "8px 0 2px" }}>
-          <Check size={16} /> {t.pendingNone}
-        </div>
-      ) : (
-        pendingRows.map((r, i) => (
-          <PendingRow key={r.key} icon={r.icon} label={r.label} count={r.count} amber={r.amber} onClick={r.onClick} okLabel={t.pendingAllOk} last={i === pendingRows.length - 1} />
-        ))
-      )}
-    </Card>
-  );
-  const highCard = (
-    <Card style={{ flex: "0 0 auto" }}>
-      <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{t.highlightsTitle}</div>
-      <div style={{ fontSize: 12, color: COLORS.ink3, margin: "2px 0 10px" }}>{highlightsSubtitle}</div>
-      {topStaff.length === 0 ? (
-        <div style={{ fontSize: 13, color: COLORS.ink2 }}>{highlightsEmptyText}</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {topStaff.map((s, i) => (
-            <div key={s.staffId} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: 16, fontSize: 12, fontWeight: 700, color: COLORS.ink3 }}>{i + 1}</span>
-              <Avatar name={s.name} size={28} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
-                <div style={{ fontSize: 11.5, color: COLORS.ink3 }}>{fmtHM(Math.round(s.hours * 60))} h</div>
-              </div>
-              <span title={t.highlightsPraises} style={{ fontSize: 12, fontWeight: 700, color: COLORS.forest600 }}>★ {s.praises}</span>
-              <span title={t.highlightsComplaints} style={{ fontSize: 12, fontWeight: 700, color: s.complaints ? COLORS.clayInk : COLORS.ink3 }}>⚠ {s.complaints}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-  const reclCard = (
-    <ReclamacoesCard
-      compact
-      current={complaintsCurrent} excelenteThreshold={excelenteThreshold} razoavelThreshold={razoavelThreshold}
-      recent={recentComplaints}
-      title={t.complaintsTitle} subtitle={t.complaintsSubtitle}
-      labels={{ excelente: t.gaugeExcelente, razoavel: t.gaugeRazoavel, critico: t.gaugeCritico }}
-    />
-  );
-  const cityCard = (wide) => (
-    <ClientsByCityCard
-      clients={clients} t={t} mobile={tier === "mobile"}
-      style={{ flex: "0 0 auto" }} wide={wide}
-      onOpenCity={(city) => onNavigate("clientes", { city })}
-      onOpenClients={() => onNavigate("clientes", { filter: "nocity" })}
-    />
-  );
-
-  const evoData = evoMetric === "eur" ? valueChartData : hoursChartData;
-
-  return (
-    <div style={styles.content}>
-      <PageHeader title={t.title} subtitle={formatTodayLabel(lang)} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
-
-      {/* 1 — Financeiro do período (A receber − A pagar = Margem) */}
-      <FinanceBlock
-        lang={lang} period={financePeriod} finance={finance} today={TODAY} tier={tier}
-        outstanding={outstanding} payTotal={currentPeriodEuros} expensesTotal={currentExpensesApproved} paidCount={kpiCounts.paid} boardCount={board.length}
-        onSeeContractors={() => onNavigate("contratantes")}
-        onDefine={(id) => onNavigate("contratantes", { contractorId: id, tab: "clients" })}
-      />
-
-      {/* 2 — três números pequenos (reclamações: medidor ao lado) */}
-      <div style={statsRow}>
-        <MiniStat icon={Users} label={f.statStaff} value={activeStaff.length} onClick={() => onNavigate("funcionarios")} />
-        <MiniStat
-          icon={Building2} label={f.statClients} value={activeClientsCount(clients, TODAY)}
-          sub={f.replacementN(replacementClientsActive)} subWarn={replacementClientsActive > 0}
-          onClick={() => onNavigate("clientes", replacementClientsActive > 0 ? { filter: "replacement" } : undefined)}
-        />
-        <MiniStat icon={Clock} label={f.statHours} value={fmtHoursScreen(currentPeriodHours)} sub={currentPeriodLabel} onClick={() => onNavigate("horas")} style={tier === "desktop" ? undefined : { gridColumn: "1 / -1" }} />
-      </div>
-
-      {/* 3 — Desktop: Pendências + Reclamações (esq.) | Destaques + Notas a encher o resto (dir.), e depois
-          Clientes por cidade em faixa larga (mapa ao lado da lista). Telemóvel/tablet: colunas como antes. */}
-      {tier === "desktop" ? (
-        <>
-          <div style={{ ...row, alignItems: "stretch" }}>
-            <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-              {pendCard}
-              {reclCard}
-            </div>
-            <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-              {highCard}
-              {renderNotesCard(true)}
-            </div>
+  const blocks = {
+    pend: (
+      <>
+        <h4>{d.pendTitle}{pendingTotal > 0 && <span className="kl">{d.pendTotal(pendingTotal)}</span>}</h4>
+        {pendingRows.length === 0 ? <div className="dsh-ok"><Check size={18} /> {d.pendNone}</div> : (
+          <div className="dsh-pl">
+            {pendingRows.map((r) => (
+              <button type="button" key={r.key} className="dsh-pi" onClick={r.go}>
+                <b className={`dsh-pn t-${r.tone}`}>{r.count}</b>
+                <div><b>{r.label}</b></div>
+                <span aria-hidden="true" style={{ color: "#B4BAB5", fontWeight: 800 }}>›</span>
+              </button>
+            ))}
           </div>
-          <div style={{ marginBottom: 20 }}>{cityCard(true)}</div>
-        </>
-      ) : (
-        <div style={row}>
-          <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-            {pendCard}
-            {highCard}
-            {notesCard}
-          </div>
-          <div style={{ flex: "1.4 1 440px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-            {reclCard}
-            {cityCard(false)}
-          </div>
-        </div>
-      )}
-
-      {/* 4 — um só gráfico de evolução, com alternador € | Horas */}
-      <Card style={{ marginBottom: isPhone ? 12 : 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.ink }}>{f.evolution}</div>
-          <SegmentedControl
-            options={[{ value: "eur", label: "€" }, { value: "hours", label: f.hours }]}
-            value={evoMetric} onChange={setEvoMetric}
-          />
-        </div>
-        <div style={{ maxWidth: 620 }}>
-        {evoMetric === "eur" ? (
-          <PeriodBarChart
-            data={evoData} valueFormatter={compactEuro}
-            currentValueLabel={fmtEuro(evoData[evoData.length - 1].value)}
-            title={t.historyValueTitle} comparisonLabel={t.vsPreviousPeriod}
-          />
-        ) : (
-          <PeriodLineChart
-            data={evoData} valueFormatter={fmtHoursScreen}
-            averageLabel={t.averageHoursLabel}
-            title={t.historyHoursTitle} comparisonLabel={t.vsPreviousPeriod}
-          />
         )}
+      </>
+    ),
+    monit: (
+      <>
+        <h4>{d.monitTitle}<button type="button" onClick={() => onNavigate("monitoramento")}>{d.open}</button></h4>
+        <div className="dsh-mo">
+          <svg className="dsh-ring" width="86" height="86" viewBox="0 0 86 86" aria-hidden="true">
+            <circle cx="43" cy="43" r="35" className="rt" />
+            <circle cx="43" cy="43" r="35" className="rf" pathLength="100" style={{ strokeDasharray: `${monitored.length ? (onTrack / monitored.length) * 100 : 100} 100` }} />
+          </svg>
+          <div className="dsh-mt"><b><CountUp value={onTrack} />/{monitored.length}</b><span>{d.onTrack}</span></div>
         </div>
-      </Card>
-    </div>
-  );
-}
+        {lastDay && notFinalized.length > 0 ? (
+          <p className="dsh-ml"><b>{d.notFinalized(notFinalized.length)}</b> · {notFinalized.slice(0, 3).map((s) => s.name.split(" ")[0]).join(", ")}</p>
+        ) : gaps.length > 0 ? (
+          <p className="dsh-ml"><b>{d.missing(gaps.length)}</b> · {gaps.slice(0, 3).map((g) => g.name.split(" ")[0]).join(", ")}{gaps.length > 3 ? "…" : ""}</p>
+        ) : <p className="dsh-ml">{d.allGood}</p>}
+        {gaps.length > 0 && (
+          <div className="dsh-mrow">
+            <span className="dsh-stack">{gaps.slice(0, 4).map((g) => <Avatar key={g.id} name={g.name} size={32} />)}</span>
+            <button type="button" className="dsh-btn k" onClick={remindAll} disabled={reminded || !setSentItems}>
+              {reminded ? <><Check size={14} /> {tm.reminded}</> : <><Bell size={14} /> {d.remind(gaps.length)}</>}
+            </button>
+          </div>
+        )}
+      </>
+    ),
+    hoje: (
+      <>
+        <h4>{d.todayTitle(TODAY.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "short" }).replace(".", ""))}<button type="button" onClick={() => onNavigate("agendas")}>{d.agendas}</button></h4>
+        {todayInfo.clients === 0 ? <p className="dsh-ml">{d.noAgendaToday}</p> : (
+          <div className="dsh-nums">
+            <div><b><CountUp value={todayInfo.clients} /></b>{d.nClients}</div>
+            <div><b><CountUp value={todayInfo.people} /></b>{d.nPeople}</div>
+            <div><b><CountUp value={todayInfo.pairs} /></b>{d.nPairs}</div>
+          </div>
+        )}
+        {todayInfo.uncovered.length > 0 && (
+          <div className="dsh-warn">
+            <AlertTriangle size={18} color="#B7790E" />
+            <div><b>{d.uncovered(todayInfo.uncovered.length)}</b><span>{todayInfo.uncovered.slice(0, 2).map((c) => c.name).join(" · ")}</span></div>
+            <button type="button" className="dsh-btn k" onClick={() => onNavigate("agendas")}>{d.resolve}</button>
+          </div>
+        )}
+        <div className="dsh-wkbar" aria-hidden="true">
+          {todayInfo.week.map((w, i) => (
+            <div key={i} className={w.on ? "on" : ""}><i style={{ height: `${Math.max(4, (w.n / weekMax) * 100)}%`, "--d": i }} /><span>{w.label}</span></div>
+          ))}
+        </div>
+      </>
+    ),
+    mapa: (
+      <ClientsByCityCard
+        clients={clients} t={t} mobile={isPhone} wide={!isPhone} bare
+        style={{ flex: "1 1 auto", border: 0, boxShadow: "none", padding: 0, background: "transparent" }}
+        onOpenCity={(city) => onNavigate("clientes", { city })}
+        onOpenClients={() => onNavigate("clientes", { filter: "nocity" })}
+      />
+    ),
+    fin: (
+      <>
+        <div className="dsh-fh"><span>{d.finTitle(periodMonth)}</span><button type="button" onClick={() => onNavigate("contratantes")}>{d.contractors}</button></div>
+        <div className="dsh-big"><CountUp value={finance.receivable} format={(v) => fmtEuro(v)} /></div>
+        <div className="dsh-two">
+          <div>{d.staffCost}<b>−{fmtEuro(finance.pricedStaff)}</b></div>
+          <div>{d.margin}<b className="acc">{fmtEuro(finance.margin)}</b></div>
+        </div>
+        {finance.unpriced > 0 && <div className="dsh-note-dim">{d.unpriced(finance.unpriced)}</div>}
+        {outstanding > 0 && <div className="dsh-note-dim">{d.outstanding}: <b style={{ color: "#fff" }}>{fmtEuro(outstanding)}</b></div>}
+        {finance.cards.length > 0 ? (() => {
+          const total = finance.cards.reduce((s, c) => s + (c.hours || 0), 0) || 1;
+          return (
+            <div className="dsh-cbox">
+              <div className="dsh-cbar">{finance.cards.map((c) => <i key={c.contractor.id} style={{ flex: c.hours / total, background: c.contractor.color || "#8A918C" }} />)}</div>
+              <div className="dsh-leg">{finance.cards.map((c) => <span key={c.contractor.id}><i style={{ background: c.contractor.color || "#8A918C" }} />{c.contractor.name} <em>{Math.round((c.hours / total) * 100)}%</em></span>)}</div>
+            </div>
+          );
+        })() : <div className="dsh-note-dim">{d.noFin}</div>}
+      </>
+    ),
+    recl: (
+      <>
+        <h4>{d.reclTitle}<button type="button" onClick={() => onNavigate("avisos")}>{d.seeAvisos}</button></h4>
+        <div className="dsh-rq">
+          <div className="dsh-rtop">
+            <div className="dsh-rbig"><b><CountUp value={complaintsNow} /></b><span>{d.inPeriod}</span></div>
+            {prevComplaints != null && (() => { const diff = complaintsNow - prevComplaints; return <span className={`dsh-rchip ${diff > 0 ? "bad" : diff === 0 ? "eq" : ""}`}>{d.vsPrev(diff)}</span>; })()}
+          </div>
+          <div className="dsh-rscale">
+            <i className="dsh-sg g" /><i className="dsh-sg a" /><i className="dsh-sg r" />
+            {prevComplaints != null && <b className="dsh-mark prev" style={{ left: `${scaleX(prevComplaints)}%` }} />}
+            <b className="dsh-mark" style={{ left: `${scaleX(complaintsNow)}%` }}><span>{monthAbbr(lang, period.end.getMonth())}</span></b>
+          </div>
+          <div className="dsh-rlab"><span>{t.gaugeExcelente}</span><span>{t.gaugeRazoavel}</span><span>{t.gaugeCritico}</span></div>
+          <div className="dsh-rl">
+            {recentComplaints.length === 0 ? <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{d.reclNone}</span>
+              : recentComplaints.map((c) => <div key={c.key}><i className="dsh-dt" /><b>{c.client}</b><span>{String(c.date).split("-").reverse().slice(0, 2).join("/")}</span></div>)}
+          </div>
+        </div>
+      </>
+    ),
+    notas: (
+      <>
+        <h4>{d.notesTitle}<button type="button" onClick={() => onNavigate("notas")}>{d.newNote}</button></h4>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {myNotes.length === 0 && holidaysSoon.length === 0 && <span style={{ fontSize: 13, color: COLORS.ink2 }}>{d.notesEmpty}</span>}
+          {holidaysSoon.map((h) => { const x = isoTile(h.iso); return (
+            <div key={h.iso} className="dsh-fer"><b className="dsh-dd">{x.day}<small>{x.mon}</small></b><div><b>{h.name}</b><span>{d.holidayTag}</span></div></div>
+          ); })}
+          {myNotes.map((n) => { const x = isoTile(n.date); return (
+            <div key={n.id} className="dsh-fer"><b className="dsh-dd note">{x.day}<small>{x.mon}</small></b><div><b style={{ fontWeight: 600, fontSize: 13.5 }}>{n.text}</b></div></div>
+          ); })}
+        </div>
+      </>
+    ),
+    horas: (
+      <>
+        <h4>{d.hoursCtTitle}<button type="button" onClick={() => onNavigate("historico")}>{d.history}</button></h4>
+        <div className="dsh-leg" style={{ margin: "-4px 0 12px", color: "#6F776F" }}>
+          {ctKeys.map((k) => <span key={k}><i style={{ background: ctColor(k) }} />{ctName(k)}</span>)}
+          <span><i className="gh" />{d.expectedLegend}</span>
+        </div>
+        <div className="dsh-hch">
+          {financePeriod.map((p, i) => {
+            const cur = p.isCurrent;
+            const cap = cur ? Math.max(expectedHours, p.totalHours || 0) : (p.totalHours || 0);
+            const colH = (cap / chartMax) * 130;
+            return (
+              <div key={p.key} className={`dsh-hc${cur ? " cur" : ""}`}>
+                <b>{Math.round(p.totalHours || 0).toLocaleString(loc)}{cur && expectedHours > 0 && <small> / ~{Math.round(expectedHours).toLocaleString(loc)}</small>}</b>
+                <div className={`dsh-stk${cur ? " ghost" : ""}`} style={{ height: Math.max(6, colH), "--d": i }}>
+                  {cur && <em>{d.expectedTag}</em>}
+                  {[...ctKeys].reverse().map((k) => { const v = p.contractors.get(k); const hgt = v && cap > 0 ? (v.hours / cap) * 100 : 0; return hgt > 0 ? <i key={k} style={{ height: `${hgt}%`, background: ctColor(k) }} /> : null; })}
+                </div>
+                <span>{p.label}{cur && <i className="dsh-live" />}</span>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    ),
+    dest: (
+      <>
+        <h4>{d.highlights}<span className="kl">{highlightsRealtime ? t.highlightsSubtitleRealtime : t.highlightsSubtitleClosed(usedClosed.length || highlightsMonths)}</span></h4>
+        {topStaff.length === 0 ? <span style={{ fontSize: 13, color: COLORS.ink2 }}>{highlightsRealtime ? t.highlightsEmptyRealtime : t.highlightsEmptyClosed}</span> : (
+          <div className="dsh-hl">
+            {topStaff.map((s, i) => (
+              <div key={s.id}>
+                <span style={{ width: 16, fontSize: 12, fontWeight: 800, color: COLORS.ink3 }}>{i + 1}</span>
+                <Avatar name={s.name} size={30} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                  <div style={{ fontSize: 11.5, color: COLORS.ink3 }}>{fmtHM(Math.round(s.hours * 60))} h</div>
+                </div>
+                <span title={t.highlightsPraises} style={{ fontSize: 12, fontWeight: 800, color: "var(--p1)" }}>★ {s.praises}</span>
+                <span title={t.highlightsComplaints} style={{ fontSize: 12, fontWeight: 800, color: s.complaints ? "#D6454A" : COLORS.ink3 }}>⚠ {s.complaints}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    ),
+  };
 
-// Número pequeno do topo (substitui os cartões grandes): ícone, rótulo, valor e uma linha de apoio.
-function MiniStat({ icon: Icon, label, value, sub, subWarn, onClick, style }) {
+  const themeKey = (company && company.theme) || DEFAULT_THEME;
+  const weekTicks = [];
+  for (let i = 0; i < totalDays; i++) { const day = addDays(period.start, i); weekTicks.push({ left: (i / Math.max(1, totalDays - 1)) * 100, wk: day.getDay() === 1 }); }
+
   return (
-    <button
-      type="button" onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 12, textAlign: "left", fontFamily: "inherit", cursor: "pointer",
-        background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, padding: "12px 14px", minWidth: 0, ...style,
-      }}
-    >
-      <div style={{ width: 38, height: 38, borderRadius: RADIUS.chip, background: COLORS.forest50, color: COLORS.forest600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <Icon size={19} strokeWidth={1.8} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, color: COLORS.ink2, lineHeight: 1.25 }}>{label}</div>
-        <div style={{ fontFamily: FONT.heading, fontWeight: 700, fontSize: 21, color: COLORS.ink, lineHeight: 1.2 }}>{value}</div>
-        {sub && <div style={{ fontSize: 12, color: subWarn ? COLORS.clayInk : COLORS.ink3, fontWeight: subWarn ? 700 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</div>}
-      </div>
-    </button>
+    <div className={`dsh${edit ? " edit" : ""}`}>
+      <section className="dsh-head">
+        <div style={{ minWidth: 0 }}>
+          <h1>{d.greet(hr)}{firstName ? `, ${firstName}` : ""}.</h1>
+          <p>{TODAY.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" })} · <span className="dsh-chip">{d.dayOf(dayN, totalDays)}</span></p>
+        </div>
+        <div className="dsh-acts">
+          <button type="button" className="dsh-btn p" onClick={() => onNavigate("monitoramento")}><Plus size={16} strokeWidth={2.4} /> {d.fillHours}</button>
+          <button type="button" className="dsh-btn" onClick={() => onNavigate("avisos")}><MessageSquare size={16} /> {d.sendNotice}</button>
+          <button type="button" className="dsh-btn" onClick={() => onNavigate("clientes", { clientId: "new" })}><Home size={16} /> {d.newClient}</button>
+          {!isPhone && <span className="dsh-sep" />}
+          {!isPhone && <SearchButton size={42} style={{ borderRadius: "50%", border: 0 }} />}
+          {!isPhone && (
+            <select className="dsh-lang" aria-label="Língua" value={lang} onChange={(e) => setLang(e.target.value)}
+              style={{ height: 42, borderRadius: 21, border: 0, background: "#fff", padding: "0 12px", fontFamily: "inherit", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+              {Object.keys(LANG_NAMES).map((k) => <option key={k} value={k}>{LANG_NAMES[k]}</option>)}
+            </select>
+          )}
+          {!isPhone && <button type="button" className={`dsh-btn dsh-edit${edit ? " on" : ""}`} onClick={() => setEdit((v) => !v)}><Pencil size={15} /> {d.customize}</button>}
+        </div>
+      </section>
+
+      {edit && !isPhone && (
+        <section className="dsh-tray">
+          <div><b>{d.trayTitle}</b><span>{d.trayHint}</span></div>
+          <div className="dsh-hid">
+            <span className="kl">{d.hiddenLabel}</span>
+            {hidden.length === 0 ? <em>{d.noneHidden}</em> : hidden.map((k) => (
+              <button type="button" key={k} onClick={() => updatePrefs({ ...prefs, order, hidden: hidden.filter((x) => x !== k) })}>+ {blockTitle[k]}</button>
+            ))}
+            {(hidden.length > 0 || (prefs.order || []).length > 0) && <button type="button" onClick={() => updatePrefs({ order: [], hidden: [] })}>{d.reset}</button>}
+          </div>
+          {setCompany && (
+            <div className="dsh-th">
+              <span className="kl">{d.companyColor}</span>
+              {THEMES.map((th) => (
+                <button key={th.key} type="button" title={th.label[lang] || th.label.pt} aria-label={th.label[lang] || th.label.pt} aria-pressed={th.key === themeKey}
+                  className={`dsh-sw${th.key === themeKey ? " on" : ""}`} style={{ background: th.p1 }}
+                  onClick={() => { applyTheme(th.key); setCompany((c) => ({ ...c, theme: th.key })); }} />
+              ))}
+            </div>
+          )}
+          <button type="button" className="dsh-btn p" onClick={() => setEdit(false)}>{d.done}</button>
+        </section>
+      )}
+
+      <nav className="dsh-tabs" aria-label="Dashboard">
+        {["hoje", "periodo", "empresa"].map((k) => (
+          <button key={k} type="button" className={tab === k ? "on" : ""} aria-pressed={tab === k} onClick={() => { setTab(k); try { window.scrollTo({ top: 0 }); } catch { /* */ } }}>{d.tabs[k]}</button>
+        ))}
+      </nav>
+
+      <section className={`dw dsh-hero c4 fixed${tab === "periodo" ? " show" : ""}`} data-tab="periodo" style={{ "--i": 0 }}>
+        <div className="dsh-hero-in">
+          <div>
+            <span className="dsh-kick">{d.kick(periodMonth)}</span>
+            <div className="dsh-day">{d.day} <b><CountUp value={dayN} /></b> <small>{d.of} {totalDays}</small></div>
+            <span className="dsh-sub">{d.sub(formatPeriodLabel(period, lang), daysLeft)}</span>
+          </div>
+          <div className="dsh-rule">
+            <div className="dsh-marks">
+              {dayN > 2 && dayN < totalDays - 1 && <div className="dsh-mk today" style={{ left: `${pos(TODAY)}%` }}><b>{d.today}</b><span>{fmtDM(TODAY)}</span></div>}
+              {(dayN <= 2) && <div className="dsh-mk today start" style={{ left: 0 }}><b>{d.today}</b><span>{fmtDM(TODAY)}</span></div>}
+              {holidaysInPeriod.slice(0, 2).map((h) => { const [y, m, dd] = h.iso.split("-").map(Number); const hd = new Date(y, m - 1, dd); const p = pos(hd); return Math.abs(p - pos(TODAY)) > 12 && p < 86 ? <div key={h.iso} className="dsh-mk hol" style={{ left: `${p}%` }} title={h.name}><b>{d.holiday}</b><span>{fmtDM(hd)}</span></div> : null; })}
+              <div className="dsh-mk end" style={{ left: "100%" }}><b>{dayN >= totalDays - 1 ? `${d.today} · ${d.close}` : d.close}</b><span>{fmtDM(period.end)}</span></div>
+            </div>
+            <div className="dsh-track">
+              {weekTicks.map((w, i) => <i key={i} className={w.wk ? "wk" : ""} style={{ left: `${w.left}%` }} />)}
+              <div className="dsh-fill" style={{ width: `${pos(TODAY)}%` }} />
+              {holidaysInPeriod.map((h) => { const [y, m, dd] = h.iso.split("-").map(Number); return <div key={h.iso} className="dsh-hd" style={{ left: `${pos(new Date(y, m - 1, dd))}%` }} title={h.name} />; })}
+              <div className="dsh-dot" style={{ left: `${pos(TODAY)}%` }} />
+            </div>
+            <div className="dsh-dates">
+              {weekTicks.map((w, i) => (w.wk && w.left < 92 ? <span key={i} style={{ left: `${w.left}%` }}>{fmtDM(addDays(period.start, i))}</span> : null))}
+            </div>
+          </div>
+          <div>
+            <span className="kl">{d.hoursLogged}</span>
+            <div className="dsh-hn"><b><CountUp value={periodHours} format={(v) => `${Math.round(v).toLocaleString(loc)}h`} /></b>{expectedHours > 0 && <small>/ ~{Math.round(expectedHours).toLocaleString(loc)}h</small>}</div>
+            {expectedHours > 0 && <div className="dsh-bar"><i style={{ width: `${Math.min(100, hoursPct)}%` }} /></div>}
+            {expectedHours > 0 && <span className="kl">{d.pct(hoursPct)} · {fmtEuro(periodPay)}</span>}
+          </div>
+        </div>
+        <svg className="dsh-fita" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 13C35 19 29 45 50 51" /><path d="M50 13C29 19 35 45 14 51" /></svg>
+      </section>
+
+      <section className={`dsh-kpis c4${tab === "periodo" ? " show" : ""}`} data-tab="periodo">
+        <button type="button" className="dsh-kp" onClick={() => onNavigate("funcionarios")}>
+          <span className="kl">{d.activeStaff}</span>
+          <div className="dsh-kr"><b><CountUp value={activeStaff.length} /></b><Spark values={staffSeries} /></div>
+          <small>{d.ofN(staff.length)}</small>
+        </button>
+        <button type="button" className="dsh-kp" onClick={() => onNavigate("clientes")}>
+          <span className="kl">{d.clients}</span>
+          <div className="dsh-kr"><b><CountUp value={activeClientsCount(clients, TODAY)} /></b></div>
+          <small className={newClients > 0 ? "up" : ""}>{d.newIn(newClients)}</small>
+        </button>
+        <button type="button" className="dsh-kp" onClick={() => onNavigate("clientes", replacementActive > 0 ? { filter: "replacement" } : undefined)}>
+          <span className="kl">{d.replacement}</span>
+          <div className="dsh-kr"><b><CountUp value={replacementActive} /></b></div>
+          <small>{d.tempClients}</small>
+        </button>
+        <button type="button" className="dsh-kp" onClick={() => onNavigate("horas")}>
+          <span className="kl">{d.hoursPeriod}</span>
+          <div className="dsh-kr"><b><CountUp value={periodHours} format={(v) => `${Math.round(v).toLocaleString(loc)}h`} /></b><Spark values={hoursSeries} /></div>
+          <small>{expectedHours > 0 ? d.expected(`${Math.round(expectedHours).toLocaleString(loc)}h`) : formatPeriodLabel(period, lang)}</small>
+        </button>
+      </section>
+
+      {order.map((k, i) => wrap(k, i, blocks[k], k === "fin" ? "dsh-dark" : ""))}
+    </div>
   );
 }
 

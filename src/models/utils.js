@@ -1749,6 +1749,26 @@ function staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, p
   return { staffCount, totalDays };
 }
 
+// Igual a `staffWithGapsCount`, mas devolve QUEM tem dias em falta (para o
+// Monitoramento compacto do Dashboard): [{ id, name, days }], mais dias primeiro.
+function staffWithGaps(staff, horasData, clients, assignments, payPeriod, payPeriodChunks, cutoffDay, today, absences, covers) {
+  const out = [];
+  const hasAgendaOnDay = (staffId, d) => {
+    if (absenceOn(absences, staffId, isoDateStr(d))) return false;
+    return agendaClientIdsOn(assignments, covers, staffId, d).some((id) => { const c = clientById(clients, id); return c && clientAppliesOnDate(c, d); });
+  };
+  staff.filter((s) => isStaffActive(s, today) && s.accountType === "fixo").forEach((s) => {
+    const h = horasData[s.id] || { entries: [], lockedWeeks: {}, noClientDays: [] };
+    const locked = migrateLockedWeeksToBlocks(h.lockedWeeks, payPeriod, cutoffDay);
+    const days = payPeriodChunks.reduce((sum, chunk) => {
+      if (locked[isoDateStr(chunk.start)] || chunk.start > today) return sum;
+      return sum + calPeriodDays(chunk).filter((d) => d <= today && staffStartedOn(s, d) && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d))).length;
+    }, 0);
+    if (days > 0) out.push({ id: s.id, name: s.name, days });
+  });
+  return out.sort((a, b) => b.days - a.days);
+}
+
 // Bloco de notas/lembretes pessoais (dashboard do supervisor e, opcionalmente,
 // da gerência). `ownerId` é o id do funcionário dono da nota, ou a string
 // "management" para notas partilhadas por todos os logins de gerência.
@@ -1930,5 +1950,5 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
+export { staffWithGaps, EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
 };
