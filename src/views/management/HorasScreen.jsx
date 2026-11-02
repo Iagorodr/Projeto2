@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
-import { Check, Pencil, X, RotateCcw } from "lucide-react";
+import { Check, Pencil, X, RotateCcw, MoreHorizontal, FileDown } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
-import { useControlSize } from "../../hooks/useBreakpoint.js";
+import { useControlSize, useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { TODAY } from "../../models/data.js";
 import {
   clientById, clientDurationOn, entryClientName, isPendingClientEntry, recomputeSharedHours, visitDateOf, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
   weekBlocksOfPayPeriod, calPeriodLabel, boardStaff, countReviews,
-  expensesOf, staffExpensesApproved, staffExpensesPending, pendingExpenseList,
+  expensesOf, staffExpensesApproved, staffExpensesPending, pendingExpenseList, expectedShare, dayScheduledClients, addDays, absenceOn, isStaffActive, migrateLockedWeeksToBlocks,
 } from "../../models/utils.js";
 import { formatTodayLabel, T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import { exportStaffHorasPdf, exportPeriodSummaryPdf } from "../../models/pdfExport.js";
@@ -162,6 +162,26 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     [monthOffset, horasData, clients, period, ctx],
   );
   const reviewCount = reviews.total;
+  const isPhoneTier = useBreakpoint() === "mobile";
+  const [paidStamp, setPaidStamp] = useState(null); // carimbo "✓ Pago" logo depois de marcar
+  const [moreOpen, setMoreOpen] = useState(false);
+  // Horas previstas pela agenda para cada pessoa no período (a sua parte de cada visita).
+  const expectedByStaff = useMemo(() => {
+    const out = {};
+    const days = [];
+    for (let d = new Date(period.start); d <= period.end; d = addDays(d, 1)) days.push(new Date(d));
+    staff.forEach((s) => {
+      let min = 0;
+      days.forEach((d) => {
+        if (!isStaffActive(s, d) || absenceOn(absences, s.id, isoDateStr(d))) return;
+        dayScheduledClients(clients, assignments, s.id, d, covers).forEach((c) => { min += expectedShare(ctx, c, isoDateStr(d), s.id).minutes; });
+      });
+      out[s.id] = min / 60;
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff, clients, assignments, covers, absences, period.start.getTime(), period.end.getTime(), ctx]);
+  const extrasPendingCount = board.reduce((n, s) => n + ((horasData[s.id] || { entries: [] }).entries || []).filter((e) => dateStrInPeriod(e.date, period) && e.extra && !e.approved && !e.voided).length, 0);
 
   const CHIP_FILTERS = {
     todos: () => true,
@@ -255,6 +275,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   function confirmPay() {
     if (!payAsk || !payDateOk) return;
     updateHoras(payAsk.staffId, (h) => (h.status === "finalizado" ? { ...h, paid: true, paidAt: payIso } : h));
+    setPaidStamp(payAsk.staffId);
+    setTimeout(() => setPaidStamp(null), 1600);
     setPayAsk(null);
   }
   function confirmUnpay() {
@@ -384,7 +406,23 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         return <Pill variant="pending">{c0.pending}</Pill>;
       },
     },
-    { key: "hours", label: t.colTotalHours, width: 1, render: (s) => fmtHoursScreen(staffTotalHours(horasData[s.id] || { entries: [] }, period)) },
+    {
+      key: "hours", label: t.colTotalHours, width: 1.3,
+      render: (s) => {
+        const done = staffTotalHours(horasData[s.id] || { entries: [] }, period);
+        const exp = expectedByStaff[s.id] || 0;
+        return (
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700 }}>{fmtHoursScreen(done)}{exp > 0 && <span style={{ color: COLORS.ink3, fontWeight: 500 }}> / {fmtHoursScreen(Math.round(exp * 2) / 2)}</span>}</div>
+            {exp > 0 && (
+              <div style={{ height: 6, borderRadius: 4, background: "#EEF1EC", marginTop: 5, overflow: "hidden", maxWidth: 140 }}>
+                <div className="b1-grow-x-anim" style={{ height: "100%", width: `${Math.min(100, (done / exp) * 100)}%`, background: done > exp * 1.05 ? COLORS.clay : "var(--p1)", borderRadius: 4, transformOrigin: "left" }} />
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
     {
       key: "extras", label: t.miniExtrasLabel, width: 1,
       render: (s) => {
@@ -448,7 +486,20 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
               prevLabel={t.previousPeriod} nextLabel={t.nextPeriod}
               labelStyle={{ fontSize: 13 }}
             />
-            <Button variant="secondary" onClick={exportPeriodPdf}>{t.exportPdfGeneral}</Button>
+            <div style={{ position: "relative" }}>
+              <Button variant="secondary" icon={MoreHorizontal} aria-label={T[lang].common.more} onClick={() => setMoreOpen((v) => !v)} />
+              {moreOpen && (
+                <>
+                  <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
+                  <div role="menu" className="sx-pop" style={{ position: "absolute", right: 0, top: ctrlHeight + 6, zIndex: 31, minWidth: 220, background: COLORS.card, borderRadius: 14, boxShadow: "0 20px 40px -16px rgba(21,24,22,.35)", border: `1px solid ${COLORS.line}`, padding: 6 }}>
+                    <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); exportPeriodPdf(); }}
+                      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", border: "none", background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: COLORS.ink, textAlign: "left" }}>
+                      <FileDown size={17} /> {t.exportPdfGeneral}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
               <Button variant="primary" disabled={!canClosePeriod} onClick={() => setCloseConfirmOpen(true)}>{t.closePeriod}</Button>
               {!(board.length > 0 && unpaidForClose === 0) && <Pill variant="pending">{t.missingPaymentsHint(unpaidForClose)}</Pill>}
@@ -464,23 +515,37 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         </Card>
       )}
 
-      <Card variant="hero" style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>{t.heroTitle}</div>
-        <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 32, marginBottom: 2 }}>{fmtEuro(periodGrandTotal)}</div>
-        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: expensesApprovedTotal > 0 ? 4 : 16 }}>{fmtHoursScreen(periodTotalHours)} · {periodLabel}</div>
-        {expensesApprovedTotal > 0 && <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 16 }}>{T[lang].expenses.heroLine(fmtEuro(periodTotalEuros), fmtEuro(expensesApprovedTotal))}</div>}
-        <SegmentedBar
-          onHero
-          segments={[
-            { value: kpiCounts.paid, color: "#fff" },
-            { value: kpiCounts.unpaid, color: COLORS.clay },
-            { value: kpiCounts.pending, color: "rgba(255,255,255,.28)" },
-          ]}
-        />
-        <div style={{ fontSize: 12.5, opacity: 0.85, marginTop: 8 }}>
-          {t.heroLegend(kpiCounts.paid, kpiCounts.unpaid, kpiCounts.pending)}
+      <div className="b1-rise" style={{ background: "#151816", color: "#fff", borderRadius: 24, padding: "22px 24px", marginBottom: 20, display: "grid", gridTemplateColumns: isPhoneTier ? "minmax(0, 1fr)" : "minmax(0, 1.4fr) minmax(0, 1fr)", gap: 24, alignItems: "center" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, color: "#C9CFCB", fontWeight: 600, marginBottom: 6 }}>{t.heroTitle}</div>
+          <div style={{ fontFamily: FONT.heading, fontSize: 40, lineHeight: 1, marginBottom: 6 }}>{fmtEuro(periodGrandTotal)}</div>
+          <div style={{ fontSize: 13, color: "#A9B2AC", marginBottom: expensesApprovedTotal > 0 ? 4 : 14 }}>{fmtHoursScreen(periodTotalHours)} · {periodLabel}</div>
+          {expensesApprovedTotal > 0 && <div style={{ fontSize: 13, color: "#A9B2AC", marginBottom: 14 }}>{T[lang].expenses.heroLine(fmtEuro(periodTotalEuros), fmtEuro(expensesApprovedTotal))}</div>}
+          <SegmentedBar
+            onHero
+            segments={[
+              { value: kpiCounts.paid, color: "var(--p1-60)" },
+              { value: kpiCounts.unpaid, color: COLORS.clay },
+              { value: kpiCounts.pending, color: "rgba(255,255,255,.22)" },
+            ]}
+          />
+          <div style={{ fontSize: 12.5, color: "#C9CFCB", marginTop: 8 }}>{t.heroLegend(kpiCounts.paid, kpiCounts.unpaid, kpiCounts.pending)}</div>
         </div>
-      </Card>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          {[
+            { label: t.totalHoursLabel, value: fmtHoursScreen(periodTotalHours) },
+            { label: t.miniExtrasLabel, value: extrasPendingCount, warn: extrasPendingCount > 0 },
+            ...(expensesInUse ? [{ label: T[lang].expenses.pendingRow, value: pendingExpensesInPeriod, warn: pendingExpensesInPeriod > 0, onClick: () => setExpensesOpen(true) }] : []),
+            ...(monthOffset === 0 ? [{ label: t.reviewTitle, value: reviewCount, warn: reviewCount > 0, onClick: () => setReviewOpen(true) }] : []),
+          ].map((k) => (
+            <button key={k.label} type="button" onClick={k.onClick} disabled={!k.onClick}
+              style={{ textAlign: "left", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 16, padding: "12px 14px", color: "#fff", fontFamily: "inherit", cursor: k.onClick ? "pointer" : "default" }}>
+              <div style={{ fontSize: 12, color: "#A9B2AC", fontWeight: 600 }}>{k.label}</div>
+              <div style={{ fontFamily: FONT.heading, fontSize: 24, marginTop: 2, color: k.warn ? "#F2C14E" : "#fff" }}>{k.value}</div>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <div className="chip-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", minWidth: 0, maxWidth: "100%" }}>
@@ -526,8 +591,33 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
           const locked = openHoras.paid;
           const pendingExtras = openHoras.entries.filter((e) => e.extra && !e.approved && !e.voided && dateStrInPeriod(e.date, period)).length;
           const groups = groupEntriesByBlock(openHoras.entries, payPeriodChunks, lang, period);
+          const lockedNow = migrateLockedWeeksToBlocks(openHoras.lockedWeeks || {}, period, cutoffDay);
+          const weeksDone = openHoras.status === "finalizado" ? payPeriodChunks.length : payPeriodChunks.filter((ch) => lockedNow[isoDateStr(ch.start)]).length;
+          const steps = [
+            { label: t.cycleWeeks(weeksDone, payPeriodChunks.length), done: weeksDone >= payPeriodChunks.length || openHoras.status === "finalizado" },
+            { label: t.cycleMonth, done: openHoras.status === "finalizado" },
+            { label: c0.paid, done: !!openHoras.paid },
+          ];
+          const curStep = steps.findIndex((x) => !x.done);
           return (
             <>
+              {paidStamp === openStaff.id && (
+                <div aria-hidden="true" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 5 }}>
+                  <div className="sx-stamp">✓ {c0.paid}</div>
+                </div>
+              )}
+              <div role="list" aria-label={t.cycleAria} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+                {steps.map((st, i) => (
+                  <div key={i} role="listitem" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {i > 0 && <span style={{ width: 18, height: 2, borderRadius: 2, background: st.done || steps[i - 1].done ? "var(--p1)" : COLORS.line }} />}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 999, fontSize: 12.5, fontWeight: 700,
+                      background: st.done ? "var(--p1-12)" : i === curStep ? "#FBF0D9" : COLORS.lineSoft, color: st.done ? "var(--p2)" : i === curStep ? "#8A5A0B" : COLORS.ink3 }}>
+                      {st.done ? <Check size={13} strokeWidth={3} /> : <span style={{ width: 14, height: 14, borderRadius: 7, border: "2px solid currentColor", display: "inline-block" }} />}
+                      {st.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
               <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
                 <Card style={{ flex: 1, padding: "14px 16px" }}>
                   <div style={{ fontSize: 11.5, color: COLORS.ink2, marginBottom: 4 }}>{t.miniHoursLabel}</div>
