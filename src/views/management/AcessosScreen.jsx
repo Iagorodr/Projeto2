@@ -61,8 +61,11 @@ function ResetDialog({ open, staffMember, t, c0, onClose, onConfirm, busy, error
 
         {result && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: "monospace", fontSize: 13.5, background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: 12, wordBreak: "break-all", marginBottom: 8 }}>
-              {result.email}<br />{result.password}
+            <div style={{ background: "#151816", color: "#fff", borderRadius: 16, padding: "14px 16px", marginBottom: 8, wordBreak: "break-all" }}>
+              <div style={{ fontSize: 12.5, color: "#A9B2AC", marginBottom: 6 }}>{result.email}</div>
+              <div aria-label={result.password} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 22, fontWeight: 700, letterSpacing: ".06em" }}>
+                {String(result.password).split("").map((ch, i) => <span key={i} aria-hidden="true" className="b1-fade" style={{ animationDelay: `${i * 45}ms` }}>{ch}</span>)}
+              </div>
             </div>
             <div style={{ fontSize: 12, color: COLORS.ink3 }}>{t.credentialsWarning}</div>
           </div>
@@ -71,7 +74,7 @@ function ResetDialog({ open, staffMember, t, c0, onClose, onConfirm, busy, error
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           {result ? (
             <>
-              <Button variant="secondary" icon={copied ? Check : Copy} onClick={onCopy}>{copied ? t.copied : t.copyCredentials}</Button>
+              <Button variant="secondary" icon={copied ? Check : Copy} onClick={onCopy}>{copied ? `${t.copied} ✓` : t.copyCredentials}</Button>
               <Button variant="primary" onClick={onClose}>{c0.close}</Button>
             </>
           ) : (
