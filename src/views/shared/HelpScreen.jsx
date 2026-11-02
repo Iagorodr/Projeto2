@@ -217,6 +217,116 @@ function HelpBody({ lang, role, contextKey, contextLabel, reportKey, userName, s
   );
 }
 
+
+// Ajuda no PC (B1, estilo do tutorial): categorias (páginas) à esquerda; à direita o artigo da
+// página escolhida com os passos numerados, "Isto ajudou?" e relacionados. "Reportar problema"
+// fica sempre à vista no fundo da coluna da esquerda.
+function HelpDesk({ lang, role, reportKey, userName, onTutorial }) {
+  const h = helpTexts(lang).ui;
+  const extra = HELP_DESK[lang] || HELP_DESK.pt;
+  const pages = pageList(lang, role);
+  const [sel, setSel] = useState(() => (pages.some((p) => p.key === reportKey) ? reportKey : pages[0]?.key));
+  const [report, setReport] = useState(false);
+  const [voted, setVoted] = useState({});
+  const manual = sel ? manualFor(lang, role, sel) : null;
+  const idx = pages.findIndex((p) => p.key === sel);
+  const related = [pages[idx - 1], pages[idx + 1]].filter(Boolean);
+  const box = { background: COLORS.card, borderRadius: 22, padding: 18 };
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr)", gap: 20, alignItems: "start" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, position: "sticky", top: 16 }}>
+        <div style={{ ...box, padding: 8, display: "flex", flexDirection: "column", gap: 2 }}>
+          {pages.map((p) => {
+            const on = p.key === sel && !report;
+            return (
+              <button key={p.key} type="button" onClick={() => { setSel(p.key); setReport(false); }}
+                style={{ textAlign: "left", padding: "10px 12px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: on ? 800 : 600, background: on ? "var(--p1-12)" : "transparent", color: on ? "var(--p2)" : COLORS.ink }}>
+                {p.name}
+              </button>
+            );
+          })}
+        </div>
+        {onTutorial && (
+          <button type="button" onClick={onTutorial} style={{ ...box, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+            <PlayCircle size={20} color="var(--p1)" /> <span style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.ink }}>{(TUTORIAL_UI[lang] || TUTORIAL_UI.pt).review}</span>
+          </button>
+        )}
+        <button type="button" onClick={() => setReport(true)} style={{ padding: "12px 14px", borderRadius: 22, display: "flex", alignItems: "center", gap: 10, border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left", background: report ? "var(--p1)" : "#151816", color: "#fff" }}>
+          <Send size={18} /> <span style={{ fontSize: 13.5, fontWeight: 800 }}>{h.reportTitle}</span>
+        </button>
+      </div>
+
+      {report ? (
+        <div key="report" style={{ ...box, maxWidth: 720, animation: "b1-rise .4s var(--ease) both" }}>
+          <div style={{ fontFamily: FONT.heading, fontSize: 22, marginBottom: 12 }}>{h.reportTitle}</div>
+          <ReportForm key={lang} lang={lang} role={role} reportKey={reportKey} userName={userName} />
+        </div>
+      ) : manual && (
+        <div key={sel} style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 820, animation: "b1-rise .4s var(--ease) both" }}>
+          <div style={box}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--p1)" }}>{extra.page}</div>
+            <div style={{ fontFamily: FONT.heading, fontSize: 28, lineHeight: 1.1, margin: "4px 0 10px" }}>{pageName(lang, role, sel)}</div>
+            <div style={{ fontSize: 15, lineHeight: 1.6, color: COLORS.ink2 }}>{manual.summary}</div>
+          </div>
+          {manual.howto?.length > 0 && (
+            <div style={box}>
+              <div style={{ fontFamily: FONT.heading, fontSize: 18, marginBottom: 12 }}>{h.howto}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {manual.howto.map((item) => (
+                  <div key={item.q}>
+                    <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>{item.q}</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {item.steps.map((st, i) => (
+                        <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                          <span style={{ width: 28, height: 28, borderRadius: 14, background: "var(--p1)", color: "#fff", fontWeight: 900, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>{i + 1}</span>
+                          <span style={{ fontSize: 14, lineHeight: 1.55, color: COLORS.ink, paddingTop: 4 }}>{st}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {manual.means?.length > 0 && (
+            <div style={box}>
+              <div style={{ fontFamily: FONT.heading, fontSize: 18, marginBottom: 12 }}>{h.means}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+                {manual.means.map(([term, text]) => (
+                  <div key={term} style={{ background: "#F5F6F3", borderRadius: 14, padding: "12px 14px", fontSize: 13.5, lineHeight: 1.5, color: COLORS.ink2 }}>
+                    <div style={{ fontWeight: 800, color: COLORS.ink, marginBottom: 2 }}>{term}</div>{text}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ ...box, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            {voted[sel] ? <span style={{ fontSize: 14, fontWeight: 700, color: "#167049" }}>✓ {extra.thanks}</span> : (
+              <>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{extra.helped}</span>
+                <Button variant="secondary" onClick={() => setVoted((v) => ({ ...v, [sel]: "yes" }))}>{extra.yes}</Button>
+                <Button variant="secondary" onClick={() => { setVoted((v) => ({ ...v, [sel]: "no" })); setReport(true); }}>{extra.no}</Button>
+              </>
+            )}
+            {related.length > 0 && (
+              <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: COLORS.ink3 }}>
+                {extra.related}
+                {related.map((p) => <button key={p.key} type="button" onClick={() => setSel(p.key)} style={{ border: "none", background: "var(--p1-12)", color: "var(--p2)", borderRadius: 999, padding: "6px 12px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{p.name}</button>)}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const HELP_DESK = {
+  pt: { page: "Página", helped: "Isto ajudou?", yes: "Sim", no: "Não", thanks: "Obrigado!", related: "Relacionados:" },
+  en: { page: "Page", helped: "Did this help?", yes: "Yes", no: "No", thanks: "Thank you!", related: "Related:" },
+  fr: { page: "Page", helped: "Cela vous a aidé ?", yes: "Oui", no: "Non", thanks: "Merci !", related: "Liés :" },
+};
+
 // Página "Ajuda" inteira (telemóvel; no PC também funciona se se chegar aqui).
 export default function HelpScreen({ lang, setLang, role, reportKey, userName, onHome, desktop, onTutorial }) {
   const h = helpTexts(lang).ui;
@@ -225,7 +335,7 @@ export default function HelpScreen({ lang, setLang, role, reportKey, userName, o
     return (
       <div style={styles.content}>
         <PageHeader title={h.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
-        <div style={{ maxWidth: 720 }}>{body}</div>
+        <HelpDesk lang={lang} role={role} reportKey={reportKey} userName={userName} onTutorial={onTutorial} />
       </div>
     );
   }
