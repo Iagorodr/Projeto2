@@ -180,8 +180,8 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
   const groups = { hoje: [], atraso: [], semana: [], depois: [] };
   notes.forEach((n) => groups[bucketOf(n)].push(n));
   const groupDefs = [
-    { key: "hoje", label: t.groupToday },
     { key: "atraso", label: t.groupOverdue },
+    { key: "hoje", label: t.groupToday },
     { key: "semana", label: t.groupThisWeek },
     { key: "depois", label: t.groupLater },
   ];
@@ -189,7 +189,7 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
   const list = notes.length === 0 ? (
     <EmptyNotes text={t.emptyState} />
   ) : (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="b1-cascade" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {groupDefs.map((g) => (
         <NoteGroup key={g.key} groupKey={g.key} label={g.label} items={groups[g.key]} lang={lang} t={t} todayIso={todayIso} onDelete={deleteNote} deleteSize={desktop ? "gerencia" : "mobile"} />
       ))}

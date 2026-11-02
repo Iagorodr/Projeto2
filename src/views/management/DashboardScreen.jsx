@@ -21,7 +21,7 @@ import { upcomingHolidays } from "../../models/holidays.js";
 import ClientsByCityCard from "./ClientsByCityCard.jsx";
 import { contractorPeriods, periodFinance } from "../../models/contractorStats.js";
 import { FIN } from "../../models/i18nFin.js";
-import { Avatar } from "../shared/ui/index.js";
+import { Avatar, Toast } from "../shared/ui/index.js";
 import { SearchButton } from "../shared/GlobalSearch.jsx";
 import { THEMES, DEFAULT_THEME, applyTheme } from "../../styles/theme.js";
 import { localPrefs, loadPrefs, savePrefs } from "../../models/userPrefs.js";
@@ -167,8 +167,19 @@ function DashboardScreen({
   function remindAll() {
     if (!setSentItems || gaps.length === 0) return;
     const today = isoDateStr(TODAY);
-    setSentItems((prev) => [...gaps.map((g, i) => ({ id: Date.now() + i, type: "aviso", staffId: g.id, clientId: null, text: tm.remindText(g.days), date: today, hasPhoto: false, seenByManagement: true })), ...prev]);
+    const base = Date.now();
+    const ids = gaps.map((g, i) => base + i);
+    setSentItems((prev) => [...gaps.map((g, i) => ({ id: ids[i], type: "aviso", staffId: g.id, clientId: null, text: tm.remindText(g.days), date: today, hasPhoto: false, seenByManagement: true })), ...prev]);
     setReminded(true);
+    setUndo({ ids });
+    setTimeout(() => setUndo((u) => (u && u.ids === ids ? null : u)), 5000);
+  }
+  const [undo, setUndo] = useState(null);
+  function undoRemind() {
+    if (!undo) return;
+    const drop = new Set(undo.ids);
+    setSentItems((prev) => prev.filter((i) => !drop.has(i.id)));
+    setReminded(false); setUndo(null);
   }
 
   // ── hoje ──
@@ -581,6 +592,7 @@ function DashboardScreen({
       </section>
 
       {order.map((k, i) => wrap(k, i, blocks[k], k === "fin" ? "dsh-dark" : ""))}
+      {undo && <Toast message={d.reminded(undo.ids.length)} actionLabel={T[lang].notas.undo} onAction={undoRemind} onDismiss={() => setUndo(null)} closeLabel={T[lang].common.close} />}
     </div>
   );
 }

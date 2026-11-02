@@ -27,6 +27,7 @@ const pt = {
   notesTitle: "Notas", newNote: "+ Nova", holidayTag: "Feriado", notesEmpty: "Sem notas nem feriados próximos.",
   hoursCtTitle: "Horas por contratante", history: "Histórico", expectedLegend: "Previsto do período em curso", noContractor: "Sem contratante", expectedTag: "previsto",
   highlights: "Destaques da equipa",
+  reminded: (n) => (n === 1 ? "Lembrete enviado a 1 pessoa." : `Lembrete enviado a ${n} pessoas.`),
 };
 
 const en = {
@@ -57,6 +58,7 @@ const en = {
   notesTitle: "Notes", newNote: "+ New", holidayTag: "Holiday", notesEmpty: "No notes or upcoming holidays.",
   hoursCtTitle: "Hours by contractor", history: "History", expectedLegend: "Planned for the current period", noContractor: "No contractor", expectedTag: "planned",
   highlights: "Team highlights",
+  reminded: (n) => (n === 1 ? "Reminder sent to 1 person." : `Reminder sent to ${n} people.`),
 };
 
 const fr = {
@@ -87,6 +89,7 @@ const fr = {
   notesTitle: "Notes", newNote: "+ Nouvelle", holidayTag: "Férié", notesEmpty: "Pas de notes ni de jours fériés proches.",
   hoursCtTitle: "Heures par donneur d'ordre", history: "Historique", expectedLegend: "Prévu pour la période en cours", noContractor: "Sans donneur d'ordre", expectedTag: "prévu",
   highlights: "Points forts de l'équipe",
+  reminded: (n) => (n === 1 ? "Rappel envoyé à 1 personne." : `Rappel envoyé à ${n} personnes.`),
 };
 
 export const DASH = { pt, en, fr };
