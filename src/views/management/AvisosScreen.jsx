@@ -4,6 +4,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
+import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { clientById, staffById, isoDateStr, fmtNoteDate, getOpenPeriod, isSolicitationOld, isSolicitationStale, isStaffActive, groupSentItems, uniqueSentCount, recipientsText } from "../../models/utils.js";
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { uploadFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
@@ -152,6 +153,8 @@ function EmptyNote({ children }) {
 // entrada passa a ser o primeiro que se vê (abre em Pedidos), e os
 // acordeões viram separadores (chips).
 function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingItems, sentItems, setSentItems, setHorasData, closedPeriods, cutoffDay }) {
+  const wide = useBreakpoint() === "desktop";
+  const [selId, setSelId] = useState(null);
   const t = T[lang].avisos;
   const c0 = T[lang].common;
   const [tab, setTab] = useState("pedidos");
@@ -265,6 +268,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   // precisa de um segundo conceito de "visto").
   function selectTab(key) {
     setTab(key);
+    setSelId(null);
     const typeByTab = { reclamacoes: "reclamacao", elogios: "elogio", avisos: "aviso" };
     const type = typeByTab[key];
     if (!type) return;
@@ -282,7 +286,53 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
         <FilterChip active={tab === "avisos"} onClick={() => selectTab("avisos")} count={unseenOf(notices)}>{t.sectionNotices}</FilterChip>
       </div>
 
-      {tab === "pedidos" ? (
+      {wide ? (() => {
+        // PC (B1): como o correio — lista à esquerda, o aviso aberto à direita.
+        const list = tab === "pedidos" ? visibleMissingItems : tabContent.items;
+        const sel = list.find((x) => x.id === selId) || list[0] || null;
+        const dotOf = (x) => (tab === "pedidos" ? ({ new: "var(--p1)", pending: "#C98A12", resolved: "#C3C8C2" })[pedidoStatus(x)] : (x.seenByManagement ? "#C3C8C2" : "var(--p1)"));
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 380px) minmax(0, 1fr)", gap: 16, alignItems: "start" }}>
+            <div style={{ background: COLORS.card, borderRadius: 20, padding: 6, display: "flex", flexDirection: "column", gap: 2, maxHeight: "calc(100dvh - 200px)", overflowY: "auto" }}>
+              {list.length === 0 && <div style={{ padding: 16 }}><EmptyNote>{t.nothingHere}</EmptyNote></div>}
+              {list.map((x, i) => {
+                const st = staffById(staff, x.staffId);
+                const cl = x.clientId ? clientById(clients, x.clientId) : null;
+                const on = sel && sel.id === x.id;
+                return (
+                  <button key={x.id} type="button" onClick={() => setSelId(x.id)} className="b1-rise"
+                    style={{ animationDelay: `${Math.min(i, 8) * 35}ms`, display: "grid", gridTemplateColumns: "10px 32px 1fr auto", gap: 10, alignItems: "center", textAlign: "left", padding: "10px 10px", borderRadius: 14, border: "none", background: on ? "var(--p1-12)" : "transparent", cursor: "pointer", fontFamily: "inherit", color: COLORS.ink }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 4, background: dotOf(x) }} />
+                    <Avatar name={st ? st.name : "—"} size={32} />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{st ? st.name : "—"}{cl ? ` · ${cl.name}` : ""}</span>
+                      <span style={{ display: "block", fontSize: 12.5, color: COLORS.ink2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tab === "pedidos" ? `${missingItemSubjectLabel(x, lang)} · ` : ""}{x.text}</span>
+                    </span>
+                    <span style={{ fontSize: 11.5, color: COLORS.ink3, whiteSpace: "nowrap" }}>{fmtNoteDate(x.date)}</span>
+                  </button>
+                );
+              })}
+              {tab === "pedidos" && staleMissingItems.length > 0 && (
+                <button type="button" onClick={() => setShowStale((v) => !v)}
+                  style={{ alignSelf: "flex-start", background: "transparent", border: "none", cursor: "pointer", color: COLORS.ink2, fontSize: 12.5, fontWeight: 600, padding: "8px 10px", fontFamily: "inherit", textDecoration: "underline" }}>
+                  {showStale ? t.hideClosedPeriodItems : t.showClosedPeriodItems(staleMissingItems.length)}
+                </button>
+              )}
+            </div>
+            <div key={sel ? sel.id : "none"} style={{ animation: "b1-sheet-left .3s var(--ease) both", minWidth: 0 }}>
+              {sel && (tab === "pedidos" ? (
+                <PedidoCard
+                  m={sel} staff={staff} clients={clients} lang={lang} t={t} c0={c0}
+                  stale={isSolicitationOld(sel, openPeriod)}
+                  replying={replyingId} replyDraft={replyDraft} setReplyDraft={setReplyDraft}
+                  onStartReply={startReply} onSendReply={sendReply} onToggleResolved={toggleResolved}
+                />
+              ) : <SentItemCard item={sel} type={tabContent.type} staff={staff} clients={clients} c0={c0} lang={lang} />)}
+            </div>
+          </div>
+        );
+      })() : (
+      tab === "pedidos" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {visibleMissingItems.length === 0 ? <EmptyNote>{t.nothingHere}</EmptyNote> : visibleMissingItems.map((m) => (
             <PedidoCard
@@ -312,6 +362,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
             <SentItemCard key={item.id} item={item} type={tabContent.type} staff={staff} clients={clients} c0={c0} lang={lang} />
           ))}
         </div>
+      )
       )}
 
       <Drawer
