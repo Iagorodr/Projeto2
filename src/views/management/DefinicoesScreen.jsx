@@ -38,6 +38,9 @@ const SECTIONS = [
   { id: "perfil", labelKey: "navProfile" },
   { id: "pagamento", labelKey: "navPayment" },
   { id: "alertas", labelKey: "navAlerts" },
+  { id: "destaques", labelKey: "navHighlights" },
+  { id: "reclamacoes", labelKey: "navComplaints" },
+  { id: "aparencia", labelKey: "navAppearance" },
   { id: "risco", labelKey: "navDanger" },
 ];
 
@@ -53,14 +56,15 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
 
   const [activeSection, setActiveSection] = useState("perfil");
   const sectionRefs = {
-    perfil: useRef(null), pagamento: useRef(null), alertas: useRef(null), risco: useRef(null),
+    perfil: useRef(null), pagamento: useRef(null), alertas: useRef(null), destaques: useRef(null), reclamacoes: useRef(null), aparencia: useRef(null), risco: useRef(null),
   };
   // Telemóvel: o índice de secções passa a uma linha de separadores no topo (desliza
   // para o lado e fica preso ao rolar) e a foto fica por cima dos campos do perfil.
   const phone = useBreakpoint() === "mobile";
+  const secStyle = (id) => (activeSection === id ? { animation: "b1-rise .4s var(--ease) both" } : { display: "none" });
   function goToSection(id) {
     setActiveSection(id);
-    sectionRefs[id].current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* */ }
   }
 
   // --- Perfil da empresa (gravado só ao clicar "Guardar alterações") ---
@@ -154,7 +158,7 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
       <div style={{ display: "flex", flexDirection: phone ? "column" : "row", gap: phone ? 12 : 32, alignItems: phone ? "stretch" : "flex-start" }}>
         <nav style={phone
           ? { position: "sticky", top: 0, zIndex: 5, display: "flex", gap: 6, overflowX: "auto", background: COLORS.page, padding: "6px 0", margin: "0 -2px", scrollbarWidth: "none" }
-          : { position: "sticky", top: 24, width: 168, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+          : { position: "sticky", top: 24, width: 200, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
           {SECTIONS.map((sec) => (
             <button
               key={sec.id}
@@ -164,7 +168,7 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                 textAlign: "left", border: phone ? `1px solid ${activeSection === sec.id ? COLORS.forest200 : COLORS.line}` : "none", cursor: "pointer",
                 padding: "9px 12px", borderRadius: 10, fontSize: 13, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap", fontFamily: "inherit",
                 ...(phone && activeSection !== sec.id ? { background: COLORS.card } : null),
-                color: activeSection === sec.id ? COLORS.forest700 : COLORS.ink2,
+                color: sec.id === "risco" ? "#B8343A" : activeSection === sec.id ? COLORS.forest700 : COLORS.ink2,
                 background: activeSection === sec.id ? COLORS.forest50 : phone ? COLORS.card : "transparent",
               }}
             >
@@ -174,7 +178,7 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
         </nav>
 
         <div style={{ flex: 1, maxWidth: 720, minWidth: 0, display: "flex", flexDirection: "column", gap: 16, paddingBottom: phone ? 24 : 90 }}>
-          <div ref={sectionRefs.perfil}>
+          <div ref={sectionRefs.perfil} style={secStyle("perfil")}>
             <Card>
               <div style={styles.sectionTitle}>{t.companyProfile}</div>
               <div style={phone ? { ...styles.defProfileRow, flexDirection: "column", alignItems: "stretch", gap: 16 } : styles.defProfileRow}>
@@ -226,7 +230,9 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                 ))}
               </div>
             </Card>
-            <Card style={{ marginTop: 16 }}>
+          </div>
+          <div ref={sectionRefs.aparencia} style={secStyle("aparencia")}>
+            <Card>
               <div style={styles.sectionTitle}>{t.themeTitle}</div>
               <div style={{ ...styles.defSettingHint, marginTop: 0, marginBottom: 14 }}>{t.themeHint}</div>
               <div role="radiogroup" aria-label={t.themeTitle} style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
@@ -247,7 +253,7 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
             </Card>
           </div>
 
-          <div ref={sectionRefs.pagamento}>
+          <div ref={sectionRefs.pagamento} style={secStyle("pagamento")}>
             <Card>
               <div style={styles.sectionTitle}>{t.payment}</div>
               <div style={styles.defSettingRow}>
@@ -266,18 +272,6 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                 />
               </div>
             </Card>
-          </div>
-
-          <div ref={sectionRefs.alertas}>
-            <Card>
-              <div style={styles.sectionTitle}>{t.alerts}</div>
-              <div style={styles.defSettingRow}>
-                <div style={{ flex: 1 }}>
-                  <div style={styles.defSettingLabel}>{t.contractAlertLabel}</div>
-                </div>
-                <input type="number" min={1} style={styles.defNumberInput} value={contractAlertDays} onChange={(e) => setContractAlertDays(Number(e.target.value))} />
-              </div>
-            </Card>
             <Card style={{ marginTop: 16 }}>
               <div style={styles.sectionTitle}>{t.closeDeadlineTitle}</div>
               <div style={styles.defSettingRow}>
@@ -288,7 +282,21 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                 <input type="number" min={1} max={31} style={styles.defNumberInput} value={closeDeadlineDays} onChange={(e) => setCloseDeadlineDays(Math.min(31, Math.max(1, Math.round(Number(e.target.value)) || 1)))} />
               </div>
             </Card>
-            <Card style={{ marginTop: 16 }}>
+          </div>
+
+          <div ref={sectionRefs.alertas} style={secStyle("alertas")}>
+            <Card>
+              <div style={styles.sectionTitle}>{t.alerts}</div>
+              <div style={styles.defSettingRow}>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.defSettingLabel}>{t.contractAlertLabel}</div>
+                </div>
+                <input type="number" min={1} style={styles.defNumberInput} value={contractAlertDays} onChange={(e) => setContractAlertDays(Number(e.target.value))} />
+              </div>
+            </Card>
+          </div>
+          <div ref={sectionRefs.destaques} style={secStyle("destaques")}>
+            <Card>
               <div style={styles.sectionTitle}>{t.highlightsSettingsTitle}</div>
               <div style={{ ...styles.defSettingHint, marginTop: -6, marginBottom: 10 }}>{t.highlightsSettingsIntro}</div>
               <div style={styles.defSettingRow}>
@@ -305,7 +313,9 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                 <input type="number" min={1} max={12} disabled={!!highlightsRealtime} style={styles.defNumberInput} value={highlightsMonths} onChange={(e) => setHighlightsMonths(Math.min(12, Math.max(1, Math.round(Number(e.target.value)) || 1)))} />
               </div>
             </Card>
-            <Card style={{ marginTop: 16 }}>
+          </div>
+          <div ref={sectionRefs.reclamacoes} style={secStyle("reclamacoes")}>
+            <Card>
               <div style={styles.sectionTitle}>{t.complaintMeterTitle}</div>
               <div style={{ ...styles.defSettingHint, marginTop: -6, marginBottom: 10 }}>{t.complaintMeterIntro}</div>
               <div style={styles.defSettingRow}>
@@ -351,7 +361,7 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
             </Card>
           </div>
 
-          <div ref={sectionRefs.risco}>
+          <div ref={sectionRefs.risco} style={secStyle("risco")}>
             <Card variant="alert">
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                 <AlertTriangle size={16} />
