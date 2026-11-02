@@ -339,7 +339,7 @@ export default function App() {
         const empCloseInfo = closeDeadlineInfo(getOpenPeriod(c.closedPeriods, c.cutoffDay, TODAY), TODAY, c.closeDeadlineDays);
         const body = (
           <>
-            {(c.empScreen === "menu" || c.empScreen === "horas") && empCloseInfo.ended && (
+            {c.empScreen === "menu" && empCloseInfo.ended && (
               <div style={{ padding: "12px 16px 0" }}><CloseDeadlineBanner lang={c.lang} info={empCloseInfo} role="employee" finalized={(c.horasData[c.me.id] || {}).status === "finalizado"} /></div>
             )}
             {c.empScreen === "menu" && (
@@ -351,7 +351,7 @@ export default function App() {
               />
             )}
             {c.empScreen === "horas" && (
-              <EmployeeHorasScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setMissingItems={c.setMissingItems} absences={c.absences} covers={c.covers} saveState={c.saveState} onRetrySave={c.retrySave} />
+              <EmployeeHorasScreen topNotice={empCloseInfo.ended ? <CloseDeadlineBanner lang={c.lang} info={empCloseInfo} role="employee" finalized={(c.horasData[c.me.id] || {}).status === "finalizado"} /> : null} lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} company={c.company} clients={c.clients} staff={c.staff} assignments={c.assignments} horasData={c.horasData} setHorasData={c.setHorasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} setMissingItems={c.setMissingItems} absences={c.absences} covers={c.covers} saveState={c.saveState} onRetrySave={c.retrySave} />
             )}
             {c.empScreen === "avisos" && (
               <EmployeeAvisosScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} absences={c.absences} setAbsences={c.setAbsences} isSupervisor={isSupervisor} desktop={empTier !== "mobile"} />

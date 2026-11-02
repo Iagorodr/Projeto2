@@ -69,13 +69,14 @@ function MissingBanner({ title, subtitle, action, onAction }) {
   );
 }
 
-function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [], covers = [], asManager = false, startDate = null, saveState = "saved", onRetrySave }) {
+function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [], covers = [], asManager = false, startDate = null, saveState = "saved", onRetrySave }) {
   const t = T[lang].employeeHoras;
   const pdfT = T[lang].pdf;
   const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang];
   const weekdayFull = WEEKDAY_FULL_BY_LANG[lang];
   const dayLabels17 = DAY_LABELS_1_7_BY_LANG[lang];
   const me = staff.find((s) => s.id === staffId);
+  const [noticesOpen, setNoticesOpen] = useState(false);
   const staffName = me?.name || "";
   // Gerência a preencher por este funcionário (Monitoramento): tudo o que se grava fica marcado "pela gerência".
   const writeHoras = asManager ? (fn) => setHorasData((prev) => tagManagerChanges(fn(prev), prev, staffId)) : setHorasData;
@@ -732,6 +733,7 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           />
         )}
         {!asManager && <OfflineBar state={saveState} lang={lang} onRetry={onRetrySave} style={{ marginBottom: 12 }} />}
+        {topNotice && (chunkZone === "before" || showFinalizedView) && <div style={{ marginBottom: 12 }}>{topNotice}</div>}
 
         {!showFinalizedView && chunkZone === "within" && myHoras.reopened && (
           <div style={{ marginBottom: 10 }}><Pill variant="reopened">{t.reopenedPill}</Pill></div>
@@ -842,19 +844,34 @@ function EmployeeHorasScreen({ lang, setLang, onHome, staffId, company, clients,
           <div style={{ flex: 1, minWidth: 0, width: "100%", maxWidth: showTwoColumn ? 620 : undefined, display: "flex", flexDirection: "column", gap: 16 }}>
             <WeekStrip days={weekStripDays} onSelectDay={setSelectedDateKey} legend={t.weekStripLegend} legendItems={t.weekLegend} />
 
-            {missingDaysInChunk.length === 1 && (
-              <MissingBanner
-                title={t.missingOneTitle(weekdayFull[missingDaysInChunk[0].getDay()], dmOf(missingDaysInChunk[0]))}
-                subtitle={t.missingOneSubtitle(scheduledIfActive(missingDaysInChunk[0]).length)}
-                action={t.registerNowAction} onAction={() => setSelectedDateKey(isoDateStr(missingDaysInChunk[0]))}
-              />
-            )}
-            {missingDaysInChunk.length > 1 && (
-              <MissingBanner
-                title={t.missingManyTitle(missingDaysInChunk.length)}
-                action={t.missingManyAction} onAction={() => setSelectedDateKey(isoDateStr(missingDaysInChunk[0]))}
-              />
-            )}
+            {(() => {
+              // Avisos do topo (B1): se houver vários ao mesmo tempo, mostra só o mais urgente + "+N avisos".
+              const notices = [];
+              if (topNotice) notices.push(<div key="deadline">{topNotice}</div>);
+              if (missingDaysInChunk.length === 1) notices.push(
+                <MissingBanner key="miss1"
+                  title={t.missingOneTitle(weekdayFull[missingDaysInChunk[0].getDay()], dmOf(missingDaysInChunk[0]))}
+                  subtitle={t.missingOneSubtitle(scheduledIfActive(missingDaysInChunk[0]).length)}
+                  action={t.registerNowAction} onAction={() => setSelectedDateKey(isoDateStr(missingDaysInChunk[0]))}
+                />);
+              if (missingDaysInChunk.length > 1) notices.push(
+                <MissingBanner key="missN"
+                  title={t.missingManyTitle(missingDaysInChunk.length)}
+                  action={t.missingManyAction} onAction={() => setSelectedDateKey(isoDateStr(missingDaysInChunk[0]))}
+                />);
+              if (notices.length === 0) return null;
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {notices[0]}
+                  {notices.length > 1 && (noticesOpen ? notices.slice(1) : (
+                    <button type="button" onClick={() => setNoticesOpen(true)}
+                      style={{ alignSelf: "flex-start", border: "none", background: "#151816", color: "#fff", borderRadius: 999, padding: "6px 12px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                      {t.moreNotices(notices.length - 1)}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
 
             {canReopenWeek && (
               <Button variant="secondary" style={{ width: "100%" }} onClick={() => setReopenWeekOpen(true)}>
