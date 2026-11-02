@@ -26,6 +26,7 @@ const pt = {
   reclNone: "Sem reclamações neste período.",
   notesTitle: "Notas", newNote: "+ Nova", holidayTag: "Feriado", notesEmpty: "Sem notas nem feriados próximos.",
   hoursCtTitle: "Horas por contratante", history: "Histórico", expectedLegend: "Previsto do período em curso", noContractor: "Sem contratante", expectedTag: "previsto",
+  stepsTitle: "Primeiros passos", stepsCount: (d, n) => `${d} de ${n}`, stepContractors: "Criar os contratantes", stepClients: "Criar os clientes", stepStaff: "Criar os funcionários", stepAgenda: "Montar a agenda",
   highlights: "Destaques da equipa",
   reminded: (n) => (n === 1 ? "Lembrete enviado a 1 pessoa." : `Lembrete enviado a ${n} pessoas.`),
 };
@@ -57,6 +58,7 @@ const en = {
   reclNone: "No complaints this period.",
   notesTitle: "Notes", newNote: "+ New", holidayTag: "Holiday", notesEmpty: "No notes or upcoming holidays.",
   hoursCtTitle: "Hours by contractor", history: "History", expectedLegend: "Planned for the current period", noContractor: "No contractor", expectedTag: "planned",
+  stepsTitle: "First steps", stepsCount: (d, n) => `${d} of ${n}`, stepContractors: "Add the contractors", stepClients: "Add the clients", stepStaff: "Add the staff", stepAgenda: "Build the schedule",
   highlights: "Team highlights",
   reminded: (n) => (n === 1 ? "Reminder sent to 1 person." : `Reminder sent to ${n} people.`),
 };
@@ -88,6 +90,7 @@ const fr = {
   reclNone: "Aucune réclamation cette période.",
   notesTitle: "Notes", newNote: "+ Nouvelle", holidayTag: "Férié", notesEmpty: "Pas de notes ni de jours fériés proches.",
   hoursCtTitle: "Heures par donneur d'ordre", history: "Historique", expectedLegend: "Prévu pour la période en cours", noContractor: "Sans donneur d'ordre", expectedTag: "prévu",
+  stepsTitle: "Premiers pas", stepsCount: (d, n) => `${d} sur ${n}`, stepContractors: "Créer les donneurs d'ordre", stepClients: "Créer les clients", stepStaff: "Créer les employés", stepAgenda: "Monter le planning",
   highlights: "Points forts de l'équipe",
   reminded: (n) => (n === 1 ? "Rappel envoyé à 1 personne." : `Rappel envoyé à ${n} personnes.`),
 };

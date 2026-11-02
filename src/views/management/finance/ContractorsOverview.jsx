@@ -56,6 +56,9 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, closin
   const isPhone = tier === "mobile";
   const [metric, setMetric] = useState("hours");
   const [months, setMonths] = useState(6);
+  const [view, setView] = useState(() => { try { return localStorage.getItem("servix.ctView") || "cards"; } catch { return "cards"; } });
+  const [flipped, setFlipped] = useState(null);
+  const setViewP = (v) => { setView(v); try { localStorage.setItem("servix.ctView", v); } catch { /* */ } };
   const eurMode = metric === "eur";
   const current = periods[periods.length - 1];
   const previous = periods[periods.length - 2];
@@ -230,6 +233,54 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, closin
       })()}
 
       {rows.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+          <SegmentedControl options={[{ value: "cards", label: f.viewCards }, { value: "table", label: f.viewTable }]} value={view} onChange={setViewP} />
+        </div>
+      )}
+      {rows.length > 0 && view === "cards" && (
+        <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+          {rows.map((r, i) => {
+            const on = flipped === r.c.id;
+            const cl = clientsOfContractor(clients, r.c);
+            const face = { position: "absolute", inset: 0, borderRadius: 24, padding: 18, backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", display: "flex", flexDirection: "column", boxSizing: "border-box" };
+            return (
+              <div key={r.c.id} className="b1-rise" style={{ animationDelay: `${i * 60}ms`, perspective: 1000, height: 230 }}>
+                <div role="button" tabIndex={0} aria-pressed={on} onClick={() => setFlipped(on ? null : r.c.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setFlipped(on ? null : r.c.id); } }}
+                  style={{ position: "relative", width: "100%", height: "100%", transformStyle: "preserve-3d", transition: "transform .6s var(--ease)", transform: on ? "rotateY(180deg)" : "none", cursor: "pointer" }}>
+                  <div style={{ ...face, background: r.c.color || "#5A625C", color: "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ fontFamily: FONT.heading, fontSize: 20, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.c.name}</span>
+                      {r.c.isDirect && <span style={{ fontSize: 11, fontWeight: 800, background: "rgba(255,255,255,.2)", borderRadius: 999, padding: "3px 9px" }}>{T[lang].contratantes.direct}</span>}
+                    </div>
+                    <div style={{ marginTop: "auto" }}>
+                      <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 600 }}>{f.colReceive}</div>
+                      <div style={{ fontFamily: FONT.heading, fontSize: 32, lineHeight: 1.05 }}>{r.value != null ? eur0(r.value) : "—"}</div>
+                      <div style={{ display: "flex", gap: 16, marginTop: 10, fontSize: 12.5, fontWeight: 700, opacity: 0.92 }}>
+                        <span>{fmtHoursScreen(r.hours)}</span><span>{f.clientsN(r.clientsN)}</span>{r.margin != null && <span>{f.colMargin} {eur0(r.margin)}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ ...face, transform: "rotateY(180deg)", background: COLORS.card, border: `2px solid ${r.c.color || COLORS.line}`, color: COLORS.ink, gap: 6, fontSize: 12.5 }}>
+                    <div style={{ fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}><Dot color={r.c.color} size={10} />{r.c.name}</div>
+                    <div style={{ color: COLORS.ink2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{cl.slice(0, 6).map((x) => x.name).join(" · ") || "—"}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", marginTop: 4 }}>
+                      <span>{f.colHours}: <b>{fmtHoursScreen(r.hours)}</b></span>
+                      <span>{f.rateShort}: <b>{r.c.rate ? `${r.c.rate} €/h` : "—"}</b></span>
+                      <span>{f.billing}: <b>{r.dates && r.dates.billing ? fmtDay(r.dates.billing, lang) : "—"}</b></span>
+                      <span>{f.payment}: <b>{r.dates && r.dates.payment ? fmtDay(r.dates.payment, lang) : "—"}</b></span>
+                    </div>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(r.c); }}
+                      style={{ marginTop: "auto", alignSelf: "flex-start", border: "none", background: "#151816", color: "#fff", borderRadius: 999, padding: "8px 14px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                      {f.openFile} →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {rows.length > 0 && view === "table" && (
         <div style={{ display: "flex", flexDirection: "column", gap: isPhone ? 10 : 0, background: isPhone ? "transparent" : COLORS.card, border: isPhone ? "none" : `1px solid ${COLORS.line}`, borderRadius: RADIUS.card, overflow: "hidden" }}>
           {!isPhone && (
             <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "12px 18px", background: COLORS.headerTint, borderBottom: `1px solid ${COLORS.line}` }}>

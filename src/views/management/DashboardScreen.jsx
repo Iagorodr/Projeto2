@@ -504,6 +504,35 @@ function DashboardScreen({
         </div>
       </section>
 
+      {(() => {
+        // Primeiros passos (empresa nova): some quando os 4 estiverem feitos.
+        const hasAgenda = Object.keys(assignments || {}).some((k) => /^\d+-\d+$/.test(k) && (assignments[k] || []).length > 0);
+        const steps = [
+          { key: "contratantes", label: d.stepContractors, done: (contractors || []).length > 0 },
+          { key: "clientes", label: d.stepClients, done: clients.length > 0 },
+          { key: "funcionarios", label: d.stepStaff, done: staff.length > 0 },
+          { key: "agendas", label: d.stepAgenda, done: hasAgenda },
+        ];
+        if (steps.every((x) => x.done)) return null;
+        const next = steps.findIndex((x) => !x.done);
+        return (
+          <section className="dw c4 fixed show" data-tab="hoje" style={{ "--i": 0 }}>
+            <h4>{d.stepsTitle}<span className="kl">{d.stepsCount(steps.filter((x) => x.done).length, steps.length)}</span></h4>
+            <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "repeat(4, 1fr)", gap: 10 }}>
+              {steps.map((x, i) => (
+                <button key={x.key} type="button" onClick={() => onNavigate(x.key)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 16, border: i === next ? "2px solid var(--p1)" : "1px solid #E2E5DF", background: x.done ? "var(--p1-8)" : "#fff", cursor: "pointer", fontFamily: "inherit", textAlign: "left", color: "#151816" }}>
+                  <span style={{ width: 28, height: 28, borderRadius: 14, flex: "none", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 13, background: x.done ? "var(--p1)" : i === next ? "#151816" : "#EEF0EC", color: x.done || i === next ? "#fff" : "#6F776F" }}>
+                    {x.done ? <Check size={15} strokeWidth={3} /> : i + 1}
+                  </span>
+                  <span style={{ fontSize: 13.5, fontWeight: 700, textDecoration: x.done ? "line-through" : "none", opacity: x.done ? 0.6 : 1 }}>{x.label}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
       {edit && !isPhone && (
         <section className="dsh-tray">
           <div><b>{d.trayTitle}</b><span>{d.trayHint}</span></div>
