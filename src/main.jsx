@@ -27,6 +27,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   </React.StrictMode>
 );
 
+// Ecrã de carregamento (index.html): sai com um esmorecer quando a app já desenhou.
+try {
+  const ld = document.getElementById("sx-loader");
+  if (ld) setTimeout(() => { ld.style.opacity = "0"; setTimeout(() => ld.remove(), 400); }, 450);
+} catch (e) { /* ignora */ }
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((err) => {

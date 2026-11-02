@@ -10,6 +10,7 @@ import { useState } from "react";
 import { LogOut, ChevronsLeft, ChevronsRight, Search } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
 import { Avatar } from "../Avatar.jsx";
+import { LogoBadge } from "../../Logo.jsx";
 import { useGlobalSearch } from "../../GlobalSearch.jsx";
 
 const STORE_KEY = "servix.menuCollapsed";
@@ -39,14 +40,14 @@ function GroupedSidebar({
         className="sx-navitem"
         style={{
           display: "flex", alignItems: "center", gap: 11, position: "relative", width: "100%",
-          height: 42, padding: collapsed ? 0 : "0 10px", justifyContent: collapsed ? "center" : "flex-start",
-          borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit",
-          background: active ? "rgba(255,255,255,.18)" : "transparent", color: "#fff",
+          height: 40, padding: collapsed ? 0 : "0 10px", justifyContent: collapsed ? "center" : "flex-start",
+          borderRadius: 15, border: "none", cursor: "pointer", fontFamily: "inherit",
+          background: active ? "#fff" : "transparent", color: active ? "var(--p2)" : "#fff",
           animationDelay: `${i * 22}ms`,
         }}
       >
         <span style={{ position: "relative", display: "flex" }}>
-          <Icon size={20} strokeWidth={active ? 2.3 : 1.9} color="#fff" style={{ opacity: active ? 1 : 0.85 }} />
+          <Icon size={20} strokeWidth={active ? 2.3 : 1.9} color={active ? "var(--p1)" : "#fff"} style={{ opacity: active ? 1 : 0.85 }} />
           {hasBadge && collapsed && (
             <span style={{ position: "absolute", top: -3, right: -4, width: 9, height: 9, borderRadius: 9, background: "#F2C14E", boxShadow: "0 0 0 2px var(--p1)" }} />
           )}
@@ -69,15 +70,16 @@ function GroupedSidebar({
       aria-label="Menu"
       style={{
         width, flexShrink: 0, display: "flex", flexDirection: "column",
-        position: "sticky", top: 0, height: "100dvh", alignSelf: "flex-start",
-        padding: collapsed ? "16px 10px" : "16px 14px", boxSizing: "border-box",
-        background: "var(--p1)", color: "#fff", transition: "width .28s var(--ease), padding .28s var(--ease)",
+        position: "sticky", top: 16, height: "calc(100dvh - 32px)", alignSelf: "flex-start", margin: 16, marginRight: 4,
+        padding: collapsed ? "16px 12px" : "16px 14px", boxSizing: "border-box", borderRadius: collapsed ? 38 : 30,
+        background: "var(--p1)", color: "#fff", transition: "width .28s var(--ease), padding .28s var(--ease), border-radius .28s var(--ease)",
+        boxShadow: "0 18px 40px -24px var(--p1-shadow)",
         overflow: "hidden",
       }}
     >
       {user && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: collapsed ? "0 0 12px" : "2px 4px 12px", justifyContent: collapsed ? "center" : "flex-start" }}>
-          <Avatar name={user.name} photoUrl={user.photoUrl} size={collapsed ? 36 : 38} />
+          <LogoBadge size={collapsed ? 44 : 44} tone="light" />
           {!collapsed && (
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.name}</div>
