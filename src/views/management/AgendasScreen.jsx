@@ -13,6 +13,7 @@ import {
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
+import { findContractor } from "../../models/contractors.js";
 import { CoverDialog, CoverEditDialog, CoversPanel } from "./CoverDialog.jsx";
 import { PeriodNav, RoundArrow } from "../shared/ui/PeriodNav.jsx";
 import {
@@ -305,12 +306,14 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
 // 2026-10-06 -> "06/10" (datas curtas nos avisos de validade).
 function fmtDM(d) { return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`; }
 
-function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setCovers, clients, setClients, staff, assignments, setAssignments, onOpenClient }) {
+function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences, covers = [], setCovers, clients, setClients, staff, assignments, setAssignments, onOpenClient }) {
   const t = T[lang].agendas;
   const c0 = T[lang].common;
   const tc = T[lang].clientes;
   const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
   const [search, setSearch] = useState("");
+  const [expandedCells, setExpandedCells] = useState(() => new Set()); // células com todos os clientes à vista (B1: até 3 + "+N")
+  const ctColor = (client) => { const k = findContractor(contractors, client.origin); return (k && k.color) || "#C9CEC7"; };
   // No telemóvel abre em "Por dia" (lista que cabe no ecrã); a grade "Por funcionário" continua a um toque.
   const [view, setView] = useState(() => (typeof window !== "undefined" && window.innerWidth < 640 ? "day" : "staff")); // "staff" | "day"
   // Lote 4, 4.6 (achado do Iago — "a busca de cliente aparece muito em
@@ -604,7 +607,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
               onMouseEnter={() => setHoverCell(key)}
               onMouseLeave={() => setHoverCell((h) => (h === key ? null : h))}
               style={{
-                position: "relative", padding: 8, display: "flex", flexDirection: "column", gap: 6, minWidth: 0,
+                position: "relative", padding: 6, display: "flex", flexDirection: "column", gap: 4, minWidth: 0,
                 minHeight: 56, background: absence ? "repeating-linear-gradient(135deg, #FBEFEA, #FBEFEA 8px, #FFF7F3 8px, #FFF7F3 16px)" : isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
               }}
             >
@@ -614,7 +617,7 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
                   {tAbs.absentTag}{absence.handled ? " ✓" : ""}
                 </span>
               )}
-              {clientIds.map((cid) => {
+              {(expandedCells.has(key) || clientIds.length <= 3 ? clientIds : clientIds.slice(0, 3)).map((cid) => {
                 const client = clientById(clients, cid);
                 if (!client) return null;
                 const coverInfo = coverIn.find((x) => x.clientId === cid);
@@ -652,8 +655,8 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
                         aria-haspopup="dialog" aria-expanded={isTeamOpen}
                         onClick={() => setOpenTeam((k) => (k === thisTeamKey ? null : thisTeamKey))}
                         style={{
-                          display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 30, width: "100%", borderRadius: RADIUS.chip,
-                          padding: "4px 8px", background: COLORS.clayTint, fontSize: 12.5, border: "none", cursor: "pointer",
+                          display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 26, width: "100%", borderRadius: 8,
+                          padding: "3px 7px", background: COLORS.clayTint, fontSize: 12, border: "none", borderLeft: `3px solid ${ctColor(client)}`, cursor: "pointer",
                           fontFamily: "inherit", textAlign: "left", boxShadow: freqStyle ? `inset 3px 0 0 ${freqStyle.ink}` : "none",
                           outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
                         }}
@@ -687,8 +690,8 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
                   <div
                     key={cid} title={tooltip}
                     style={{
-                      display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 30, borderRadius: RADIUS.chip, padding: "4px 8px",
-                      background: freqStyle ? freqStyle.bg : COLORS.lineSoft, fontSize: 12.5, outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
+                      display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 26, borderRadius: 8, padding: "3px 7px", borderLeft: `3px solid ${ctColor(client)}`,
+                      background: freqStyle ? freqStyle.bg : COLORS.lineSoft, fontSize: 12, outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
                       boxShadow: freqStyle ? `inset 3px 0 0 ${freqStyle.ink}` : "none",
                     }}
                   >
@@ -724,6 +727,12 @@ function AgendasScreen({ lang, setLang, absences, setAbsences, covers = [], setC
                 );
               })}
 
+              {clientIds.length > 3 && (
+                <button type="button" onClick={() => setExpandedCells((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; })}
+                  style={{ alignSelf: "flex-start", border: "none", background: "#151816", color: "#fff", borderRadius: 999, padding: "3px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                  {expandedCells.has(key) ? t.showLess : t.moreClients(clientIds.length - 3)}
+                </button>
+              )}
               {coverAway.map(({ clientId, cover }) => {
                 const client = clientById(clients, clientId);
                 if (!client) return null;

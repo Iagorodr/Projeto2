@@ -226,6 +226,7 @@ const T = {
       confirmDeleteBulkBody: (n) => `${n} cliente${n === 1 ? "" : "s"} ser${n === 1 ? "á" : "ão"} removido${n === 1 ? "" : "s"} para sempre, incluindo a remoção das agendas e as atribuições da semana atual.`,
     },
     agendas: {
+      moreClients: (n) => `+${n} clientes`, showLess: "Mostrar menos",
       title: "Agendas", subtitle: "Semana tipo, repete-se todas as semanas",
       searchPlaceholder: "Pesquisar funcionário ou cliente",
       footNote: "Quando 2+ funcionários têm o mesmo cliente no mesmo dia, viram equipa automaticamente (selo com o número de pessoas).",
@@ -1094,6 +1095,7 @@ const T = {
       confirmDeleteBulkBody: (n) => `${n} client${n === 1 ? "" : "s"} will be permanently removed, including removal from the schedules and this week's assignments.`,
     },
     agendas: {
+      moreClients: (n) => `+${n} clients`, showLess: "Show less",
       title: "Schedules", subtitle: "Typical week, repeats every week",
       searchPlaceholder: "Search staff or client",
       footNote: "When 2+ staff share the same client on the same day, they automatically become a team (badge with the headcount).",
@@ -1910,6 +1912,7 @@ const T = {
       confirmDeleteBulkBody: (n) => `${n} client${n === 1 ? "" : "s"} ser${n === 1 ? "a" : "ont"} supprimé${n === 1 ? "" : "s"} définitivement, y compris le retrait des agendas et les affectations de cette semaine.`,
     },
     agendas: {
+      moreClients: (n) => `+${n} clients`, showLess: "Afficher moins",
       title: "Plannings", subtitle: "Semaine type, se répète chaque semaine",
       searchPlaceholder: "Rechercher un employé ou un client",
       footNote: "Quand 2 employés ou plus ont le même client le même jour, ils forment automatiquement une équipe (badge avec le nombre de personnes).",
