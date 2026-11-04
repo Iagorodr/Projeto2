@@ -15,7 +15,6 @@ import { TODAY } from "../models/data.js";
 import { activeClientsCount, isStaffActive } from "../models/utils.js";
 import { diffKeys, mergeRemote, buildPatch, isMissingRpc } from "../models/horasSync.js";
 import { listDiff, listMerge, mapDiff, mapMerge, isEmptyDiff } from "../models/appDataSync.js";
-import { INITIAL_CLOSED_PERIODS } from "../models/seedHistory.js";
 import { supabase, isSupabaseConfigured } from "../models/supabaseClient.js";
 import { setStorageCompany, removeFile } from "../models/fileStorage.js";
 import {
@@ -129,7 +128,12 @@ export function useAppController() {
     horasRef.current = next;
     setHorasDataState(next);
   }, []);
-  const [closedPeriods, setClosedPeriods] = useState(START_EMPTY ? [] : INITIAL_CLOSED_PERIODS);
+  const [closedPeriods, setClosedPeriods] = useState([]);
+  // Histórico de demonstração (~340 kB) só é carregado no modo demonstração.
+  useEffect(() => {
+    if (START_EMPTY) return;
+    import("../models/seedHistory.js").then((m) => setClosedPeriods((prev) => (prev.length ? prev : m.INITIAL_CLOSED_PERIODS)));
+  }, []);
   const [missingItems, setMissingItems] = useState(START_EMPTY ? [] : INITIAL_MISSING);
   const [sentItems, setSentItems] = useState(START_EMPTY ? [] : INITIAL_SENT);
   const [personalNotes, setPersonalNotes] = useState([]);

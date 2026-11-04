@@ -1,6 +1,7 @@
 // Camada "View" raiz: lê o estado do controller e decide qual tela mostrar.
 // Não guarda estado do negócio — só consome useAppController().
 import { useEffect, useRef, useState } from "react";
+import { lazyPage, prefetchPages } from "./views/shared/lazyPage.jsx";
 import { MoreHorizontal, LogOut, Repeat, Download, CircleHelp } from "lucide-react";
 import { useInstallPrompt } from "./hooks/useInstallPrompt.js";
 import { useAppController } from "./controllers/useAppController.js";
@@ -21,37 +22,43 @@ import CompanyGateScreen from "./views/CompanyGateScreen.jsx";
 import CompanyBlockedScreen from "./views/CompanyBlockedScreen.jsx";
 import CompanyNotice from "./views/shared/CompanyNotice.jsx";
 import SetNewPasswordScreen from "./views/SetNewPasswordScreen.jsx";
-import DashboardScreen from "./views/management/DashboardScreen.jsx";
-import ClientesScreen from "./views/management/ClientesScreen.jsx";
-import ContratantesScreen from "./views/management/ContratantesScreen.jsx";
-import AgendasScreen from "./views/management/AgendasScreen.jsx";
-import HorasScreen from "./views/management/HorasScreen.jsx";
-import MonitoramentoScreen from "./views/management/MonitoramentoScreen.jsx";
-import AvisosScreen from "./views/management/AvisosScreen.jsx";
-import FuncionariosScreen from "./views/management/FuncionariosScreen.jsx";
-import AcessosScreen from "./views/management/AcessosScreen.jsx";
-import HistoricoScreen from "./views/management/HistoricoScreen.jsx";
-import DefinicoesScreen from "./views/management/DefinicoesScreen.jsx";
-import NotasScreen from "./views/shared/NotasScreen.jsx";
-import HelpScreen, { HelpDrawer, HelpFab } from "./views/shared/HelpScreen.jsx";
-import { helpTexts } from "./models/helpTexts.js";
-import Tutorial from "./views/tutorial/Tutorial.jsx";
+import { HelpFab, HELP_LABEL } from "./views/shared/HelpFab.jsx";
 import { applyTheme, DEFAULT_THEME } from "./styles/theme.js";
 
 // EmployeeMenuScreen.jsx (a lista de botões sem casca nenhuma) ficou
 // substituído pelo EmployeeInicioScreen novo + a casca da Etapa 3 abaixo
 // — ficheiro removido do projeto na limpeza pós-Etapa 4 (estava órfão,
 // sem nenhum import).
-import EmployeeHorasScreen from "./views/employee/EmployeeHorasScreen.jsx";
-import EmployeeAvisosScreen from "./views/employee/EmployeeAvisosScreen.jsx";
-import EmployeeAgendaScreen from "./views/employee/EmployeeAgendaScreen.jsx";
-import EmployeeClientesScreen from "./views/employee/EmployeeClientesScreen.jsx";
-import EmployeeHistoricoScreen from "./views/employee/EmployeeHistoricoScreen.jsx";
-import EmployeeInicioScreen from "./views/employee/EmployeeInicioScreen.jsx";
 // SupervisorDashboardScreen.jsx (o antigo "Início" do supervisor em
 // PC/tablet, só notas/lembretes) ficou substituído pelo EmployeeInicioScreen
 // novo (Etapa 4b, secção 5.1) — ficheiro removido do projeto na limpeza
 // pós-Etapa 4 (estava órfão, sem nenhum import).
+
+// Code splitting: cada página é carregada só quando é aberta (o telemóvel do
+// funcionário não descarrega as páginas da gerência, e vice-versa). Depois do
+// primeiro ecrã, as restantes páginas do perfil são pré-carregadas em segundo
+// plano, para a navegação continuar instantânea.
+const DashboardScreen = lazyPage(() => import("./views/management/DashboardScreen.jsx"));
+const ClientesScreen = lazyPage(() => import("./views/management/ClientesScreen.jsx"));
+const ContratantesScreen = lazyPage(() => import("./views/management/ContratantesScreen.jsx"));
+const AgendasScreen = lazyPage(() => import("./views/management/AgendasScreen.jsx"));
+const HorasScreen = lazyPage(() => import("./views/management/HorasScreen.jsx"));
+const MonitoramentoScreen = lazyPage(() => import("./views/management/MonitoramentoScreen.jsx"));
+const AvisosScreen = lazyPage(() => import("./views/management/AvisosScreen.jsx"));
+const FuncionariosScreen = lazyPage(() => import("./views/management/FuncionariosScreen.jsx"));
+const AcessosScreen = lazyPage(() => import("./views/management/AcessosScreen.jsx"));
+const HistoricoScreen = lazyPage(() => import("./views/management/HistoricoScreen.jsx"));
+const DefinicoesScreen = lazyPage(() => import("./views/management/DefinicoesScreen.jsx"));
+const HelpScreen = lazyPage(() => import("./views/shared/HelpScreen.jsx"));
+const HelpDrawer = lazyPage(() => import("./views/shared/HelpScreen.jsx").then((m) => ({ default: m.HelpDrawer })), { fallback: null });
+const NotasScreen = lazyPage(() => import("./views/shared/NotasScreen.jsx"));
+const Tutorial = lazyPage(() => import("./views/tutorial/Tutorial.jsx"), { fallback: null });
+const EmployeeHorasScreen = lazyPage(() => import("./views/employee/EmployeeHorasScreen.jsx"));
+const EmployeeAvisosScreen = lazyPage(() => import("./views/employee/EmployeeAvisosScreen.jsx"));
+const EmployeeAgendaScreen = lazyPage(() => import("./views/employee/EmployeeAgendaScreen.jsx"));
+const EmployeeClientesScreen = lazyPage(() => import("./views/employee/EmployeeClientesScreen.jsx"));
+const EmployeeHistoricoScreen = lazyPage(() => import("./views/employee/EmployeeHistoricoScreen.jsx"));
+const EmployeeInicioScreen = lazyPage(() => import("./views/employee/EmployeeInicioScreen.jsx"));
 
 export default function App() {
   const c = useAppController();
@@ -70,6 +77,11 @@ export default function App() {
     else if (roleThemeShownRef.current) applyTheme(DEFAULT_THEME);
     roleThemeShownRef.current = !!roleTheme;
   }, [activeTheme, roleTheme]);
+  // Depois de entrar, pré-carrega em segundo plano as páginas deste perfil.
+  useEffect(() => {
+    if (c.perspective === "management") prefetchPages([DashboardScreen, HorasScreen, MonitoramentoScreen, AgendasScreen, AvisosScreen, NotasScreen, ClientesScreen, FuncionariosScreen, ContratantesScreen, HistoricoScreen, AcessosScreen, DefinicoesScreen]);
+    else if (c.perspective === "employee") prefetchPages([EmployeeInicioScreen, EmployeeHorasScreen, EmployeeAgendaScreen, EmployeeAvisosScreen, EmployeeClientesScreen, EmployeeHistoricoScreen, NotasScreen]);
+  }, [c.perspective]);
   const install = useInstallPrompt();
   const isMobile = useIsMobile();
   // Casca nova da Etapa 3 (sidebar/rail/barra inferior); a gerência
@@ -312,7 +324,7 @@ export default function App() {
           />
           {mgmtContent}
           {c.screen !== "ajuda" && <HelpFab lang={c.lang} onClick={() => setHelpOpen(true)} />}
-          <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role="manager" screenKey={c.screen} userName={c.me?.name || c.company.name} onTutorial={openTutorial} />
+          {helpOpen && <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role="manager" screenKey={c.screen} userName={c.me?.name || c.company.name} onTutorial={openTutorial} />}
         </div>
         );
       })()}
@@ -432,7 +444,7 @@ export default function App() {
             // Ainda no navegador (não instalado): atalho para baixar o app.
             // Com o diálogo nativo (Chrome/Android) instala logo; nos outros
             // casos abre a página /instalar com o passo a passo.
-            { key: "ajuda", icon: CircleHelp, label: helpTexts(c.lang).ui.title, onSelect: () => c.setEmpScreen("ajuda") },
+            { key: "ajuda", icon: CircleHelp, label: HELP_LABEL[c.lang] || HELP_LABEL.pt, onSelect: () => c.setEmpScreen("ajuda") },
             ...(!install.installed ? [{
               key: "install", icon: Download, label: T[c.lang].common.installApp,
               onSelect: () => { if (install.canPromptNative) install.promptInstall(); else window.location.assign(`/instalar?lang=${c.lang}`); },
@@ -490,7 +502,7 @@ export default function App() {
               </div>
             </div>
             {c.empScreen !== "ajuda" && <HelpFab lang={c.lang} onClick={() => setHelpOpen(true)} />}
-            <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role={isSupervisor ? "supervisor" : "employee"} screenKey={c.empScreen} userName={c.me.name} onTutorial={openTutorial} />
+            {helpOpen && <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} lang={c.lang} role={isSupervisor ? "supervisor" : "employee"} screenKey={c.empScreen} userName={c.me.name} onTutorial={openTutorial} />}
           </div>
         );
       })()}

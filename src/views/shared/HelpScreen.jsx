@@ -357,20 +357,5 @@ export function HelpDrawer({ open, onClose, lang, role, screenKey, userName, onT
   );
 }
 
-// Botão fixo "?" (só PC/tablet), canto inferior direito.
-export function HelpFab({ lang, onClick }) {
-  const h = helpTexts(lang).ui;
-  return (
-    <button
-      type="button" onClick={onClick} aria-label={h.fabLabel} title={h.fabLabel}
-      style={{
-        position: "fixed", right: 22, bottom: 22, zIndex: 40, width: 52, height: 52, borderRadius: RADIUS.pill ?? 999,
-        border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-        background: `linear-gradient(180deg, ${COLORS.vivoBtnTop}, ${COLORS.vivoBtnBottom})`, color: "#fff",
-        boxShadow: SHADOW.sh2 || "0 10px 20px -8px rgba(31,122,95,.7)",
-      }}
-    >
-      <CircleHelp size={26} strokeWidth={2} />
-    </button>
-  );
-}
+// HelpFab vive em HelpFab.jsx (fica no pacote principal, sem os manuais).
+export { HelpFab } from "./HelpFab.jsx";

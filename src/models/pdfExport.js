@@ -1,8 +1,15 @@
 // Camada "Model": geração de relatórios em PDF de verdade (tabela formatada,
 // tipo planilha profissional), substituindo o antigo window.print() que só
 // imprimia a tela como estava (com botões, ícones de edição etc.).
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+// jsPDF (~400 kB) só é descarregado quando alguém exporta um PDF.
+let pdfLib = null;
+async function loadPdf() {
+  if (!pdfLib) {
+    const [{ jsPDF }, at] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+    pdfLib = { jsPDF, autoTable: at.default || at.autoTable };
+  }
+  return pdfLib;
+}
 import { clientById, entryClientName, fmtEuro, fmtHoursNum, expenseApprovedValue } from "./utils.js";
 
 // ---------------------------------------------------------------------------
@@ -230,6 +237,7 @@ function buildTotalsBox(doc, startY, totals) {
 // Relatório detalhado por funcionário: Data, Cliente, Horas, Valor/hora, Total
 // — igual às colunas já usadas na tela (Data/Cliente/Horas/Valor/Total).
 async function exportStaffHorasPdf({ companyName, companyInfo, staffName, periodLabel, entries, clients, totalHours, totalValue, expenses, lang, pdfT, provisional }) {
+  const { jsPDF, autoTable } = await loadPdf();
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const startY = await buildHeader(doc, {
     companyInfo,
@@ -336,6 +344,7 @@ async function exportStaffHorasPdf({ companyName, companyInfo, staffName, period
 // Resumo do período inteiro (todos os funcionários): Funcionário, Status,
 // Total de horas, Total a pagar — para o botão "Exportar PDF (geral)".
 async function exportPeriodSummaryPdf({ companyName, companyInfo, periodLabel, rows, totalHours, totalValue, totalExpenses, pdfT, statusLabels }) {
+  const { jsPDF, autoTable } = await loadPdf();
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const startY = await buildHeader(doc, {
     companyInfo,
@@ -376,6 +385,7 @@ async function exportPeriodSummaryPdf({ companyName, companyInfo, periodLabel, r
 // gerência (auditoria de um período já fechado: horas por funcionário +
 // contagens de reclamações/elogios/avisos/solicitações daquele período).
 async function exportGenericTablePdf({ companyName, companyInfo, reportTitle, subtitle, columns, rows, totals, columnStyles, fileName, pdfT }) {
+  const { jsPDF, autoTable } = await loadPdf();
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const startY = await buildHeader(doc, { companyName, reportTitle, subtitle, pdfT, companyInfo });
 
