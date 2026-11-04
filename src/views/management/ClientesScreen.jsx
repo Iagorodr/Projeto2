@@ -1,9 +1,10 @@
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
 import { MapTrigger } from "../shared/MapPicker.jsx";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useFileUrl } from "../../hooks/useFileUrl.js";
 import { findContractor, normName, normalizeContractorColor } from "../../models/contractors.js";
 import { FIN } from "../../models/i18nFin.js";
-import { Plus, Pencil, MapPin, Phone, Calendar, Euro, ChevronDown, Users, Megaphone } from "lucide-react";
+import { Plus, Pencil, MapPin, Phone, Calendar, Euro, ChevronDown, Users, Megaphone, Camera, RefreshCw, X, Image as ImageIcon } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
@@ -46,6 +47,43 @@ function contractStatus(client, contractAlertDays) {
   if (diffDays < 0) return { kind: "expired", diffDays: Math.abs(diffDays) };
   if (diffDays <= contractAlertDays) return { kind: "ending", diffDays };
   return { kind: "ok", diffDays };
+}
+
+// Foto do planning (folha de serviço do cliente) — topo da ficha, ao lado do mapa.
+// Tocar abre a foto inteira; "Trocar" envia outra; o × remove (com confirmação).
+function PlanningPhoto({ photo, t, busy, onPick, onRemove, height }) {
+  const { url } = useFileUrl(photo);
+  const inputId = useMemo(() => `planning-${Math.random().toString(36).slice(2)}`, []);
+  const input = (
+    <input type="file" id={inputId} accept="image/*" style={{ display: "none" }} disabled={busy}
+      onChange={(e) => { onPick(e.target.files[0]); e.target.value = ""; }} />
+  );
+  if (!photo) {
+    return (
+      <label htmlFor={inputId} style={{ height, borderRadius: 14, border: `1.5px dashed ${COLORS.lineInput}`, background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: busy ? "wait" : "pointer", color: COLORS.ink2, textAlign: "center", padding: 8 }}>
+        {input}
+        <Camera size={22} color={COLORS.primary} />
+        <span style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.25 }}>{busy ? "…" : t.b1PlanningAdd}</span>
+      </label>
+    );
+  }
+  return (
+    <div style={{ position: "relative", height, borderRadius: 14, overflow: "hidden", background: COLORS.lineSoft }}>
+      {input}
+      {url ? (
+        <a href={url} target="_blank" rel="noopener noreferrer" aria-label={t.b1PlanningOpen} style={{ display: "block", height: "100%" }}>
+          <img src={url} alt={t.b1Planning} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        </a>
+      ) : (
+        <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><ImageIcon size={22} color={COLORS.ink3} /></div>
+      )}
+      <span style={{ position: "absolute", left: 8, bottom: 8, fontSize: 11, fontWeight: 700, color: COLORS.ink, background: "rgba(255,255,255,.9)", padding: "2px 8px", borderRadius: 999, pointerEvents: "none" }}>{t.b1Planning}</span>
+      <div style={{ position: "absolute", right: 6, top: 6, display: "flex", gap: 4 }}>
+        <label htmlFor={inputId} title={t.b1PlanningChange} aria-label={t.b1PlanningChange} style={{ width: 30, height: 30, borderRadius: 10, background: "rgba(255,255,255,.92)", display: "flex", alignItems: "center", justifyContent: "center", cursor: busy ? "wait" : "pointer", color: COLORS.ink }}><RefreshCw size={14} /></label>
+        <button type="button" onClick={onRemove} title={t.b1PlanningRemove} aria-label={t.b1PlanningRemove} style={{ width: 30, height: 30, borderRadius: 10, border: "none", background: "rgba(255,255,255,.92)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLORS.dangerInk }}><X size={15} /></button>
+      </div>
+    </div>
+  );
 }
 
 // Pilha de avatares da equipa (documento, 4.2: coluna "Equipa") — até 3
@@ -161,6 +199,8 @@ function ClientesScreen({
   const [docRemoveIdx, setDocRemoveIdx] = useState(null);
   const [docBusyIdx, setDocBusyIdx] = useState(null);
   const [docError, setDocError] = useState("");
+  const [planningBusy, setPlanningBusy] = useState(false);
+  const [planningRemoveOpen, setPlanningRemoveOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
@@ -337,6 +377,27 @@ function ClientesScreen({
       setDocError(T[lang].files[uploadErrorKey(err)]);
     }
     setDocBusyIdx(null);
+  }
+
+  // Foto do planning: envia para o cofre (só imagens), troca a anterior e apaga-a.
+  async function uploadPlanning(clientId, file) {
+    if (!file || planningBusy) return;
+    setPlanningBusy(true); setDocError("");
+    try {
+      const ref = await uploadFile(file, { kind: KINDS.docsClients, ownerId: clientId, imagesOnly: true });
+      const old = (clients.find((c) => c.id === clientId) || {}).planningPhoto;
+      setClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, planningPhoto: ref } : c)));
+      if (old) removeFile(old);
+    } catch (err) {
+      setDocError(T[lang].files[uploadErrorKey(err)]);
+    }
+    setPlanningBusy(false);
+  }
+  function removePlanning(clientId) {
+    const old = (clients.find((c) => c.id === clientId) || {}).planningPhoto;
+    setClients((prev) => prev.map((c) => (c.id === clientId ? { ...c, planningPhoto: null } : c)));
+    if (old) removeFile(old);
+    setPlanningRemoveOpen(false);
   }
 
   const columns = [
@@ -559,7 +620,11 @@ function ClientesScreen({
             <div className="b1-cascade">
               <MapTrigger client={openClient} lang={lang} render={({ onOpen }) => (
                 <div style={{ borderRadius: RADIUS.card, background: COLORS.bg, padding: 10 }}>
-                  <MiniPlaceMap city={openClient.city} ariaLabel={t.b1MapAria(openClient.city || "")} />
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.35fr)", gap: 8 }}>
+                    <PlanningPhoto photo={openClient.planningPhoto} t={t} busy={planningBusy} height={132}
+                      onPick={(f) => uploadPlanning(openClient.id, f)} onRemove={() => setPlanningRemoveOpen(true)} />
+                    <MiniPlaceMap city={openClient.city} ariaLabel={t.b1MapAria(openClient.city || "")} />
+                  </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 4px 4px" }}>
                     <div style={{ width: 34, height: 34, borderRadius: 10, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <MapPin size={17} color={COLORS.primary} />
@@ -872,6 +937,17 @@ function ClientesScreen({
       {copyOpen && openClient && (
         <CopyClientsDialog lang={lang} title={T[lang].absences.shareTitleOne(openClient.name)} clients={[openClient]} onClose={() => setCopyOpen(false)} />
       )}
+
+      <ConfirmDialog
+        open={planningRemoveOpen && !!openClient}
+        title={t.b1PlanningRemove}
+        body={t.b1PlanningRemoveBody}
+        cancelLabel={c0.cancel}
+        confirmLabel={t.b1PlanningRemove}
+        destructive
+        onCancel={() => setPlanningRemoveOpen(false)}
+        onConfirm={() => openClient && removePlanning(openClient.id)}
+      />
 
       <ConfirmDialog
         open={docRemoveIdx != null && !!openClient}

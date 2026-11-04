@@ -20,7 +20,7 @@ import { setStorageCompany, removeFile } from "../models/fileStorage.js";
 import {
   toDbClient, fromDbClient, toDbStaff, fromDbStaff,
   toDbCompanySettings, fromDbCompanySettings,
-  toDbContractor, fromDbContractor, toDbClosing, fromDbClosing, setSellPriceColumn,
+  toDbContractor, fromDbContractor, toDbClosing, fromDbClosing, setSellPriceColumn, setPlanningColumn, toDbStaffPrivate,
 } from "../models/dbMappers.js";
 import { deriveContractors } from "../models/contractors.js";
 import {
@@ -91,6 +91,8 @@ export function useAppController() {
   // Meses fechados por contratante (supabase/contratantes_fecho.sql). Gravados um a um, ao fechar/reabrir/marcar.
   const [contractorClosings, setContractorClosings] = useState([]);
   const closingsReadyRef = useRef(false);
+  // `staff_private` (NIF, só gerência) existe e foi lida: só então se grava.
+  const staffPrivateReadyRef = useRef(false);
   const closingsRef = useRef([]);
   closingsRef.current = contractorClosings;
   const [staff, setStaff] = useState(START_EMPTY ? [] : INITIAL_STAFF);
@@ -463,18 +465,21 @@ export function useAppController() {
     let staffList = staff;
     let ok = true;
     try {
-      const [clientsRes, staffRes, settingsRes, appDataRes, contractorsRes, closingsRes] = await Promise.all([
+      const [clientsRes, staffRes, settingsRes, appDataRes, contractorsRes, closingsRes, staffPrivateRes] = await Promise.all([
         supabase.from("clients").select("*"),
         supabase.from("staff").select("*"),
         supabase.from("company_settings").select("*").eq("id", companyIdRef.current).maybeSingle(),
         supabase.from("app_data").select("*").eq("id", companyIdRef.current).maybeSingle(),
         supabase.from("contractors").select("*"),
         supabase.from("contractor_periods").select("*"),
+        // Só a gerência recebe linhas (RLS); para a equipa vem vazio.
+        supabase.from("staff_private").select("staff_id, nif"),
       ]);
 
       if (clientsRes.error) { console.error("Erro ao carregar clientes:", clientsRes.error); ok = false; }
       else if (clientsRes.data && (START_EMPTY || clientsRes.data.length > 0)) {
         setSellPriceColumn(clientsRes.data.length === 0 || "sell_price" in clientsRes.data[0]);
+        setPlanningColumn(clientsRes.data.length === 0 || "planning_photo" in clientsRes.data[0]);
         setClients(clientsRes.data.map(fromDbClient));
       }
 
@@ -510,6 +515,15 @@ export function useAppController() {
       if (staffRes.error) { console.error("Erro ao carregar funcionários:", staffRes.error); ok = false; }
       else if (staffRes.data && (START_EMPTY || staffRes.data.length > 0)) {
         staffList = staffRes.data.map(fromDbStaff);
+        // NIF (staff_private): tabela ainda por criar → não é erro, o NIF só não fica guardado.
+        if (staffPrivateRes && !staffPrivateRes.error && Array.isArray(staffPrivateRes.data)) {
+          staffPrivateReadyRef.current = true;
+          const nifBy = new Map(staffPrivateRes.data.map((r) => [Number(r.staff_id), r.nif || ""]));
+          staffList = staffList.map((st) => ({ ...st, nif: nifBy.get(Number(st.id)) || "" }));
+        } else {
+          staffPrivateReadyRef.current = false;
+          if (staffPrivateRes && staffPrivateRes.error) console.warn("Tabela `staff_private` ausente: correr supabase/fichas_planning_nif.sql. NIF só em memória.");
+        }
         setStaff(staffList);
       }
 
@@ -874,7 +888,12 @@ export function useAppController() {
   useEffect(() => {
     if (!hydrated || !isSupabaseConfigured || !readOk || perspective !== "management") return;
     upsertWithDocs("staff", staff.map(toDbStaff)).then(({ error }) => {
-      if (error) console.error("Erro ao gravar funcionários:", error);
+      if (error) { console.error("Erro ao gravar funcionários:", error); return; }
+      // Depois de `staff` (a chave estrangeira precisa do funcionário já gravado).
+      if (!staffPrivateReadyRef.current || staff.length === 0) return;
+      supabase.from("staff_private").upsert(staff.map(toDbStaffPrivate)).then(({ error: e2 }) => {
+        if (e2) console.error("Erro ao gravar NIF:", e2);
+      });
     });
   }, [hydrated, readOk, perspective, staff]);
 

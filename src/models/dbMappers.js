@@ -42,6 +42,9 @@ function docsFromDb(value) {
 // descobre isso ao ler os clientes e, se faltar, não a envia (para não falhar a gravação dos clientes).
 let sellPriceColumn = true;
 export function setSellPriceColumn(available) { sellPriceColumn = !!available; }
+// Idem para `planning_photo` (supabase/fichas_planning_nif.sql).
+let planningColumn = true;
+export function setPlanningColumn(available) { planningColumn = !!available; }
 
 function toDbClient(c) {
   return {
@@ -56,6 +59,7 @@ function toDbClient(c) {
     hours_month: numOrNull(c.hoursMonth),
     value_hour: numOrNull(c.valueHour),
     ...(sellPriceColumn ? { sell_price: numOrNull(c.sellPrice) } : {}),
+    ...(planningColumn ? { planning_photo: refForDb(c.planningPhoto) } : {}),
     frequency: c.frequency,
     frequency_anchor: c.frequencyAnchor || null,
     availability: c.availability,
@@ -100,6 +104,7 @@ function fromDbClient(row) {
     clientValidUntil: row.client_valid_until || "",
     origin: row.origin || "",
     documents: docsFromDb(row.documents),
+    planningPhoto: row.planning_photo && typeof row.planning_photo === "object" && row.planning_photo.path ? { ...row.planning_photo } : null,
   };
 }
 
@@ -230,6 +235,11 @@ function fromDbStaff(row) {
   };
 }
 
+// Dados só da gerência (supabase/fichas_planning_nif.sql → staff_private).
+function toDbStaffPrivate(s) {
+  return { staff_id: s.id, nif: (s.nif || "").trim() || null };
+}
+
 function toDbCompanySettings({ company, cutoffDay, contractAlertDays, closeDeadlineDays, highlightsMonths, highlightsRealtime, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount }) {
   // Sem `id`: a linha da empresa é escolhida por quem grava (`.eq("id", <empresa>)`).
   return {
@@ -276,7 +286,7 @@ function fromDbCompanySettings(row) {
 export {
   refForDb, docsForDb, docsFromDb,
   toDbClient, fromDbClient,
-  toDbStaff, fromDbStaff,
+  toDbStaff, fromDbStaff, toDbStaffPrivate,
   toDbCompanySettings, fromDbCompanySettings,
   toDbContractor, fromDbContractor, toDbClosing, fromDbClosing,
 };

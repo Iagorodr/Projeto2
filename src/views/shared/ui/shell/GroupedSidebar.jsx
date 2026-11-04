@@ -6,6 +6,8 @@
 //   fechado:      trilho só com ícones; linha fina entre grupos; contador vira
 //                 ponto amarelo.
 // O estado aberto/fechado fica guardado neste aparelho.
+// Opção B (escolhida pelo Iago): o último grupo (Sistema: Acessos, Definições,
+// Ajuda) e o Sair ficam fixos no fundo como botões com ícone — sempre à vista.
 // Nunca corta itens: conforme a altura disponível, primeiro aperta (linhas mais
 // baixas, sem títulos de grupo); se ainda não couber, os últimos grupos passam
 // para um botão «•••» com popover (Sistema primeiro, depois Dinheiro, …). Como
@@ -41,7 +43,9 @@ function GroupedSidebar({
   const moreWrapRef = useRef(null);
   // `keep` = quantos itens (pela ordem do menu) ficam no trilho; o resto vai para o «•••».
   // Vai item a item (não grupo a grupo) para nunca sobrar espaço vazio por cima do «•••».
-  const totalItems = groups.reduce((n, g) => n + g.items.length, 0);
+  const footGroup = groups.length > 1 ? groups[groups.length - 1] : null;
+  const railGroups = footGroup ? groups.slice(0, -1) : groups;
+  const totalItems = railGroups.reduce((n, g) => n + g.items.length, 0);
   const [fit, setFit] = useState({ dense: false, keep: totalItems });
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = moreWrapRef;
@@ -49,7 +53,7 @@ function GroupedSidebar({
   const required = useCallback((dense, keep) => {
     const itemH = dense ? H.itemDense : H.item;
     let h = 0, left = keep, gi = 0;
-    for (const g of groups) {
+    for (const g of railGroups) {
       if (left <= 0) break;
       const n = Math.min(left, g.items.length);
       if (gi > 0) h += H.gap + (dense ? H.sepDense : collapsed ? H.sepClosed : H.sepOpen);
@@ -60,7 +64,7 @@ function GroupedSidebar({
     if (extraItems.length) h += H.extraPad + extraItems.length * (itemH + H.gap);
     if (keep < totalItems) h += 13 + itemH; // botão «•••» + linha
     return h + 2; // folga
-  }, [groups, extraItems.length, collapsed, totalItems]);
+  }, [railGroups, extraItems.length, collapsed, totalItems]);
 
   const measure = useCallback(() => {
     const area = areaRef.current;
@@ -103,7 +107,7 @@ function GroupedSidebar({
   const moreGroups = [];
   {
     let left = Math.min(fit.keep, totalItems);
-    groups.forEach((g) => {
+    railGroups.forEach((g) => {
       const n = Math.max(0, Math.min(left, g.items.length));
       if (n > 0) mainGroups.push(n === g.items.length ? g : { ...g, items: g.items.slice(0, n) });
       if (n < g.items.length) moreGroups.push(n === 0 ? g : { ...g, key: `${g.key}-more`, items: g.items.slice(n) });
@@ -198,7 +202,7 @@ function GroupedSidebar({
     >
       {user && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: collapsed ? "0 0 12px" : "2px 4px 12px", justifyContent: collapsed ? "center" : "flex-start" }}>
-          <LogoBadge size={collapsed ? 44 : 44} tone="light" />
+          <LogoBadge size={collapsed ? 40 : 44} tone="light" />
           {!collapsed && (
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.name}</div>
@@ -208,20 +212,20 @@ function GroupedSidebar({
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: collapsed ? "column" : "row", gap: 6, marginBottom: 10 }}>
+      <div style={{ display: "flex", flexDirection: "row", gap: collapsed ? 4 : 6, marginBottom: 10 }}>
         <button
           type="button" onClick={() => setCollapsed(!collapsed)}
           title={collapsed ? labels.expand : labels.collapse} aria-label={collapsed ? labels.expand : labels.collapse}
-          style={{ flex: collapsed ? "none" : 1, height: 36, borderRadius: 10, border: "1px solid rgba(255,255,255,.22)", background: "rgba(255,255,255,.08)", color: "#fff", display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 8, padding: collapsed ? 0 : "0 10px", fontSize: 12.5, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}
+          style={{ flex: 1, minWidth: 0, height: collapsed ? 30 : 36, borderRadius: collapsed ? 9 : 10, border: "1px solid rgba(255,255,255,.22)", background: "rgba(255,255,255,.08)", color: "#fff", display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 8, padding: collapsed ? 0 : "0 10px", fontSize: 12.5, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}
         >
-          {collapsed ? <ChevronsRight size={17} /> : <><ChevronsLeft size={17} /> {labels.collapse}</>}
+          {collapsed ? <ChevronsRight size={15} /> : <><ChevronsLeft size={17} /> {labels.collapse}</>}
         </button>
         {onSearch && (
           <button
             type="button" onClick={onSearch} title={`${labels.search} (Ctrl+K)`} aria-label={labels.search}
-            style={{ width: collapsed ? "100%" : 36, height: 36, borderRadius: 10, border: "1px solid rgba(255,255,255,.22)", background: "rgba(255,255,255,.08)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            style={{ width: collapsed ? undefined : 36, flex: collapsed ? 1 : "none", minWidth: 0, height: collapsed ? 30 : 36, borderRadius: collapsed ? 9 : 10, border: "1px solid rgba(255,255,255,.22)", background: "rgba(255,255,255,.08)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
           >
-            <Search size={17} />
+            <Search size={collapsed ? 15 : 17} />
           </button>
         )}
       </div>
@@ -269,13 +273,41 @@ function GroupedSidebar({
         </div>
       )}
 
-      <button
-        type="button" onClick={onLogout} aria-label={logoutLabel} title={collapsed ? logoutLabel : undefined}
-        style={{ display: "flex", alignItems: "center", gap: 10, height: 42, marginTop: 8, padding: collapsed ? 0 : "0 10px", justifyContent: collapsed ? "center" : "flex-start", border: "none", borderTop: "1px solid rgba(255,255,255,.16)", background: "transparent", color: "rgba(255,255,255,.85)", fontSize: 13.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", flexShrink: 0 }}
-      >
-        <LogOut size={18} />
-        {!collapsed && logoutLabel}
-      </button>
+      {/* Rodapé fixo: Sistema + Sair como botões com ícone (opção B). */}
+      {(() => {
+        const items = [...(footGroup ? footGroup.items : []), { key: "__logout", icon: LogOut, label: logoutLabel, onClick: onLogout }];
+        return (
+          <div role="group" aria-label={footGroup ? footGroup.label : logoutLabel}
+            style={{
+              flexShrink: 0, marginTop: 8, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,.16)",
+              display: "grid", gap: collapsed ? 4 : 2,
+              gridTemplateColumns: collapsed ? "1fr 1fr" : `repeat(${items.length}, minmax(0, 1fr))`,
+            }}>
+            {items.map((it) => {
+              const active = it.key === activeKey;
+              const Icon = it.icon;
+              const hasBadge = it.badge != null && it.badge > 0;
+              return (
+                <button key={it.key} type="button"
+                  onClick={() => (it.onClick ? it.onClick() : onNavigate(it.key))}
+                  title={it.label} aria-label={it.label} aria-current={active ? "page" : undefined}
+                  className="sx-footbtn"
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: 0, border: "none", background: "transparent", color: "#fff", cursor: "pointer", fontFamily: "inherit", minWidth: 0 }}>
+                  <span className="sx-footicon" data-active={active ? "1" : undefined} style={{
+                    position: "relative", width: collapsed ? "100%" : 40, height: collapsed ? 30 : 34, borderRadius: collapsed ? 9 : 10, display: "flex", alignItems: "center", justifyContent: "center",
+                    border: active ? "1px solid #fff" : "1px solid rgba(255,255,255,.22)", background: active ? "#fff" : "rgba(255,255,255,.08)",
+                    color: active ? "var(--p1)" : "#fff", transition: "background .15s",
+                  }}>
+                    <Icon size={collapsed ? 15 : 17} strokeWidth={active ? 2.3 : 1.9} />
+                    {hasBadge && <span style={{ position: "absolute", top: -3, right: -3, width: 9, height: 9, borderRadius: 9, background: "#F2C14E", boxShadow: "0 0 0 2px var(--p1)" }} />}
+                  </span>
+                  {!collapsed && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "-0.01em", opacity: active ? 1 : 0.85, maxWidth: "100%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</span>}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
     </nav>
   );
 }

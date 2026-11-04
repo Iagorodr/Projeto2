@@ -186,3 +186,4 @@ html {
 /* Menu lateral: se mesmo apertado não couber, a lista rola sem barra visível. */
 .sx-navscroll { scrollbar-width: none; }
 .sx-navscroll::-webkit-scrollbar { display: none; }
+@media (hover: hover) { .sx-footbtn:hover .sx-footicon:not([data-active]) { background: rgba(255,255,255,.18) !important; } }

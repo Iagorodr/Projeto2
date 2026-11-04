@@ -20,7 +20,7 @@ import KnownClientsSection from "./KnownClientsSection.jsx";
 const DOC_ACCEPT = "image/*,application/pdf,.doc,.docx,.xls,.xlsx";
 const EMPTY_STAFF = {
   name: "", email: "", contact: "", accountType: "fixo", status: "ativo", validUntil: "",
-  iban: "", role: "funcionario", canViewAllClients: false, canExpenses: false, partnerId: null, startDate: "", documents: [null, null, null, null],
+  iban: "", nif: "", role: "funcionario", canViewAllClients: false, canExpenses: false, partnerId: null, startDate: "", documents: [null, null, null, null],
 };
 
 // "YYYY-MM-DD" -> "23/09" (documento, 4.9: "Expirou a 23/09", "até 23/09").
@@ -446,8 +446,13 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
                 </Card>
               )}
 
-              <ProfileSection title={t.sectionIban}>
-                <MaskedIban iban={openStaff.iban} t={t} />
+              <ProfileSection title={t.b1PayTax}>
+                <div style={styles.viewGrid}>
+                  <ViewField label={t.sectionIban} full><MaskedIban iban={openStaff.iban} t={t} /></ViewField>
+                  <ViewField label={t.b1Nif} full>
+                    {openStaff.nif ? <span style={{ fontFamily: "monospace", fontSize: 13.5, letterSpacing: "0.02em" }}>{openStaff.nif}</span> : <span style={{ color: COLORS.ink3 }}>–</span>}
+                  </ViewField>
+                </div>
               </ProfileSection>
 
               <ProfileSection title={t.sectionAccount}>
@@ -572,6 +577,10 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
             </Field>
             <Field label={t.fIban}>
               <input type="text" style={styles.input} value={draft.iban} onChange={(e) => updateDraft("iban", e.target.value)} placeholder="BE00 0000 0000 0000" />
+            </Field>
+            <Field label={t.b1Nif}>
+              <input type="text" inputMode="text" autoComplete="off" style={styles.input} value={draft.nif || ""} onChange={(e) => updateDraft("nif", e.target.value)} placeholder="BE 0123.456.789" />
+              <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 4 }}>{t.b1NifHint}</div>
             </Field>
             <Field label={t.fAccountType} required>
               <select style={styles.input} value={draft.accountType} onChange={(e) => updateDraft("accountType", e.target.value)}>
