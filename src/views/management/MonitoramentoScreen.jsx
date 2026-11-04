@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, Lock, ArrowLeft } from "lucide-react";
+import { AlertTriangle, Check, Lock, ArrowLeft, Bell } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT, SHADOW } from "../../styles/tokens.js";
@@ -13,6 +13,9 @@ import { T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
   PageHeader, MobileHeader, Card, Pill, Avatar, FilterChip, SearchField, Button, Drawer, DataTable, InfoTip, ChevronCircle, ConfirmDialog,
 } from "../shared/ui/index.js";
+
+// Botões das linhas: mais baixos que os do resto do ecrã (a tabela fica mais leve).
+const ROW_BTN = { height: 34, padding: "0 12px", whiteSpace: "nowrap" };
 import EmployeeHorasScreen from "../employee/EmployeeHorasScreen.jsx";
 
 // Monitoramento — documento de design, secções 4.4/4.5 (mesmo ficheiro; o
@@ -266,17 +269,18 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       // cortado (sem reticências, porque o `overflow: hidden` de
       // DataTable.jsx não aplica elipse a um filho em flex/bloco como um
       // `<Button>`, só a texto que estoura direto na célula).
-      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 300, allowOverflow: true, mobileFull: true,
+      key: "gaps", label: t.colGaps, width: 1.4, minWidth: 290, allowOverflow: true, mobileFull: true,
       render: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }} onClick={(ev) => ev.stopPropagation()}>
           {row.totalGaps > 0 && <span style={{ fontWeight: 700, color: COLORS.alert, fontSize: 13 }}>{row.totalGaps}</span>}
           {row.totalGaps > 0 && setSentItems && (
-            <Button variant="secondary" style={{ padding: "0 12px", whiteSpace: "nowrap" }} disabled={remindedIds.includes(row.staffMember.id)} onClick={() => remindStaff(row.staffMember.id, row.totalGaps)}>
+            <Button variant="secondary" icon={remindedIds.includes(row.staffMember.id) ? undefined : Bell} style={ROW_BTN} disabled={remindedIds.includes(row.staffMember.id)} onClick={() => remindStaff(row.staffMember.id, row.totalGaps)}>
               {remindedIds.includes(row.staffMember.id) ? t.reminded : t.remind}
             </Button>
           )}
-          {setHorasData && <Button variant="secondary" style={{ padding: "0 12px", whiteSpace: "nowrap" }} onClick={() => setFill({ staffId: row.staffMember.id, date: null })}>{t.fillHours}</Button>}
-          <Button variant="secondary" style={{ padding: "0 12px", whiteSpace: "nowrap" }} onClick={() => setOpenStaffId(row.staffMember.id)}>{t.viewExtract}</Button>
+          {setHorasData && <Button variant="secondary" style={ROW_BTN} onClick={() => setFill({ staffId: row.staffMember.id, date: null })}>{t.fillHours}</Button>}
+          {/* "Ver mês" é secundário: texto, para a linha não ter três botões iguais. */}
+          <Button variant="ghost" style={{ ...ROW_BTN, padding: "0 6px" }} onClick={() => setOpenStaffId(row.staffMember.id)}>{t.viewExtract}</Button>
         </div>
       ),
     },

@@ -38,8 +38,8 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   const [weekStart, setWeekStart] = useState(() => startOfISOWeek(TODAY));
   const todayDay = TODAY.getDay() === 0 ? 7 : TODAY.getDay();
   const [expandedDay, setExpandedDay] = useState(todayDay);
-  // Mobile: dia selecionado no WeekStrip (1–5)
-  const [selectedDay, setSelectedDay] = useState(todayDay <= 5 ? todayDay : 1);
+  // Mobile: dia selecionado no WeekStrip (hoje, incluindo sábado/domingo)
+  const [selectedDay, setSelectedDay] = useState(todayDay);
 
   const weekDates = AGENDA_DAYS.map((_, i) => addDays(weekStart, i));
   const isCurrentWeek = isoDateStr(weekStart) === isoDateStr(startOfISOWeek(TODAY));
@@ -169,7 +169,8 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
           {client.address && (
             <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginTop: 6, fontSize: 12.5, color: COLORS.ink2, lineHeight: 1.4 }}>
               <MapPin size={13} style={{ flexShrink: 0, marginTop: 1 }} />
-              <span>{client.address}{client.city ? `, ${client.city}` : ""}</span>
+              {/* A morada muitas vezes já termina na cidade: não a repetir ("…, Ottignies, Ottignies"). */}
+              <span>{client.address}{client.city && !String(client.address).toLowerCase().includes(String(client.city).toLowerCase()) ? `, ${client.city}` : ""}</span>
             </div>
           )}
 
@@ -312,9 +313,11 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   }
 
   // ── Vista mobile (novo design) ──
-  // WeekStrip de 5 dias (Seg–Sex), cartões com barra colorida, resumo semanal em tabela
-  const WORK_DAYS = [1, 2, 3, 4, 5];
-  const DAY_ABBR = { pt: ["SEG", "TER", "QUA", "QUI", "SEX"], en: ["MON", "TUE", "WED", "THU", "FRI"], fr: ["LUN", "MAR", "MER", "JEU", "VEN"] };
+  // Faixa Seg–Sex; sábado e domingo entram quando há clientes (ou é hoje / o dia
+  // escolhido) — antes ficavam sempre de fora e quem trabalha ao fim de semana não
+  // via esses clientes nem as horas no total da semana.
+  const WORK_DAYS = AGENDA_DAYS.filter((d) => d <= 5 || getDayOccurrences(d).length > 0 || (isCurrentWeek && d === todayDay) || d === selectedDay);
+  const DAY_ABBR = { pt: ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"], en: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"], fr: ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"] };
   const abbrs = DAY_ABBR[lang] || DAY_ABBR.pt;
 
   const stripDays = WORK_DAYS.map((day, i) => {
@@ -325,13 +328,13 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     if (day === selectedDay) state = "selected";
     else if (occ.length === 0) state = "noClients";
     else state = "registered";
-    return { key: day, dayLabel: abbrs[i], dayNumber: date.getDate(), state, isToday };
+    return { key: day, dayLabel: abbrs[day - 1], dayNumber: date.getDate(), state, isToday };
   });
 
   const selOcc = getDayOccurrences(selectedDay);
   const selTotalMin = getDayTotalMinutes(selectedDay, selOcc);
 
-  // Resumo semanal: dias × horas (só Seg–Sex)
+  // Resumo semanal: dias × horas (os mesmos dias da faixa)
   const weekSummary = WORK_DAYS.map((day) => {
     const occ = getDayOccurrences(day);
     return { day, minutes: getDayTotalMinutes(day, occ) };

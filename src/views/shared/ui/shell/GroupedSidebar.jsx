@@ -6,10 +6,12 @@
 //   fechado:      trilho só com ícones; linha fina entre grupos; contador vira
 //                 ponto amarelo.
 // O estado aberto/fechado fica guardado neste aparelho.
-// Nunca faz scroll: se a altura ficar abaixo de ~700 px, o grupo Sistema colapsa
-// num botão «•••» com popover.
+// Nunca corta itens: conforme a altura disponível, primeiro aperta (linhas mais
+// baixas, sem títulos de grupo); se ainda não couber, os últimos grupos passam
+// para um botão «•••» com popover (Sistema primeiro, depois Dinheiro, …). Como
+// último recurso a lista faz scroll — nunca esconde páginas.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LogOut, ChevronsLeft, ChevronsRight, Search, MoreHorizontal, X } from "lucide-react";
+import { LogOut, ChevronsLeft, ChevronsRight, Search, MoreHorizontal } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
 import { Avatar } from "../Avatar.jsx";
 import { LogoBadge } from "../../Logo.jsx";
@@ -20,7 +22,8 @@ function readCollapsed(def) {
   try { const v = localStorage.getItem(STORE_KEY); return v == null ? def : v === "1"; } catch { return def; }
 }
 
-const COMPACT_THRESHOLD = 700;
+// Alturas (px) usadas para calcular o que cabe. Têm de bater com os estilos abaixo.
+const H = { item: 40, itemDense: 32, gap: 2, label: 25, sepOpen: 11, sepClosed: 17, sepDense: 9, extraPad: 17 };
 
 function GroupedSidebar({
   groups, activeKey, onNavigate, user, onLogout, logoutLabel, extraItems = [],
@@ -32,21 +35,50 @@ function GroupedSidebar({
   const setCollapsed = (v) => { setCollapsedRaw(v); try { localStorage.setItem(STORE_KEY, v ? "1" : "0"); } catch { /* ignora */ } };
   const width = collapsed ? 76 : 244;
 
-  // ── medir altura e compactar o grupo Sistema ──
+  // ── medir a altura disponível e decidir densidade / grupos no «•••» ──
   const navRef = useRef(null);
-  const [compact, setCompact] = useState(false);
+  const areaRef = useRef(null);
+  const moreWrapRef = useRef(null);
+  const [fit, setFit] = useState({ dense: false, overflow: 0 });
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef(null);
+  const moreRef = moreWrapRef;
+
+  const required = useCallback((dense, overflow) => {
+    const itemH = dense ? H.itemDense : H.item;
+    const kept = groups.slice(0, groups.length - overflow);
+    let h = 0;
+    kept.forEach((g, gi) => {
+      if (gi > 0) h += H.gap + (dense ? H.sepDense : collapsed ? H.sepClosed : H.sepOpen);
+      if (!collapsed && !dense) h += H.label;
+      h += g.items.length * (itemH + H.gap);
+    });
+    if (extraItems.length) h += H.extraPad + extraItems.length * (itemH + H.gap);
+    if (overflow > 0) h += 13 + itemH; // botão «•••» + linha
+    return h;
+  }, [groups, extraItems.length, collapsed]);
+
+  const measure = useCallback(() => {
+    const area = areaRef.current;
+    if (!area) return;
+    const moreH = moreWrapRef.current ? moreWrapRef.current.offsetHeight + 4 : 0;
+    const avail = area.clientHeight + moreH;
+    const options = [];
+    for (let o = 0; o < groups.length; o += 1) { options.push({ dense: false, overflow: o }); options.push({ dense: true, overflow: o }); }
+    // Prefere: nada no «•••» e normal; depois apertado; depois ir passando grupos.
+    const ordered = [{ dense: false, overflow: 0 }, { dense: true, overflow: 0 }, ...options.filter((x) => x.overflow > 0 && x.dense)];
+    const pick = ordered.find((x) => required(x.dense, x.overflow) <= avail) || { dense: true, overflow: Math.max(0, groups.length - 1) };
+    setFit((cur) => (cur.dense === pick.dense && cur.overflow === pick.overflow ? cur : pick));
+  }, [groups.length, required]);
 
   useEffect(() => {
     const el = navRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setCompact(entry.contentRect.height < COMPACT_THRESHOLD);
-    });
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(() => measure());
     ro.observe(el);
+    measure();
     return () => ro.disconnect();
-  }, []);
+  }, [measure]);
+  useEffect(() => { measure(); }, [collapsed, measure]);
 
   // fechar popover ao clicar fora
   useEffect(() => {
@@ -56,10 +88,12 @@ function GroupedSidebar({
     return () => document.removeEventListener("pointerdown", onClick);
   }, [moreOpen]);
 
-  // separar: os primeiros N-1 grupos ficam sempre, o último (Sistema) pode colapsar
-  const mainGroups = compact ? groups.slice(0, -1) : groups;
-  const systemGroup = compact ? groups[groups.length - 1] : null;
-  const systemHasActive = systemGroup ? systemGroup.items.some((it) => it.key === activeKey) : false;
+  const dense = fit.dense;
+  const mainGroups = fit.overflow > 0 ? groups.slice(0, groups.length - fit.overflow) : groups;
+  const moreGroups = fit.overflow > 0 ? groups.slice(groups.length - fit.overflow) : [];
+  const moreHasActive = moreGroups.some((g) => g.items.some((it) => it.key === activeKey));
+  const moreBadge = moreGroups.reduce((s, g) => s + g.items.reduce((t, it) => t + (it.badge > 0 ? it.badge : 0), 0), 0);
+  const itemH = dense ? H.itemDense : H.item;
 
   const renderItem = (item, i, opts = {}) => {
     const active = item.key === activeKey;
@@ -82,8 +116,8 @@ function GroupedSidebar({
           color: active ? "var(--p2)" : COLORS.ink,
         } : {
           display: "flex", alignItems: "center", gap: 11, position: "relative", width: "100%",
-          height: 40, padding: collapsed ? 0 : "0 10px", justifyContent: collapsed ? "center" : "flex-start",
-          borderRadius: 15, border: "none", cursor: "pointer", fontFamily: "inherit",
+          height: itemH, flexShrink: 0, padding: collapsed ? 0 : "0 10px", justifyContent: collapsed ? "center" : "flex-start",
+          borderRadius: dense ? 12 : 15, border: "none", cursor: "pointer", fontFamily: "inherit",
           background: active ? "#fff" : "transparent", color: active ? "var(--p2)" : "#fff",
           animationDelay: `${i * 22}ms`,
         }}
@@ -110,20 +144,23 @@ function GroupedSidebar({
 
   let n = 0;
 
-  // popover do «•••»
-  const morePopover = moreOpen && systemGroup && (
+  // popover do «•••»: os grupos que não couberam, cada um com o seu título.
+  const morePopover = moreOpen && moreGroups.length > 0 && (
     <div
+      role="menu"
       style={{
-        position: "absolute", bottom: "100%", left: collapsed ? 0 : 4, marginBottom: 8,
-        minWidth: 180, background: COLORS.card, borderRadius: 14,
+        position: "absolute", bottom: 0, left: "calc(100% + 10px)",
+        width: 220, maxHeight: "calc(100dvh - 48px)", overflowY: "auto", background: COLORS.card, borderRadius: 14,
         boxShadow: "0 12px 40px rgba(21,24,22,.22)", padding: 6,
-        zIndex: 10, display: "flex", flexDirection: "column", gap: 2,
+        zIndex: 60, display: "flex", flexDirection: "column", gap: 2, animation: "sx-pop-in .18s var(--ease) both",
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: COLORS.ink3, padding: "6px 12px 4px" }}>
-        {systemGroup.label}
-      </div>
-      {systemGroup.items.map((it) => renderItem(it, 0, { inPopover: true }))}
+      {moreGroups.map((g, gi) => (
+        <div key={g.key} style={{ display: "flex", flexDirection: "column", gap: 2, borderTop: gi ? `1px solid ${COLORS.lineSoft}` : "none", paddingTop: gi ? 4 : 0, marginTop: gi ? 4 : 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: COLORS.ink3, padding: "6px 12px 4px" }}>{g.label}</div>
+          {g.items.map((it) => renderItem(it, 0, { inPopover: true }))}
+        </div>
+      ))}
     </div>
   );
 
@@ -137,7 +174,7 @@ function GroupedSidebar({
         padding: collapsed ? "16px 12px" : "16px 14px", boxSizing: "border-box", borderRadius: collapsed ? 38 : 30,
         background: "var(--p1)", color: "#fff", transition: "width .28s var(--ease), padding .28s var(--ease), border-radius .28s var(--ease)",
         boxShadow: "0 18px 40px -24px var(--p1-shadow)",
-        overflow: "visible",
+        overflow: "visible", zIndex: 40,
       }}
     >
       {user && (
@@ -170,40 +207,44 @@ function GroupedSidebar({
         )}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 2, overflow: "hidden" }}>
+      <div ref={areaRef} className="sx-navscroll" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", overflowX: "hidden" }}>
         {mainGroups.map((g, gi) => (
-          <div key={g.key} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,.16)", margin: collapsed ? "8px 8px" : "8px 4px 2px" }} />}
-            {!collapsed && <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: 0.6, padding: "6px 10px 4px" }}>{g.label}</div>}
+          <div key={g.key} style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+            {gi > 0 && <div style={{ height: 1, flexShrink: 0, background: "rgba(255,255,255,.16)", margin: dense ? "4px 8px" : collapsed ? "8px 8px" : "8px 4px 2px" }} />}
+            {!collapsed && !dense && <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: 0.6, padding: "6px 10px 4px" }}>{g.label}</div>}
             {g.items.map((it) => renderItem(it, n++))}
           </div>
         ))}
         {extraItems.length > 0 && (
-          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,.16)", display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,.16)", display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
             {extraItems.map((it) => renderItem(it, n++))}
           </div>
         )}
       </div>
 
-      {/* botão «•••» quando o grupo Sistema está compactado */}
-      {systemGroup && (
-        <div ref={moreRef} style={{ position: "relative", flexShrink: 0, marginTop: 4 }}>
+      {/* botão «•••» com os grupos que não couberam */}
+      {moreGroups.length > 0 && (
+        <div ref={moreWrapRef} style={{ position: "relative", flexShrink: 0, marginTop: 4 }}>
           <div style={{ height: 1, background: "rgba(255,255,255,.16)", margin: collapsed ? "4px 8px" : "4px 4px" }} />
           <button
             type="button" onClick={() => setMoreOpen((v) => !v)}
-            title={systemGroup.label}
-            aria-label={systemGroup.label}
-            aria-expanded={moreOpen}
+            title={moreGroups.map((g) => g.label).join(" · ")}
+            aria-label={moreGroups.map((g) => g.label).join(" · ")}
+            aria-haspopup="menu" aria-expanded={moreOpen}
             style={{
-              display: "flex", alignItems: "center", gap: 10, width: "100%",
-              height: 40, padding: collapsed ? 0 : "0 10px", justifyContent: collapsed ? "center" : "flex-start",
-              borderRadius: 15, border: "none", cursor: "pointer", fontFamily: "inherit",
-              background: systemHasActive ? "rgba(255,255,255,.18)" : "transparent",
+              display: "flex", alignItems: "center", gap: 11, width: "100%", position: "relative",
+              height: itemH, padding: collapsed ? 0 : "0 10px", justifyContent: collapsed ? "center" : "flex-start",
+              borderRadius: dense ? 12 : 15, border: "none", cursor: "pointer", fontFamily: "inherit",
+              background: moreOpen || moreHasActive ? "rgba(255,255,255,.18)" : "transparent",
               color: "#fff",
             }}
           >
-            <MoreHorizontal size={20} strokeWidth={1.9} style={{ opacity: 0.85 }} />
-            {!collapsed && <span style={{ fontSize: 14, fontWeight: 600 }}>•••</span>}
+            <span style={{ position: "relative", display: "flex" }}>
+              <MoreHorizontal size={20} strokeWidth={1.9} style={{ opacity: 0.85 }} />
+              {moreBadge > 0 && collapsed && <span style={{ position: "absolute", top: -3, right: -4, width: 9, height: 9, borderRadius: 9, background: "#F2C14E", boxShadow: "0 0 0 2px var(--p1)" }} />}
+            </span>
+            {!collapsed && <span style={{ flex: 1, textAlign: "left", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{moreGroups.map((g) => g.label).join(" · ")}</span>}
+            {!collapsed && moreBadge > 0 && <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: "#F2C14E", color: "#151816", fontSize: 11.5, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{moreBadge}</span>}
           </button>
           {morePopover}
         </div>

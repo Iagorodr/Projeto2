@@ -223,7 +223,7 @@ export default function App() {
         const mgmtMobile = empTier === "mobile";
         const padX = mgmtMobile ? 14 : 24;
         const mgmtContent = (
-          <div key={`${c.screen}:${c.navIntent ? JSON.stringify(c.navIntent) : ""}`} className="sx-page" style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+          <div key={`${c.screen}:${c.navIntent ? JSON.stringify(c.navIntent) : ""}`} className="sx-page" style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, paddingBottom: mgmtMobile ? undefined : 72 /* espaço para o botão "?" não tapar a última linha */ }}>
             {c.companyNotice && (
               <div style={{ padding: `16px ${padX}px 0` }}>
                 <CompanyNotice lang={c.lang} notice={c.companyNotice} audience="management" companyName={c.company.name} companyCode={c.companyCode} />
