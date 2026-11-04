@@ -38,6 +38,7 @@ const T = {
       loadErrorBanner: "Não foi possível carregar os dados. Tente novamente.",
     },
     pdf: {
+      pageOf: (i, n) => `Página ${i} de ${n}`,
       colDate: "Data", colClient: "Cliente", colHours: "Horas", colValueHour: "Valor/hora", colTotal: "Total",
       colStaff: "Funcionário", colStatus: "Status", colTotalHours: "Total de horas", colTotalPay: "Total a pagar",
       totalHoursLabel: "Total de horas", totalValueLabel: "Valor a receber", generatedOn: "Gerado em", companyVat: "NIF/IVA", companyPhone: "Tel",
@@ -921,6 +922,7 @@ const T = {
       loadErrorBanner: "Couldn't load the data. Please try again.",
     },
     pdf: {
+      pageOf: (i, n) => `Page ${i} of ${n}`,
       colDate: "Date", colClient: "Client", colHours: "Hours", colValueHour: "Value/hour", colTotal: "Total",
       colStaff: "Staff", colStatus: "Status", colTotalHours: "Total hours", colTotalPay: "Total to pay",
       totalHoursLabel: "Total hours", totalValueLabel: "Amount to receive", generatedOn: "Generated on", companyVat: "VAT", companyPhone: "Tel",
@@ -1746,6 +1748,7 @@ const T = {
       loadErrorBanner: "Impossible de charger les données. Veuillez réessayer.",
     },
     pdf: {
+      pageOf: (i, n) => `Page ${i} sur ${n}`,
       colDate: "Date", colClient: "Client", colHours: "Heures", colValueHour: "Valeur/heure", colTotal: "Total",
       colStaff: "Employé", colStatus: "Statut", colTotalHours: "Total d'heures", colTotalPay: "Total à payer",
       totalHoursLabel: "Total d'heures", totalValueLabel: "Montant à recevoir", generatedOn: "Généré le", companyVat: "TVA", companyPhone: "Tél",

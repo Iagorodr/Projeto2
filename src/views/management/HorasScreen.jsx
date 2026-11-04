@@ -233,7 +233,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       return { name: s.name, paid: h.paid, status: h.status, hours: staffTotalHours(h, period), value: staffTotalPay(h, clients, period), expenses: staffExpensesApproved(h, period) };
     });
     exportPeriodSummaryPdf({
-      companyName: company?.name,
+      companyName: company?.name, companyInfo: company,
       periodLabel,
       rows,
       totalHours: periodTotalHours,
@@ -245,7 +245,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   }
   function exportStaffPdf() {
     exportStaffHorasPdf({
-      companyName: company?.name,
+      companyName: company?.name, companyInfo: company,
       staffName: openStaff.name,
       periodLabel,
       entries: openHoras.entries.filter((e) => dateStrInPeriod(e.date, period)),

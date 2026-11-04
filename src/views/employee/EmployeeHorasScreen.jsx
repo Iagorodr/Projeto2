@@ -676,7 +676,7 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
 
   function downloadPdf(provisional) {
     exportStaffHorasPdf({
-      companyName: company?.name, staffName, periodLabel: calPeriodLabel(payPeriod, lang),
+      companyName: company?.name, companyInfo: company, staffName, periodLabel: calPeriodLabel(payPeriod, lang),
       entries: periodEntries, clients, totalHours: periodHours,
       totalValue: periodEntries.reduce((s, e) => { const c = clientById(clients, e.clientId); return s + e.hours * (c ? c.valueHour : 0); }, 0),
       expenses: periodExpenses.filter((x) => x.status !== "rejected"),

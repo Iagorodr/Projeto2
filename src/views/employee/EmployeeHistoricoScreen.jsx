@@ -93,7 +93,7 @@ function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, company, clie
           <Button
             variant="secondary"
             onClick={() => exportStaffHorasPdf({
-              companyName: company?.name,
+              companyName: company?.name, companyInfo: company,
               staffName: line ? line.name : "",
               periodLabel: open.periodLabel,
               entries: line ? line.entries : [],
