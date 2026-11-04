@@ -124,7 +124,10 @@ h1, h2, h3 { font-stretch: 112%; }
 .sx-navitem { animation: sx-nav-in .3s var(--ease) both; transition: background .15s var(--ease); }
 @media (hover: hover) { .sx-navitem:hover { background: rgba(255,255,255,.12) !important; } .sx-navitem[aria-current="page"]:hover { background: #fff !important; } }
 /* Troca de página: a área de conteúdo esmorece e volta. */
-.sx-page { animation: b1-fade .28s var(--ease) both; }
+/* `backwards` e não `both`: com `both` a animação ficava "ativa" para sempre e o
+   .sx-page virava um contexto de empilhamento — gavetas e diálogos da página
+   ficavam por baixo do botão "?" e da barra de baixo do telemóvel. */
+.sx-page { animation: b1-fade .28s var(--ease) backwards; }
 .b1-grow-x-anim { animation: b1-grow-x 1s var(--ease) .2s both; }
 @keyframes sx-stamp { 0% { opacity: 0; transform: scale(2.2) rotate(-14deg); } 35% { opacity: 1; transform: scale(1) rotate(-8deg); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1) rotate(-8deg); } }
 .sx-stamp { font-weight: 900; font-stretch: 118%; font-size: 44px; color: var(--p1); border: 5px solid var(--p1); border-radius: 18px; padding: 8px 22px; background: rgba(255,255,255,.92); animation: sx-stamp 1.6s var(--ease) both; letter-spacing: .02em; }
@@ -169,3 +172,8 @@ html {
   .chip-row::-webkit-scrollbar { display: none; }
   .chip-row > * { flex-shrink: 0; }
 }
+
+/* Fichas (Clientes / Funcionários): o pin cai no mini-mapa. */
+@keyframes b1-pin-drop { 0% { opacity: 0; transform: translate(-50%, -160%); } 70% { opacity: 1; transform: translate(-50%, -92%); } 100% { transform: translate(-50%, -100%); } }
+.b1-pin-drop { animation: b1-pin-drop .5s var(--ease) .15s both; }
+@media (prefers-reduced-motion: reduce) { .b1-pin-drop { animation: none !important; } }

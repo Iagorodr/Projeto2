@@ -239,7 +239,7 @@ export default function App() {
             {c.screen === "notas" && (
               <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />
             )}
-            {c.screen === "funcionarios" && <FuncionariosScreen navIntent={c.navIntent} lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} openPeriodStart={isoDateStr(openPeriodNow.start)} companyEmail={c.company.email} />}
+            {c.screen === "funcionarios" && <FuncionariosScreen navIntent={c.navIntent} lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} contractors={c.contractors} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} openPeriodStart={isoDateStr(openPeriodNow.start)} companyEmail={c.company.email} />}
             {c.screen === "contratantes" && <ContratantesScreen lang={c.lang} setLang={c.setLang} contractors={c.contractors} setContractors={c.setContractors} onDeleteContractor={c.deleteContractor} clients={c.clients} setClients={c.setClients} staff={c.staff} horasData={c.horasData} closedPeriods={c.closedPeriods} cutoffDay={c.cutoffDay} assignments={c.assignments} covers={c.covers} absences={c.absences} closings={c.contractorClosings} onSaveClosing={c.saveClosing} companyName={c.company.name} companyInfo={c.company} who={c.company.email} onNavigate={c.goTo} navIntent={c.navIntent} />}
             {c.screen === "acessos" && <AcessosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} companyEmail={c.company.email} />}
             {c.screen === "ajuda" && (

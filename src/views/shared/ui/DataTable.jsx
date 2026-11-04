@@ -45,6 +45,9 @@ function DataTable({
   // `noCards`: força a tabela também no telemóvel (por omissão, <640px vira lista de cartões).
   noCards,
   sortLabel = "Ordenar",
+  // Redesign B1: `activeId` marca a linha cuja ficha está aberta; `rowAccent(row)`
+  // devolve uma cor para a borda esquerda (ex.: a cor do contratante).
+  activeId = null, rowAccent,
 }) {
   const [hoverId, setHoverId] = useState(null);
   const rowHeight = dense ? 48 : 56;
@@ -71,6 +74,7 @@ function DataTable({
         batchActions={batchActions} batchLabel={batchLabel}
         EmptyIcon={EmptyIcon} emptyMessage={emptyMessage} emptyAction={emptyAction}
         loading={loading} skeletonRows={skeletonRows}
+        activeId={activeId} rowAccent={rowAccent}
       />
     );
   }
@@ -142,6 +146,8 @@ function DataTable({
               const id = getRowId(row);
               const selected = selectedIds?.has(id);
               const hovered = hoverId === id;
+              const active = activeId != null && id === activeId;
+              const accent = rowAccent ? rowAccent(row) : null;
               return (
                 <div
                   key={id}
@@ -153,8 +159,10 @@ function DataTable({
                   style={{
                     display: "flex", alignItems: "center", height: rowHeight, padding: "0 16px", gap: 16,
                     borderBottom: `1px solid ${COLORS.lineSoft}`,
-                    background: selected ? COLORS.forest50 : hovered ? COLORS.forest50 : COLORS.card,
-                    borderLeft: selected ? `3px solid ${COLORS.forest600}` : "3px solid transparent",
+                    background: selected || active || hovered ? COLORS.forest50 : COLORS.card,
+                    borderLeft: `3px solid ${accent || (selected || active ? COLORS.forest600 : "transparent")}`,
+                    boxShadow: active ? "inset 0 0 0 1.5px var(--p1-35)" : undefined,
+                    transition: "background .2s",
                     cursor: onRowClick ? "pointer" : "default", boxSizing: "border-box",
                   }}
                 >
@@ -228,7 +236,7 @@ function DataTable({
 function MobileCards({
   columns, rows, getRowId, onRowClick, sortKey, sortDir, onSortChange, sortLabel,
   selectable, selectedIds, selectedCount, onToggleSelect, onToggleSelectAll, batchActions, batchLabel,
-  EmptyIcon, emptyMessage, emptyAction, loading, skeletonRows,
+  EmptyIcon, emptyMessage, emptyAction, loading, skeletonRows, activeId, rowAccent,
 }) {
   const [first, ...rest] = columns.filter((c) => !c.mobileHidden);
   const infoCols = rest.filter((c) => c.label);
@@ -282,6 +290,8 @@ function MobileCards({
         rows.map((row) => {
           const id = getRowId(row);
           const selected = selectedIds?.has(id);
+          const active = activeId != null && id === activeId;
+          const accent = rowAccent ? rowAccent(row) : null;
           return (
             <div
               key={id} data-testid="dt-card"
@@ -290,8 +300,9 @@ function MobileCards({
               onKeyDown={(e) => { if (onRowClick && (e.key === "Enter" || e.key === " ")) onRowClick(row); }}
               style={{
                 display: "flex", gap: 10, alignItems: "flex-start", padding: "12px 14px",
-                border: `1px solid ${selected ? COLORS.forest600 : COLORS.line}`, borderRadius: RADIUS.card,
-                background: selected ? COLORS.forest50 : COLORS.card, cursor: onRowClick ? "pointer" : "default",
+                border: `1px solid ${selected || active ? COLORS.forest600 : COLORS.line}`, borderRadius: RADIUS.card,
+                borderLeft: accent ? `4px solid ${accent}` : undefined,
+                background: selected || active ? COLORS.forest50 : COLORS.card, cursor: onRowClick ? "pointer" : "default",
               }}
             >
               {selectable && (

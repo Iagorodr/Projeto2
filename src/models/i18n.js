@@ -167,6 +167,7 @@ const T = {
       averageHoursLabel: (n) => `média ${n}h`,
     },
     clientes: {
+      b1Replacement: "Replacement", b1Preference: "Preferência de horário", b1Todo: "O que fazer", b1DocSent: "Existe", b1DocMissing: "Em falta", b1ColType: "Tipo", b1MapAria: (c) => `Mapa de ${c}`, b1NoAddress: "Sem morada", b1Visits: (n) => `${n} ${n === 1 ? "visita" : "visitas"} por semana`, b1DocsCount: (a, b) => `${a} de ${b}`,
       title: "Clientes",
       subtitle: (n) => `${n} cliente${n === 1 ? "" : "s"} ativo${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Pesquisar cliente", newClient: "Novo cliente",
@@ -461,6 +462,7 @@ const T = {
       withPhoto: "com foto",
     },
     funcionarios: {
+      b1ColPartner: "Dupla", b1Duo: (n) => `Em dupla com ${n}`, b1Solo: "Trabalha sozinho/a", b1DocSoon: (n) => n === 0 ? "Expira hoje" : `Expira em ${n} d`, b1DocsCount: (a, b) => `${a} de ${b}`, b1ResidenceAlert: (d) => `Título de residência ${d}`, b1ClientsCount: (n) => `${n} ${n === 1 ? "cliente" : "clientes"}`,
       title: "Funcionários",
       subtitle: (n) => `${n} funcionário${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Pesquisar funcionário", newStaff: "Novo Funcionário",
@@ -1042,6 +1044,7 @@ const T = {
       averageHoursLabel: (n) => `average ${n}h`,
     },
     clientes: {
+      b1Replacement: "Replacement", b1Preference: "Schedule preference", b1Todo: "What to do", b1DocSent: "On file", b1DocMissing: "Missing", b1ColType: "Type", b1MapAria: (c) => `Map of ${c}`, b1NoAddress: "No address", b1Visits: (n) => `${n} ${n === 1 ? "visit" : "visits"} per week`, b1DocsCount: (a, b) => `${a} of ${b}`,
       title: "Clients",
       subtitle: (n) => `${n} active client${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Search client", newClient: "New client",
@@ -1321,6 +1324,7 @@ const T = {
       withPhoto: "with photo",
     },
     funcionarios: {
+      b1ColPartner: "Pair", b1Duo: (n) => `Paired with ${n}`, b1Solo: "Works alone", b1DocSoon: (n) => n === 0 ? "Expires today" : `Expires in ${n} d`, b1DocsCount: (a, b) => `${a} of ${b}`, b1ResidenceAlert: (d) => `Residence permit ${d}`, b1ClientsCount: (n) => `${n} ${n === 1 ? "client" : "clients"}`,
       title: "Staff",
       subtitle: (n) => `${n} staff member${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Search staff", newStaff: "New Staff",
@@ -1864,6 +1868,7 @@ const T = {
       averageHoursLabel: (n) => `moyenne ${n}h`,
     },
     clientes: {
+      b1Replacement: "Remplacement", b1Preference: "Préférence d'horaire", b1Todo: "À faire", b1DocSent: "Présent", b1DocMissing: "Manquant", b1ColType: "Type", b1MapAria: (c) => `Carte de ${c}`, b1NoAddress: "Sans adresse", b1Visits: (n) => `${n} ${n === 1 ? "passage" : "passages"} par semaine`, b1DocsCount: (a, b) => `${a} sur ${b}`,
       title: "Clients",
       subtitle: (n) => `${n} client${n === 1 ? "" : "s"} actif${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Rechercher un client", newClient: "Nouveau client",
@@ -2143,6 +2148,7 @@ const T = {
       withPhoto: "avec photo",
     },
     funcionarios: {
+      b1ColPartner: "Duo", b1Duo: (n) => `En duo avec ${n}`, b1Solo: "Travaille seul(e)", b1DocSoon: (n) => n === 0 ? "Expire aujourd'hui" : `Expire dans ${n} j`, b1DocsCount: (a, b) => `${a} sur ${b}`, b1ResidenceAlert: (d) => `Titre de séjour ${d}`, b1ClientsCount: (n) => `${n} ${n === 1 ? "client" : "clients"}`,
       title: "Employés",
       subtitle: (n) => `${n} employé${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Rechercher un employé", newStaff: "Nouvel employé",

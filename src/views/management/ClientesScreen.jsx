@@ -1,7 +1,7 @@
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
 import { MapTrigger } from "../shared/MapPicker.jsx";
 import { useState } from "react";
-import { findContractor, normName } from "../../models/contractors.js";
+import { findContractor, normName, normalizeContractorColor } from "../../models/contractors.js";
 import { FIN } from "../../models/i18nFin.js";
 import { Plus, Pencil, MapPin, Phone, Calendar, Euro, ChevronDown, Users, Megaphone } from "lucide-react";
 import { styles } from "../../styles/styles.js";
@@ -20,6 +20,7 @@ import CityField from "../shared/CityField.jsx";
 import { resolveCity } from "../../models/cities.js";
 import {
   PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, Drawer, Button, ConfirmDialog, ProgressBar, Card, StoredFile,
+  ProfileSection, MiniPlaceMap, DocSlot, Fab, ContractorBadge, HeroChip,
 } from "../shared/ui/index.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { uploadFile, removeFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
@@ -45,14 +46,6 @@ function contractStatus(client, contractAlertDays) {
   if (diffDays < 0) return { kind: "expired", diffDays: Math.abs(diffDays) };
   if (diffDays <= contractAlertDays) return { kind: "ending", diffDays };
   return { kind: "ok", diffDays };
-}
-
-function SectionTitle({ children, first }) {
-  return (
-    <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink2, textTransform: "uppercase", letterSpacing: "0.06em", margin: first ? "0 0 10px" : "22px 0 10px" }}>
-      {children}
-    </div>
-  );
 }
 
 // Pilha de avatares da equipa (documento, 4.2: coluna "Equipa") — até 3
@@ -360,6 +353,12 @@ function ClientesScreen({
       },
     },
     { key: "city", label: t.colCity, render: (c) => c.city || "—" },
+    {
+      key: "kind", label: t.b1ColType, width: 1, mobileHidden: true,
+      render: (c) => (c.clientType === "replacement"
+        ? <Pill variant="neutral">{t.b1Replacement}</Pill>
+        : <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{t.clientTypeFixed}</span>),
+    },
     { key: "contact", label: t.colContact, mobileHidden: true, render: (c) => c.contact || "—" },
     {
       key: "team", label: t.colTeam, width: 1.3,
@@ -429,7 +428,7 @@ function ClientesScreen({
         title={t.title}
         subtitle={t.subtitle(activeCount)}
         lang={lang} setLang={setLang} langNames={LANG_NAMES}
-        actions={<Button icon={Plus} onClick={openNew}>{t.newClient}</Button>}
+        actions={isMobile ? null : <Button icon={Plus} onClick={openNew}>{t.newClient}</Button>}
       />
 
       <div style={{ marginBottom: 14, maxWidth: 420 }}>
@@ -497,6 +496,8 @@ function ClientesScreen({
         columns={columns}
         rows={filtered}
         onRowClick={openView}
+        activeId={drawerOpen && !isNew ? openClientId : null}
+        rowAccent={(c) => { const ct = findContractor(contractors, c.origin); return ct ? normalizeContractorColor(ct.color) : null; }}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
         onToggleSelectAll={toggleSelectAll}
@@ -505,6 +506,8 @@ function ClientesScreen({
         emptyMessage={anyFilterActive ? t.noResults : t.emptyNoClients}
         emptyIcon={Users}
       />
+
+      {isMobile && !drawerOpen && <Fab icon={Plus} label={t.newClient} onClick={openNew} />}
 
       <Drawer
         open={drawerOpen}
@@ -539,152 +542,162 @@ function ClientesScreen({
           )
         }
       >
-        {mode === "view" && openClient && (
-          <>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-              <Pill variant="neutral">{CLIENT_TYPES[openClient.type]}</Pill>
-              <Pill variant="neutral">{openClient.clientType === "replacement" ? t.clientTypeReplacement : t.clientTypeFixed}</Pill>
-              {openClient.origin && <Pill variant="neutral">{openClient.origin}</Pill>}
-            </div>
-
-            <SectionTitle first>{t.sectionLocation}</SectionTitle>
-            <div style={styles.viewGrid}>
-              <ViewField icon={MapPin} label={t.fCity}>{openClient.city || "—"}</ViewField>
-              <ViewField icon={Phone} label={t.fContact}>
-                {openClient.contact ? <a href={`tel:${openClient.contact}`} style={{ color: COLORS.primary, textDecoration: "underline" }}>{openClient.contact}</a> : "—"}
-              </ViewField>
-              <ViewField icon={MapPin} label={t.fAddress} full>
-                <MapTrigger client={openClient} lang={lang} render={({ onOpen }) => (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                    {onOpen ? (
-                      <button type="button" onClick={onOpen} style={{ padding: 0, border: "none", background: "transparent", fontFamily: "inherit", fontSize: "inherit", textAlign: "left", color: COLORS.primary, textDecoration: "underline", cursor: "pointer" }}>
-                        {openClient.address}
-                      </button>
-                    ) : (
-                      <span>{openClient.address || "—"}</span>
-                    )}
-                    {onOpen && (
-                      <button type="button" onClick={onOpen} style={{ padding: 0, border: "none", background: "transparent", fontFamily: "inherit", color: COLORS.primary, textDecoration: "underline", fontSize: 12.5, whiteSpace: "nowrap", cursor: "pointer" }}>
-                        {t.openMap}
-                      </button>
-                    )}
-                  </div>
-                )} />
-              </ViewField>
-            </div>
-
-            <SectionTitle>{t.sectionContract}</SectionTitle>
-            <div style={styles.viewGrid}>
-              <ViewField icon={Calendar} label={t.fContract}>{openClient.contractStart || "—"} – {openClient.contractEnd || "—"}</ViewField>
-              <ViewField icon={Calendar} label={t.fRemaining}>
-                {(() => {
-                  const st = contractStatus(openClient, contractAlertDays);
-                  if (!st) return "—";
-                  return st.kind === "expired" ? t.contractEndedDaysAgo(st.diffDays) : t.contractRemainingDays(st.diffDays);
-                })()}
-              </ViewField>
-              <ViewField icon={Euro} label={t.fValueHour}>{openClient.valueHour ? `€ ${openClient.valueHour}` : "—"}</ViewField>
-              {(() => { const ct = findContractor(contractors, openClient.origin); return ct && ct.isDirect; })() && (
-                <ViewField icon={Euro} label={FIN[lang].sellPriceField}>{openClient.sellPrice ? `€ ${openClient.sellPrice}` : "—"}</ViewField>
-              )}
-              <ViewField label={t.fHoursMonth}>{openClient.hoursMonth ? fmtHoursScreen(openClient.hoursMonth) : "—"}</ViewField>
-              <ViewField label={t.fHoursMode}>{openClient.hoursMode === "individual" ? t.hoursModeIndividual : t.hoursModeSplit}</ViewField>
-            </div>
-
-            <SectionTitle>{t.sectionService}</SectionTitle>
-            <div style={styles.viewGrid}>
-              <ViewField label={t.fFrequency}>{FREQS[openClient.frequency] || "—"}</ViewField>
-              {(openClient.frequency === "biweekly" || openClient.frequency === "monthly") && (() => {
-                const next = [0, 1, 2, 3].map((i) => addDays(startOfISOWeek(TODAY), 7 * i)).find((ws) => clientAppliesThisWeek(openClient, ws));
-                return next ? <ViewField label={t.fNextVisitWeek}>{weekLabelPT(next, lang)}</ViewField> : null;
-              })()}
-              <ViewField label={t.fHoursPerDay}>{openClient.duration ? fmtMinutes(openClient.duration) : "—"}</ViewField>
-              {Object.keys(openClient.durationByDay || {}).length > 0 && (
-                <ViewField label={t.durationByDayLabel}>
-                  {Object.entries(openClient.durationByDay).sort(([a], [b]) => a - b).map(([d, m]) => `${dayLabels[d]} ${fmtMinutes(m)}`).join(" · ")}
-                </ViewField>
-              )}
-              <ViewField label={t.fDaysPerWeek} full>
-                {openClient.days && openClient.days.length > 0
-                  ? `${openClient.days.map((d) => dayLabels[d]).join(" ")} (${openClient.days.length})`
-                  : "—"}
-              </ViewField>
-              <ViewField label={t.fAvailability} full>{openClient.availability || "—"}</ViewField>
-            </div>
-
-            <SectionTitle>{t.sectionTeam}</SectionTitle>
-            {(() => {
-              const teamIds = clientTeamStaffIds(assignments, openClient.id);
-              if (teamIds.length === 0) return <div style={{ fontSize: 13, color: COLORS.ink3 }}>{t.noTeamAssigned}</div>;
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 6 }}>
-                  {teamIds.map((id) => {
-                    const s = staffById(staff, id);
-                    if (!s) return null;
-                    return (
-                      <div key={id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Avatar name={s.name} size={28} />
-                        <span style={{ fontSize: 13.5, color: COLORS.ink }}>{s.name}</span>
+        {mode === "view" && openClient && (() => {
+          // Ficha B1 (documento p. 28 + resposta 3): no topo o mapa da localidade com
+          // a morada e "Ver no mapa"; depois preferência de horário e "o que fazer";
+          // dupla/equipa; contrato; documentos com estado; histórico. Nada saiu da ficha antiga.
+          const ct = findContractor(contractors, openClient.origin);
+          const ctColor = ct ? normalizeContractorColor(ct.color) : null;
+          const teamIds = clientTeamStaffIds(assignments, openClient.id);
+          const docs = openClient.documents || [];
+          const docsFilled = t.docSlots.filter((_, i) => !!docs[i]).length;
+          const nextWeek = (openClient.frequency === "biweekly" || openClient.frequency === "monthly")
+            ? [0, 1, 2, 3].map((i) => addDays(startOfISOWeek(TODAY), 7 * i)).find((ws) => clientAppliesThisWeek(openClient, ws))
+            : null;
+          const st = contractStatus(openClient, contractAlertDays);
+          return (
+            <div className="b1-cascade">
+              <MapTrigger client={openClient} lang={lang} render={({ onOpen }) => (
+                <div style={{ borderRadius: RADIUS.card, background: COLORS.bg, padding: 10 }}>
+                  <MiniPlaceMap city={openClient.city} ariaLabel={t.b1MapAria(openClient.city || "")} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 4px 4px" }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <MapPin size={17} color={COLORS.primary} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink, overflowWrap: "anywhere" }}>{openClient.address || t.b1NoAddress}</div>
+                      <div style={{ fontSize: 12, color: COLORS.ink2 }}>
+                        {openClient.city || "—"}
+                        {openClient.contact && <> · <a href={`tel:${openClient.contact}`} style={{ color: COLORS.primary, fontWeight: 600 }}><Phone size={11} style={{ verticalAlign: "-1px", marginRight: 3 }} />{openClient.contact}</a></>}
                       </div>
+                    </div>
+                    {onOpen && <Button variant="secondary" onClick={onOpen}>{t.openMap}</Button>}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "8px 4px 2px" }}>
+                    <ContractorBadge name={openClient.origin} color={ctColor} />
+                    <HeroChip>{openClient.clientType === "replacement" ? t.clientTypeReplacement : t.clientTypeFixed}</HeroChip>
+                    <HeroChip>{CLIENT_TYPES[openClient.type]}</HeroChip>
+                  </div>
+                </div>
+              )} />
+
+              <ProfileSection title={t.b1Preference}>
+                {openClient.days && openClient.days.length > 0 && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                    {AGENDA_DAYS.map((d) => {
+                      const on = openClient.days.includes(d);
+                      const ov = (openClient.durationByDay || {})[String(d)];
+                      return (
+                        <div key={d} style={{ minWidth: 46, padding: "6px 8px", borderRadius: 10, textAlign: "center", background: on ? "var(--p1-12)" : COLORS.lineSoft, color: on ? COLORS.primaryDark : COLORS.ink3, border: on ? "1px solid var(--p1-35)" : "1px solid transparent" }}>
+                          <div style={{ fontSize: 12, fontWeight: 700 }}>{dayLabels[d]}</div>
+                          {on && <div style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{fmtMinutes(ov || openClient.duration || 0)}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div style={styles.viewGrid}>
+                  <ViewField label={t.fAvailability} full>{openClient.availability || "—"}</ViewField>
+                  <ViewField label={t.fFrequency}>{FREQS[openClient.frequency] || "—"}</ViewField>
+                  {nextWeek && <ViewField label={t.fNextVisitWeek}>{weekLabelPT(nextWeek, lang)}</ViewField>}
+                  <ViewField label={t.fHoursPerDay}>{openClient.duration ? fmtMinutes(openClient.duration) : "—"}</ViewField>
+                  {Object.keys(openClient.durationByDay || {}).length > 0 && (
+                    <ViewField label={t.durationByDayLabel}>
+                      {Object.entries(openClient.durationByDay).sort(([a], [b]) => a - b).map(([d, m]) => `${dayLabels[d]} ${fmtMinutes(m)}`).join(" · ")}
+                    </ViewField>
+                  )}
+                  <ViewField label={t.fDaysPerWeek} full>
+                    {openClient.days && openClient.days.length > 0
+                      ? `${openClient.days.map((d) => dayLabels[d]).join(" ")} (${openClient.days.length})`
+                      : "—"}
+                  </ViewField>
+                </div>
+              </ProfileSection>
+
+              <ProfileSection title={t.b1Todo}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {openClient.priorities && (
+                    <Card variant="warm" style={{ padding: "12px 14px" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                        <Megaphone size={15} color={COLORS.clayInk} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <div>
+                          <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.clayInk, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>{t.fPriorities}</div>
+                          <div style={{ fontSize: 13, color: COLORS.ink, whiteSpace: "pre-wrap" }}>{openClient.priorities}</div>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+                  <ViewField label={t.fDescription}>{openClient.description || "—"}</ViewField>
+                  <ViewField label={t.fNote}>{openClient.note || "—"}</ViewField>
+                </div>
+              </ProfileSection>
+
+              <ProfileSection title={t.sectionTeam} aside={onNavigate && teamIds.length > 0 ? <Button variant="ghost" onClick={() => onNavigate("agendas")}>{t.viewAgenda}</Button> : null}>
+                {teamIds.length === 0 ? (
+                  <div style={{ fontSize: 13, color: COLORS.ink3 }}>{t.noTeamAssigned}</div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {teamIds.map((id) => {
+                      const s = staffById(staff, id);
+                      if (!s) return null;
+                      return (
+                        <div key={id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 12px 5px 5px", borderRadius: 999, background: COLORS.bg }}>
+                          <Avatar name={s.name} size={28} />
+                          <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{s.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </ProfileSection>
+
+              <ProfileSection title={t.sectionContract}>
+                <div style={styles.viewGrid}>
+                  <ViewField icon={Calendar} label={t.fContract}>{openClient.contractStart || "—"} – {openClient.contractEnd || "—"}</ViewField>
+                  <ViewField icon={Calendar} label={t.fRemaining}>
+                    {!st ? "—" : st.kind === "expired" ? t.contractEndedDaysAgo(st.diffDays) : t.contractRemainingDays(st.diffDays)}
+                  </ViewField>
+                  <ViewField icon={Euro} label={t.fValueHour}>{openClient.valueHour ? `€ ${openClient.valueHour}` : "—"}</ViewField>
+                  {ct && ct.isDirect && (
+                    <ViewField icon={Euro} label={FIN[lang].sellPriceField}>{openClient.sellPrice ? `€ ${openClient.sellPrice}` : "—"}</ViewField>
+                  )}
+                  <ViewField label={t.fHoursMonth}>{openClient.hoursMonth ? fmtHoursScreen(openClient.hoursMonth) : "—"}</ViewField>
+                  <ViewField label={t.fHoursMode}>{openClient.hoursMode === "individual" ? t.hoursModeIndividual : t.hoursModeSplit}</ViewField>
+                </div>
+              </ProfileSection>
+
+              <ProfileSection title={t.documentsTitle} aside={<span style={{ fontSize: 12, fontWeight: 600, color: COLORS.ink3 }}>{t.b1DocsCount(docsFilled, t.docSlots.length)}</span>}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                  {t.docSlots.map((label, idx) => {
+                    const doc = docs[idx];
+                    const inputId = `doc-client-${openClient.id}-${idx}`;
+                    const busy = docBusyIdx === idx;
+                    return (
+                      <DocSlot key={idx} label={label} state={doc ? "ok" : "missing"} statusLabel={doc ? t.b1DocSent : t.b1DocMissing}>
+                        {doc ? (
+                          <StoredFile file={doc} labels={T[lang].files} size={40} onRemove={() => setDocRemoveIdx(idx)} removeLabel={t.removeDoc} />
+                        ) : (
+                          <>
+                            <input type="file" id={inputId} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" style={{ display: "none" }} disabled={docBusyIdx != null} onChange={(e) => { uploadDocument(openClient.id, idx, e.target.files[0]); e.target.value = ""; }} />
+                            <label htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 32, padding: "0 12px", borderRadius: 8, background: COLORS.bg, fontSize: 12.5, fontWeight: 600, color: COLORS.ink2, cursor: busy ? "wait" : "pointer" }}>
+                              <Plus size={14} />{busy ? T[lang].files.uploading : t.attach}
+                            </label>
+                          </>
+                        )}
+                      </DocSlot>
                     );
                   })}
-                  {onNavigate && (
-                    <Button variant="ghost" onClick={() => onNavigate("agendas")}>{t.viewAgenda}</Button>
-                  )}
                 </div>
-              );
-            })()}
+                {docError && <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: 8 }}>{docError}</div>}
+                <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 8 }}>{t.docsNote}</div>
+              </ProfileSection>
 
-            <SectionTitle>{t.sectionNotes}</SectionTitle>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <ViewField label={t.fDescription}>{openClient.description || "—"}</ViewField>
-              {openClient.priorities && (
-                <Card variant="warm" style={{ padding: "12px 14px" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                    <Megaphone size={15} color={COLORS.clayInk} style={{ flexShrink: 0, marginTop: 1 }} />
-                    <div>
-                      <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.clayInk, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>{t.fPriorities}</div>
-                      <div style={{ fontSize: 13, color: COLORS.ink }}>{openClient.priorities}</div>
-                    </div>
-                  </div>
-                </Card>
-              )}
-              <ViewField label={t.fNote}>{openClient.note || "—"}</ViewField>
+              <ProfileSection title={t.historyTitle}>
+                <FeedbackHistory t={t} items={sentItems.filter((i) => i.clientId === openClient.id && (i.type === "reclamacao" || i.type === "elogio"))} />
+              </ProfileSection>
             </div>
-
-            <SectionTitle>{t.historyTitle}</SectionTitle>
-            <FeedbackHistory t={t} items={sentItems.filter((i) => i.clientId === openClient.id && (i.type === "reclamacao" || i.type === "elogio"))} />
-
-            {/* Upload de documentos — funcionalidade já existente no ecrã
-                antigo, fora do que o documento de design 4.2/5.4 descreve.
-                Mantida por não haver pedido pra removê-la (ver LEIA-ME). */}
-            <SectionTitle>{t.documentsTitle}</SectionTitle>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
-              {t.docSlots.map((label, idx) => {
-                const doc = (openClient.documents || [])[idx];
-                const inputId = `doc-client-${openClient.id}-${idx}`;
-                const busy = docBusyIdx === idx;
-                return (
-                  <div key={idx} style={{ border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: "10px 12px" }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.ink2, marginBottom: 6 }}>{label}</div>
-                    {doc ? (
-                      <StoredFile file={doc} labels={T[lang].files} size={40} onRemove={() => setDocRemoveIdx(idx)} removeLabel={t.removeDoc} />
-                    ) : (
-                      <>
-                        <input type="file" id={inputId} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" style={{ display: "none" }} disabled={docBusyIdx != null} onChange={(e) => { uploadDocument(openClient.id, idx, e.target.files[0]); e.target.value = ""; }} />
-                        <label htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", padding: "6px 12px", borderRadius: 8, border: `1px dashed ${COLORS.line}`, fontSize: 12, fontWeight: 600, color: COLORS.ink2, cursor: busy ? "wait" : "pointer" }}>
-                          {busy ? T[lang].files.uploading : t.attach}
-                        </label>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {docError && <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: 8 }}>{docError}</div>}
-            <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 8 }}>{t.docsNote}</div>
-          </>
-        )}
+          );
+        })()}
 
         {mode === "edit" && (
           <div style={isMobile ? { ...styles.formGrid, gridTemplateColumns: "1fr" } : styles.formGrid}>

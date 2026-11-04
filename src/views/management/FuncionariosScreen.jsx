@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, Eye, EyeOff, Copy, Check, AlertTriangle, Plus } from "lucide-react";
+import { Pencil, Eye, EyeOff, Copy, Check, AlertTriangle, Plus, Users } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { TODAY, LANG_NAMES } from "../../models/data.js";
@@ -9,7 +9,9 @@ import { Field, ViewField } from "../shared/Layout.jsx";
 import { Toggle } from "../shared/ui/Toggle.jsx";
 import {
   PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, SupervisorTag, Drawer, Button, ConfirmDialog, Card, StoredFile,
+  ProfileSection, ProfileHero, DocSlot, docState, Fab, HeroChip,
 } from "../shared/ui/index.js";
+import { findContractor, normalizeContractorColor } from "../../models/contractors.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { supabase } from "../../models/supabaseClient.js";
 import { uploadFile, removeFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
@@ -82,17 +84,16 @@ function ReadOnlyToggle({ on }) {
   return <Toggle on={on} readOnly />;
 }
 
-function SectionTitle({ children, first }) {
-  return (
-    <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink2, textTransform: "uppercase", letterSpacing: "0.06em", margin: first ? "0 0 10px" : "22px 0 10px" }}>
-      {children}
-    </div>
-  );
-}
-
 // Chip "Tipo de conta" (documento, 4.9): "Fixo" ou "Replacement temporário
 // · até 23/09"; se a validade já passou, vira a pílula cinzenta "Expirou a
 // 23/09" em vez disso.
+// Mesmo texto do selo, sem a pílula (para o topo da ficha).
+function AccountTypeLabel({ s, t }) {
+  if (s.accountType !== "replacement") return t.accountFixed;
+  if (!s.validUntil) return t.accountReplacement;
+  if (isExpiredByValidity(s)) return t.expiredOn(dmFromIso(s.validUntil));
+  return t.accountReplacementUntil(dmFromIso(s.validUntil));
+}
 function AccountTypePill({ s, t }) {
   if (s.accountType !== "replacement") return <Pill variant="neutral">{t.accountFixed}</Pill>;
   if (!s.validUntil) return <Pill variant="neutral">{t.accountReplacement}</Pill>;
@@ -126,7 +127,7 @@ function StatusBlock({ s, t, c0 }) {
 // `isStaffActive` (Etapa 4j) refletida na lista e na gaveta. `onNavigate`
 // é opcional (liga "Clientes atribuídos" à tela de Agendas, mesmo padrão
 // já usado em ClientesScreen.jsx).
-function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, clients, assignments, onDeleteStaff, onNavigate, openPeriodStart, companyEmail }) {
+function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, clients, assignments, contractors = [], onDeleteStaff, onNavigate, openPeriodStart, companyEmail }) {
   const t = T[lang].funcionarios;
   const ta = T[lang].acessos;
   const c0 = T[lang].common;
@@ -311,7 +312,20 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
       ),
     },
     { key: "accountType", label: t.colAccountType, width: 1.8, render: (s) => <AccountTypePill s={s} t={t} /> },
-    { key: "contact", label: t.colContact, render: (s) => s.contact || "—" },
+    {
+      key: "partner", label: t.b1ColPartner, width: 1.4,
+      render: (s) => {
+        const p = s.partnerId != null ? staff.find((x) => x.id === s.partnerId) : null;
+        if (!p) return <span style={{ fontSize: 12, color: COLORS.ink3 }}>—</span>;
+        return (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <Avatar name={p.name} size={22} />
+            <span style={{ fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name.split(" ")[0]}</span>
+          </span>
+        );
+      },
+    },
+    { key: "contact", label: t.colContact, mobileHidden: true, render: (s) => s.contact || "—" },
     { key: "clients", label: t.colClients, width: 0.8, numeric: true, render: (s) => getAssignedClientIds(assignments, s.id).length },
     { key: "status", label: t.colStatus, width: 1.4, render: (s) => <StatusBlock s={s} t={t} c0={c0} /> },
   ];
@@ -326,7 +340,7 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
         title={t.title}
         subtitle={t.subtitle(staff.length)}
         lang={lang} setLang={setLang} langNames={LANG_NAMES}
-        actions={<Button icon={Plus} onClick={openNew}>{t.newStaff}</Button>}
+        actions={isMobile ? null : <Button icon={Plus} onClick={openNew}>{t.newStaff}</Button>}
       />
 
       <div style={{ marginBottom: 14, maxWidth: 420 }}>
@@ -345,6 +359,7 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
         columns={columns}
         rows={filtered}
         onRowClick={openView}
+        activeId={drawerOpen && !isNew ? openId : null}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
         onToggleSelectAll={toggleSelectAll}
@@ -353,11 +368,13 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
         emptyMessage={t.noResults}
       />
 
+      {isMobile && !drawerOpen && <Fab icon={Plus} label={t.newStaff} onClick={openNew} />}
+
       <Drawer
         open={drawerOpen}
         onClose={closeDrawer}
         closeLabel={c0.close}
-        avatar={(mode === "view" || mode === "created") && drawerStaff ? <Avatar name={drawerStaff.name} size={36} /> : undefined}
+        avatar={mode === "created" && drawerStaff ? <Avatar name={drawerStaff.name} size={36} /> : undefined}
         title={mode === "edit" ? (isNew ? t.modalNewTitle : t.modalEditTitle) : mode === "created" ? t.newAccountStepTitle : drawerStaff?.name}
         pill={mode === "view" && drawerStaff ? <StatusBlock s={drawerStaff} t={t} c0={c0} /> : null}
         footer={
@@ -376,116 +393,160 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
           ) : null
         }
       >
-        {mode === "view" && openStaff && (
-          <>
-            {drawerExpired && (
-              <Card variant="alert" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, padding: "12px 14px" }}>
-                <AlertTriangle size={15} style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: 13 }}>{t.expiredBanner}</span>
-              </Card>
-            )}
-
-            <SectionTitle first>{t.sectionContact}</SectionTitle>
-            <div style={styles.viewGrid}>
-              <ViewField label={t.fContact} full>
-                {openStaff.contact ? <a href={`tel:${openStaff.contact}`} style={{ color: COLORS.primary, textDecoration: "underline" }}>{openStaff.contact}</a> : "—"}
-              </ViewField>
-            </div>
-
-            <SectionTitle>{t.sectionIban}</SectionTitle>
-            <MaskedIban iban={openStaff.iban} t={t} />
-
-            <SectionTitle>{t.sectionAccount}</SectionTitle>
-            <div style={styles.viewGrid}>
-              <ViewField label={t.fAccountType}>{openStaff.accountType === "fixo" ? t.accountFixed : t.accountReplacement}</ViewField>
-              {openStaff.accountType === "replacement" && (
-                <ViewField label={t.fValidUntil}>{openStaff.validUntil || "-"}</ViewField>
+        {mode === "view" && openStaff && (() => {
+          // Ficha B1 (documento p. 28 + resposta 3): mesmo componente da ficha de
+          // Clientes; no topo avatar grande, tipo e dupla; documentos com estado e
+          // validade (sobretudo o título de residência). Nada saiu da ficha antiga.
+          const partner = staff.find((s) => s.id === openStaff.partnerId) || null;
+          const docs = openStaff.documents || [];
+          const docsFilled = t.docSlots.filter((_, i) => !!docs[i]).length;
+          const daysLeft = (doc) => (doc && doc.validUntil ? daysUntilIso(doc.validUntil) : null);
+          const residence = docs[2];
+          const residenceState = docState(residence, TODAY);
+          const residenceAlert = residence && (residenceState === "soon" || residenceState === "expired")
+            ? t.b1ResidenceAlert(residenceState === "expired" ? t.docStatusExpired.toLowerCase() : t.b1DocSoon(daysLeft(residence)).toLowerCase())
+            : null;
+          return (
+            <div className="b1-cascade">
+              {drawerExpired && (
+                <Card variant="alert" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "12px 14px" }}>
+                  <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 13 }}>{t.expiredBanner}</span>
+                </Card>
               )}
-              <ViewField label={t.fStartDate}>{openStaff.startDate ? openStaff.startDate.split("-").reverse().join("/") : t.startDateNone}</ViewField>
-              <ViewField label={t.fPartner}>{(staff.find((s) => s.id === openStaff.partnerId) || {}).name || t.partnerNone}</ViewField>
-              <ViewField label={t.fCanViewAllClients}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <ReadOnlyToggle on={!!openStaff.canViewAllClients} />
-                  <span>{openStaff.canViewAllClients ? c0.yes : c0.no}</span>
+
+              <ProfileHero
+                media={<div style={{ borderRadius: "50%", boxShadow: "0 0 0 4px #fff" }}><Avatar name={openStaff.name} photoUrl={openStaff.photoUrl} size={68} /></div>}
+                subtitle={openStaff.contact ? <a href={`tel:${openStaff.contact}`} style={{ color: COLORS.primary, fontWeight: 600 }}>{openStaff.contact}</a> : null}
+                badges={(
+                  <>
+                    <HeroChip><AccountTypeLabel s={openStaff} t={t} /></HeroChip>
+                    {isSupervisorRole(openStaff.role) && <SupervisorTag kind="role">{openStaff.role === "gerencia_supervisor" ? ta.roleGerenciaSupervisor : ta.roleSupervisor}</SupervisorTag>}
+                    <HeroChip>{t.b1ClientsCount(assignedIds.length)}</HeroChip>
+                  </>
+                )}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${COLORS.line}` }}>
+                  <Users size={16} color={COLORS.ink2} />
+                  {partner ? (
+                    <>
+                      <Avatar name={partner.name} size={24} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>{t.b1Duo(partner.name)}</span>
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 13, color: COLORS.ink2 }}>{t.b1Solo}</span>
+                  )}
                 </div>
-              </ViewField>
-              <ViewField label={t.fCanExpenses}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <ReadOnlyToggle on={!!openStaff.canExpenses} />
-                  <span>{openStaff.canExpenses ? c0.yes : c0.no}</span>
-                </div>
-              </ViewField>
-            </div>
+              </ProfileHero>
 
-            <SectionTitle>{t.assignedClients}</SectionTitle>
-            {assignedIds.length === 0 ? (
-              <div style={styles.noClientsText}>{t.noClients}</div>
-            ) : (
-              <div style={styles.clientChipsRow}>
-                {assignedIds.map((cid) => {
-                  const c = clientById(clients, cid);
-                  return c ? <span key={cid} style={styles.clientChip}>{c.name}</span> : null;
-                })}
-              </div>
-            )}
-            {onNavigate ? (
-              <Button variant="ghost" onClick={() => onNavigate("agendas")} style={{ marginTop: 6 }}>{t.assignedNote}</Button>
-            ) : (
-              <div style={styles.assignedNote}>{t.assignedNote}</div>
-            )}
+              {residenceAlert && (
+                <Card variant="alert" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, padding: "10px 14px" }}>
+                  <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 13 }}>{residenceAlert}</span>
+                </Card>
+              )}
 
-            <SectionTitle>{t.knownClientsTitle}</SectionTitle>
-            <KnownClientsSection staffMember={openStaff} clients={clients} assignments={assignments} setStaff={setStaff} t={t} cancelLabel={c0.cancel} />
+              <ProfileSection title={t.sectionIban}>
+                <MaskedIban iban={openStaff.iban} t={t} />
+              </ProfileSection>
 
-            <SectionTitle>{t.documentsTitle}</SectionTitle>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
-              {t.docSlots.map((label, idx) => {
-                const doc = (openStaff.documents || [])[idx];
-                const inputId = `doc-staff-${openStaff.id}-${idx}`;
-                const docExpired = doc?.validUntil && daysUntilIso(doc.validUntil) < 0;
-                return (
-                  <div key={idx} style={{ border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: "10px 12px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.ink2 }}>{label}</div>
-                      {doc ? (
-                        <Pill variant={docExpired ? "missing" : "paid"}>{docExpired ? t.docStatusExpired : t.docStatusSent}</Pill>
-                      ) : (
-                        <Pill variant="neutral">{t.docStatusMissing}</Pill>
-                      )}
+              <ProfileSection title={t.sectionAccount}>
+                <div style={styles.viewGrid}>
+                  <ViewField label={t.fAccountType}>{openStaff.accountType === "fixo" ? t.accountFixed : t.accountReplacement}</ViewField>
+                  {openStaff.accountType === "replacement" && (
+                    <ViewField label={t.fValidUntil}>{openStaff.validUntil || "-"}</ViewField>
+                  )}
+                  <ViewField label={t.fStartDate}>{openStaff.startDate ? openStaff.startDate.split("-").reverse().join("/") : t.startDateNone}</ViewField>
+                  <ViewField label={t.fPartner}>{partner ? partner.name : t.partnerNone}</ViewField>
+                  <ViewField label={t.fCanViewAllClients}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <ReadOnlyToggle on={!!openStaff.canViewAllClients} />
+                      <span>{openStaff.canViewAllClients ? c0.yes : c0.no}</span>
                     </div>
-                    {doc ? (
-                      <>
-                        <StoredFile file={doc} labels={T[lang].files} size={40} style={{ marginBottom: 8 }} />
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-                          <input type="file" id={inputId} accept={DOC_ACCEPT} style={{ display: "none" }} disabled={!!docBusyKey} onChange={(e) => { attachDocFile(openStaff.id, idx, e.target.files[0]); e.target.value = ""; }} />
-                          <label htmlFor={inputId} style={{ fontSize: 12, fontWeight: 600, color: COLORS.primary, cursor: docBusyKey ? "wait" : "pointer", textDecoration: "underline" }}>{docBusyKey === `${openStaff.id}-${idx}` ? T[lang].files.uploading : t.docReplace}</label>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 10.5, color: COLORS.ink3, marginBottom: 3 }}>{t.docValidUntil}</div>
-                          <input
-                            type="date" style={{ ...styles.input, height: 32, fontSize: 12.5 }}
-                            value={doc.validUntil || ""}
-                            onChange={(e) => updateDocField(openStaff.id, idx, { validUntil: e.target.value || null })}
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <input type="file" id={inputId} accept={DOC_ACCEPT} style={{ display: "none" }} disabled={!!docBusyKey} onChange={(e) => { attachDocFile(openStaff.id, idx, e.target.files[0]); e.target.value = ""; }} />
-                        <label htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", padding: "6px 12px", borderRadius: 8, border: `1px dashed ${COLORS.line}`, fontSize: 12, fontWeight: 600, color: COLORS.ink2, cursor: docBusyKey ? "wait" : "pointer" }}>
-                          {docBusyKey === `${openStaff.id}-${idx}` ? T[lang].files.uploading : t.attach}
-                        </label>
-                      </>
-                    )}
+                  </ViewField>
+                  <ViewField label={t.fCanExpenses}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <ReadOnlyToggle on={!!openStaff.canExpenses} />
+                      <span>{openStaff.canExpenses ? c0.yes : c0.no}</span>
+                    </div>
+                  </ViewField>
+                </div>
+              </ProfileSection>
+
+              <ProfileSection title={t.assignedClients}>
+                {assignedIds.length === 0 ? (
+                  <div style={styles.noClientsText}>{t.noClients}</div>
+                ) : (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {assignedIds.map((cid) => {
+                      const c = clientById(clients, cid);
+                      if (!c) return null;
+                      const ct = findContractor(contractors, c.origin);
+                      return (
+                        <span key={cid} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: COLORS.ink, background: COLORS.bg, padding: "5px 10px", borderRadius: 999, maxWidth: "100%" }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 3, background: ct ? normalizeContractorColor(ct.color) : COLORS.ink3, flexShrink: 0 }} />
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                        </span>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                )}
+                {onNavigate ? (
+                  <Button variant="ghost" onClick={() => onNavigate("agendas")} style={{ marginTop: 6 }}>{t.assignedNote}</Button>
+                ) : (
+                  <div style={styles.assignedNote}>{t.assignedNote}</div>
+                )}
+              </ProfileSection>
+
+              <ProfileSection title={t.knownClientsTitle}>
+                <KnownClientsSection staffMember={openStaff} clients={clients} assignments={assignments} setStaff={setStaff} t={t} cancelLabel={c0.cancel} />
+              </ProfileSection>
+
+              <ProfileSection title={t.documentsTitle} aside={<span style={{ fontSize: 12, fontWeight: 600, color: COLORS.ink3 }}>{t.b1DocsCount(docsFilled, t.docSlots.length)}</span>}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+                  {t.docSlots.map((label, idx) => {
+                    const doc = docs[idx];
+                    const inputId = `doc-staff-${openStaff.id}-${idx}`;
+                    const state = docState(doc, TODAY);
+                    const statusLabel = state === "missing" ? t.docStatusMissing : state === "expired" ? t.docStatusExpired : state === "soon" ? t.b1DocSoon(daysLeft(doc)) : t.docStatusSent;
+                    const busy = docBusyKey === `${openStaff.id}-${idx}`;
+                    return (
+                      <DocSlot key={idx} label={label} state={state} statusLabel={statusLabel}>
+                        {doc ? (
+                          <>
+                            <StoredFile file={doc} labels={T[lang].files} size={40} style={{ marginBottom: 8 }} />
+                            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+                              <div style={{ flex: "1 1 130px" }}>
+                                <div style={{ fontSize: 10.5, color: COLORS.ink3, marginBottom: 3 }}>{t.docValidUntil}</div>
+                                <input
+                                  type="date" style={{ ...styles.input, height: 32, fontSize: 12.5 }}
+                                  value={doc.validUntil || ""}
+                                  onChange={(e) => updateDocField(openStaff.id, idx, { validUntil: e.target.value || null })}
+                                />
+                              </div>
+                              <input type="file" id={inputId} accept={DOC_ACCEPT} style={{ display: "none" }} disabled={!!docBusyKey} onChange={(e) => { attachDocFile(openStaff.id, idx, e.target.files[0]); e.target.value = ""; }} />
+                              <label htmlFor={inputId} style={{ fontSize: 12, fontWeight: 600, color: COLORS.primary, cursor: docBusyKey ? "wait" : "pointer", textDecoration: "underline", paddingBottom: 7 }}>{busy ? T[lang].files.uploading : t.docReplace}</label>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <input type="file" id={inputId} accept={DOC_ACCEPT} style={{ display: "none" }} disabled={!!docBusyKey} onChange={(e) => { attachDocFile(openStaff.id, idx, e.target.files[0]); e.target.value = ""; }} />
+                            <label htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 32, padding: "0 12px", borderRadius: 8, background: COLORS.bg, fontSize: 12.5, fontWeight: 600, color: COLORS.ink2, cursor: docBusyKey ? "wait" : "pointer" }}>
+                              <Plus size={14} />{busy ? T[lang].files.uploading : t.attach}
+                            </label>
+                          </>
+                        )}
+                      </DocSlot>
+                    );
+                  })}
+                </div>
+                {docError && <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: 8 }}>{docError}</div>}
+                <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 8 }}>{t.docsNote}</div>
+                <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 10 }}>{t.loginNote}</div>
+              </ProfileSection>
             </div>
-            {docError && <div style={{ fontSize: 12.5, color: COLORS.dangerInk, marginTop: 8 }}>{docError}</div>}
-            <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 8 }}>{t.docsNote}</div>
-            <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 10 }}>{t.loginNote}</div>
-          </>
-        )}
+          );
+        })()}
 
         {mode === "edit" && (
           <div style={isMobile ? { ...styles.formGrid, gridTemplateColumns: "1fr" } : styles.formGrid}>
