@@ -357,7 +357,7 @@ export default function App() {
               <EmployeeAvisosScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} clients={c.clients} staff={c.staff} assignments={c.assignments} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} absences={c.absences} setAbsences={c.setAbsences} isSupervisor={isSupervisor} desktop={empTier !== "mobile"} />
             )}
             {c.empScreen === "agenda" && (
-              <EmployeeAgendaScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} staff={c.staff} clients={c.clients} assignments={c.assignments} covers={c.covers} absences={c.absences} onOpenClient={c.openEmpClient} desktop={empTier !== "mobile"} />
+              <EmployeeAgendaScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} staffId={c.me.id} staff={c.staff} clients={c.clients} assignments={c.assignments} covers={c.covers} absences={c.absences} contractors={c.contractors || []} onOpenClient={c.openEmpClient} desktop={empTier !== "mobile"} />
             )}
             {c.empScreen === "clientes" && (
               <EmployeeClientesScreen lang={c.lang} setLang={c.setLang} onHome={() => c.setEmpScreen("menu")} onBackToAgenda={() => c.setEmpScreen("agenda")} focus={c.empClientFocus} onClearFocus={() => c.setEmpClientFocus(null)} staffId={c.me.id} clients={c.clients} assignments={c.assignments} canViewAll={!!c.me.canViewAllClients} desktop={empTier !== "mobile"} />

@@ -368,7 +368,6 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
       <Drawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={480}
         title={t.drawerNewTitle}
         closeLabel={c0.close}
         footer={

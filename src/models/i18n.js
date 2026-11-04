@@ -123,6 +123,8 @@ const T = {
       gateNotFound: "Não encontrámos este código. Confira com a gerência.",
       gateError: "Não foi possível verificar agora. Tente novamente.",
       gateHelp: "Não tem o código? Peça-o à gerência da sua empresa.",
+      gateTagline: "Gestão de equipas, simplificada.",
+      gateSubtitle: "Horas, agendas, clientes e pagamentos num só lugar.",
       currentCompany: "Empresa", changeCompany: "Trocar de empresa",
       yourCompany: "da sua empresa",
       blockedTitleExpired: "Assinatura vencida", blockedTitleSuspended: "Acesso suspenso",
@@ -838,6 +840,10 @@ const T = {
       // documento exige aria-label em ícones sozinhos.
       previousWeek: "Semana anterior", nextWeek: "Semana seguinte",
       backLabel: "Início",
+      // Novo — redesign mobile (WeekStrip + cartões + resumo semanal)
+      legendStripDone: "Com clientes", legendStripNone: "Sem clientes",
+      clientSingular: "cliente", clientPlural: "clientes",
+      weeklySummary: "Resumo semanal", weekTotal: "Total",
     },
     employeeClientes: {
       title: "Clientes",
@@ -995,6 +1001,8 @@ const T = {
       gateNotFound: "We couldn't find this code. Check it with management.",
       gateError: "Couldn't check right now. Please try again.",
       gateHelp: "Don't have the code? Ask your company's management.",
+      gateTagline: "Team management, simplified.",
+      gateSubtitle: "Hours, schedules, clients and payments in one place.",
       currentCompany: "Company", changeCompany: "Switch company",
       yourCompany: "your company's",
       blockedTitleExpired: "Subscription expired", blockedTitleSuspended: "Access suspended",
@@ -1662,6 +1670,9 @@ const T = {
       legendShared: "shared client", legendRecurring: "biweekly or monthly",
       previousWeek: "Previous week", nextWeek: "Next week",
       backLabel: "Home",
+      legendStripDone: "With clients", legendStripNone: "No clients",
+      clientSingular: "client", clientPlural: "clients",
+      weeklySummary: "Weekly summary", weekTotal: "Total",
     },
     employeeClientes: {
       title: "Clients",
@@ -1812,6 +1823,8 @@ const T = {
       gateNotFound: "Ce code est introuvable. Vérifiez-le auprès de la direction.",
       gateError: "Vérification impossible pour le moment. Veuillez réessayer.",
       gateHelp: "Vous n'avez pas le code ? Demandez-le à la direction de votre entreprise.",
+      gateTagline: "Gestion d'équipes, simplifiée.",
+      gateSubtitle: "Heures, plannings, clients et paiements au même endroit.",
       currentCompany: "Entreprise", changeCompany: "Changer d'entreprise",
       yourCompany: "de votre entreprise",
       blockedTitleExpired: "Abonnement expiré", blockedTitleSuspended: "Accès suspendu",
@@ -2479,6 +2492,9 @@ const T = {
       legendShared: "client partagé", legendRecurring: "bimensuel ou mensuel",
       previousWeek: "Semaine précédente", nextWeek: "Semaine suivante",
       backLabel: "Accueil",
+      legendStripDone: "Avec clients", legendStripNone: "Aucun client",
+      clientSingular: "client", clientPlural: "clients",
+      weeklySummary: "Résumé hebdomadaire", weekTotal: "Total",
     },
     employeeClientes: {
       title: "Clients",

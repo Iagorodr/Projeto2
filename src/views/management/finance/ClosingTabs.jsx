@@ -183,7 +183,7 @@ function ReopenDrawer({ lang, open, onClose, onConfirm }) {
   }
   return (
     <Drawer
-      open={open} onClose={() => { setReason(""); onClose(); }} width={480} closeLabel={f.close} title={f.reopenTitle}
+      open={open} onClose={() => { setReason(""); onClose(); }} closeLabel={f.close} title={f.reopenTitle}
       footer={<><Button variant="secondary" onClick={() => { setReason(""); onClose(); }}>{f.cancel}</Button><div style={{ flex: 1 }} /><Button variant="primary" onClick={go} disabled={!ok || busy}>{f.reopenConfirm}</Button></>}
     >
       <div style={{ fontSize: 13.5, color: COLORS.ink2, marginBottom: 14 }}>{f.reopenBody}</div>

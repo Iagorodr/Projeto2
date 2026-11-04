@@ -168,7 +168,6 @@ function ContratantesScreen({ lang, setLang, contractors, setContractors, onDele
       <Drawer
         open={!!(editingId && draft)}
         onClose={close}
-        width={560}
         closeLabel={c0.close}
         title={editing ? editing.name : t.drawerNew}
         pill={draft && draft.isDirect ? <Pill variant="neutral">{t.direct}</Pill> : null}

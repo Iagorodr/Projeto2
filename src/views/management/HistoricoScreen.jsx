@@ -395,7 +395,6 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
       <Drawer
         open={!!openStaff}
         onClose={() => setOpenStaffId(null)}
-        width={560}
         avatar={openStaff && <Avatar name={openStaff.name} size={36} />}
         title={openStaff?.name}
         pill={openStaff && <Pill variant={openStaff.paid ? "paid" : "owed"}>{openStaff.paid ? c0.paid : c0.unpaid}</Pill>}

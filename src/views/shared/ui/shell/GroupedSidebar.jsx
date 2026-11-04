@@ -6,8 +6,10 @@
 //   fechado:      trilho só com ícones; linha fina entre grupos; contador vira
 //                 ponto amarelo.
 // O estado aberto/fechado fica guardado neste aparelho.
-import { useState } from "react";
-import { LogOut, ChevronsLeft, ChevronsRight, Search } from "lucide-react";
+// Nunca faz scroll: se a altura ficar abaixo de ~700 px, o grupo Sistema colapsa
+// num botão «•••» com popover.
+import { useCallback, useEffect, useRef, useState } from "react";
+import { LogOut, ChevronsLeft, ChevronsRight, Search, MoreHorizontal, X } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
 import { Avatar } from "../Avatar.jsx";
 import { LogoBadge } from "../../Logo.jsx";
@@ -17,6 +19,8 @@ const STORE_KEY = "servix.menuCollapsed";
 function readCollapsed(def) {
   try { const v = localStorage.getItem(STORE_KEY); return v == null ? def : v === "1"; } catch { return def; }
 }
+
+const COMPACT_THRESHOLD = 700;
 
 function GroupedSidebar({
   groups, activeKey, onNavigate, user, onLogout, logoutLabel, extraItems = [],
@@ -28,17 +32,55 @@ function GroupedSidebar({
   const setCollapsed = (v) => { setCollapsedRaw(v); try { localStorage.setItem(STORE_KEY, v ? "1" : "0"); } catch { /* ignora */ } };
   const width = collapsed ? 76 : 244;
 
-  const renderItem = (item, i) => {
+  // ── medir altura e compactar o grupo Sistema ──
+  const navRef = useRef(null);
+  const [compact, setCompact] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef(null);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setCompact(entry.contentRect.height < COMPACT_THRESHOLD);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // fechar popover ao clicar fora
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onClick = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false); };
+    document.addEventListener("pointerdown", onClick);
+    return () => document.removeEventListener("pointerdown", onClick);
+  }, [moreOpen]);
+
+  // separar: os primeiros N-1 grupos ficam sempre, o último (Sistema) pode colapsar
+  const mainGroups = compact ? groups.slice(0, -1) : groups;
+  const systemGroup = compact ? groups[groups.length - 1] : null;
+  const systemHasActive = systemGroup ? systemGroup.items.some((it) => it.key === activeKey) : false;
+
+  const renderItem = (item, i, opts = {}) => {
     const active = item.key === activeKey;
     const Icon = item.icon;
     const hasBadge = item.badge != null && item.badge > 0;
+    const inPopover = opts.inPopover;
     return (
       <button
-        key={item.key} type="button" onClick={() => onNavigate(item.key)}
-        title={collapsed ? item.label : undefined} aria-label={collapsed ? item.label : undefined}
+        key={item.key} type="button"
+        onClick={() => { onNavigate(item.key); if (inPopover) setMoreOpen(false); }}
+        title={collapsed && !inPopover ? item.label : undefined}
+        aria-label={collapsed && !inPopover ? item.label : undefined}
         aria-current={active ? "page" : undefined}
-        className="sx-navitem"
-        style={{
+        className={inPopover ? undefined : "sx-navitem"}
+        style={inPopover ? {
+          display: "flex", alignItems: "center", gap: 10, width: "100%",
+          height: 38, padding: "0 12px", borderRadius: 10, border: "none",
+          cursor: "pointer", fontFamily: "inherit",
+          background: active ? "var(--p1-12)" : "transparent",
+          color: active ? "var(--p2)" : COLORS.ink,
+        } : {
           display: "flex", alignItems: "center", gap: 11, position: "relative", width: "100%",
           height: 40, padding: collapsed ? 0 : "0 10px", justifyContent: collapsed ? "center" : "flex-start",
           borderRadius: 15, border: "none", cursor: "pointer", fontFamily: "inherit",
@@ -47,16 +89,18 @@ function GroupedSidebar({
         }}
       >
         <span style={{ position: "relative", display: "flex" }}>
-          <Icon size={20} strokeWidth={active ? 2.3 : 1.9} color={active ? "var(--p1)" : "#fff"} style={{ opacity: active ? 1 : 0.85 }} />
-          {hasBadge && collapsed && (
+          <Icon size={inPopover ? 18 : 20} strokeWidth={active ? 2.3 : 1.9}
+            color={inPopover ? (active ? "var(--p1)" : COLORS.ink2) : (active ? "var(--p1)" : "#fff")}
+            style={{ opacity: active ? 1 : 0.85 }} />
+          {hasBadge && collapsed && !inPopover && (
             <span style={{ position: "absolute", top: -3, right: -4, width: 9, height: 9, borderRadius: 9, background: "#F2C14E", boxShadow: "0 0 0 2px var(--p1)" }} />
           )}
         </span>
-        {!collapsed && (
+        {(!collapsed || inPopover) && (
           <>
-            <span style={{ flex: 1, textAlign: "left", fontSize: 14, fontWeight: active ? 800 : 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.label}</span>
+            <span style={{ flex: 1, textAlign: "left", fontSize: inPopover ? 13.5 : 14, fontWeight: active ? 800 : 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.label}</span>
             {hasBadge && (
-              <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: "#F2C14E", color: "#151816", fontSize: 11.5, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", fontVariantNumeric: "tabular-nums" }}>{item.badge}</span>
+              <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: inPopover ? "var(--p1-12)" : "#F2C14E", color: inPopover ? "var(--p2)" : "#151816", fontSize: 11.5, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center", fontVariantNumeric: "tabular-nums" }}>{item.badge}</span>
             )}
           </>
         )}
@@ -65,8 +109,27 @@ function GroupedSidebar({
   };
 
   let n = 0;
+
+  // popover do «•••»
+  const morePopover = moreOpen && systemGroup && (
+    <div
+      style={{
+        position: "absolute", bottom: "100%", left: collapsed ? 0 : 4, marginBottom: 8,
+        minWidth: 180, background: COLORS.card, borderRadius: 14,
+        boxShadow: "0 12px 40px rgba(21,24,22,.22)", padding: 6,
+        zIndex: 10, display: "flex", flexDirection: "column", gap: 2,
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: COLORS.ink3, padding: "6px 12px 4px" }}>
+        {systemGroup.label}
+      </div>
+      {systemGroup.items.map((it) => renderItem(it, 0, { inPopover: true }))}
+    </div>
+  );
+
   return (
     <nav
+      ref={navRef}
       aria-label="Menu"
       style={{
         width, flexShrink: 0, display: "flex", flexDirection: "column",
@@ -74,7 +137,7 @@ function GroupedSidebar({
         padding: collapsed ? "16px 12px" : "16px 14px", boxSizing: "border-box", borderRadius: collapsed ? 38 : 30,
         background: "var(--p1)", color: "#fff", transition: "width .28s var(--ease), padding .28s var(--ease), border-radius .28s var(--ease)",
         boxShadow: "0 18px 40px -24px var(--p1-shadow)",
-        overflow: "hidden",
+        overflow: "visible",
       }}
     >
       {user && (
@@ -107,8 +170,8 @@ function GroupedSidebar({
         )}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,.25) transparent", display: "flex", flexDirection: "column", gap: 2 }}>
-        {groups.map((g, gi) => (
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 2, overflow: "hidden" }}>
+        {mainGroups.map((g, gi) => (
           <div key={g.key} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,.16)", margin: collapsed ? "8px 8px" : "8px 4px 2px" }} />}
             {!collapsed && <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", opacity: 0.6, padding: "6px 10px 4px" }}>{g.label}</div>}
@@ -121,6 +184,30 @@ function GroupedSidebar({
           </div>
         )}
       </div>
+
+      {/* botão «•••» quando o grupo Sistema está compactado */}
+      {systemGroup && (
+        <div ref={moreRef} style={{ position: "relative", flexShrink: 0, marginTop: 4 }}>
+          <div style={{ height: 1, background: "rgba(255,255,255,.16)", margin: collapsed ? "4px 8px" : "4px 4px" }} />
+          <button
+            type="button" onClick={() => setMoreOpen((v) => !v)}
+            title={systemGroup.label}
+            aria-label={systemGroup.label}
+            aria-expanded={moreOpen}
+            style={{
+              display: "flex", alignItems: "center", gap: 10, width: "100%",
+              height: 40, padding: collapsed ? 0 : "0 10px", justifyContent: collapsed ? "center" : "flex-start",
+              borderRadius: 15, border: "none", cursor: "pointer", fontFamily: "inherit",
+              background: systemHasActive ? "rgba(255,255,255,.18)" : "transparent",
+              color: "#fff",
+            }}
+          >
+            <MoreHorizontal size={20} strokeWidth={1.9} style={{ opacity: 0.85 }} />
+            {!collapsed && <span style={{ fontSize: 14, fontWeight: 600 }}>•••</span>}
+          </button>
+          {morePopover}
+        </div>
+      )}
 
       <button
         type="button" onClick={onLogout} aria-label={logoutLabel} title={collapsed ? logoutLabel : undefined}

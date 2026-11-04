@@ -22,8 +22,8 @@ function themeColors() {
   const v = (n, d) => ((cs && cs.getPropertyValue(n).trim()) || d);
   const p1 = v("--p1", "#1E8C5A"), p2 = v("--p2", "#166B45"), p12 = v("--p1-12", "#E4F1EB");
   return {
-    "#1F7A5F": p1, "#238A69": p1, "#1A6F56": p2, "#185A4A": p2, "#2A8A73": p1, "#143F35": "#151816",
-    "#E4EFEA": p12, "#E28A65": "#C98A12", "#5B6F67": "#5A625C", "#1A2B26": "#151816", "#9FB3AA": "#B4BAB5", "#C3D4CC": "#D3D8D1",
+    "#1F7A5F": p1, "#238A69": p1, "#23806A": p1, "#1A6F56": p2, "#185A4A": p2, "#2A8A73": p1, "#143F35": "#151816",
+    "#E4EFEA": p12, "#DCEBE4": p12, "#D6EBE1": p12, "#E28A65": "#C98A12", "#5B6F67": "#5A625C", "#1A2B26": "#151816", "#9FB3AA": "#B4BAB5", "#C3D4CC": "#D3D8D1",
   };
 }
 function recolor(svg) {

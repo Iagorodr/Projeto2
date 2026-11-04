@@ -86,7 +86,6 @@ function EmployeeHistoricoScreen({ lang, setLang, onHome, staffId, company, clie
     <Drawer
       open={!!open}
       onClose={() => setOpenId(null)}
-      width={560}
       title={open?.periodLabel}
       pill={open && (open.isPending ? <Pill variant="neutral">{t.inReview}</Pill> : <Pill variant="neutral">{t.closedAt} {fmtNoteDate(open.closedAt)}</Pill>)}
       footer={open && (

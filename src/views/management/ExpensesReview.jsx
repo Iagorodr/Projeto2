@@ -75,7 +75,7 @@ function ExpensesReviewDrawer({ lang, open, onClose, items, staff, decide }) {
   const nameOf = (sid) => (staff.find((s) => String(s.id) === String(sid)) || {}).name || "—";
   return (
     <Drawer
-      open={open} onClose={onClose} title={t.reviewTitle} width={560}
+      open={open} onClose={onClose} title={t.reviewTitle}
       footer={<Button variant="secondary" onClick={onClose}>{t.reviewClose}</Button>}
     >
       {items.length === 0 ? (

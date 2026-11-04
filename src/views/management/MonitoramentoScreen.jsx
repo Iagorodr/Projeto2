@@ -158,7 +158,6 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
     <Drawer
       open={!!openStaff}
       onClose={() => setOpenStaffId(null)}
-      width={560}
       avatar={openStaff && <Avatar name={openStaff.name} size={36} />}
       title={openStaff && t.staffReportTitle(openStaff.name)}
     >

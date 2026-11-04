@@ -356,7 +356,6 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
       <Drawer
         open={drawerOpen}
         onClose={closeDrawer}
-        width={560}
         closeLabel={c0.close}
         avatar={(mode === "view" || mode === "created") && drawerStaff ? <Avatar name={drawerStaff.name} size={36} /> : undefined}
         title={mode === "edit" ? (isNew ? t.modalNewTitle : t.modalEditTitle) : mode === "created" ? t.newAccountStepTitle : drawerStaff?.name}

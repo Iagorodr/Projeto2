@@ -1,6 +1,6 @@
 // Gaveta / drawer (documento de design, 2.9): substitui as janelas modais
-// no meio do ecrã. Desktop: vem da direita, largura 560 (Horas: 640 — quem
-// usa passa `width={640}`), sobreposição rgba(15,49,41,.45). Cabeçalho
+// no meio do ecrã. Desktop: vem da direita, largura 480 (Horas/Fecho: 640 —
+// quem usa passa `width={640}`), sobreposição rgba(15,49,41,.45). Cabeçalho
 // pegajoso (ícone/avatar + título + selo + ações + fechar 40), corpo com
 // scroll, rodapé pegajoso com ações. Esc e clique fora fecham; com
 // alterações por guardar, pede confirmação antes.
@@ -23,7 +23,7 @@ import { RADIUS, SHADOW } from "../../../styles/tokens.js";
 import { ConfirmDialog } from "./ConfirmDialog.jsx";
 
 function Drawer({
-  open, onClose, width = 560,
+  open, onClose, width = 480,
   icon: Icon, avatar, title, pill, headerActions,
   footer, children,
   dirty, unsavedTitle = "Alterações por guardar", unsavedBody = "Tens alterações que ainda não foram guardadas. Queres mesmo sair sem guardar?",

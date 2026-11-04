@@ -509,7 +509,6 @@ function ClientesScreen({
       <Drawer
         open={drawerOpen}
         onClose={closeDrawer}
-        width={560}
         closeLabel={c0.close}
         icon={mode === "view" ? TypeIcon : undefined}
         title={

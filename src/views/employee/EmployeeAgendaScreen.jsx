@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, RefreshCw, UsersRound } from "lucide-react";
+import { ChevronRight, RefreshCw, UsersRound, MapPin } from "lucide-react";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -13,20 +13,15 @@ import {
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { PageHeader, Pill, MobileHeader } from "../shared/ui/index.js";
 import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
+import { WeekStrip } from "../shared/ui/mobile/WeekStrip.jsx";
+import { findContractor } from "../../models/contractors.js";
 
-// Mesma divisão de nome usada em EmployeeClientesScreen.jsx/ClientesScreen.jsx
-// (duplicada de propósito, ver o comentário lá) — só usada aqui no resumo de
-// uma linha do dia fechado (5.3, "Novo"), pra não encher esse resumo com o
-// nome da filial. O cartão aberto mostra o nome completo (ver mais abaixo).
 function splitClientName(name) {
   const idx = (name || "").indexOf(" - ");
   if (idx === -1) return [name, null];
   return [name.slice(0, idx), name.slice(idx + 3)];
 }
 
-// Pílula de recorrência (documento, 5.3): "escrever a palavra 'Quinzenal' ou
-// 'Mensal' numa pílula (não só o ícone)" — antes só havia o ícone RefreshCw
-// discretamente ao lado da duração. `label` já vem traduzido de T[lang].
 function RecurringPill({ label }) {
   return (
     <Pill variant="neutral" icon={RefreshCw}>
@@ -35,16 +30,7 @@ function RecurringPill({ label }) {
   );
 }
 
-// Agenda (documento de design, secção 5.3) — "ver a semana a partir do seu
-// lado". `staff` (lista completa) é novo nesta etapa: precisa dela por dois
-// motivos — (1) `isStaffActive` pra aplicar a regra já prevista em
-// `isStaffActive` (utils.js): "os dias a seguir à validade ficam sem
-// clientes" pra uma conta Replacement expirada, igual já feito em
-// EmployeeHorasScreen/EmployeeInicioScreen (Etapa 4j); (2) contar quantas
-// pessoas partilham um cliente num dia certo (`teamSizeFor`, mesma conta de
-// AgendasScreen.jsx, gerência, 4.3) — sem isso não dá pra saber se um
-// cliente é partilhado nem qual é "a parte" do próprio funcionário.
-function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, assignments, covers = [], onOpenClient, desktop }) {
+function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, assignments, covers = [], contractors = [], onOpenClient, desktop }) {
   const t = T[lang].employeeAgenda;
   const tCov = T[lang].coberturas;
   const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
@@ -52,16 +38,16 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
   const [weekStart, setWeekStart] = useState(() => startOfISOWeek(TODAY));
   const todayDay = TODAY.getDay() === 0 ? 7 : TODAY.getDay();
   const [expandedDay, setExpandedDay] = useState(todayDay);
+  // Mobile: dia selecionado no WeekStrip (1–5)
+  const [selectedDay, setSelectedDay] = useState(todayDay <= 5 ? todayDay : 1);
 
   const weekDates = AGENDA_DAYS.map((_, i) => addDays(weekStart, i));
   const isCurrentWeek = isoDateStr(weekStart) === isoDateStr(startOfISOWeek(TODAY));
 
-  // Inclui as coberturas de férias (quem cobre conta na equipa do dia).
   function teamSizeFor(day, clientId) {
     return staff.filter((s) => agendaClientIdsOn(assignments, covers, s.id, weekDates[day - 1]).includes(clientId)).length;
   }
   function firstNameOf(id) { const m = staffById(staff, id); return m ? m.name.split(" ")[0] : "—"; }
-  // Clientes que faço neste dia por cobrir um colega, e os meus que um colega cobre.
   function coveringFor(day) { return coveringOn(assignments, covers, staffId, weekDates[day - 1]); }
   function awayFor(day) {
     if (!isStaffActive(me, weekDates[day - 1])) return [];
@@ -70,9 +56,6 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
       .filter((x) => x.client && clientAppliesOnDate(x.client, weekDates[day - 1]));
   }
 
-  // Cliente partilhado: a "parte" do próprio é duração ÷ nº de pessoas
-  // nesse cliente, nesse dia — mesma conta de AgendasScreen.staffWeekMinutes
-  // (4.3), só que por dia em vez de somada na semana.
   function occurrenceMeta(day, client) {
     const teamSize = teamSizeFor(day, client.id) || 1;
     const shared = teamSize > 1 && client.hoursMode !== "individual";
@@ -83,9 +66,6 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     return { teamSize, shared, perPersonMin, recurring, freqLabel, dur };
   }
 
-  // `isStaffActive(me, date)` por DATA (não por hoje): uma conta Replacement
-  // que expira a meio da semana mostrada continua a ver os clientes dos
-  // dias anteriores à validade, só os de depois ficam sem clientes.
   function getDayOccurrences(day) {
     const date = weekDates[day - 1];
     if (!isStaffActive(me, date)) return [];
@@ -94,21 +74,18 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
       .map((id) => clients.find((c) => c.id === id))
       .filter((c) => c && clientAppliesOnDate(c, date));
   }
-  // Total do dia (pílula): soma da PARTE do próprio em cada cliente, não a
-  // duração bruta — senão um cliente partilhado conta a dobrar no total do
-  // funcionário (a conta antiga desta tela tinha esse erro).
+
   function getDayTotalMinutes(day, occ) {
     return occ.reduce((s, c) => s + occurrenceMeta(day, c).perPersonMin, 0);
   }
-  // Resumo de uma linha pro dia fechado (documento, 5.3, "Novo"): primeiros
-  // dois nomes + "+N" pro resto — "Cliente 33 · Cliente 5 +1".
+
   function daySummaryLine(occ) {
     if (occ.length === 0) return null;
     const names = occ.map((c) => splitClientName(c.name)[0]);
     if (names.length <= 2) return names.join(" · ");
     return `${names.slice(0, 2).join(" · ")} +${names.length - 2}`;
   }
-  // Tocar num cliente abre a ficha dele em Clientes (Enter/Espaço também).
+
   function openProps(client) {
     if (!onOpenClient) return {};
     return {
@@ -118,6 +95,12 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     };
   }
   function goWeek(delta) { setWeekStart((w) => addDays(w, delta * 7)); }
+
+  // Cor do contratante de um cliente
+  function contractorColorOf(client) {
+    const ct = findContractor(contractors, client.origin);
+    return ct ? ct.color : null;
+  }
 
   const weekNav = (
     <PeriodNav
@@ -129,10 +112,81 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     />
   );
 
-  // Cartão de cliente, telemóvel (dia aberto): nome completo + duração/parte
-  // + janela horária (`c.availability`, texto livre já existente), pílula de
-  // recorrência à parte, separador + descrição. Partilhado: cartão clay-tint
-  // com ícone de pessoas (documento, 5.3).
+  function coverTagOf(day, clientId) {
+    const x = coveringFor(day).find((c) => c.clientId === clientId);
+    return x ? tCov.coveringTag(firstNameOf(x.cover.fromStaffId)) : null;
+  }
+  function AwayNote({ day }) {
+    const items = awayFor(day);
+    if (items.length === 0) return null;
+    return (
+      <>
+        {items.map(({ cover, client }) => (
+          <span key={cover.id} title={`${client.name} · ${tCov.awayTag(firstNameOf(cover.toStaffId))}`}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 28, borderRadius: RADIUS.chip, padding: "0 9px", border: `1.5px dashed ${COLORS.line}`, fontSize: 12.5, color: COLORS.ink2, maxWidth: 260 }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.name}</span>
+            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700 }}>{tCov.awayTag(firstNameOf(cover.toStaffId))}</span>
+          </span>
+        ))}
+      </>
+    );
+  }
+
+  // ── Cartão de cliente mobile (novo design) ──
+  // Barra colorida do contratante à esquerda, nome, morada com pin, intervalo horário
+  function MobileClientCard({ day, client }) {
+    const { shared, perPersonMin, recurring, freqLabel, teamSize, dur } = occurrenceMeta(day, client);
+    const ctColor = contractorColorOf(client);
+    return (
+      <div
+        {...openProps(client)}
+        style={{
+          borderRadius: 14, border: `1px solid ${COLORS.line}`,
+          background: COLORS.card, overflow: "hidden",
+          cursor: onOpenClient ? "pointer" : "default",
+          display: "flex",
+        }}
+      >
+        {/* Barra colorida do contratante */}
+        <div style={{
+          width: 5, flexShrink: 0, borderRadius: "14px 0 0 14px",
+          background: ctColor || COLORS.ink3,
+        }} />
+        <div style={{ flex: 1, minWidth: 0, padding: "12px 14px" }}>
+          {/* Nome + chevron */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{client.name}</div>
+              {coverTagOf(day, client.id) && <div style={{ marginTop: 3 }}><Pill variant="neutral">{coverTagOf(day, client.id)}</Pill></div>}
+            </div>
+            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>
+              {recurring && <RecurringPill label={freqLabel} />}
+              {onOpenClient && <ChevronRight size={16} color={COLORS.ink3} />}
+            </div>
+          </div>
+
+          {/* Morada com pin */}
+          {client.address && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 5, marginTop: 6, fontSize: 12.5, color: COLORS.ink2, lineHeight: 1.4 }}>
+              <MapPin size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{client.address}{client.city ? `, ${client.city}` : ""}</span>
+            </div>
+          )}
+
+          {/* Intervalo horário + duração */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 12.5, color: COLORS.ink2 }}>
+            {shared && <UsersRound size={12} strokeWidth={1.8} style={{ flexShrink: 0 }} />}
+            <span>
+              {shared ? `${t.peopleLabel(teamSize)} · ${fmtMinutes(perPersonMin)} ${t.each}` : fmtMinutes(dur)}
+              {client.availability ? ` · ${client.availability}` : ""}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Cartão de cliente desktop (existente, sem alteração) ──
   function ClientCard({ day, client }) {
     const { shared, perPersonMin, recurring, freqLabel, teamSize, dur } = occurrenceMeta(day, client);
     return (
@@ -170,29 +224,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     );
   }
 
-  function coverTagOf(day, clientId) {
-    const x = coveringFor(day).find((c) => c.clientId === clientId);
-    return x ? tCov.coveringTag(firstNameOf(x.cover.fromStaffId)) : null;
-  }
-  function AwayNote({ day }) {
-    const items = awayFor(day);
-    if (items.length === 0) return null;
-    return (
-      <>
-        {items.map(({ cover, client }) => (
-          <span key={cover.id} title={`${client.name} · ${tCov.awayTag(firstNameOf(cover.toStaffId))}`}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 28, borderRadius: RADIUS.chip, padding: "0 9px", border: `1.5px dashed ${COLORS.line}`, fontSize: 12.5, color: COLORS.ink2, maxWidth: 260 }}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.name}</span>
-            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700 }}>{tCov.awayTag(firstNameOf(cover.toStaffId))}</span>
-          </span>
-        ))}
-      </>
-    );
-  }
-
-  // Chip compacto, PC/tablet (todos os dias em linha, "chips de cliente ao
-  // centro") — mesmo visual dos chips de AgendasScreen.jsx (gerência, 4.3),
-  // sem descrição (vista de relance, não de detalhe).
+  // Chip compacto, PC/tablet
   function ClientChip({ day, client }) {
     const { shared, perPersonMin, recurring, teamSize, dur } = occurrenceMeta(day, client);
     const tooltip = `${client.name} · ${fmtMinutes(dur)}${shared ? ` · ${t.peopleLabel(teamSize)}, ${fmtMinutes(perPersonMin)} ${t.each}` : ""}`;
@@ -219,13 +251,11 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     );
   }
 
+  // ── Vista desktop (sem alterações) ──
   if (desktop) {
     return (
       <div style={styles.content}>
         <PageHeader title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} actions={weekNav} />
-
-        {/* Legenda (documento, 5.3: "a sua parte da visita, laranja = com
-            mais pessoas, quinzenal"). */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 18, alignItems: "center", marginBottom: 16, fontSize: 12.5, color: COLORS.ink2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, height: 22, borderRadius: 8, padding: "0 8px", background: COLORS.lineSoft, fontSize: 11.5, fontWeight: 600, color: COLORS.ink }}>
@@ -246,7 +276,6 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
             <span>{t.legendRecurring}</span>
           </div>
         </div>
-
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {AGENDA_DAYS.map((day) => {
             const date = weekDates[day - 1];
@@ -282,20 +311,39 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     );
   }
 
+  // ── Vista mobile (novo design) ──
+  // WeekStrip de 5 dias (Seg–Sex), cartões com barra colorida, resumo semanal em tabela
+  const WORK_DAYS = [1, 2, 3, 4, 5];
+  const DAY_ABBR = { pt: ["SEG", "TER", "QUA", "QUI", "SEX"], en: ["MON", "TUE", "WED", "THU", "FRI"], fr: ["LUN", "MAR", "MER", "JEU", "VEN"] };
+  const abbrs = DAY_ABBR[lang] || DAY_ABBR.pt;
+
+  const stripDays = WORK_DAYS.map((day, i) => {
+    const date = weekDates[day - 1];
+    const occ = getDayOccurrences(day);
+    const isToday = isCurrentWeek && day === todayDay;
+    let state = "default";
+    if (day === selectedDay) state = "selected";
+    else if (occ.length === 0) state = "noClients";
+    else state = "registered";
+    return { key: day, dayLabel: abbrs[i], dayNumber: date.getDate(), state, isToday };
+  });
+
+  const selOcc = getDayOccurrences(selectedDay);
+  const selTotalMin = getDayTotalMinutes(selectedDay, selOcc);
+
+  // Resumo semanal: dias × horas (só Seg–Sex)
+  const weekSummary = WORK_DAYS.map((day) => {
+    const occ = getDayOccurrences(day);
+    return { day, minutes: getDayTotalMinutes(day, occ) };
+  });
+  const weekTotalMin = weekSummary.reduce((s, d) => s + d.minutes, 0);
+
   return (
     <div style={mobStyles.phone}>
-      {/* QA (achado do Iago, 3ª volta — "mesmo contexto, páginas
-          diferentes"): cabeçalho trocado pelo `MobileHeader` já usado em
-          Horas (seta de voltar em vez do ícone de casa, idioma "PT"
-          compacto no mesmo lugar) e a fileira de troca de semana que
-          segue usa o MESMO estilo de botão de Horas (círculo 40,
-          COLORS.line/COLORS.card) em vez do `mobStyles.periodNav`
-          antigo (48, cantos só arredondados, cores diferentes).
-          QA (2ª rodada): título de volta — só a Horas fica sem título
-          ("quem fica sem o título é a página horas, o resto tem
-          título"); aqui tinha sido removido também por engano. */}
       <MobileHeader onBack={onHome} backLabel={t.backLabel} title={t.title} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+
+      {/* Navegação de semana */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
         <PeriodNav
           label={weekLabelPT(weekStart, lang)} size={40}
           onPrev={() => goWeek(-1)} onNext={() => goWeek(1)}
@@ -303,53 +351,93 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
           labelStyle={{ fontSize: 20 }}
         />
       </div>
-      <div style={mobStyles.dayList}>
-        {AGENDA_DAYS.map((day) => {
-          const occ = getDayOccurrences(day);
-          const totalMin = getDayTotalMinutes(day, occ);
-          const isExpanded = expandedDay === day;
-          const isToday = isCurrentWeek && day === todayDay;
-          const summary = daySummaryLine(occ);
-          return (
-            <div key={day} style={mobStyles.dayCard}>
-              <button
-                style={{ ...mobStyles.agendaDayHeader, minHeight: 72, borderBottom: isExpanded ? `1px solid ${COLORS.border}` : "none" }}
-                onClick={() => setExpandedDay(isExpanded ? null : day)}
-              >
-                <span style={{ ...mobStyles.dayHeaderLeft, flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={mobStyles.dayAbbrBold}>{dayLabels[day]}</span>
-                    {isToday && (
-                      <span style={{ background: COLORS.clay, color: "#3A1A0D", fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "2px 9px", lineHeight: 1.3 }}>
-                        {t.todayPill}
-                      </span>
-                    )}
-                  </span>
-                  {/* Novo (documento, 5.3): resumo dos clientes numa linha
-                      quando o dia está fechado, pra dar pra ver sem abrir. */}
-                  {!isExpanded && summary && (
-                    <span style={{ fontSize: 11.5, color: COLORS.ink3 }}>{summary}</span>
-                  )}
-                </span>
-                {occ.length === 0
-                  ? <span style={{ fontSize: 12, color: COLORS.ink3 }}>{t.noClientsShort}</span>
-                  : <Pill>{fmtMinutes(totalMin)}</Pill>}
-              </button>
-              {isExpanded && (
-                <div style={mobStyles.agendaDayBody}>
-                  {occ.length === 0 ? (
-                    <div style={mobStyles.emptyDay}>{t.noClients}</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {occ.map((c) => <ClientCard key={c.id} day={day} client={c} />)}
-                    </div>
-                  )}
-                  {awayFor(day).length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}><AwayNote day={day} /></div>}
-                </div>
-              )}
+
+      {/* WeekStrip de 5 dias */}
+      <WeekStrip
+        days={stripDays}
+        onSelectDay={(key) => setSelectedDay(key)}
+        legendItems={{
+          done: t.legendStripDone || "Com clientes",
+          none: t.legendStripNone || "Sem clientes",
+          today: t.todayPill,
+        }}
+      />
+
+      {/* Cartões do dia selecionado */}
+      <div style={{ marginTop: 18, minHeight: 120 }}>
+        {selOcc.length === 0 ? (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "40px 16px", textAlign: "center",
+          }}>
+            <span style={{ fontSize: 14, color: COLORS.ink3 }}>{t.noClients}</span>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Total do dia */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink2 }}>
+                {selOcc.length} {selOcc.length === 1 ? (t.clientSingular || "cliente") : (t.clientPlural || "clientes")}
+              </span>
+              <Pill>{fmtMinutes(selTotalMin)}</Pill>
             </div>
-          );
-        })}
+            {selOcc.map((c) => <MobileClientCard key={c.id} day={selectedDay} client={c} />)}
+          </div>
+        )}
+        {awayFor(selectedDay).length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            <AwayNote day={selectedDay} />
+          </div>
+        )}
+      </div>
+
+      {/* Resumo semanal em tabela */}
+      <div style={{
+        marginTop: 24, borderRadius: 14, border: `1px solid ${COLORS.line}`,
+        background: COLORS.card, overflow: "hidden",
+      }}>
+        <div style={{
+          padding: "10px 14px", fontSize: 13, fontWeight: 700, color: COLORS.ink,
+          borderBottom: `1px solid ${COLORS.line}`,
+        }}>
+          {t.weeklySummary || "Resumo semanal"}
+        </div>
+        <div style={{ display: "flex" }}>
+          {weekSummary.map(({ day, minutes }) => {
+            const isSelected = day === selectedDay;
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => setSelectedDay(day)}
+                style={{
+                  flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                  padding: "10px 0", border: "none", cursor: "pointer", fontFamily: "inherit",
+                  background: isSelected ? "var(--p1-8)" : "transparent",
+                  borderBottom: isSelected ? "2px solid var(--p1)" : "2px solid transparent",
+                }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 700, color: COLORS.ink2, letterSpacing: "0.03em" }}>
+                  {abbrs[day - 1]}
+                </span>
+                <span style={{
+                  fontSize: 14, fontWeight: 600,
+                  color: minutes > 0 ? COLORS.ink : COLORS.ink3,
+                }}>
+                  {minutes > 0 ? fmtMinutes(minutes) : "—"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "8px 14px", borderTop: `1px solid ${COLORS.line}`,
+          fontSize: 13, fontWeight: 700, color: COLORS.ink,
+        }}>
+          <span>{t.weekTotal || "Total"}</span>
+          <span>{fmtMinutes(weekTotalMin)}</span>
+        </div>
       </div>
     </div>
   );

@@ -1,63 +1,119 @@
-// Casca comum dos ecrãs de antes do login (código da empresa, login,
-// assinatura vencida): fundo em gradiente, seletor de idioma e cartão central.
-// O logótipo também vive aqui para os três ecrãs usarem o mesmo.
+// Casca dos ecrãs de antes do login (código da empresa, login, assinatura
+// vencida). Desktop: layout dividido — painel esquerdo 520 px com gradiente
+// verde, blobs SVG animados e grelha de pontos; painel direito (#ECEEE9)
+// com formulário centrado. Telemóvel: coluna única, fundo #ECEEE9, logo
+// centrado no topo.
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW, FONT } from "../../styles/tokens.js";
 import { LangSwitcher } from "./Layout.jsx";
-import { LogoMark } from "./Logo.jsx";
+import { LogoBadge, LogoLockup } from "./Logo.jsx";
+import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 
-// Logótipo do ecrã de início de sessão (documento, 4.12): "bloco 34
-// forest-600 com ✓ + 'Servi' em forest-800 e 'x' em clay".
-export function LoginLogo() {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ width: 34, height: 34, borderRadius: 9, background: COLORS.forest600, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <LogoMark size={22} tone="reversed" />
-      </div>
-      <span style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 21, color: COLORS.forest800, lineHeight: 1 }}>
-        Servi<span style={{ color: COLORS.clay }}>x</span>
-      </span>
-    </div>
-  );
+// Logótipo do ecrã de início de sessão.
+export function LoginLogo({ size = "default" }) {
+  return <LogoLockup size={size === "large" ? 28 : 22} />;
 }
 
 // Campo de texto dos ecrãs de antes do login.
 export const authInputStyle = {
-  width: "100%", height: 44, borderRadius: RADIUS.control, border: `1px solid ${COLORS.lineInput}`,
-  padding: "0 14px", fontSize: 14, color: COLORS.ink, background: COLORS.card, boxSizing: "border-box",
-  fontFamily: "inherit",
+  width: "100%", height: 48, borderRadius: 14, border: `1.5px solid ${COLORS.lineInput}`,
+  padding: "0 16px", fontSize: 15, color: COLORS.ink, background: "#fff", boxSizing: "border-box",
+  fontFamily: "inherit", outline: "none",
 };
 
-// Fundo: gradiente verde-menta → forest, com dois brilhos radiais (clay no
-// topo, forest escuro no canto oposto) — eco dos dois tons da marca.
-export function AuthShell({ lang, setLang, children, cardStyle }) {
+// ── Blobs animados SVG ──
+const BLOB_KEYFRAMES = `
+@keyframes sx-drift1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(30px,-20px) scale(1.05); } 66% { transform: translate(-15px,25px) scale(.97); } }
+@keyframes sx-drift2 { 0%,100% { transform: translate(0,0) scale(1); } 40% { transform: translate(-25px,15px) scale(1.04); } 70% { transform: translate(20px,-10px) scale(.96); } }
+@keyframes sx-drift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(15px,20px) scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .sx-blob { animation: none !important; } }
+`;
+
+function BlobPanel({ tagline, subtitle }) {
   return (
-    <div
-      style={{
-        minHeight: "100dvh", flex: 1, width: "100%", position: "relative", boxSizing: "border-box",
-        background: "linear-gradient(160deg, var(--p1-12) 0%, var(--p1-35) 45%, var(--p1) 100%)",
-        display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-      }}
-    >
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute", inset: 0,
-          background:
-            "radial-gradient(circle at 50% 0%, rgba(226,138,101,.35), transparent 50%), " +
-            "radial-gradient(circle at 100% 100%, rgba(15,49,41,.35), transparent 55%)",
-        }}
-      />
-      <div style={{ position: "absolute", top: 20, right: 20 }}>
+    <div style={{
+      width: 520, flexShrink: 0, position: "relative", overflow: "hidden",
+      background: "linear-gradient(170deg, var(--p1) 0%, var(--p2) 100%)",
+      display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
+      padding: "60px 48px", boxSizing: "border-box",
+    }}>
+      <style>{BLOB_KEYFRAMES}</style>
+      {/* grelha de pontos */}
+      <svg aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.08 }}>
+        <pattern id="sx-dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r="1.5" fill="#fff" />
+        </pattern>
+        <rect width="100%" height="100%" fill="url(#sx-dots)" />
+      </svg>
+      {/* blobs */}
+      <svg aria-hidden="true" viewBox="0 0 520 600" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+        <ellipse className="sx-blob" cx="130" cy="140" rx="150" ry="130" fill="rgba(255,255,255,.07)"
+          style={{ animation: "sx-drift1 10s ease-in-out infinite" }} />
+        <ellipse className="sx-blob" cx="380" cy="400" rx="170" ry="140" fill="rgba(255,255,255,.06)"
+          style={{ animation: "sx-drift2 12s ease-in-out infinite" }} />
+        <ellipse className="sx-blob" cx="250" cy="300" rx="120" ry="100" fill="rgba(255,255,255,.05)"
+          style={{ animation: "sx-drift3 8s ease-in-out infinite" }} />
+      </svg>
+      {/* conteúdo */}
+      <div style={{ position: "relative", zIndex: 1, textAlign: "center", color: "#fff", maxWidth: 360 }}>
+        <LogoBadge size={56} tone="light" />
+        <div style={{ marginTop: 28, fontFamily: FONT.heading, fontSize: 28, fontWeight: 800, lineHeight: 1.2 }}>
+          {tagline}
+        </div>
+        {subtitle && (
+          <div style={{ marginTop: 12, fontSize: 15, opacity: 0.8, lineHeight: 1.5 }}>
+            {subtitle}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function AuthShell({ lang, setLang, children, tagline, subtitle, cardStyle }) {
+  const tier = useBreakpoint();
+  const isDesktop = tier === "desktop";
+  const showPanel = isDesktop && tagline;
+
+  if (showPanel) {
+    return (
+      <div style={{
+        minHeight: "100dvh", display: "flex", width: "100%",
+      }}>
+        <BlobPanel tagline={tagline} subtitle={subtitle} />
+        <div style={{
+          flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          background: "#ECEEE9", position: "relative", padding: 40, boxSizing: "border-box",
+          minHeight: "100dvh",
+        }}>
+          <div style={{ position: "absolute", top: 24, right: 24 }}>
+            <LangSwitcher lang={lang} setLang={setLang} />
+          </div>
+          <div style={{ width: 400, maxWidth: "100%", ...cardStyle }}>
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Telemóvel / tablet / sem painel: coluna única
+  return (
+    <div style={{
+      minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center",
+      background: "#ECEEE9", padding: "40px 20px", boxSizing: "border-box",
+      position: "relative",
+    }}>
+      <div style={{ position: "absolute", top: 16, right: 16 }}>
         <LangSwitcher lang={lang} setLang={setLang} />
       </div>
-      <div
-        style={{
-          position: "relative", width: 420, maxWidth: "100%", background: COLORS.card,
-          borderRadius: RADIUS.card, boxShadow: SHADOW.sh2, padding: "36px 32px", boxSizing: "border-box",
-          ...cardStyle,
-        }}
-      >
+      {tagline && (
+        <div style={{ marginBottom: 32 }}>
+          <LogoBadge size={48} />
+        </div>
+      )}
+      <div style={{ width: 400, maxWidth: "100%", ...cardStyle }}>
         {children}
       </div>
     </div>
