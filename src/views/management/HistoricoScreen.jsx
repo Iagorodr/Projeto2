@@ -149,6 +149,135 @@ function OccurrenceSection({ icon: Icon, title, items, emptyLabel, clients, lang
   );
 }
 
+// Carimbos do período (documento p. 29): PAGO quando todos os que trabalharam
+// estão pagos; REABERTO quando houve um mês reaberto para correção nesse período
+// (registado no fecho a partir desta versão; períodos antigos não o têm).
+// Sem PAGO, mostra "N por pagar" a âmbar. `index` dá o atraso da cascata.
+function periodStatus(p) {
+  const worked = (p.staffSummaries || []).filter((s) => s.hours > 0 || s.euros > 0);
+  const unpaid = worked.filter((s) => !s.paid).length;
+  const reopened = (p.staffSummaries || []).some((s) => s.reopened);
+  return { paid: worked.length > 0 && unpaid === 0, unpaid, reopened };
+}
+
+function Stamp({ tone, children, delay }) {
+  const c = tone === "re" ? { ink: COLORS.reopened, bg: COLORS.reopenedBg } : { ink: COLORS.ok, bg: COLORS.okTint };
+  return (
+    <span
+      className="b1-stamp-hit"
+      style={{
+        display: "inline-block", padding: "2px 8px", borderRadius: 6, border: `2px solid ${c.ink}`, color: c.ink, background: c.bg,
+        fontFamily: FONT.heading, fontWeight: 900, fontSize: 11, letterSpacing: "0.08em", lineHeight: 1.3, whiteSpace: "nowrap",
+        animationDelay: `${delay}ms`,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function PeriodStamps({ p, t, index = 0 }) {
+  const st = periodStatus(p);
+  const delay = 150 + Math.min(index, 12) * 90;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0" }}>
+      {st.paid ? <Stamp delay={delay}>{t.b1Paid}</Stamp> : st.unpaid > 0 ? <Pill variant="pending">{t.b1Unpaid(st.unpaid)}</Pill> : null}
+      {st.reopened && <span title={t.b1ReopenedHint}><Stamp tone="re" delay={delay + 60}>{t.b1Reopened}</Stamp></span>}
+    </div>
+  );
+}
+
+// Resumo do último período fechado vs o anterior.
+function LastPeriodSummary({ p, prev, t, mobile, onOpen }) {
+  const value = p.totalEuros + (p.totalExpenses || 0);
+  const prevValue = prev ? prev.totalEuros + (prev.totalExpenses || 0) : null;
+  const people = (p.staffSummaries || []).filter((s) => s.hours > 0).length;
+  const dRecl = prev ? p.reclamacoes - prev.reclamacoes : null;
+  const metric = (label, val, extra) => (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.ink3, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontFamily: FONT.heading, fontWeight: 800, fontSize: mobile ? 22 : 26, lineHeight: 1.1, color: COLORS.ink, fontVariantNumeric: "tabular-nums" }}>{val}</div>
+      {extra && <div style={{ marginTop: 6 }}>{extra}</div>}
+    </div>
+  );
+  return (
+    <Card className="b1-rise" style={{ marginBottom: 18, padding: mobile ? 16 : "18px 22px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.ink2, textTransform: "uppercase", letterSpacing: "0.06em" }}>{t.b1Last}</span>
+          <span style={{ fontFamily: FONT.heading, fontWeight: 800, fontSize: 17, color: COLORS.ink }}>{p.periodLabel}</span>
+          <PeriodStamps p={p} t={t} />
+        </div>
+        {!mobile && <Button variant="secondary" onClick={onOpen}>{t.b1Open}</Button>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, minmax(0, 1fr))", gap: mobile ? 16 : 20 }}>
+        {metric(t.kpiHours, fmtHoursScreen(p.totalHours), <DeltaPill value={pctChange(p.totalHours, prev ? prev.totalHours : null)} t={t} compact={mobile} />)}
+        {metric(t.kpiValue, fmtEuro(value), <DeltaPill value={pctChange(value, prevValue)} t={t} compact={mobile} />)}
+        {metric(t.colComplaints, p.reclamacoes, dRecl === null ? null : <span style={{ fontSize: 12, fontWeight: 600, color: dRecl > 0 ? COLORS.clayInk : COLORS.ink2 }}>{t.b1ComplaintsDelta(dRecl)}</span>)}
+        {metric(t.b1People, people, <span style={{ fontSize: 12, color: COLORS.ink2 }}>{t.b1OccShort(p.reclamacoes, p.elogios, p.avisos)}</span>)}
+      </div>
+      {mobile && <div style={{ marginTop: 16, display: "flex" }}><Button variant="secondary" onClick={onOpen} style={{ flex: 1 }}>{t.b1Open}</Button></div>}
+    </Card>
+  );
+}
+
+// Telemóvel: cartões agrupados por ano (o ano do fim do período), com a mesma
+// seleção para apagar que a tabela do PC.
+function MobilePeriodList({ periods, t, onOpen, valueOf, selectable, selectedIds, onToggleSelect, batch }) {
+  if (periods.length === 0) {
+    return <Card style={{ padding: "28px 16px", textAlign: "center", fontSize: 13.5, color: COLORS.ink2 }}>{t.noResults}</Card>;
+  }
+  const groups = [];
+  periods.forEach((p, i) => {
+    const y = (p.periodEnd || "").slice(0, 4) || "—";
+    const g = groups[groups.length - 1];
+    if (g && g.year === y) g.items.push({ p, i }); else groups.push({ year: y, items: [{ p, i }] });
+  });
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {groups.map((g) => (
+        <section key={g.year}>
+          <div style={{ fontFamily: FONT.heading, fontWeight: 800, fontSize: 15, color: COLORS.ink2, margin: "0 2px 8px" }}>{g.year}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {g.items.map(({ p, i }) => {
+              const selected = selectedIds?.has(p.id);
+              return (
+                <div
+                  key={p.id} role="button" tabIndex={0} onClick={() => onOpen(p)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onOpen(p); }}
+                  style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "12px 14px", borderRadius: RADIUS.card, cursor: "pointer", background: selected ? COLORS.forest50 : COLORS.card, border: `1px solid ${selected ? COLORS.forest600 : COLORS.line}` }}
+                >
+                  {selectable && (
+                    <label onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", padding: "2px 0", cursor: "pointer" }}>
+                      <input type="checkbox" checked={!!selected} onChange={() => onToggleSelect(p.id)} style={{ width: 20, height: 20, margin: 0, accentColor: COLORS.vivo, cursor: "pointer" }} />
+                    </label>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{p.periodLabel}</span>
+                      <PeriodStamps p={p} t={t} index={i} />
+                    </div>
+                    <div style={{ display: "flex", gap: 14, marginTop: 6, fontSize: 13.5, color: COLORS.ink, fontVariantNumeric: "tabular-nums" }}>
+                      <span><b>{fmtHoursScreen(p.totalHours)}</b></span>
+                      <span><b>{fmtEuro(valueOf(p))}</b></span>
+                    </div>
+                    <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 4 }}>{t.b1OccShort(p.reclamacoes, p.elogios, p.avisos)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+      {batch && (
+        <div style={{ position: "fixed", bottom: 116, left: 12, right: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: COLORS.forest900, color: "#fff", padding: "10px 14px", borderRadius: RADIUS.card, boxShadow: "0 12px 30px rgba(0,0,0,.25)", fontSize: 13, zIndex: 40 }}>
+          {batch}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDeletePeriods, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount }) {
   const t = T[lang].historico;
   const c0 = T[lang].common;
@@ -240,14 +369,22 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
   }
 
   // ---------- Lista (ecrã inicial do Histórico) ----------
+  // Redesign B1 (documento p. 29): resumo do último período vs o anterior; lista
+  // com horas, valor pago, ocorrências e carimbo PAGO / REABERTO (batem em
+  // cascata); seleção + Apagar com "APAGAR" mantidos. Telemóvel: cartões
+  // agrupados por ano.
   if (!open) {
     const maxHours = Math.max(1, ...closedPeriods.map((p) => p.totalHours));
+    const valueOf = (p) => p.totalEuros + (p.totalExpenses || 0);
+    const prevOf = (p) => closedPeriods[closedPeriods.indexOf(p) + 1] || null;
+    const stampsOf = (p, i) => <PeriodStamps p={p} t={t} index={i} />;
     const listColumns = [
       { key: "period", label: t.colPeriod, width: 1.3, render: (p) => <span style={{ fontWeight: 600 }}>{p.periodLabel}</span> },
+      { key: "status", label: t.b1ColStatus, width: 1.3, allowOverflow: true, render: (p) => stampsOf(p, closedPeriods.indexOf(p)) },
       {
         key: "hours", label: t.colHours, width: 1.5,
         render: (p) => {
-          const prev = closedPeriods[closedPeriods.indexOf(p) + 1];
+          const prev = prevOf(p);
           const delta = pctChange(p.totalHours, prev ? prev.totalHours : null);
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -261,13 +398,13 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
         },
       },
       {
-        key: "value", label: t.colValue, width: 1.3,
+        key: "value", label: t.colValue, width: 1.6,
         render: (p) => {
-          const prev = closedPeriods[closedPeriods.indexOf(p) + 1];
-          const delta = pctChange(p.totalEuros + (p.totalExpenses || 0), prev ? prev.totalEuros + (prev.totalExpenses || 0) : null);
+          const prev = prevOf(p);
+          const delta = pctChange(valueOf(p), prev ? valueOf(prev) : null);
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span>{fmtEuro(p.totalEuros + (p.totalExpenses || 0))}</span>
+              <span>{fmtEuro(valueOf(p))}</span>
               <DeltaPill value={delta} t={t} compact />
             </div>
           );
@@ -292,23 +429,40 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
         },
       },
     ];
+    const selectionProps = canDelete ? {
+      selectedIds,
+      onToggleSelect: toggleSelect,
+      onToggleSelectAll: toggleSelectAll,
+      batchActions: <Button variant="dangerSolid" onClick={() => setDeleteIds([...selectedIds])}>{t.deleteSelected}</Button>,
+      batchLabel: (n) => t.selectedCount(n),
+    } : {};
 
     return (
       <div style={styles.content}>
         <PageHeader title={t.title} subtitle={t.subtitle} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
-        <DataTable
-          columns={listColumns}
-          rows={closedPeriods}
-          onRowClick={(p) => setOpenId(p.id)}
-          emptyMessage={t.noResults}
-          {...(canDelete ? {
-            selectedIds,
-            onToggleSelect: toggleSelect,
-            onToggleSelectAll: toggleSelectAll,
-            batchActions: <Button variant="dangerSolid" onClick={() => setDeleteIds([...selectedIds])}>{t.deleteSelected}</Button>,
-            batchLabel: (n) => t.selectedCount(n),
-          } : {})}
-        />
+        {closedPeriods.length > 0 && (
+          <LastPeriodSummary p={closedPeriods[0]} prev={closedPeriods[1] || null} t={t} mobile={isMobile} onOpen={() => setOpenId(closedPeriods[0].id)} />
+        )}
+        {isMobile ? (
+          <MobilePeriodList
+            periods={closedPeriods} t={t} onOpen={(p) => setOpenId(p.id)} valueOf={valueOf}
+            selectable={canDelete} selectedIds={selectedIds} onToggleSelect={toggleSelect}
+            batch={canDelete && selectedIds.size > 0 ? (
+              <>
+                <span>{t.selectedCount(selectedIds.size)}</span>
+                <Button variant="dangerSolid" onClick={() => setDeleteIds([...selectedIds])}>{t.deleteSelected}</Button>
+              </>
+            ) : null}
+          />
+        ) : (
+          <DataTable
+            columns={listColumns}
+            rows={closedPeriods}
+            onRowClick={(p) => setOpenId(p.id)}
+            emptyMessage={t.noResults}
+            {...selectionProps}
+          />
+        )}
         {deleteDialog}
       </div>
     );
@@ -343,6 +497,7 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <h1 style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: 26, color: COLORS.ink, margin: 0 }}>{open.periodLabel}</h1>
           <Pill variant="neutral">{t.closedAt} {fmtNoteDate(open.closedAt)}</Pill>
+          <PeriodStamps p={open} t={t} />
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <Button variant="secondary" onClick={exportAuditPdf}>{horasT.exportPdfGeneral}</Button>

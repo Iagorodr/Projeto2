@@ -562,6 +562,7 @@ const T = {
       copied: "Copiado!",
     },
     historico: {
+      b1Last: "Último período", b1Open: "Abrir", b1Paid: "PAGO", b1Reopened: "REABERTO", b1Unpaid: (n) => `${n} por pagar`, b1ColStatus: "Estado", b1Occ: "Ocorrências", b1People: "Pessoas", b1ComplaintsDelta: (d) => (d === 0 ? "igual ao anterior" : `${d > 0 ? "↑" : "↓"} ${Math.abs(d)} vs anterior`), b1OccShort: (r, e, a) => `${r} recl. · ${e} elog. · ${a} ${a === 1 ? "aviso" : "avisos"}`, b1ReopenedHint: "Houve correções depois de finalizar (meses reabertos)",
       title: "Histórico",
       subtitle: "Períodos fechados",
       noResults: "Nenhum período fechado ainda. Feche um período em Horas quando todos os funcionários estiverem pagos.",
@@ -1419,6 +1420,7 @@ const T = {
       copied: "Copied!",
     },
     historico: {
+      b1Last: "Last period", b1Open: "Open", b1Paid: "PAID", b1Reopened: "REOPENED", b1Unpaid: (n) => `${n} unpaid`, b1ColStatus: "Status", b1Occ: "Occurrences", b1People: "People", b1ComplaintsDelta: (d) => (d === 0 ? "same as before" : `${d > 0 ? "↑" : "↓"} ${Math.abs(d)} vs previous`), b1OccShort: (r, e, a) => `${r} compl. · ${e} praise · ${a} ${a === 1 ? "notice" : "notices"}`, b1ReopenedHint: "Corrections were made after finalising (reopened months)",
       title: "History",
       subtitle: "Closed periods",
       noResults: "No period closed yet. Close a period in Hours once every staff member is paid.",
@@ -2243,6 +2245,7 @@ const T = {
       copied: "Copié !",
     },
     historico: {
+      b1Last: "Dernière période", b1Open: "Ouvrir", b1Paid: "PAYÉ", b1Reopened: "ROUVERT", b1Unpaid: (n) => `${n} à payer`, b1ColStatus: "État", b1Occ: "Événements", b1People: "Personnes", b1ComplaintsDelta: (d) => (d === 0 ? "comme avant" : `${d > 0 ? "↑" : "↓"} ${Math.abs(d)} vs précédente`), b1OccShort: (r, e, a) => `${r} récl. · ${e} élog. · ${a} avis`, b1ReopenedHint: "Des corrections ont été faites après finalisation (mois rouverts)",
       title: "Historique",
       subtitle: "Périodes clôturées",
       noResults: "Aucune période clôturée pour l'instant. Clôturez une période dans Heures quand tous les employés sont payés.",
