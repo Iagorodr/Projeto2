@@ -39,36 +39,44 @@ function GroupedSidebar({
   const navRef = useRef(null);
   const areaRef = useRef(null);
   const moreWrapRef = useRef(null);
-  const [fit, setFit] = useState({ dense: false, overflow: 0 });
+  // `keep` = quantos itens (pela ordem do menu) ficam no trilho; o resto vai para o «•••».
+  // Vai item a item (não grupo a grupo) para nunca sobrar espaço vazio por cima do «•••».
+  const totalItems = groups.reduce((n, g) => n + g.items.length, 0);
+  const [fit, setFit] = useState({ dense: false, keep: totalItems });
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = moreWrapRef;
 
-  const required = useCallback((dense, overflow) => {
+  const required = useCallback((dense, keep) => {
     const itemH = dense ? H.itemDense : H.item;
-    const kept = groups.slice(0, groups.length - overflow);
-    let h = 0;
-    kept.forEach((g, gi) => {
+    let h = 0, left = keep, gi = 0;
+    for (const g of groups) {
+      if (left <= 0) break;
+      const n = Math.min(left, g.items.length);
       if (gi > 0) h += H.gap + (dense ? H.sepDense : collapsed ? H.sepClosed : H.sepOpen);
       if (!collapsed && !dense) h += H.label;
-      h += g.items.length * (itemH + H.gap);
-    });
+      h += n * (itemH + H.gap);
+      left -= n; gi += 1;
+    }
     if (extraItems.length) h += H.extraPad + extraItems.length * (itemH + H.gap);
-    if (overflow > 0) h += 13 + itemH; // botão «•••» + linha
-    return h;
-  }, [groups, extraItems.length, collapsed]);
+    if (keep < totalItems) h += 13 + itemH; // botão «•••» + linha
+    return h + 2; // folga
+  }, [groups, extraItems.length, collapsed, totalItems]);
 
   const measure = useCallback(() => {
     const area = areaRef.current;
     if (!area) return;
     const moreH = moreWrapRef.current ? moreWrapRef.current.offsetHeight + 4 : 0;
     const avail = area.clientHeight + moreH;
-    const options = [];
-    for (let o = 0; o < groups.length; o += 1) { options.push({ dense: false, overflow: o }); options.push({ dense: true, overflow: o }); }
-    // Prefere: nada no «•••» e normal; depois apertado; depois ir passando grupos.
-    const ordered = [{ dense: false, overflow: 0 }, { dense: true, overflow: 0 }, ...options.filter((x) => x.overflow > 0 && x.dense)];
-    const pick = ordered.find((x) => required(x.dense, x.overflow) <= avail) || { dense: true, overflow: Math.max(0, groups.length - 1) };
-    setFit((cur) => (cur.dense === pick.dense && cur.overflow === pick.overflow ? cur : pick));
-  }, [groups.length, required]);
+    let pick;
+    if (required(false, totalItems) <= avail) pick = { dense: false, keep: totalItems };
+    else if (required(true, totalItems) <= avail) pick = { dense: true, keep: totalItems };
+    else {
+      let k = totalItems - 1;
+      while (k > 1 && required(true, k) > avail) k -= 1;
+      pick = { dense: true, keep: k };
+    }
+    setFit((cur) => (cur.dense === pick.dense && cur.keep === pick.keep ? cur : pick));
+  }, [required, totalItems]);
 
   useEffect(() => {
     const el = navRef.current;
@@ -89,8 +97,19 @@ function GroupedSidebar({
   }, [moreOpen]);
 
   const dense = fit.dense;
-  const mainGroups = fit.overflow > 0 ? groups.slice(0, groups.length - fit.overflow) : groups;
-  const moreGroups = fit.overflow > 0 ? groups.slice(groups.length - fit.overflow) : [];
+  // Divide os grupos pelo número de itens que cabem (um grupo pode ficar partido:
+  // ex. Horas no trilho e Histórico no «•••», sob o título "Dinheiro").
+  const mainGroups = [];
+  const moreGroups = [];
+  {
+    let left = Math.min(fit.keep, totalItems);
+    groups.forEach((g) => {
+      const n = Math.max(0, Math.min(left, g.items.length));
+      if (n > 0) mainGroups.push(n === g.items.length ? g : { ...g, items: g.items.slice(0, n) });
+      if (n < g.items.length) moreGroups.push(n === 0 ? g : { ...g, key: `${g.key}-more`, items: g.items.slice(n) });
+      left -= n;
+    });
+  }
   const moreHasActive = moreGroups.some((g) => g.items.some((it) => it.key === activeKey));
   const moreBadge = moreGroups.reduce((s, g) => s + g.items.reduce((t, it) => t + (it.badge > 0 ? it.badge : 0), 0), 0);
   const itemH = dense ? H.itemDense : H.item;
