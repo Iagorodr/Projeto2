@@ -10,8 +10,9 @@ import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { uploadFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
 import { Field } from "../shared/Layout.jsx";
 import {
-  PageHeader, Button, Drawer, Pill, SupervisorTag, Avatar, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, StoredFile, Card, Toast,
+  PageHeader, Button, Drawer, Pill, SupervisorTag, Avatar, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, StoredFile, Card, Toast, Fab,
 } from "../shared/ui/index.js";
+import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
 
 // Um dos 3 "cartões grandes selecionáveis" da gaveta "Novo aviso"
@@ -158,6 +159,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   const t = T[lang].avisos;
   const c0 = T[lang].common;
   const [tab, setTab] = useState("pedidos");
+  const isMobileAv = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draftType, setDraftType] = useState("reclamacao");
   const [draftStaffIds, setDraftStaffIds] = useState([]); // vários destinatários
@@ -277,7 +279,8 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
 
   return (
     <div style={styles.content}>
-      <PageHeader title={t.title} actions={<Button icon={Plus} onClick={openDrawer}>{t.newAviso}</Button>} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      <PageHeader title={t.title} actions={isMobileAv ? null : <Button icon={Plus} onClick={openDrawer}>{t.newAviso}</Button>} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
+      {isMobileAv && <Fab icon={Plus} label={t.newAviso} onClick={openDrawer} />}
 
       <div className="chip-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
         <FilterChip active={tab === "pedidos"} onClick={() => selectTab("pedidos")} count={pendingSolicitations}>{t.sectionSolicitations}</FilterChip>

@@ -4,7 +4,7 @@
 // mini-linha, e blocos que se podem reordenar/ocultar (Personalizar, guardado por
 // pessoa). No telemóvel: 3 abas (Hoje · Período · Empresa).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, MessageSquare, Home, Pencil, GripVertical, EyeOff, Bell, Check, AlertTriangle } from "lucide-react";
+import { Plus, MessageSquare, Home, Pencil, GripVertical, EyeOff, Eye, Bell, Check, AlertTriangle, ChevronUp, ChevronDown, X } from "lucide-react";
 import "./dashboard.css";
 import { COLORS } from "../../styles/colors.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
@@ -21,13 +21,15 @@ import { upcomingHolidays } from "../../models/holidays.js";
 import ClientsByCityCard from "./ClientsByCityCard.jsx";
 import { contractorPeriods, periodFinance } from "../../models/contractorStats.js";
 import { FIN } from "../../models/i18nFin.js";
-import { Avatar, Toast } from "../shared/ui/index.js";
+import { Avatar, Toast, Drawer } from "../shared/ui/index.js";
 import { SearchButton } from "../shared/GlobalSearch.jsx";
 import { THEMES, DEFAULT_THEME, applyTheme } from "../../styles/theme.js";
 import { localPrefs, loadPrefs, savePrefs } from "../../models/userPrefs.js";
 
 const LOCALE = { pt: "pt-PT", en: "en-GB", fr: "fr-BE" };
 const DAY_MS = 86400000;
+// Botões da folha "Personalizar" (telemóvel): a folha fica fora dos estilos .dsh.
+const SHEET_BTN = { height: 40, padding: "0 14px", borderRadius: 20, border: "1px solid #E2E5DF", background: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, color: "#151816", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" };
 const BLOCKS = ["pend", "monit", "hoje", "mapa", "fin", "recl", "notas", "horas", "dest"];
 const LAYOUT = { pend: "c1 r2", monit: "c1", hoje: "c1", mapa: "c2 r2", fin: "c2", recl: "c1", notas: "c1", horas: "c4", dest: "c2" };
 const TAB_OF = { hero: "periodo", kpis: "periodo", pend: "hoje", monit: "hoje", hoje: "hoje", mapa: "empresa", fin: "periodo", recl: "periodo", notas: "empresa", horas: "periodo", dest: "periodo" };
@@ -266,9 +268,18 @@ function DashboardScreen({
     list.splice(i, 0, from);
     updatePrefs({ ...prefs, order: list });
   };
+  // Telemóvel: subir/descer um bloco (sem arrastar).
+  const stepBlock = (key, dir) => {
+    const list = [...order];
+    const i = list.indexOf(key), j = i + dir;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    updatePrefs({ ...prefs, order: list });
+  };
+  const toggleHidden = (key) => updatePrefs({ ...prefs, order, hidden: hidden.includes(key) ? hidden.filter((x) => x !== key) : [...hidden, key] });
 
   const [tab, setTab] = useState("hoje");
-  const blockTitle = { pend: d.pendTitle, monit: d.monitTitle, hoje: d.todayTitle(""), mapa: t.citiesTitle || "Mapa", fin: d.finTitle(""), recl: d.reclTitle, notas: d.notesTitle, horas: d.hoursCtTitle, dest: d.highlights };
+  const blockTitle = { pend: d.pendTitle, monit: d.monitTitle, hoje: d.todayTitle("").replace(/\s*·\s*$/, ""), mapa: t.citiesTitle || "Mapa", fin: d.finTitle("").replace(/\s+\S+\s*$/, ""), recl: d.reclTitle, notas: d.notesTitle, horas: d.hoursCtTitle, dest: d.highlights };
   const hr = new Date().getHours();
   const firstName = String(userName || "").trim().split(/\s+/)[0];
 
@@ -482,8 +493,15 @@ function DashboardScreen({
   for (let i = 0; i < totalDays; i++) { const day = addDays(period.start, i); weekTicks.push({ left: (i / Math.max(1, totalDays - 1)) * 100, wk: day.getDay() === 1 }); }
 
   return (
-    <div className={`dsh${edit ? " edit" : ""}`}>
+    <div className={`dsh${edit && !isPhone ? " edit" : ""}`}>
       <section className="dsh-head">
+        {/* Telemóvel: Personalizar como botão redondo ao lado da saudação (abre uma folha). */}
+        {isPhone && (
+          <button type="button" onClick={() => setEdit(true)} aria-label={d.customize} title={d.customize}
+            style={{ float: "right", width: 44, height: 44, borderRadius: 22, border: "none", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#151816", cursor: "pointer", boxShadow: "0 1px 2px rgba(21,24,22,.06)", marginLeft: 10 }}>
+            <Pencil size={17} />
+          </button>
+        )}
         <div style={{ minWidth: 0 }}>
           <h1>{d.greet(hr)}{firstName ? `, ${firstName}` : ""}.</h1>
           <p>{TODAY.toLocaleDateString(loc, { weekday: "long", day: "numeric", month: "long" })} · <span className="dsh-chip">{d.dayOf(dayN, totalDays)}</span></p>
@@ -513,11 +531,16 @@ function DashboardScreen({
           { key: "funcionarios", label: d.stepStaff, done: staff.length > 0 },
           { key: "agendas", label: d.stepAgenda, done: hasAgenda },
         ];
-        if (steps.every((x) => x.done)) return null;
+        if (steps.every((x) => x.done) || prefs.stepsHidden) return null;
         const next = steps.findIndex((x) => !x.done);
         return (
           <section className="dw c4 fixed show" data-tab="hoje" style={{ "--i": 0 }}>
-            <h4>{d.stepsTitle}<span className="kl">{d.stepsCount(steps.filter((x) => x.done).length, steps.length)}</span></h4>
+            <h4>{d.stepsTitle}<span className="kl">{d.stepsCount(steps.filter((x) => x.done).length, steps.length)}</span>
+              <button type="button" onClick={() => updatePrefs({ ...prefs, order, stepsHidden: true })} aria-label={d.hideSteps}
+                style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, height: 30, padding: "0 10px", borderRadius: 15, border: "1px solid #E2E5DF", background: "#fff", fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: "#5A625C", cursor: "pointer" }}>
+                <X size={13} /> {d.hideSteps}
+              </button>
+            </h4>
             <div style={{ display: "grid", gridTemplateColumns: isPhone ? "1fr" : "repeat(4, 1fr)", gap: 10 }}>
               {steps.map((x, i) => (
                 <button key={x.key} type="button" onClick={() => onNavigate(x.key)}
@@ -541,6 +564,7 @@ function DashboardScreen({
             {hidden.length === 0 ? <em>{d.noneHidden}</em> : hidden.map((k) => (
               <button type="button" key={k} onClick={() => updatePrefs({ ...prefs, order, hidden: hidden.filter((x) => x !== k) })}>+ {blockTitle[k]}</button>
             ))}
+            {prefs.stepsHidden && <button type="button" onClick={() => updatePrefs({ ...prefs, order, stepsHidden: false })}>+ {d.stepsTitle}</button>}
             {(hidden.length > 0 || (prefs.order || []).length > 0) && <button type="button" onClick={() => updatePrefs({ order: [], hidden: [] })}>{d.reset}</button>}
           </div>
           {setCompany && (
@@ -555,6 +579,48 @@ function DashboardScreen({
           )}
           <button type="button" className="dsh-btn p" onClick={() => setEdit(false)}>{d.done}</button>
         </section>
+      )}
+
+      {/* Telemóvel: Personalizar numa folha — subir/descer, mostrar/ocultar e cor da empresa. */}
+      {isPhone && (
+        <Drawer open={edit} onClose={() => setEdit(false)} title={d.customize} closeLabel={d.done}
+          footer={<button type="button" style={{ ...SHEET_BTN, flex: 1, height: 52, background: "var(--p1)", color: "#fff", border: "none" }} onClick={() => setEdit(false)}>{d.done}</button>}>
+          <div style={{ fontSize: 13, color: "#5A625C", marginBottom: 12 }}>{d.phoneCustomizeHint}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {order.map((k, i) => {
+              const off = hidden.includes(k);
+              return (
+                <div key={k} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 6px 6px 14px", borderRadius: 14, background: off ? "#F4F6F2" : "#fff", border: "1px solid #E2E5DF" }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: off ? "#8A918B" : "#151816", textDecoration: off ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{blockTitle[k]}</span>
+                  {[[-1, ChevronUp, d.moveUp, i === 0], [1, ChevronDown, d.moveDown, i === order.length - 1]].map(([dir, Ic, lab, dis]) => (
+                    <button key={dir} type="button" aria-label={`${lab}: ${blockTitle[k]}`} disabled={dis} onClick={() => stepBlock(k, dir)}
+                      style={{ width: 40, height: 40, borderRadius: 12, border: "none", background: "#EEF0EC", display: "flex", alignItems: "center", justifyContent: "center", color: "#151816", opacity: dis ? 0.35 : 1, cursor: dis ? "default" : "pointer" }}><Ic size={18} /></button>
+                  ))}
+                  <button type="button" aria-label={`${off ? d.showBlock : d.hideBlock}: ${blockTitle[k]}`} aria-pressed={!off} onClick={() => toggleHidden(k)}
+                    style={{ width: 40, height: 40, borderRadius: 12, border: "none", background: off ? "#EEF0EC" : "var(--p1-12)", color: off ? "#6F776F" : "var(--p2)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>{off ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            {prefs.stepsHidden && <button type="button" style={SHEET_BTN} onClick={() => updatePrefs({ ...prefs, order, stepsHidden: false })}>+ {d.stepsTitle}</button>}
+            {(hidden.length > 0 || (prefs.order || []).length > 0) && <button type="button" style={SHEET_BTN} onClick={() => updatePrefs({ order: [], hidden: [] })}>{d.reset}</button>}
+          </div>
+          {setCompany && (
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: "#5A625C", marginBottom: 10 }}>{d.companyColor}</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {THEMES.map((th) => (
+                  <button key={th.key} type="button" title={th.label[lang] || th.label.pt} aria-label={th.label[lang] || th.label.pt} aria-pressed={th.key === themeKey}
+                    onClick={() => { applyTheme(th.key); setCompany((c) => ({ ...c, theme: th.key })); }}
+                    style={{ width: 44, height: 44, borderRadius: 14, border: "none", background: th.p1, boxShadow: th.key === themeKey ? `0 0 0 3px #fff, 0 0 0 5px ${th.p1}` : "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                    {th.key === themeKey && <Check size={18} color="#fff" strokeWidth={3} />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </Drawer>
       )}
 
       <nav className="dsh-tabs" aria-label="Dashboard">

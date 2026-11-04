@@ -8,7 +8,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { isoDateStr, addDays, startOfISOWeek, notesForOwner, monthAbbr } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { Field } from "./Layout.jsx";
-import { PageHeader, Button, IconButton, Drawer, Pill, Card, Toast, InfoTip, MobileHeader } from "./ui/index.js";
+import { PageHeader, Button, IconButton, Drawer, Pill, Card, Toast, InfoTip, MobileHeader, Fab } from "./ui/index.js";
 import { usePushNotifications } from "../../hooks/usePushNotifications.js";
 
 // "YYYY-MM-DD" -> Date local (meia-noite local, não UTC) — mesmo padrão já
@@ -247,7 +247,8 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
 
       <PushStatus push={push} t={t} c0={c0} desktop={false} />
 
-      <Button size="mobile" icon={Plus} onClick={openSheet} style={{ width: "100%", marginBottom: 18 }}>{t.newNote}</Button>
+      {/* Nova nota: botão "+" flutuante (documento p. 35), acima da barra de baixo. */}
+      {!sheetOpen && <Fab icon={Plus} label={t.newNote} onClick={openSheet} />}
 
       {list}
 
