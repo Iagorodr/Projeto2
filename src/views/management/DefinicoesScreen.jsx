@@ -251,6 +251,39 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
                 })}
               </div>
             </Card>
+            {/* Só aparece quando o banco já tem as colunas (redesign_b1_cores_equipa.sql):
+                antes disso, gravar a escolha fazia falhar a gravação das definições. */}
+            {(!supabase || "employeeTheme" in company) && <Card style={{ marginTop: 16 }}>
+              <div style={styles.sectionTitle}>{t.roleThemeTitle}</div>
+              <div style={{ ...styles.defSettingHint, marginTop: 0, marginBottom: 14 }}>{t.roleThemeHint}</div>
+              {[["employeeTheme", t.roleThemeEmployee], ["supervisorTheme", t.roleThemeSupervisor]].map(([field, label], gi) => {
+                const value = company[field] || null;
+                const companyKey = company.theme || DEFAULT_THEME;
+                const options = [{ key: null, p1: THEMES.find((x) => x.key === companyKey)?.p1, label: t.roleThemeSame }, ...THEMES.map((th) => ({ key: th.key, p1: th.p1, label: th.label[lang] || th.label.pt }))];
+                return (
+                  <div key={field} style={{ paddingTop: gi ? 16 : 0, marginTop: gi ? 16 : 0, borderTop: gi ? `1px solid ${COLORS.lineSoft}` : "none" }}>
+                    <div style={{ ...styles.defSettingLabel, marginBottom: 10 }}>{label}</div>
+                    <div role="radiogroup" aria-label={label} style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                      {options.map((o) => {
+                        const on = value === o.key;
+                        const same = o.key === null;
+                        return (
+                          <button key={o.key || "same"} type="button" role="radio" aria-checked={on} title={o.label}
+                            onClick={() => setCompany((c) => ({ ...c, [field]: o.key }))}
+                            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, border: "none", background: "transparent", padding: 0, cursor: "pointer", fontFamily: "inherit", width: same ? 76 : 52 }}>
+                            <span style={{ width: 40, height: 40, borderRadius: 13, background: same ? `repeating-linear-gradient(135deg, ${o.p1}, ${o.p1} 6px, #fff 6px, #fff 9px)` : o.p1, boxShadow: on ? `0 0 0 3px #fff, 0 0 0 5px ${o.p1}` : same ? `inset 0 0 0 1px ${COLORS.line}` : "none", display: "flex", alignItems: "center", justifyContent: "center", transition: "box-shadow .2s" }}>
+                              {on && <span style={{ width: 22, height: 22, borderRadius: "50%", background: o.p1, display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={14} color="#fff" strokeWidth={3} /></span>}
+                            </span>
+                            <span style={{ fontSize: 11.5, lineHeight: 1.2, textAlign: "center", fontWeight: on ? 700 : 500, color: on ? COLORS.ink : COLORS.ink2 }}>{o.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ ...styles.defSettingHint, marginTop: 14 }}>{t.roleThemePreview}</div>
+            </Card>}
           </div>
 
           <div ref={sectionRefs.pagamento} style={secStyle("pagamento")}>

@@ -36,7 +36,7 @@ import NotasScreen from "./views/shared/NotasScreen.jsx";
 import HelpScreen, { HelpDrawer, HelpFab } from "./views/shared/HelpScreen.jsx";
 import { helpTexts } from "./models/helpTexts.js";
 import Tutorial from "./views/tutorial/Tutorial.jsx";
-import { applyTheme } from "./styles/theme.js";
+import { applyTheme, DEFAULT_THEME } from "./styles/theme.js";
 
 // EmployeeMenuScreen.jsx (a lista de botões sem casca nenhuma) ficou
 // substituído pelo EmployeeInicioScreen novo + a casca da Etapa 3 abaixo
@@ -56,8 +56,20 @@ import EmployeeInicioScreen from "./views/employee/EmployeeInicioScreen.jsx";
 export default function App() {
   const c = useAppController();
   // Cor da empresa (redesign B1): aplica-se assim que as definições da empresa chegam.
+  // Funcionários e supervisores (e a gerência em "Ver como funcionário") veem a
+  // cor escolhida para o seu papel em Definições; sem escolha, a da empresa.
   const companyTheme = c.company && c.company.theme;
-  useEffect(() => { if (companyTheme) applyTheme(companyTheme); }, [companyTheme]);
+  const roleTheme = c.perspective === "employee" && c.me
+    ? (isSupervisorRole(c.me.role) ? c.company?.supervisorTheme : c.company?.employeeTheme)
+    : null;
+  const activeTheme = roleTheme || companyTheme;
+  const roleThemeShownRef = useRef(false);
+  useEffect(() => {
+    if (activeTheme) applyTheme(activeTheme);
+    // Saiu de "Ver como funcionário" numa empresa sem cor guardada: volta à cor padrão.
+    else if (roleThemeShownRef.current) applyTheme(DEFAULT_THEME);
+    roleThemeShownRef.current = !!roleTheme;
+  }, [activeTheme, roleTheme]);
   const install = useInstallPrompt();
   const isMobile = useIsMobile();
   // Casca nova da Etapa 3 (sidebar/rail/barra inferior); a gerência

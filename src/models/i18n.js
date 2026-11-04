@@ -622,7 +622,7 @@ const T = {
     definicoes: {
       title: "Definições",
       navProfile: "Perfil da empresa", navPayment: "Pagamento e fecho", navAlerts: "Alertas", navHighlights: "Destaques", navComplaints: "Reclamações", navAppearance: "Cor e aparência", navDanger: "Zona de risco",
-      themeTitle: "Cor da empresa", themeHint: "A cor do menu, dos botões principais e dos destaques, para toda a equipa. As cores de alerta (atenção, urgente, pago) não mudam.", themeSaved: "Cor guardada.", companyDataTitle: "Dados da empresa", companyDataHint: "Aparecem no cabeçalho dos relatórios em PDF (contratantes e histórico).",
+      roleThemeTitle: "Cor do app da equipa", roleThemeHint: "A cor que funcionários e supervisores veem no telemóvel. Por defeito é a cor da empresa.", roleThemeEmployee: "Funcionários", roleThemeSupervisor: "Supervisores", roleThemeSame: "Igual à empresa", roleThemePreview: "Ver como funcionário mostra esta cor.", themeTitle: "Cor da empresa", themeHint: "A cor do menu, dos botões principais e dos destaques, para toda a equipa. As cores de alerta (atenção, urgente, pago) não mudam.", themeSaved: "Cor guardada.", companyDataTitle: "Dados da empresa", companyDataHint: "Aparecem no cabeçalho dos relatórios em PDF (contratantes e histórico).",
       fAddress: "Morada", fVat: "Nº de empresa / IVA", fIban: "IBAN", fPhone: "Telefone",
       companyProfile: "Perfil da empresa", companyName: "Nome da empresa", email: "Email", newPassword: "Nova palavra-passe",
       keepPasswordHint: "Deixe em branco para manter a palavra-passe atual.",
@@ -1481,7 +1481,7 @@ const T = {
     definicoes: {
       title: "Settings",
       navProfile: "Company profile", navPayment: "Payment and closing", navAlerts: "Alerts", navHighlights: "Highlights", navComplaints: "Complaints", navAppearance: "Colour and look", navDanger: "Danger zone",
-      themeTitle: "Company colour", themeHint: "The colour of the menu, main buttons and highlights, for the whole team. Alert colours (attention, urgent, paid) do not change.", themeSaved: "Colour saved.", companyDataTitle: "Company details", companyDataHint: "Shown in the header of PDF reports (contractors and history).",
+      roleThemeTitle: "Team app colour", roleThemeHint: "The colour employees and supervisors see on their phones. By default it is the company colour.", roleThemeEmployee: "Employees", roleThemeSupervisor: "Supervisors", roleThemeSame: "Same as company", roleThemePreview: "View as employee shows this colour.", themeTitle: "Company colour", themeHint: "The colour of the menu, main buttons and highlights, for the whole team. Alert colours (attention, urgent, paid) do not change.", themeSaved: "Colour saved.", companyDataTitle: "Company details", companyDataHint: "Shown in the header of PDF reports (contractors and history).",
       fAddress: "Address", fVat: "Company / VAT number", fIban: "IBAN", fPhone: "Phone",
       companyProfile: "Company profile", companyName: "Company name", email: "Email", newPassword: "New password",
       keepPasswordHint: "Leave blank to keep the current password.",
@@ -2307,7 +2307,7 @@ const T = {
     definicoes: {
       title: "Paramètres",
       navProfile: "Profil de l'entreprise", navPayment: "Paiement et clôture", navAlerts: "Alertes", navHighlights: "Points forts", navComplaints: "Réclamations", navAppearance: "Couleur et apparence", navDanger: "Zone à risque",
-      themeTitle: "Couleur de l'entreprise", themeHint: "La couleur du menu, des boutons principaux et des accents, pour toute l'équipe. Les couleurs d'alerte (attention, urgent, payé) ne changent pas.", themeSaved: "Couleur enregistrée.", companyDataTitle: "Données de l'entreprise", companyDataHint: "Affichées dans l'en-tête des rapports PDF (donneurs d'ordre et historique).",
+      roleThemeTitle: "Couleur de l'app de l'équipe", roleThemeHint: "La couleur que les employés et superviseurs voient sur leur téléphone. Par défaut, c'est la couleur de l'entreprise.", roleThemeEmployee: "Employés", roleThemeSupervisor: "Superviseurs", roleThemeSame: "Comme l'entreprise", roleThemePreview: "Voir comme employé affiche cette couleur.", themeTitle: "Couleur de l'entreprise", themeHint: "La couleur du menu, des boutons principaux et des accents, pour toute l'équipe. Les couleurs d'alerte (attention, urgent, payé) ne changent pas.", themeSaved: "Couleur enregistrée.", companyDataTitle: "Données de l'entreprise", companyDataHint: "Affichées dans l'en-tête des rapports PDF (donneurs d'ordre et historique).",
       fAddress: "Adresse", fVat: "N° d'entreprise / TVA", fIban: "IBAN", fPhone: "Téléphone",
       companyProfile: "Profil de l'entreprise", companyName: "Nom de l'entreprise", email: "Email", newPassword: "Nouveau mot de passe",
       keepPasswordHint: "Laissez vide pour conserver le mot de passe actuel.",

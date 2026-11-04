@@ -242,6 +242,10 @@ function toDbCompanySettings({ company, cutoffDay, contractAlertDays, closeDeadl
     phone: company.phone || null,
     // Cor da empresa (redesign_b1.sql). Só vai quando existe: um banco sem a coluna não falha.
     ...(company.theme ? { theme: company.theme } : {}),
+    // Cor do app por papel (redesign_b1_cores_equipa.sql). null = igual à empresa.
+    // Só vai quando a coluna existe no banco (a chave só aparece se veio na leitura).
+    ...("employeeTheme" in company ? { employee_theme: company.employeeTheme || null } : {}),
+    ...("supervisorTheme" in company ? { supervisor_theme: company.supervisorTheme || null } : {}),
     cutoff_day: cutoffDay,
     contract_alert_days: contractAlertDays,
     close_deadline_days: closeDeadlineDays,
@@ -255,7 +259,9 @@ function toDbCompanySettings({ company, cutoffDay, contractAlertDays, closeDeadl
 
 function fromDbCompanySettings(row) {
   return {
-    company: { name: row.name, email: row.email, photoUrl: row.photo_url || null, address: row.address || "", vatNumber: row.vat_number || "", iban: row.iban || "", phone: row.phone || "", theme: row.theme || undefined },
+    company: { name: row.name, email: row.email, photoUrl: row.photo_url || null, address: row.address || "", vatNumber: row.vat_number || "", iban: row.iban || "", phone: row.phone || "", theme: row.theme || undefined,
+      ...("employee_theme" in row ? { employeeTheme: row.employee_theme || null } : {}),
+      ...("supervisor_theme" in row ? { supervisorTheme: row.supervisor_theme || null } : {}) },
     cutoffDay: row.cutoff_day,
     contractAlertDays: row.contract_alert_days,
     closeDeadlineDays: row.close_deadline_days ?? 7,
