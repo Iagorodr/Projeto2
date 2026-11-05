@@ -12,7 +12,7 @@ import {
   INITIAL_MISSING, INITIAL_SENT,
 } from "../models/data.js";
 import { TODAY } from "../models/data.js";
-import { activeClientsCount, isStaffActive } from "../models/utils.js";
+import { activeClientsCount, isStaffActive, snapshotClientRate } from "../models/utils.js";
 import { diffKeys, mergeRemote, buildPatch, isMissingRpc } from "../models/horasSync.js";
 import { listDiff, listMerge, mapDiff, mapMerge, isEmptyDiff } from "../models/appDataSync.js";
 import { supabase, isSupabaseConfigured } from "../models/supabaseClient.js";
@@ -1006,8 +1006,13 @@ export function useAppController() {
   function enterEmployee(staffId) { setLoggedInStaffId(staffId); setPerspective("employee"); setEmpScreen("menu"); }
 
   function deleteClient(clientId) {
+    const gone = clients.find((c) => c.id === clientId) || {};
+    // As horas já feitas neste cliente continuam a valer: guarda nas linhas o valor/hora
+    // e o nome (antes, ao apagar o cliente, essas horas passavam a valer 0 € no pagamento).
+    setHorasData((prev) => snapshotClientRate(prev, clientId, gone.valueHour, { clientName: gone.name }));
     // ficheiros do cliente saem do cofre (melhor esforço)
-    ((clients.find((c) => c.id === clientId) || {}).documents || []).forEach((d) => { if (d) removeFile(d); });
+    (gone.documents || []).forEach((d) => { if (d) removeFile(d); });
+    if (gone.planningPhoto) removeFile(gone.planningPhoto);
     setClients((prev) => prev.filter((c) => c.id !== clientId));
     setAssignments((prev) => {
       const next = {};

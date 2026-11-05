@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from "react";
-import { Check, Pencil, X, RotateCcw, MoreHorizontal, FileDown } from "lucide-react";
+import { Check, Pencil, X, RotateCcw, MoreHorizontal, FileDown, Lock } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, FONT } from "../../styles/tokens.js";
 import { useControlSize, useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { TODAY } from "../../models/data.js";
 import {
-  clientById, clientDurationOn, entryClientName, isPendingClientEntry, recomputeSharedHours, visitDateOf, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
+  clientById, clientDurationOn, entryClientName, isPendingClientEntry, recomputeSharedHours, unpinVisit, entryRate, visitDateOf, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
   weekBlocksOfPayPeriod, calPeriodLabel, boardStaff, countReviews,
@@ -324,7 +324,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   // entre todos os que fizeram esse cliente nesse dia e limpa a marca.
   function resplitEntry(entry) {
     if (!entry || !entry.clientId) return;
-    setHorasData((prev) => recomputeSharedHours(prev, clients, visitDateOf(entry), entry.clientId, { ctx }));
+    // Redividir é uma decisão explícita da gerência: solta também as horas fixadas desta visita.
+    setHorasData((prev) => recomputeSharedHours(unpinVisit(prev, visitDateOf(entry), entry.clientId), clients, visitDateOf(entry), entry.clientId, { ctx }));
   }
   function startEditRow(i, entry) { setEditingIndex(i); setRowDraft({ clientId: entry.clientId || "", hours: entry.hours }); }
   function cancelEditRow() { setEditingIndex(null); }
@@ -347,7 +348,12 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
             if (idx !== i) return e;
             const { splitAdjusted, splitHours, shareReview, sharedCount, teamConfirmed, outside, outsideHours, conflict, solo, soloCheck, ...base } = e;
             const kept = clientChanged ? base : e;
-            return { ...kept, clientId: newClientId, custom: rowDraft.clientId ? undefined : e.custom, hours: Number(rowDraft.hours) || 0, approved: e.extra ? false : e.approved };
+            const newHours = Number(rowDraft.hours) || 0;
+            // Horas corrigidas à mão pela gerência ficam FIXAS: nenhum cálculo automático
+            // (colegas a marcar, mudança no cliente, revisões) as volta a mudar.
+            const hoursEdited = Math.abs(newHours - (e.hours || 0)) > 1e-9;
+            const pin = hoursEdited ? { manualBase: Math.max(0, newHours - (e.extraMinutes || 0) / 60) } : {};
+            return { ...kept, ...pin, clientId: newClientId, custom: rowDraft.clientId ? undefined : e.custom, hours: newHours, approved: e.extra ? false : e.approved };
           }),
         },
       };
@@ -689,7 +695,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                         const isEditing = editingIndex === i;
                         const client = clientById(clients, e.clientId);
                         const pendingClient = isPendingClientEntry(e);
-                        const valueHour = client ? client.valueHour : 0;
+                        const valueHour = entryRate(e, clients);
                         const d = parseISODate(e.date);
                         const dateLabel = `${dayAbbr[d.getDay()].toLowerCase()} ${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
                         return (
@@ -747,6 +753,13 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                         </span>
                                       )}
                                       {e.solo && !e.conflict && <Pill variant="paid">{t.soloRowTag}</Pill>}
+                                      {typeof e.manualBase === "number" && !e.voided && (
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                                          <Pill variant="neutral"><Lock size={11} /> {t.b1PinnedTag}</Pill>
+                                          <InfoTip text={t.b1PinnedInfo} label={c0.moreInfoLabel} />
+                                          {!locked && <Button variant="ghost" onClick={() => resplitEntry(e)}>{t.b1Unpin}</Button>}
+                                        </span>
+                                      )}
                                       {e.shareReview && (
                                         <>
                                           <Pill variant="pending">{t.shareReviewTag}</Pill>

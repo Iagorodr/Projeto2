@@ -127,7 +127,7 @@ function StatusBlock({ s, t, c0 }) {
 // `isStaffActive` (Etapa 4j) refletida na lista e na gaveta. `onNavigate`
 // é opcional (liga "Clientes atribuídos" à tela de Agendas, mesmo padrão
 // já usado em ClientesScreen.jsx).
-function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, clients, assignments, contractors = [], onDeleteStaff, onNavigate, openPeriodStart, companyEmail }) {
+function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, clients, assignments, contractors = [], horasData = {}, onDeleteStaff, onNavigate, openPeriodStart, companyEmail }) {
   const t = T[lang].funcionarios;
   const ta = T[lang].acessos;
   const c0 = T[lang].common;
@@ -223,7 +223,18 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
       setMode("view");
     }
   }
+  // Apagar um funcionário apaga também as horas dele. Com horas por pagar (período
+  // aberto ou ainda não pago) isso não pode acontecer: propõe-se desativar.
+  const hasOpenHours = (sid) => {
+    const h = horasData[sid];
+    if (!h || !Array.isArray(h.entries)) return false;
+    return h.entries.some((e) => !e.voided && (!openPeriodStart || e.date >= openPeriodStart));
+  };
+  const deactivate = (ids) => setStaff((prev) => prev.map((s) => (ids.includes(s.id) ? { ...s, status: "inativo" } : s)));
+  const singleBlocked = openStaff ? hasOpenHours(openStaff.id) : false;
+  const bulkBlocked = [...selectedIds].filter((id) => hasOpenHours(id));
   function confirmDelete() {
+    if (singleBlocked) { deactivate([openStaff.id]); setDeleteConfirmOpen(false); return; }
     onDeleteStaff(openStaff.id);
     setDeleteConfirmOpen(false);
     closeDrawer();
@@ -240,7 +251,10 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
     setSelectedIds((prev) => (prev.size === filtered.length ? new Set() : new Set(filtered.map((s) => s.id))));
   }
   function confirmBulkDelete() {
-    selectedIds.forEach((id) => onDeleteStaff(id));
+    // Quem tem horas por pagar é desativado em vez de apagado.
+    const blocked = new Set(bulkBlocked);
+    if (blocked.size > 0) deactivate([...blocked]);
+    selectedIds.forEach((id) => { if (!blocked.has(id)) onDeleteStaff(id); });
     setSelectedIds(new Set());
     setBulkDeleteConfirmOpen(false);
   }
@@ -698,11 +712,11 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
 
       <ConfirmDialog
         open={deleteConfirmOpen && !!openStaff}
-        title={c0.deleteConfirmTitle}
-        body={openStaff ? t.confirmDeleteBody(openStaff.name) : ""}
+        title={singleBlocked ? t.b1DeleteBlockedTitle : c0.deleteConfirmTitle}
+        body={openStaff ? (singleBlocked ? t.b1DeleteBlockedBody(openStaff.name) : t.confirmDeleteBody(openStaff.name)) : ""}
         cancelLabel={c0.cancel}
-        confirmLabel={c0.confirmDelete}
-        destructive
+        confirmLabel={singleBlocked ? t.b1Deactivate : c0.confirmDelete}
+        destructive={!singleBlocked}
         onCancel={() => setDeleteConfirmOpen(false)}
         onConfirm={confirmDelete}
       />
@@ -710,7 +724,7 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
       <ConfirmDialog
         open={bulkDeleteConfirmOpen}
         title={c0.deleteConfirmTitle}
-        body={t.confirmDeleteBulkBody(selectedIds.size)}
+        body={bulkBlocked.length > 0 ? `${t.confirmDeleteBulkBody(selectedIds.size)} ${t.b1BulkBlockedNote(bulkBlocked.length)}` : t.confirmDeleteBulkBody(selectedIds.size)}
         cancelLabel={c0.cancel}
         confirmLabel={c0.confirmDelete}
         destructive

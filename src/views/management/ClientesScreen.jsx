@@ -12,7 +12,7 @@ import { TYPE_ICONS, AGENDA_DAYS, TODAY, LANG_NAMES, EMPTY_CLIENT } from "../../
 import {
   startOfISOWeek, addDays, isoDateStr, clientAppliesThisWeek, weekLabelPT,
   parseDMY, parseClientDate, clientValidityRange, fmtHoursScreen, fmtMinutes, getOpenPeriod, clientTotalHours, clientExpectedHours, clientTeamStaffIds, agendaHoursSuggestion, staffById, activeClientsCount,
-  findByName, planHoursRecalc, fmtEuro,
+  findByName, planHoursRecalc, fmtEuro, pinClientHours, unpinHours, snapshotClientRate, dateStrInPeriod, entryClientName,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { Field, ViewField } from "../shared/Layout.jsx";
@@ -212,10 +212,17 @@ function ClientesScreen({
   // A divisão das horas conta também com quem a agenda diz que faz o cliente (ver `expectedTeamIds`).
   const hoursCtx = { staff, assignments, covers, absences };
   const paidStaffIds = Object.keys(horasData).filter((sid) => horasData[sid] && horasData[sid].paid);
+  // Proteção das horas já feitas (caso ACTE 3, 4/11): mudar a duração ou a forma de
+  // contar um cliente NUNCA reescreve sozinho o que já foi registado. Ao gravar, as
+  // linhas do período ficam FIXAS (`pinnedKeys`); "Recalcular" é uma escolha
+  // explícita, com a lista de cada mudança à vista.
+  const [pinnedKeys, setPinnedKeys] = useState([]);
   const recalcClient = recalcClientId ? clients.find((c) => c.id === recalcClientId) : null;
   const recalcPlan = recalcClient && setHorasData
-    ? planHoursRecalc(horasData, clients, period, { skipStaffIds: paidStaffIds, clientIds: [recalcClient.id], ctx: hoursCtx })
+    ? planHoursRecalc(unpinHours(horasData, pinnedKeys), clients, period, { skipStaffIds: paidStaffIds, clientIds: [recalcClient.id], ctx: hoursCtx })
     : null;
+  // Valor/hora mudou e há horas feitas neste período: escolher a quem se aplica.
+  const [rateAsk, setRateAsk] = useState(null); // { clientId, name, oldRate, newRate, lines, deltaE }
   const recalcLines = recalcPlan ? recalcPlan.changes.length : 0;
   const recalcDeltaH = recalcPlan ? recalcPlan.changes.reduce((s, c) => s + (c.newHours - c.oldHours), 0) : 0;
   const recalcDeltaE = recalcClient ? recalcDeltaH * (Number(recalcClient.valueHour) || 0) : 0;
@@ -320,15 +327,37 @@ function ClientesScreen({
       const updated = { ...toSave, id: openClient.id };
       setClients((prev) => prev.map((c) => (c.id === openClient.id ? updated : c)));
       setMode("view");
-      // Mudou a duração (ou o modo de contar as horas)? Se há marcações já
-      // feitas neste período com a duração antiga, pergunta se as atualiza.
+      // Mudou a duração ou a forma de contar? Primeiro FIXA as horas já registadas
+      // neste período (ficam exatamente como estavam); depois, se a regra nova daria
+      // horas diferentes, mostra a lista e deixa a gerência decidir se recalcula.
       const durationChanged = Number(updated.duration) !== Number(openClient.duration)
         || JSON.stringify(updated.durationByDay || {}) !== JSON.stringify(openClient.durationByDay || {})
         || (updated.hoursMode || "dividida") !== (openClient.hoursMode || "dividida");
       if (durationChanged && setHorasData) {
+        const { next: pinned, keys } = pinClientHours(horasData, openClient.id, period);
+        if (keys.length > 0) setHorasData(pinned);
         const nextClients = clients.map((c) => (c.id === openClient.id ? updated : c));
-        const plan = planHoursRecalc(horasData, nextClients, period, { skipStaffIds: paidStaffIds, clientIds: [openClient.id], ctx: hoursCtx });
-        if (plan.changes.length > 0) setRecalcClientId(openClient.id);
+        const plan = planHoursRecalc(unpinHours(pinned, keys), nextClients, period, { skipStaffIds: paidStaffIds, clientIds: [openClient.id], ctx: hoursCtx });
+        if (plan.changes.length > 0) { setPinnedKeys(keys); setRecalcClientId(openClient.id); }
+      }
+      // Mudou o valor/hora? O pagamento é calculado com o valor do cliente: sem
+      // perguntar, todas as horas já feitas neste período mudavam de valor.
+      const oldRate = Number(openClient.valueHour) || 0;
+      const newRate = Number(updated.valueHour) || 0;
+      if (setHorasData && Math.abs(oldRate - newRate) > 1e-9) {
+        let lines = 0, hrs = 0;
+        Object.keys(horasData).forEach((sid) => {
+          const h = horasData[sid];
+          if (!h || h.paid) return;
+          (h.entries || []).forEach((e) => {
+            if (!e.voided && e.clientId === openClient.id && dateStrInPeriod(e.date, period) && typeof e.rate !== "number") { lines += 1; hrs += e.hours || 0; }
+          });
+        });
+        if (lines > 0) {
+          // Por defeito o que já foi feito fica com o valor antigo (guardado na linha).
+          setHorasData((prev) => snapshotClientRate(prev, openClient.id, oldRate, { period }));
+          setRateAsk({ clientId: openClient.id, name: updated.name, oldRate, newRate, lines, deltaE: hrs * (newRate - oldRate) });
+        }
       }
     }
   }
@@ -973,12 +1002,57 @@ function ClientesScreen({
 
       <ConfirmDialog
         open={!!recalcClient && recalcLines > 0}
-        title={t.recalcAskTitle}
-        body={recalcClient ? t.recalcAskBody(recalcClient.name, recalcLines, signedH(recalcDeltaH), signedE(recalcDeltaE)) : ""}
-        cancelLabel={t.recalcAskNo}
-        confirmLabel={t.recalcAskYes(recalcLines)}
-        onCancel={() => setRecalcClientId(null)}
-        onConfirm={() => { if (recalcPlan) setHorasData(recalcPlan.next); setRecalcClientId(null); }}
+        title={t.b1KeptTitle}
+        body={recalcClient && recalcPlan ? (
+          <>
+            <div>{t.b1KeptBody(recalcClient.name, recalcLines)}</div>
+            <div style={{ marginTop: 10, maxHeight: 180, overflowY: "auto", border: `1px solid ${COLORS.line}`, borderRadius: 10 }}>
+              {recalcPlan.changes.slice(0, 40).map((c, i) => {
+                const who = staffById(staff, Number(c.staffId)) || staff.find((x) => String(x.id) === String(c.staffId));
+                return (
+                  <div key={i} style={{ display: "flex", gap: 8, padding: "6px 10px", fontSize: 12.5, borderTop: i ? `1px solid ${COLORS.lineSoft}` : "none" }}>
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{who ? who.name : c.staffId} · {c.date.split("-").reverse().slice(0, 2).join("/")}</span>
+                    <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmtHoursScreen(c.oldHours)} → <b>{fmtHoursScreen(c.newHours)}</b></span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12.5, color: COLORS.ink2 }}>{t.b1KeptTotal(signedH(recalcDeltaH), signedE(recalcDeltaE))}</div>
+          </>
+        ) : ""}
+        cancelLabel={t.b1KeepBtn}
+        confirmLabel={t.b1RecalcBtn(recalcLines)}
+        destructive
+        onCancel={() => { setRecalcClientId(null); setPinnedKeys([]); }}
+        onConfirm={() => { if (recalcPlan) setHorasData(recalcPlan.next); setRecalcClientId(null); setPinnedKeys([]); }}
+      />
+
+      <ConfirmDialog
+        open={!!rateAsk && !recalcClient}
+        title={t.b1RateTitle}
+        body={rateAsk ? t.b1RateBody(rateAsk.name, fmtEuro(rateAsk.oldRate), fmtEuro(rateAsk.newRate), rateAsk.lines, signedE(rateAsk.deltaE)) : ""}
+        cancelLabel={t.b1RateKeep}
+        confirmLabel={t.b1RateApply(rateAsk ? rateAsk.lines : 0)}
+        onCancel={() => setRateAsk(null)}
+        onConfirm={() => {
+          // Aplicar a todo o período: tira o valor guardado nas linhas deste período (passam a usar o do cliente).
+          if (rateAsk) setHorasData((prev) => {
+            let next = prev;
+            Object.keys(prev).forEach((sid) => {
+              const h = prev[sid];
+              if (!h || h.paid || !Array.isArray(h.entries)) return;
+              const entries = h.entries.map((e) => {
+                if (e.clientId !== rateAsk.clientId || !dateStrInPeriod(e.date, period) || typeof e.rate !== "number" || Math.abs(e.rate - rateAsk.oldRate) > 1e-9) return e;
+                // eslint-disable-next-line no-unused-vars
+                const { rate, ...rest } = e;
+                return rest;
+              });
+              next = { ...next, [sid]: { ...h, entries } };
+            });
+            return next;
+          });
+          setRateAsk(null);
+        }}
       />
 
       <ConfirmDialog

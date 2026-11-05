@@ -6,7 +6,7 @@ import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { useBreakpoint } from "../../hooks/useBreakpoint.js";
 import {
   clientById, entryClientName, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
-  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, visitDateOf, isHorasFrozenOn, getOpenPeriod, getNextPeriod, getCutoffPeriod,
+  startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, entryRate, visitDateOf, isHorasFrozenOn, getOpenPeriod, getNextPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
   calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
   parseHoursInput, staffTotalPay, fmtEuro, expensesOf,
@@ -678,7 +678,7 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
     exportStaffHorasPdf({
       companyName: company?.name, companyInfo: company, staffName, periodLabel: calPeriodLabel(payPeriod, lang),
       entries: periodEntries, clients, totalHours: periodHours,
-      totalValue: periodEntries.reduce((s, e) => { const c = clientById(clients, e.clientId); return s + e.hours * (c ? c.valueHour : 0); }, 0),
+      totalValue: periodEntries.reduce((s, e) => s + e.hours * entryRate(e, clients), 0),
       expenses: periodExpenses.filter((x) => x.status !== "rejected"),
       lang, pdfT, provisional,
     });

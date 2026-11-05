@@ -10,7 +10,7 @@ async function loadPdf() {
   }
   return pdfLib;
 }
-import { clientById, entryClientName, fmtEuro, fmtHoursNum, expenseApprovedValue } from "./utils.js";
+import { clientById, entryClientName, fmtEuro, fmtHoursNum, expenseApprovedValue, entryRate } from "./utils.js";
 
 // ---------------------------------------------------------------------------
 // Padrão fixo dos PDFs (redesign B1, decisão do Iago): cores neutras da app,
@@ -255,8 +255,7 @@ async function exportStaffHorasPdf({ companyName, companyInfo, staffName, period
   const rows = entries
     .filter((e) => !e.voided)
     .map((e) => {
-      const c = clientById(clients, e.clientId);
-      const valueHour = c ? c.valueHour : 0;
+      const valueHour = entryRate(e, clients);
       const pendingMark = e.extra && !e.approved ? "*" : "";
       return [
         shortDate(e.date),

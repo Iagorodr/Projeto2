@@ -277,7 +277,7 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
       );
     }
     if (i.kind === "repass") {
-      const value = i.hours * (clientById(clients, i.clientId)?.valueHour || 0);
+      const value = i.hours * (clientById(clients, i.clientId)?.valueHour || 0); // previsão (linha nova): valor atual do cliente
       return (
         <div key={i.key} style={card} data-testid="review-issue" data-kind="repass">
           {head}

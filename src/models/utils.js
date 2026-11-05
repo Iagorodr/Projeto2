@@ -13,6 +13,7 @@ function clientById(clients, id) { return clients.find((c) => c.id === id); }
 function entryClientName(clients, e) {
   const c = clientById(clients, e.clientId);
   if (c) return c.name;
+  if (e.clientName) return e.clientName; // cliente entretanto apagado (nome guardado na linha)
   if (e.custom && e.custom.name) return e.custom.city ? `${e.custom.name} (${e.custom.city})` : e.custom.name;
   return "—";
 }
@@ -109,6 +110,13 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
   // quem a fez noutro dia a substituí-la.
   const inVisit = (e) => e.clientId === clientId && !e.voided && visitDateOf(e) === date;
   const baseDuration = clientDurationOn(client, date) / 60;
+  // Horas FIXADAS (`manualBase`): a gerência corrigiu as horas à mão, ou mudou a forma
+  // de contar o cliente e escolheu manter o que já estava registado. Nenhum cálculo
+  // automático (colegas a marcar, mudança de duração/modo, revisões) mexe nelas:
+  // ficam `manualBase` + os ajustes da própria pessoa (`extraMinutes`). Só a
+  // gerência as solta ("Redividir" ou "Recalcular" explícito).
+  const isManual = (e) => typeof e.manualBase === "number" && Number.isFinite(e.manualBase);
+  const manualHoursOf = (e) => Math.max(0, e.manualBase + (e.extraMinutes || 0) / 60);
   // Cliente "individual": cada funcionário regista a duração completa, sem divisão.
   if (client.hoursMode === "individual") {
     const nextInd = { ...horasDataObj };
@@ -120,7 +128,7 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
       nextInd[sid] = { ...horasDataObj[sid], entries: list.map((e) => {
         if (inVisit(e)) {
           const { splitAdjusted, splitHours, shareReview, conflict, ...rest } = e;
-          return { ...rest, hours: baseDuration + (e.extraMinutes || 0) / 60, sharedCount: 1 };
+          return { ...rest, hours: isManual(e) ? manualHoursOf(e) : baseDuration + (e.extraMinutes || 0) / 60, sharedCount: 1 };
         }
         return e;
       }) };
@@ -170,7 +178,7 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
   const perPerson = restCount > 0 ? Math.max(0, baseDuration - adjustedSum) / restCount : baseDuration / count;
   // Fecho desatualizado: alguém com a semana fechada que foi gravado com outro
   // nº de pessoas (ex.: fechou sozinho com 4h e depois um colega marcou o mesmo).
-  const needsReview = [...frozenIds].some((sid) => (entryOf(sid).sharedCount || 1) !== (honored.has(sid) ? 1 : count));
+  const needsReview = [...frozenIds].some((sid) => !isManual(entryOf(sid)) && (entryOf(sid).sharedCount || 1) !== (honored.has(sid) ? 1 : count));
   const next = { ...horasDataObj };
   staffIdsInvolved.forEach((sid) => {
     next[sid] = {
@@ -181,6 +189,7 @@ function recomputeSharedHours(horasDataObj, clients, date, clientId, opts = {}) 
           const flag = { ...(needsReview ? { shareReview: true } : {}), ...(conflict ? { conflict: true } : {}) };
           if (frozenIds.has(sid)) return { ...clean, ...flag };
           const extraH = (e.extraMinutes || 0) / 60;
+          if (isManual(e)) return { ...clean, ...(conflict ? { conflict: true } : {}), hours: manualHoursOf(e), sharedCount: count };
           if (honored.has(sid)) {
             const { splitAdjusted, splitHours, ...full } = clean;
             return { ...full, ...flag, hours: baseDuration + extraH, sharedCount: 1 };
@@ -739,7 +748,8 @@ function confirmHoursOk(horasData, clients, period, ctx, keys) {
     const ch = changes.find((c) => String(c.staffId) === sid && c.idx === idx);
     const cur = out[sid];
     if (!ch || !cur) return;
-    out = { ...out, [sid]: { ...cur, entries: cur.entries.map((e, i) => (i === idx ? { ...e, hoursOk: ch.newHours } : e)) } };
+    // "Está certo" também FIXA as horas: nenhum cálculo automático as volta a mudar.
+    out = { ...out, [sid]: { ...cur, entries: cur.entries.map((e, i) => (i === idx ? { ...e, hoursOk: ch.newHours, manualBase: Math.max(0, (e.hours || 0) - (e.extraMinutes || 0) / 60) } : e)) } };
   });
   return out;
 }
@@ -899,6 +909,48 @@ function linkSameVisit(horasData, clients, ctx, staffId, clientId, workDate, opt
 //                       continuam a contar como participantes para a parte dos outros.
 //   opts.clientIds    — se dado, só estes clientes.
 //   opts.ctx          — { staff, assignments, covers, absences }: a divisão conta também com quem a agenda esperava (ver `expectedTeamIds`).
+// Fixa as horas atuais das linhas (não anuladas) de `clientId` no período: guarda a
+// base sem os ajustes da pessoa (`manualBase` = horas − extraMinutes/60). Devolve
+// { next, keys } — `keys` ("funcionário|posição") só das que ficaram fixas agora.
+function pinClientHours(horasData, clientId, period) {
+  let next = horasData;
+  const keys = [];
+  Object.keys(horasData || {}).forEach((sid) => {
+    const h = horasData[sid];
+    if (!h || !Array.isArray(h.entries)) return;
+    let changed = false;
+    const entries = h.entries.map((e, idx) => {
+      if (e.voided || e.clientId !== clientId || (period && !dateStrInPeriod(e.date, period))) return e;
+      if (typeof e.manualBase === "number") return e;
+      changed = true; keys.push(`${sid}|${idx}`);
+      return { ...e, manualBase: Math.max(0, (e.hours || 0) - (e.extraMinutes || 0) / 60) };
+    });
+    if (changed) next = { ...next, [sid]: { ...h, entries } };
+  });
+  return { next, keys };
+}
+// Solta as linhas indicadas (`keys`) ou, sem `keys`, todas as de `clientId` na visita `date`.
+function unpinHours(horasData, keys) {
+  let next = horasData;
+  new Set(keys).forEach((k) => {
+    const [sid, idxS] = String(k).split("|");
+    const idx = Number(idxS);
+    const h = next[sid];
+    if (!h || !h.entries || !h.entries[idx]) return;
+    // eslint-disable-next-line no-unused-vars
+    const { manualBase, ...rest } = h.entries[idx];
+    next = { ...next, [sid]: { ...h, entries: h.entries.map((e, i) => (i === idx ? rest : e)) } };
+  });
+  return next;
+}
+function unpinVisit(horasData, date, clientId) {
+  const keys = [];
+  Object.keys(horasData || {}).forEach((sid) => ((horasData[sid] && horasData[sid].entries) || []).forEach((e, idx) => {
+    if (e.clientId === clientId && visitDateOf(e) === date && typeof e.manualBase === "number") keys.push(`${sid}|${idx}`);
+  }));
+  return unpinHours(horasData, keys);
+}
+
 function planHoursRecalc(horasData, clients, period, opts = {}) {
   const skip = new Set((opts.skipStaffIds || []).map(String));
   const only = opts.clientIds ? new Set(opts.clientIds) : null;
@@ -1507,13 +1559,40 @@ function staffTotalHours(horasEntry, period) {
     .reduce((s, e) => s + e.hours, 0);
 }
 
+// Valor/hora de UMA linha: o guardado na própria linha (`rate`) quando existe — fica
+// assim quando o valor do cliente muda a meio do período e a gerência escolhe não
+// mexer no que já foi feito, ou quando o cliente é apagado — senão o do cliente.
+function entryRate(e, clients) {
+  if (e && typeof e.rate === "number" && Number.isFinite(e.rate)) return e.rate;
+  const c = clientById(clients, e && e.clientId);
+  return c ? Number(c.valueHour) || 0 : 0;
+}
+// Guarda o valor/hora atual em `rate` nas linhas de `clientId` (todas, ou só do
+// período) que ainda não o têm. Usado ao mudar o valor do cliente ou ao apagá-lo.
+function snapshotClientRate(horasData, clientId, rate, { period, clientName } = {}) {
+  let next = horasData;
+  Object.keys(horasData || {}).forEach((sid) => {
+    const h = horasData[sid];
+    if (!h || !Array.isArray(h.entries)) return;
+    let changed = false;
+    const entries = h.entries.map((e) => {
+      if (e.clientId !== clientId || (period && !dateStrInPeriod(e.date, period))) return e;
+      const patch = {};
+      if (typeof e.rate !== "number") patch.rate = Number(rate) || 0;
+      if (clientName && !e.clientName) patch.clientName = clientName;
+      if (Object.keys(patch).length === 0) return e;
+      changed = true;
+      return { ...e, ...patch };
+    });
+    if (changed) next = { ...next, [sid]: { ...h, entries } };
+  });
+  return next;
+}
+
 function staffTotalPay(horasEntry, clients, period) {
   return horasEntry.entries
     .filter((e) => !e.voided && (!period || dateStrInPeriod(e.date, period)))
-    .reduce((s, e) => {
-      const c = clientById(clients, e.clientId);
-      return s + e.hours * (c ? c.valueHour : 0);
-    }, 0);
+    .reduce((s, e) => s + e.hours * entryRate(e, clients), 0);
 }
 
 function shortMonthFromIso(isoStr, lang) {
@@ -1950,5 +2029,5 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { staffWithGaps, EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
+export { entryRate, snapshotClientRate, pinClientHours, unpinHours, unpinVisit, staffWithGaps, EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
 };
