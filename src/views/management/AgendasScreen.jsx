@@ -1,5 +1,5 @@
 import { useState, useEffect, useId } from "react";
-import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, CalendarDays, AlertTriangle, ArrowLeftRight } from "lucide-react";
+import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, CalendarDays, AlertTriangle, ArrowLeftRight, CalendarPlus } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { FREQ_STYLE, isRecurringFreq } from "../../styles/freqColors.js";
 import { COLORS } from "../../styles/colors.js";
@@ -14,7 +14,7 @@ import {
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
 import { findContractor } from "../../models/contractors.js";
-import { CoverDialog, CoverEditDialog, CoversPanel } from "./CoverDialog.jsx";
+import { CoverDialog, CoverEditDialog, CoversPanel, VisitDialog, VisitsPanel, newVisitCovers } from "./CoverDialog.jsx";
 import { PeriodNav, RoundArrow } from "../shared/ui/PeriodNav.jsx";
 import {
   PageHeader, SegmentedControl, SearchField, FilterChip, Avatar, Pill, SupervisorTag, DataTable, Toast, InfoTip, Button, ConfirmDialog,
@@ -340,6 +340,8 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
   const [coverOpen, setCoverOpen] = useState(false);
   const [coverEdit, setCoverEdit] = useState(null); // grupo de coberturas cujas datas se alteram
   const [coverRemove, setCoverRemove] = useState(null); // { ids, group }
+  const [visitOpen, setVisitOpen] = useState(false); // diálogo "Visita avulsa"
+  const [cellScope, setCellScope] = useState("week"); // "+" da célula: semana-tipo ou só este dia
   const { height: ctrlHeight, radius: ctrlRadius } = useControlSize();
   // QA (achado do Iago — "Agendas"): antes era `const weekStart =
   // startOfISOWeek(TODAY)`, fixo — só dava pra ver a semana corrente.
@@ -378,7 +380,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
   function getCellClientIds(staffId, day) {
     return agendaClientIdsOn(assignments, covers, staffId, weekDates[day - 1]).filter((cid) => {
       const c = clientById(clients, cid);
-      return !c || clientAppliesOnDate(c, weekDates[day - 1]);
+      return !c || clientAppliesOnDate(c, weekDates[day - 1], covers);
     });
   }
   // Clientes que `staffId` só faz neste dia por cobertura (não são da agenda
@@ -386,7 +388,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
   function coverInItems(staffId, day) {
     return coveringOn(assignments, covers, staffId, weekDates[day - 1]).filter(({ clientId }) => {
       const c = clientById(clients, clientId);
-      return !c || clientAppliesOnDate(c, weekDates[day - 1]);
+      return !c || clientAppliesOnDate(c, weekDates[day - 1], covers);
     });
   }
   // Clientes da agenda semanal de `staffId` que, neste dia, estão cobertos por outro.
@@ -459,8 +461,31 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
     if (outsideRange) showToast(t.outsideValidityToast(picked.name, fmtDM(outsideRange.start), outsideRange.end ? fmtDM(outsideRange.end) : ""));
     setCellSearch(""); setOpenCell(null);
   }
+  // Visita avulsa a partir do "+" da célula (só este dia). A dupla vai junto,
+  // como na semana-tipo.
+  function addVisit(staffId, day, clientId) {
+    const iso = isoDateStr(weekDates[day - 1]);
+    const p = partnerOf(staff, staffId, TODAY);
+    const ids = [staffId, ...(p ? [p.id] : [])];
+    const created = newVisitCovers({ clientId, staffIds: ids, dates: [iso], covers, assignments });
+    setCellSearch(""); setOpenCell(null);
+    if (created.length === 0) return;
+    setCovers((prev) => [...(prev || []), ...created]);
+    const own = new Set(created.map((cv) => cv.id));
+    const client = clientById(clients, clientId);
+    showToast(tCov.visitCreated(client?.name || "", created.length), { actionLabel: tCov.undo, onAction: () => setCovers((prev) => (prev || []).filter((cv) => !own.has(cv.id))) });
+  }
+  function removeVisits(ids) {
+    const own = new Set(ids);
+    const removed = (covers || []).filter((cv) => own.has(cv.id));
+    if (removed.length === 0) return;
+    setCovers((prev) => (prev || []).filter((cv) => !own.has(cv.id)));
+    showToast(tCov.visitRemoved(removed.length), { actionLabel: tCov.undo, onAction: () => setCovers((prev) => [...(prev || []), ...removed.filter((cv) => !(prev || []).some((x) => x.id === cv.id))]) });
+  }
   function removeClient(staffId, day, clientId) {
-    if (coverInItems(staffId, day).some((x) => x.clientId === clientId)) { showToast(tCov.lockedHere); return; }
+    const inCover = coverInItems(staffId, day).find((x) => x.clientId === clientId);
+    if (inCover && inCover.cover.kind === "visit") { removeVisits([inCover.cover.id]); return; }
+    if (inCover) { showToast(tCov.lockedHere); return; }
     const key = cellKey(staffId, day);
     const client = clientById(clients, clientId);
     const member = staffById(staff, staffId);
@@ -621,7 +646,13 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
                 const client = clientById(clients, cid);
                 if (!client) return null;
                 const coverInfo = coverIn.find((x) => x.clientId === cid);
-                const coverTag = coverInfo ? (
+                const isVisit = !!coverInfo && coverInfo.cover.kind === "visit";
+                const coverTag = isVisit ? (
+                  <span title={tCov.visitTagTitle}
+                    style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "1px 7px", background: COLORS.amberBg, color: COLORS.amberInk }}>
+                    <CalendarPlus size={10} strokeWidth={2.6} />{tCov.visitTag}
+                  </span>
+                ) : coverInfo ? (
                   <span title={tCov.coveringTag(firstName(coverInfo.cover.fromStaffId))}
                     style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: "1px 7px", background: COLORS.vivo, color: "#fff" }}>
                     {tCov.coveringTag(firstName(coverInfo.cover.fromStaffId))}
@@ -715,7 +746,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
                       {fmtMinutes(perPerson)}
                     </span>
                     {recurring && <RefreshCw size={11} style={{ flexShrink: 0, color: freqStyle.ink }} />}
-                    {isHovered && !coverInfo && (
+                    {isHovered && (!coverInfo || isVisit) && (
                       <button
                         type="button" onClick={() => removeClient(s.id, day, cid)} aria-label={t.remove}
                         style={{ flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, padding: 0, display: "flex" }}
@@ -753,6 +784,15 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
                   titleId={`cell-add-${key}`} title={t.addClientPlaceholder} closeLabel={c0.cancel}
                   onClose={() => { setOpenCell(null); setCellSearch(""); }}
                 >
+                  {setCovers && (
+                    <div style={{ marginBottom: 10 }}>
+                      <SegmentedControl
+                        options={[{ value: "week", label: tCov.scopeWeek }, { value: "day", label: tCov.scopeDay(fmtDM(date)) }]}
+                        value={cellScope} onChange={setCellScope}
+                      />
+                      {cellScope === "day" && <div style={{ fontSize: 11.5, color: COLORS.ink2, marginTop: 6, lineHeight: 1.4 }}>{tCov.scopeDayHint}</div>}
+                    </div>
+                  )}
                   <SearchField value={cellSearch} onChange={setCellSearch} placeholder={t.addClientPlaceholder} style={{ marginBottom: 10, width: "100%" }} />
                   <div style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
                     {availableClients.length === 0 ? (
@@ -761,7 +801,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
                       const existingTeamSize = teamSizeFor(day, c.id);
                       return (
                         <button
-                          key={c.id} type="button" onClick={() => addClient(s.id, day, c.id)}
+                          key={c.id} type="button" onClick={() => (cellScope === "day" && setCovers ? addVisit(s.id, day, c.id) : addClient(s.id, day, c.id))}
                           style={{
                             display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, textAlign: "left",
                             border: "none", background: "transparent", cursor: "pointer", padding: "8px 6px", borderRadius: RADIUS.chip,
@@ -771,7 +811,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                           <span style={{ flexShrink: 0, fontSize: 11.5, color: COLORS.ink3 }}>
                             {fmtMinutes(clientDurationOnDow(c, day))}{existingTeamSize > 0 ? ` · ${t.alreadyWith(existingTeamSize)}` : ""}
-                            {!clientValidOnDate(c, weekDates[day - 1]) && (() => {
+                            {cellScope !== "day" && !clientValidOnDate(c, weekDates[day - 1]) && (() => {
                               const r = clientValidityRange(c);
                               return r ? <span style={{ color: COLORS.amberInk, fontWeight: 600 }}> · {t.outsideValidityTag(r.start ? fmtDM(r.start) : "", r.end ? fmtDM(r.end) : "")}</span> : null;
                             })()}
@@ -785,7 +825,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
               {!isOpenPopover && isHovered && (
                 <button
                   type="button"
-                  onClick={() => setOpenCell(key)}
+                  onClick={() => { setCellScope("week"); setOpenCell(key); }}
                   aria-label={t.addClientPlaceholder}
                   style={{
                     height: 28, borderRadius: RADIUS.chip, border: `2px dashed ${COLORS.vivoLight}`, background: COLORS.mintBg,
@@ -993,6 +1033,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
         />
         <SearchField value={search} onChange={setSearch} placeholder={t.searchPlaceholder} style={{ width: 260 }} />
         {setCovers && <Button variant="secondary" icon={ArrowLeftRight} onClick={() => setCoverOpen(true)}>{tCov.btn}</Button>}
+        {setCovers && <Button variant="secondary" icon={CalendarPlus} onClick={() => setVisitOpen(true)}>{tCov.visitBtn}</Button>}
       </div>
 
       {setCovers && (
@@ -1002,6 +1043,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
           onRemove={(ids, g) => setCoverRemove({ ids, group: g })}
         />
       )}
+      {setCovers && <VisitsPanel t={tCov} covers={covers} staff={staff} clients={clients} onRemove={removeVisits} />}
 
       {weekAbsenceRows.length > 0 && (
         <div style={{ border: `1px solid ${COLORS.alert}`, background: "#FFF7F3", borderRadius: RADIUS.card, padding: "10px 14px", marginBottom: 16 }}>
@@ -1189,6 +1231,11 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
             open={coverOpen} onClose={() => setCoverOpen(false)} t={tCov} lang={lang}
             staff={staff} clients={clients} assignments={assignments} covers={covers} setCovers={setCovers}
             onDone={(msg) => showToast(msg)}
+          />
+          <VisitDialog
+            open={visitOpen} onClose={() => setVisitOpen(false)} t={tCov}
+            staff={staff} clients={clients} assignments={assignments} covers={covers} setCovers={setCovers}
+            onDone={(msg, undo) => showToast(msg, undo ? { actionLabel: tCov.undo, onAction: undo } : undefined)}
           />
           <CoverEditDialog
             group={coverEdit} onClose={() => setCoverEdit(null)} t={tCov}

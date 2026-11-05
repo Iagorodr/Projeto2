@@ -5,12 +5,12 @@
 // Não inclui nada do que se paga aos funcionários.
 import { clientsOfContractor } from "./contractors.js";
 import { allMarks } from "./contractorStats.js";
-import { clientAppliesOnDate, addDays, isoDateStr, visitDateOf } from "./utils.js";
+import { clientAppliesOnDate, addDays, isoDateStr, visitDateOf, isVisitCover } from "./utils.js";
 
 function dowOf(date) { const d = date.getDay(); return d === 0 ? 7 : d; }
 
 // period: { start: Date, end: Date, iso, isCurrent }. today: Date (as visitas previstas só contam até hoje).
-export function buildContractorReport({ contractor, clients, staff, horasData, closedPeriods, assignments, period, today }) {
+export function buildContractorReport({ contractor, clients, staff, horasData, closedPeriods, assignments, covers, period, today }) {
   const mine = clientsOfContractor(clients, contractor);
   const mineIds = new Set(mine.map((c) => c.id));
   const startIso = isoDateStr(period.start);
@@ -40,6 +40,13 @@ export function buildContractorReport({ contractor, clients, staff, horasData, c
     if (!dows) return;
     days.forEach((d) => { if (dows.has(dowOf(d)) && clientAppliesOnDate(cl, d)) bucket(cl).expected.push(isoDateStr(d)); });
   });
+  // Visitas avulsas marcadas na agenda (uma por dia, mesmo com várias pessoas).
+  (covers || []).forEach((cv) => {
+    if (!isVisitCover(cv) || !mineIds.has(cv.clientId) || cv.from < startIso || cv.from > lastExpectedIso) return;
+    const b = bucket(mine.find((c) => c.id === cv.clientId));
+    if (!b.expected.includes(cv.from)) b.expected.push(cv.from);
+  });
+  byClient.forEach((b) => b.expected.sort());
 
   // Visitas feitas (uma por dia de visita; várias pessoas na mesma visita juntam-se).
   marks.forEach(({ name, e }) => {

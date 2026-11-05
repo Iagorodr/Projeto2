@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, ArrowRight, CalendarClock } from "lucide-react";
+import { X, ArrowRight, CalendarClock, CalendarPlus, Plus } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS, SHADOW } from "../../styles/tokens.js";
@@ -8,6 +8,7 @@ import { TODAY } from "../../models/data.js";
 import { DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import {
   addDays, isoDateStr, clientById, isStaffActive, fmtNoteDate, coverOverlaps,
+  isVisitCover, agendaClientIdsOn, clientDurationOn, fmtMinutes,
 } from "../../models/utils.js";
 import { Button } from "../shared/ui/index.js";
 
@@ -27,6 +28,7 @@ function newId(clientId) { return `cv-${Date.now().toString(36)}-${clientId}-${M
 function groupCovers(covers) {
   const map = new Map();
   (covers || []).forEach((cv) => {
+    if (isVisitCover(cv)) return; // visitas avulsas têm o seu próprio painel
     const key = [cv.fromStaffId, cv.toStaffId, cv.from, cv.to].join("|");
     if (!map.has(key)) map.set(key, { key, fromStaffId: cv.fromStaffId, toStaffId: cv.toStaffId, from: cv.from, to: cv.to, items: [] });
     map.get(key).items.push(cv);
@@ -319,4 +321,167 @@ function CoversPanel({ t, covers, staff, clients, onEdit, onRemove }) {
   );
 }
 
-export { CoverDialog, CoverEditDialog, CoversPanel, groupCovers };
+// ─── Visita avulsa ──────────────────────────────────────────────────────
+// Um cliente na agenda de uma ou mais pessoas, só nos dias escolhidos. Não
+// mexe na ficha do cliente nem na semana-tipo (ver `isVisitCover` em utils.js).
+function newVisitCovers({ clientId, staffIds, dates, covers, assignments }) {
+  const groupId = `vg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const now = new Date().toISOString();
+  const out = [];
+  dates.forEach((iso) => staffIds.forEach((sid) => {
+    // Já está na agenda dessa pessoa nesse dia (semana-tipo, cobertura ou outra visita): não duplica.
+    if (agendaClientIdsOn(assignments, [...(covers || []), ...out], sid, iso).includes(clientId)) return;
+    out.push({ id: `${newId(clientId)}-v`, kind: "visit", groupId, clientId, fromStaffId: null, toStaffId: sid, from: iso, to: iso, createdAt: now });
+  }));
+  return out;
+}
+
+function VisitDialog({ open, onClose, t, staff, clients, assignments, covers, setCovers, onDone, initial }) {
+  const todayIso = isoDateStr(TODAY);
+  const [clientId, setClientId] = useState("");
+  const [who, setWho] = useState([]);
+  const [dates, setDates] = useState([]);
+  const [pending, setPending] = useState(todayIso);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    setClientId(initial && initial.clientId ? String(initial.clientId) : "");
+    setWho(initial && initial.staffIds ? initial.staffIds.map(String) : []);
+    setDates(initial && initial.dates ? [...initial.dates] : [todayIso]);
+    setPending(todayIso); setError("");
+  }, [open, initial, todayIso]);
+
+  const activeStaff = useMemo(() => (staff || []).filter((s) => isStaffActive(s, TODAY)), [staff]);
+  const sortedClients = useMemo(() => [...(clients || [])].sort((a, b) => a.name.localeCompare(b.name)), [clients]);
+  if (!open) return null;
+  const client = clientId ? (clients || []).find((c) => String(c.id) === clientId) : null;
+
+  function addDate() {
+    if (!pending) return;
+    if (!dates.includes(pending)) setDates((d) => [...d, pending].sort());
+    setPending(isoDateStr(addDays(new Date(`${pending}T12:00:00`), 1)));
+    setError("");
+  }
+  function toggleWho(id) { setWho((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id])); setError(""); }
+  function save() {
+    if (!client) { setError(t.visitErrClient); return; }
+    if (who.length === 0) { setError(t.visitErrWho); return; }
+    if (dates.length === 0) { setError(t.visitErrDates); return; }
+    const staffIds = who.map((id) => (activeStaff.find((s) => String(s.id) === id) || {}).id).filter((x) => x != null);
+    const created = newVisitCovers({ clientId: client.id, staffIds, dates, covers, assignments });
+    if (created.length === 0) { setError(t.visitErrNothing); return; }
+    setCovers((prev) => [...(prev || []), ...created]);
+    const ids = new Set(created.map((cv) => cv.id));
+    onDone?.(t.visitCreated(client.name, created.length), () => setCovers((prev) => (prev || []).filter((cv) => !ids.has(cv.id))));
+    onClose();
+  }
+
+  const inputStyle = { ...styles.input, width: "100%", boxSizing: "border-box" };
+  const chip = (on) => ({
+    display: "inline-flex", alignItems: "center", gap: 6, minHeight: 34, padding: "0 12px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+    border: `1.5px solid ${on ? "var(--p1)" : COLORS.line}`, background: on ? "var(--p1-12, #E8F4EE)" : COLORS.card, color: on ? "var(--p1)" : COLORS.ink,
+  });
+  return (
+    <Overlay onClose={onClose} label={t.visitTitle} width={520}>
+      <DialogHeader title={t.visitTitle} onClose={onClose} closeLabel={t.cancel} />
+      <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 14 }}>{t.visitIntro}</div>
+
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>{t.visitClient}</FieldLabel>
+        <select aria-label={t.visitClient} style={inputStyle} value={clientId} onChange={(e) => { setClientId(e.target.value); setError(""); }}>
+          <option value="">{t.choosePerson}</option>
+          {sortedClients.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+        </select>
+        {client && (
+          <div style={{ fontSize: 12, color: COLORS.ink3, marginTop: 5 }}>
+            {t.visitDuration(fmtMinutes(clientDurationOn(client, dates[0] || todayIso)), client.hoursMode === "individual")}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>{t.visitWho}</FieldLabel>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {activeStaff.map((s) => {
+            const on = who.includes(String(s.id));
+            return <button key={s.id} type="button" aria-pressed={on} onClick={() => toggleWho(String(s.id))} style={chip(on)}>{s.name}</button>;
+          })}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <FieldLabel>{t.visitDays}</FieldLabel>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <input type="date" aria-label={t.visitDays} style={{ ...inputStyle, flex: 1 }} value={pending} onChange={(e) => setPending(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addDate(); }} />
+          <Button variant="secondary" icon={Plus} onClick={addDate}>{t.visitAddDay}</Button>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {dates.length === 0 && <span style={{ fontSize: 12.5, color: COLORS.ink3 }}>{t.visitNoDays}</span>}
+          {dates.map((iso) => (
+            <span key={iso} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: 999, padding: "3px 4px 3px 10px", fontSize: 12.5, fontWeight: 600, color: COLORS.ink }}>
+              {fmtNoteDate(iso)}
+              <button type="button" aria-label={`${t.removeOne}: ${fmtNoteDate(iso)}`} onClick={() => setDates((d) => d.filter((x) => x !== iso))}
+                style={{ border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, display: "flex", padding: 2 }}>
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <ErrorLine>{error}</ErrorLine>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
+        <Button variant="secondary" onClick={onClose}>{t.cancel}</Button>
+        <Button variant="primary" icon={CalendarPlus} onClick={save}>{t.visitSave(Math.max(1, who.length * dates.length))}</Button>
+      </div>
+    </Overlay>
+  );
+}
+
+// Visitas avulsas por fazer (as passadas saem da lista). Uma linha por grupo.
+function VisitsPanel({ t, covers, staff, clients, onRemove }) {
+  const todayIso = isoDateStr(TODAY);
+  const map = new Map();
+  (covers || []).filter((cv) => isVisitCover(cv) && (cv.to || cv.from) >= todayIso).forEach((cv) => {
+    const k = cv.groupId || cv.id;
+    if (!map.has(k)) map.set(k, { key: k, clientId: cv.clientId, items: [] });
+    map.get(k).items.push(cv);
+  });
+  const groups = [...map.values()].map((g) => ({ ...g, first: g.items.reduce((m, cv) => (cv.from < m ? cv.from : m), g.items[0].from) }))
+    .sort((a, b) => a.first.localeCompare(b.first));
+  if (groups.length === 0) return null;
+  const first = (id) => (byId(staff, id) || { name: "—" }).name.split(" ")[0];
+  return (
+    <div style={{ border: `1px solid ${COLORS.line}`, background: COLORS.card, borderRadius: RADIUS.card, padding: "10px 14px", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: COLORS.ink }}><CalendarPlus size={14} /> {t.visitPanelTitle}</div>
+      <div style={{ fontSize: 12, color: COLORS.ink2, marginBottom: 6 }}>{t.visitPanelHint}</div>
+      {groups.map((g) => {
+        const c = clientById(clients, g.clientId);
+        const items = [...g.items].sort((a, b) => a.from.localeCompare(b.from) || first(a.toStaffId).localeCompare(first(b.toStaffId)));
+        return (
+          <div key={g.key} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "6px 0", borderTop: `1px solid ${COLORS.line}`, fontSize: 12.5, color: COLORS.ink }}>
+            <span style={{ fontWeight: 700, minWidth: 0, overflowWrap: "anywhere" }}>{c ? c.name : (g.items[0].clientName || "—")}</span>
+            <span style={{ flex: "1 1 220px", display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {items.map((cv) => (
+                <span key={cv.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: COLORS.bg, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.chip, padding: "2px 4px 2px 8px" }}>
+                  {first(cv.toStaffId)} · {fmtNoteDate(cv.from)}
+                  <button type="button" aria-label={`${t.removeOne}: ${first(cv.toStaffId)} ${fmtNoteDate(cv.from)}`} title={t.removeOne}
+                    onClick={() => onRemove([cv.id])}
+                    style={{ border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, display: "flex", padding: 2 }}>
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </span>
+            <button type="button" onClick={() => onRemove(items.map((cv) => cv.id))}
+              style={{ border: `1px solid ${COLORS.line}`, background: COLORS.card, borderRadius: RADIUS.chip, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600, padding: "4px 12px", color: COLORS.ink2 }}>
+              {t.remove}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export { CoverDialog, CoverEditDialog, CoversPanel, groupCovers, VisitDialog, VisitsPanel, newVisitCovers };

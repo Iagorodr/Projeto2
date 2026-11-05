@@ -101,7 +101,7 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
   const rest = sorted.slice(7);
   const clientRows = rest.length ? [...top, { key: "other", other: true, count: rest.length, hours: rest.reduce((s, r) => s + r.hours, 0) }] : top;
 
-  const reportCtx = { staff, horasData, closedPeriods, assignments, today: TODAY };
+  const reportCtx = { staff, horasData, closedPeriods, assignments, covers, today: TODAY };
   const detailReport = buildContractorReport({ contractor: c, clients, ...reportCtx, period: current });
   const reportRows = [...cur.byClient.entries()].map(([id, hours]) => ({ id, name: (clientById(clients, id) || {}).name || "—", hours })).sort((a, b) => a.name.localeCompare(b.name));
   const tabs = [["summary", f.tabSummary], ["clients", f.tabClients], ["reports", f.tabReports], ["docs", f.tabDocs]];

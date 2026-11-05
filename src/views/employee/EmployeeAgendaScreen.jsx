@@ -72,7 +72,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     const clientIds = agendaClientIdsOn(assignments, covers, staffId, date);
     return clientIds
       .map((id) => clients.find((c) => c.id === id))
-      .filter((c) => c && clientAppliesOnDate(c, date));
+      .filter((c) => c && clientAppliesOnDate(c, date, covers));
   }
 
   function getDayTotalMinutes(day, occ) {
@@ -114,7 +114,8 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
 
   function coverTagOf(day, clientId) {
     const x = coveringFor(day).find((c) => c.clientId === clientId);
-    return x ? tCov.coveringTag(firstNameOf(x.cover.fromStaffId)) : null;
+    if (!x) return null;
+    return x.cover.kind === "visit" ? tCov.visitTag : tCov.coveringTag(firstNameOf(x.cover.fromStaffId));
   }
   function AwayNote({ day }) {
     const items = awayFor(day);

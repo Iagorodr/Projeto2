@@ -85,7 +85,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
     const clientIds = agendaClientIdsOn(assignments, covers, staffId, d);
     return clientIds.some((id) => {
       const c = clientById(clients, id);
-      return c && clientAppliesOnDate(c, d);
+      return c && clientAppliesOnDate(c, d, covers);
     });
   }
 
