@@ -5,6 +5,7 @@ import InstallPage from "./views/InstallPage.jsx";
 import "@fontsource-variable/archivo/wdth.css";
 import "./index.css";
 import { applyStoredTheme } from "./styles/theme.js";
+import { startVersionCheck } from "./versionCheck.js";
 
 // Cor da empresa: a última usada neste aparelho, logo no arranque (a da empresa chega depois do login).
 applyStoredTheme();
@@ -40,3 +41,6 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+// Versão nova publicada: o app aberto há dias atualiza-se sozinho (ver versionCheck.js).
+try { if (import.meta.env.PROD) startVersionCheck(); } catch (e) { /* ignora */ }
