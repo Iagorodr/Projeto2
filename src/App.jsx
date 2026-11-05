@@ -480,7 +480,11 @@ export default function App() {
                 onNavigate={(key) => (key === "mais" ? setMoreSheetOpen(true) : c.setEmpScreen(key))}
                 items={bottomItems}
               />
-              <MoreSheet open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} items={moreItems} user={{ name: c.me.name }} />
+              <MoreSheet
+                open={moreSheetOpen} onClose={() => setMoreSheetOpen(false)} items={moreItems} variant="grid"
+                activeKey={c.empScreen} user={{ name: c.me.name, photoUrl: c.me.photoUrl }}
+                lang={c.lang} setLang={c.setLang} langNames={LANG_NAMES}
+              />
             </div>
           );
         }
