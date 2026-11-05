@@ -6,7 +6,9 @@
 # 3. envia para o GitHub (o Vercel faz o deploy sozinho);
 # 4. arquiva os bundles já usados em ProjetoFin\bundles-publicados.
 
-$ErrorActionPreference = "Stop"
+# "Continue": o git escreve mensagens normais no stderr ("is okay", "From ...") e o
+# Windows PowerShell 5.1 com "Stop" trata-as como erro. Os erros reais vêm do $LASTEXITCODE.
+$ErrorActionPreference = "Continue"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 $parent = Split-Path -Parent (Get-Location)
 
@@ -27,7 +29,7 @@ git merge --ff-only origin/main | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail "A pasta local divergiu do GitHub." }
 
 Write-Host "-> A aplicar o bundle..."
-git bundle verify $bundle.FullName 2>&1 | Out-Null
+$null = cmd /c "git bundle verify `"$($bundle.FullName)`" 2>&1"
 if ($LASTEXITCODE -ne 0) { Fail "O bundle nao encaixa nesta versao (falta um envio anterior?)." }
 git pull --ff-only $bundle.FullName main
 if ($LASTEXITCODE -ne 0) { Fail "O bundle nao encaixa sem conflitos." }
