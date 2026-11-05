@@ -187,3 +187,8 @@ html {
 .sx-navscroll { scrollbar-width: none; }
 .sx-navscroll::-webkit-scrollbar { display: none; }
 @media (hover: hover) { .sx-footbtn:hover .sx-footicon:not([data-active]) { background: rgba(255,255,255,.18) !important; } }
+
+/* Agenda: cliente largado noutra célula "encaixa com mola". */
+@keyframes b1-snap { 0% { transform: scale(.9); } 55% { transform: scale(1.05); } 100% { transform: scale(1); } }
+.b1-snap { animation: b1-snap .42s cubic-bezier(.34,1.56,.64,1); box-shadow: 0 0 0 2px var(--p1-60, rgba(30,140,90,.6)); }
+@media (prefers-reduced-motion: reduce) { .b1-snap { animation: none; } }

@@ -10,7 +10,7 @@ import {
   addDays, isoDateStr, clientById, isStaffActive, fmtNoteDate, coverOverlaps,
   isVisitCover, agendaClientIdsOn, clientDurationOn, fmtMinutes,
 } from "../../models/utils.js";
-import { Button } from "../shared/ui/index.js";
+import { Button, SegmentedControl } from "../shared/ui/index.js";
 
 // Cobertura de férias (ver utils.js, `agendaClientIdsOn`): troca, por um
 // período, QUEM faz um cliente. A agenda semanal não é tocada, por isso a
@@ -336,7 +336,12 @@ function newVisitCovers({ clientId, staffIds, dates, covers, assignments }) {
   return out;
 }
 
-function VisitDialog({ open, onClose, t, staff, clients, assignments, covers, setCovers, onDone, initial }) {
+// `onAddWeekly(clientId, staffIds, dows)` (opcional): mostra também o modo
+// "Todas as semanas", que põe o cliente na semana-tipo (o "+" do telemóvel).
+function VisitDialog({ open, onClose, t, lang, staff, clients, assignments, covers, setCovers, onDone, initial, onAddWeekly, defaultMode = "dates" }) {
+  const labels = DAY_LABELS_1_7_BY_LANG[lang || "pt"];
+  const [mode, setMode] = useState(defaultMode);
+  const [dows, setDows] = useState([]);
   const todayIso = isoDateStr(TODAY);
   const [clientId, setClientId] = useState("");
   const [who, setWho] = useState([]);
@@ -348,8 +353,9 @@ function VisitDialog({ open, onClose, t, staff, clients, assignments, covers, se
     setClientId(initial && initial.clientId ? String(initial.clientId) : "");
     setWho(initial && initial.staffIds ? initial.staffIds.map(String) : []);
     setDates(initial && initial.dates ? [...initial.dates] : [todayIso]);
-    setPending(todayIso); setError("");
-  }, [open, initial, todayIso]);
+    setPending(todayIso); setError(""); setMode(onAddWeekly ? defaultMode : "dates");
+    const wd = TODAY.getDay(); setDows([wd === 0 ? 7 : wd]);
+  }, [open, initial, todayIso, defaultMode, onAddWeekly]);
 
   const activeStaff = useMemo(() => (staff || []).filter((s) => isStaffActive(s, TODAY)), [staff]);
   const sortedClients = useMemo(() => [...(clients || [])].sort((a, b) => a.name.localeCompare(b.name)), [clients]);
@@ -366,8 +372,14 @@ function VisitDialog({ open, onClose, t, staff, clients, assignments, covers, se
   function save() {
     if (!client) { setError(t.visitErrClient); return; }
     if (who.length === 0) { setError(t.visitErrWho); return; }
-    if (dates.length === 0) { setError(t.visitErrDates); return; }
     const staffIds = who.map((id) => (activeStaff.find((s) => String(s.id) === id) || {}).id).filter((x) => x != null);
+    if (mode === "weekly") {
+      if (dows.length === 0) { setError(t.weeklyErrDays); return; }
+      onAddWeekly(client.id, staffIds, [...dows].sort());
+      onClose();
+      return;
+    }
+    if (dates.length === 0) { setError(t.visitErrDates); return; }
     const created = newVisitCovers({ clientId: client.id, staffIds, dates, covers, assignments });
     if (created.length === 0) { setError(t.visitErrNothing); return; }
     setCovers((prev) => [...(prev || []), ...created]);
@@ -382,9 +394,14 @@ function VisitDialog({ open, onClose, t, staff, clients, assignments, covers, se
     border: `1.5px solid ${on ? "var(--p1)" : COLORS.line}`, background: on ? "var(--p1-12, #E8F4EE)" : COLORS.card, color: on ? "var(--p1)" : COLORS.ink,
   });
   return (
-    <Overlay onClose={onClose} label={t.visitTitle} width={520}>
-      <DialogHeader title={t.visitTitle} onClose={onClose} closeLabel={t.cancel} />
-      <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 14 }}>{t.visitIntro}</div>
+    <Overlay onClose={onClose} label={onAddWeekly ? t.addTitle : t.visitTitle} width={520}>
+      <DialogHeader title={onAddWeekly ? t.addTitle : t.visitTitle} onClose={onClose} closeLabel={t.cancel} />
+      {onAddWeekly && (
+        <div style={{ marginBottom: 10 }}>
+          <SegmentedControl options={[{ value: "weekly", label: t.scopeWeek }, { value: "dates", label: t.scopeDates }]} value={mode} onChange={(v) => { setMode(v); setError(""); }} />
+        </div>
+      )}
+      <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.5, marginBottom: 14 }}>{mode === "weekly" ? t.weeklyIntro : t.visitIntro}</div>
 
       <div style={{ marginBottom: 12 }}>
         <FieldLabel>{t.visitClient}</FieldLabel>
@@ -409,6 +426,17 @@ function VisitDialog({ open, onClose, t, staff, clients, assignments, covers, se
         </div>
       </div>
 
+      {mode === "weekly" ? (
+        <div style={{ marginBottom: 14 }}>
+          <FieldLabel>{t.weeklyDays}</FieldLabel>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {[1, 2, 3, 4, 5, 6, 7].map((d) => {
+              const on = dows.includes(d);
+              return <button key={d} type="button" aria-pressed={on} onClick={() => { setDows((x) => (x.includes(d) ? x.filter((y) => y !== d) : [...x, d])); setError(""); }} style={{ ...chip(on), minWidth: 52, justifyContent: "center" }}>{labels[d]}</button>;
+            })}
+          </div>
+        </div>
+      ) : (
       <div style={{ marginBottom: 14 }}>
         <FieldLabel>{t.visitDays}</FieldLabel>
         <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -428,11 +456,12 @@ function VisitDialog({ open, onClose, t, staff, clients, assignments, covers, se
           ))}
         </div>
       </div>
+      )}
 
       <ErrorLine>{error}</ErrorLine>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
         <Button variant="secondary" onClick={onClose}>{t.cancel}</Button>
-        <Button variant="primary" icon={CalendarPlus} onClick={save}>{t.visitSave(Math.max(1, who.length * dates.length))}</Button>
+        <Button variant="primary" icon={CalendarPlus} onClick={save}>{mode === "weekly" ? t.weeklySave : t.visitSave(Math.max(1, who.length * dates.length))}</Button>
       </div>
     </Overlay>
   );

@@ -412,6 +412,12 @@ const T = {
     },
     // Cobertura de férias: troca temporária de quem faz um cliente (ver utils.js, `agendaClientIdsOn`).
     coberturas: {
+      addTitle: "Adicionar à agenda", scopeDates: "Só em dias escolhidos", weeklyDays: "Dias da semana",
+      weeklyIntro: "Fica na semana-tipo: repete-se todas as semanas nesses dias (respeitando a frequência do cliente).",
+      weeklySave: "Adicionar", weeklyErrDays: "Escolha pelo menos um dia da semana.",
+      weeklyAdded: (name, n) => (n === 1 ? `${name} adicionado à agenda.` : `${name} adicionado à agenda de ${n} pessoas.`),
+      fabAdd: "Adicionar à agenda",
+      moved: (name, from, to) => `${name}: ${from} → ${to}.`, dragHint: "Arraste para outro dia ou pessoa",
       visitBtn: "Visita avulsa", visitTitle: "Visita avulsa",
       visitIntro: "Põe um cliente na agenda de alguém só nos dias que escolher. Não muda a ficha do cliente nem a semana-tipo — ideal para replacements e clientes que ninguém faz de forma fixa.",
       visitClient: "Cliente", visitWho: "Quem faz", visitDays: "Dias", visitAddDay: "Adicionar dia", visitNoDays: "Ainda sem dias.",
@@ -1294,6 +1300,12 @@ const T = {
     },
     // Holiday cover: temporary swap of who does a client (see utils.js, `agendaClientIdsOn`).
     coberturas: {
+      addTitle: "Add to schedule", scopeDates: "Only on chosen days", weeklyDays: "Weekdays",
+      weeklyIntro: "Goes into the weekly template: repeats every week on those days (following the client's frequency).",
+      weeklySave: "Add", weeklyErrDays: "Choose at least one weekday.",
+      weeklyAdded: (name, n) => (n === 1 ? `${name} added to the schedule.` : `${name} added to ${n} people's schedules.`),
+      fabAdd: "Add to schedule",
+      moved: (name, from, to) => `${name}: ${from} → ${to}.`, dragHint: "Drag to another day or person",
       visitBtn: "One-off visit", visitTitle: "One-off visit",
       visitIntro: "Put a client on someone's schedule only on the days you pick. The client's record and the weekly template stay as they are — ideal for replacements and clients nobody does regularly.",
       visitClient: "Client", visitWho: "Who does it", visitDays: "Days", visitAddDay: "Add day", visitNoDays: "No days yet.",
@@ -2138,6 +2150,12 @@ const T = {
     },
     // Remplacement de congés : échange temporaire de qui fait un client (voir utils.js, `agendaClientIdsOn`).
     coberturas: {
+      addTitle: "Ajouter au planning", scopeDates: "Seulement les jours choisis", weeklyDays: "Jours de la semaine",
+      weeklyIntro: "Va dans la semaine type : se répète chaque semaine ces jours-là (selon la fréquence du client).",
+      weeklySave: "Ajouter", weeklyErrDays: "Choisissez au moins un jour.",
+      weeklyAdded: (name, n) => (n === 1 ? `${name} ajouté au planning.` : `${name} ajouté au planning de ${n} personnes.`),
+      fabAdd: "Ajouter au planning",
+      moved: (name, from, to) => `${name} : ${from} → ${to}.`, dragHint: "Glissez vers un autre jour ou une autre personne",
       visitBtn: "Visite ponctuelle", visitTitle: "Visite ponctuelle",
       visitIntro: "Placez un client dans le planning de quelqu'un seulement les jours choisis. La fiche du client et la semaine type ne changent pas — idéal pour les remplacements et les clients que personne ne fait régulièrement.",
       visitClient: "Client", visitWho: "Qui le fait", visitDays: "Jours", visitAddDay: "Ajouter un jour", visitNoDays: "Aucun jour.",

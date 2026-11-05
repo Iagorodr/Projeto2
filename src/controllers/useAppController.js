@@ -12,7 +12,7 @@ import {
   INITIAL_MISSING, INITIAL_SENT,
 } from "../models/data.js";
 import { TODAY } from "../models/data.js";
-import { activeClientsCount, isStaffActive, snapshotClientRate } from "../models/utils.js";
+import { activeClientsCount, isStaffActive, snapshotClientRate, pinTeamChanges, getOpenPeriod, isoDateStr } from "../models/utils.js";
 import { diffKeys, mergeRemote, buildPatch, isMissingRpc } from "../models/horasSync.js";
 import { listDiff, listMerge, mapDiff, mapMerge, isEmptyDiff } from "../models/appDataSync.js";
 import { supabase, isSupabaseConfigured } from "../models/supabaseClient.js";
@@ -145,6 +145,41 @@ export function useAppController() {
   // toStaffId, from:"YYYY-MM-DD", to:"YYYY-MM-DD", createdAt } — ver utils.js
   // (`agendaClientIdsOn`). A agenda semanal não é alterada: a volta é automática.
   const [covers, setCovers] = useState([]);
+  // Agenda protegida (caso ACTE 3): quando a GERÊNCIA muda a agenda (semana-tipo,
+  // coberturas, visitas avulsas) e isso muda a equipa prevista de um dia que já
+  // tem horas, essas horas ficam fixas como estão (ver `pinTeamChanges`). As
+  // atualizações vindas do servidor usam os setters "crus" e não passam aqui.
+  const latestRef = useRef({});
+  const guardAgenda = useCallback((before, after) => {
+    const L = latestRef.current;
+    if (!L.clients || !L.staff) return;
+    const period = getOpenPeriod(L.closedPeriods || [], L.cutoffDay || 20, TODAY);
+    const fromIso = isoDateStr(period.start);
+    const toIso = isoDateStr(TODAY);
+    const base = { staff: L.staff, absences: L.absences || [] };
+    const { next, count } = pinTeamChanges(horasRef.current, L.clients, { ...base, ...before }, { ...base, ...after }, fromIso, toIso);
+    if (count > 0) setHorasData(next);
+  }, [setHorasData]);
+  const setAssignmentsGuarded = useCallback((u) => {
+    setAssignments((prev) => {
+      const next = typeof u === "function" ? u(prev) : u;
+      if (next !== prev) {
+        const cv = latestRef.current.covers || [];
+        queueMicrotask(() => guardAgenda({ assignments: prev, covers: cv }, { assignments: next, covers: cv }));
+      }
+      return next;
+    });
+  }, [guardAgenda]);
+  const setCoversGuarded = useCallback((u) => {
+    setCovers((prev) => {
+      const next = typeof u === "function" ? u(prev) : u;
+      if (next !== prev) {
+        const as = latestRef.current.assignments || {};
+        queueMicrotask(() => guardAgenda({ assignments: as, covers: prev || [] }, { assignments: as, covers: next || [] }));
+      }
+      return next;
+    });
+  }, [guardAgenda]);
 
   const [hydrated, setHydrated] = useState(!isSupabaseConfigured);
   // QA pós-auditoria (Lote 1, "Gravar só depois de ler"): só true quando
@@ -1144,6 +1179,7 @@ export function useAppController() {
   // Aviso de assinatura (a acabar / em tolerância); a gerência vê mais do que os outros.
   const companyNoticeValue = isSupabaseConfigured && perspective !== "login" ? companyNotice(companyStatus, isManagerSession) : null;
 
+  latestRef.current = { staff, clients, absences, covers, assignments, closedPeriods, cutoffDay };
   return {
     saveState: isSupabaseConfigured ? saveState : "saved", retrySave,
     perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen, empClientFocus, setEmpClientFocus, openEmpClient,
@@ -1153,10 +1189,10 @@ export function useAppController() {
     reclamacaoBaseClients: Math.max(1, activeClientsCount(clients, TODAY)), setReclamacaoBaseClients,
     reclamacaoExcelenteCount, setReclamacaoExcelenteCount,
     reclamacaoRazoavelCount, setReclamacaoRazoavelCount,
-    clients, setClients, contractors, setContractors, deleteContractor, contractorClosings, saveClosing, staff, setStaff, assignments, setAssignments,
+    clients, setClients, contractors, setContractors, deleteContractor, contractorClosings, saveClosing, staff, setStaff, assignments, setAssignments: setAssignmentsGuarded,
     horasData, setHorasData, closedPeriods, setClosedPeriods,
     missingItems, setMissingItems, sentItems, setSentItems,
-    personalNotes, setPersonalNotes, absences, setAbsences, covers, setCovers,
+    personalNotes, setPersonalNotes, absences, setAbsences, covers, setCovers: setCoversGuarded,
     enterManagement, enterEmployee, deleteClient, deleteStaff,
     formatAllData, verifyPassword,
     authLoading, authError, loginWithPassword, logout, passwordGate, requestPasswordReset, setNewPassword, tutorialPending, finishTutorial,

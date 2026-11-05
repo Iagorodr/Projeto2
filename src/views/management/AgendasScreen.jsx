@@ -16,6 +16,8 @@ import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
 import { findContractor } from "../../models/contractors.js";
 import { CoverDialog, CoverEditDialog, CoversPanel, VisitDialog, VisitsPanel, newVisitCovers } from "./CoverDialog.jsx";
 import { PeriodNav, RoundArrow } from "../shared/ui/PeriodNav.jsx";
+import { Fab } from "../shared/ui/ProfileParts.jsx";
+import { useIsMobile } from "../../hooks/useIsMobile.js";
 import {
   PageHeader, SegmentedControl, SearchField, FilterChip, Avatar, Pill, SupervisorTag, DataTable, Toast, InfoTip, Button, ConfirmDialog,
 } from "../shared/ui/index.js";
@@ -342,6 +344,13 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
   const [coverRemove, setCoverRemove] = useState(null); // { ids, group }
   const [visitOpen, setVisitOpen] = useState(false); // diálogo "Visita avulsa"
   const [cellScope, setCellScope] = useState("week"); // "+" da célula: semana-tipo ou só este dia
+  const [addOpen, setAddOpen] = useState(false); // "+" do telemóvel: Adicionar à agenda
+  const isMobile = useIsMobile();
+  // Arrastar um cliente para outro dia/pessoa (computador). `drag` = origem;
+  // `dropKey` = célula por baixo; `snapKey` = chip acabado de largar (anima).
+  const [drag, setDrag] = useState(null);
+  const [dropKey, setDropKey] = useState(null);
+  const [snapKey, setSnapKey] = useState(null);
   const { height: ctrlHeight, radius: ctrlRadius } = useControlSize();
   // QA (achado do Iago — "Agendas"): antes era `const weekStart =
   // startOfISOWeek(TODAY)`, fixo — só dava pra ver a semana corrente.
@@ -481,6 +490,85 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
     if (removed.length === 0) return;
     setCovers((prev) => (prev || []).filter((cv) => !own.has(cv.id)));
     showToast(tCov.visitRemoved(removed.length), { actionLabel: tCov.undo, onAction: () => setCovers((prev) => [...(prev || []), ...removed.filter((cv) => !(prev || []).some((x) => x.id === cv.id))]) });
+  }
+  // Semana-tipo: põe o cliente nos dias escolhidos de cada pessoa (o "+" do telemóvel).
+  function addWeekly(clientId, staffIds, dows) {
+    const before = {};
+    staffIds.forEach((sid) => dows.forEach((d) => { const k = cellKey(sid, d); before[k] = assignments[k]; }));
+    staffIds.forEach((sid) => dows.forEach((d) => { mergeAdd(cellKey(sid, d), clientId); setAuto(sid, d, clientId, false); }));
+    const client = clientById(clients, clientId);
+    showToast(tCov.weeklyAdded(client?.name || "", staffIds.length), {
+      actionLabel: tCov.undo,
+      onAction: () => setAssignments((prev) => { const n = { ...prev }; Object.entries(before).forEach(([k, v]) => { if (v === undefined) delete n[k]; else n[k] = v; }); return n; }),
+    });
+  }
+  // Largar um cliente noutra célula. Semana-tipo: sai da célula de origem e
+  // entra na de destino (a dupla muda de dia junto). Visita avulsa: muda a
+  // pessoa e/ou a data. Cobertura de férias: não se arrasta (mexe-se na cobertura).
+  function moveClient(from, toStaffId, toDay) {
+    const { staffId, day, clientId, visitId } = from;
+    if (String(staffId) === String(toStaffId) && day === toDay) return;
+    const client = clientById(clients, clientId);
+    const label = (sid, d) => `${firstName(sid)} ${dayLabels[d].toLowerCase()}`;
+    const fromLabel = label(staffId, day);
+    const toLabel = label(toStaffId, toDay);
+    const done = () => { const k = `${toStaffId}-${toDay}-${clientId}`; setSnapKey(k); setTimeout(() => setSnapKey((x) => (x === k ? null : x)), 700); };
+    if (visitId) {
+      const old = (covers || []).find((cv) => cv.id === visitId);
+      if (!old) return;
+      const iso = isoDateStr(weekDates[toDay - 1]);
+      if (agendaClientIdsOn(assignments, covers, toStaffId, iso).includes(clientId)) { setCovers((prev) => (prev || []).filter((cv) => cv.id !== visitId)); }
+      else setCovers((prev) => (prev || []).map((cv) => (cv.id === visitId ? { ...cv, toStaffId, from: iso, to: iso } : cv)));
+      done();
+      showToast(tCov.moved(client?.name || "", fromLabel, toLabel), { actionLabel: tCov.undo, onAction: () => setCovers((prev) => [...(prev || []).filter((cv) => cv.id !== visitId), old]) });
+      return;
+    }
+    // Quem muda: a pessoa e, se só muda o dia, a dupla que também tem o cliente nesse dia.
+    const moves = [{ from: staffId, to: toStaffId }];
+    const p = partnerOf(staff, staffId, TODAY);
+    if (p && String(staffId) === String(toStaffId) && (assignments[cellKey(p.id, day)] || []).includes(clientId)) moves.push({ from: p.id, to: p.id });
+    const keys = new Set();
+    moves.forEach((m) => { keys.add(cellKey(m.from, day)); keys.add(cellKey(m.to, toDay)); keys.add(autoKey(m.from, day)); keys.add(autoKey(m.to, toDay)); });
+    const snapshot = {};
+    keys.forEach((k) => { snapshot[k] = assignments[k]; });
+    setAssignments((prev) => {
+      const n = { ...prev };
+      const byName = (a, b) => (clientById(clients, a)?.name || "").localeCompare(clientById(clients, b)?.name || "");
+      moves.forEach((m) => {
+        const fk = cellKey(m.from, day); const tk = cellKey(m.to, toDay);
+        const wasAuto = (n[autoKey(m.from, day)] || []).includes(clientId);
+        n[fk] = (n[fk] || []).filter((id) => id !== clientId);
+        n[autoKey(m.from, day)] = (n[autoKey(m.from, day)] || []).filter((id) => id !== clientId);
+        if (!(n[tk] || []).includes(clientId)) n[tk] = [...(n[tk] || []), clientId].sort(byName);
+        if (wasAuto && m.from !== staffId) n[autoKey(m.to, toDay)] = [...new Set([...(n[autoKey(m.to, toDay)] || []), clientId])];
+      });
+      return n;
+    });
+    done();
+    showToast(tCov.moved(client?.name || "", fromLabel, toLabel) + (moves.length > 1 ? ` (+ ${firstName(moves[1].from)})` : ""), {
+      actionLabel: tCov.undo,
+      onAction: () => setAssignments((prev) => { const n = { ...prev }; Object.entries(snapshot).forEach(([k, v]) => { if (v === undefined) delete n[k]; else n[k] = v; }); return n; }),
+    });
+  }
+  function canDropOn(toStaffId, toDay) {
+    if (!drag) return false;
+    if (String(drag.staffId) === String(toStaffId) && drag.day === toDay) return false;
+    const m = staffById(staff, toStaffId);
+    return !!m && isStaffActive(m, weekDates[toDay - 1]);
+  }
+  function chipDragProps(staffId, day, clientId, coverInfo) {
+    const isVisit = !!coverInfo && coverInfo.cover.kind === "visit";
+    if (isMobile || (coverInfo && !isVisit)) return {};
+    return {
+      draggable: true,
+      onDragStart: (e) => {
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", String(clientId)); } catch { /* alguns browsers */ }
+        setDrag({ staffId, day, clientId, visitId: isVisit ? coverInfo.cover.id : null });
+        setOpenTeam(null); setOpenCell(null);
+      },
+      onDragEnd: () => { setDrag(null); setDropKey(null); },
+    };
   }
   function removeClient(staffId, day, clientId) {
     const inCover = coverInItems(staffId, day).find((x) => x.clientId === clientId);
@@ -631,9 +719,14 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
               key={day}
               onMouseEnter={() => setHoverCell(key)}
               onMouseLeave={() => setHoverCell((h) => (h === key ? null : h))}
+              onDragOver={(e) => { if (!canDropOn(s.id, day)) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropKey !== key) setDropKey(key); }}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDropKey((k) => (k === key ? null : k)); }}
+              onDrop={(e) => { e.preventDefault(); const from = drag; setDrag(null); setDropKey(null); if (from && canDropOn(s.id, day)) moveClient(from, s.id, day); }}
               style={{
                 position: "relative", padding: 6, display: "flex", flexDirection: "column", gap: 4, minWidth: 0,
-                minHeight: 56, background: absence ? "repeating-linear-gradient(135deg, #FBEFEA, #FBEFEA 8px, #FFF7F3 8px, #FFF7F3 16px)" : isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
+                minHeight: 56, background: dropKey === key ? "var(--p1-12, #E8F4EE)" : absence ? "repeating-linear-gradient(135deg, #FBEFEA, #FBEFEA 8px, #FFF7F3 8px, #FFF7F3 16px)" : isToday ? TODAY_COLUMN_BG : "transparent", borderRight: `1px solid ${COLORS.line}`,
+                outline: dropKey === key ? "2px dashed var(--p1)" : drag && canDropOn(s.id, day) ? `1px dashed ${COLORS.line}` : "none", outlineOffset: -3,
+                transition: "background .12s",
               }}
             >
               {absence && (
@@ -680,9 +773,11 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
                   const thisTeamKey = teamKey(s.id, day, cid);
                   const isTeamOpen = openTeam === thisTeamKey;
                   return (
-                    <div key={cid} style={{ position: "relative" }}>
+                    <div key={`sh-${cid}`} style={{ position: "relative" }}>
                       <button
-                        type="button" title={tooltip}
+                        type="button" title={isMobile ? tooltip : `${tooltip}\n${tCov.dragHint}`}
+                        {...chipDragProps(s.id, day, cid, coverInfo)}
+                        className={snapKey === `${s.id}-${day}-${cid}` ? "b1-snap" : undefined}
                         aria-haspopup="dialog" aria-expanded={isTeamOpen}
                         onClick={() => setOpenTeam((k) => (k === thisTeamKey ? null : thisTeamKey))}
                         style={{
@@ -719,8 +814,12 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
 
                 return (
                   <div
-                    key={cid} title={tooltip}
+                    key={cid} title={isMobile || (coverInfo && !isVisit) ? tooltip : `${tooltip}\n${tCov.dragHint}`}
+                    {...chipDragProps(s.id, day, cid, coverInfo)}
+                    className={snapKey === `${s.id}-${day}-${cid}` ? "b1-snap" : undefined}
                     style={{
+                      cursor: (coverInfo && !isVisit) || isMobile ? undefined : "grab",
+                      opacity: drag && drag.clientId === cid && String(drag.staffId) === String(s.id) && drag.day === day ? 0.45 : 1,
                       display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 26, borderRadius: 8, padding: "3px 7px", borderLeft: `3px solid ${ctColor(client)}`,
                       background: freqStyle ? freqStyle.bg : COLORS.lineSoft, fontSize: 12, outline: isUncovered(s.id, day, cid) ? `1.5px dashed ${COLORS.alert}` : "none",
                       boxShadow: freqStyle ? `inset 3px 0 0 ${freqStyle.ink}` : "none",
@@ -1233,7 +1332,14 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
             onDone={(msg) => showToast(msg)}
           />
           <VisitDialog
-            open={visitOpen} onClose={() => setVisitOpen(false)} t={tCov}
+            open={addOpen} onClose={() => setAddOpen(false)} t={tCov} lang={lang}
+            staff={staff} clients={clients} assignments={assignments} covers={covers} setCovers={setCovers}
+            onDone={(msg, undo) => showToast(msg, undo ? { actionLabel: tCov.undo, onAction: undo } : undefined)}
+            onAddWeekly={addWeekly} defaultMode="weekly"
+          />
+          {isMobile && !addOpen && !visitOpen && !coverOpen && <Fab icon={Plus} label={tCov.fabAdd} onClick={() => setAddOpen(true)} />}
+          <VisitDialog
+            open={visitOpen} onClose={() => setVisitOpen(false)} t={tCov} lang={lang}
             staff={staff} clients={clients} assignments={assignments} covers={covers} setCovers={setCovers}
             onDone={(msg, undo) => showToast(msg, undo ? { actionLabel: tCov.undo, onAction: undo } : undefined)}
           />
