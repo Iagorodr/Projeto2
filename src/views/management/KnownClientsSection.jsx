@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, X, Trash2 } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { TODAY } from "../../models/data.js";
 import { isoDateStr, clientById } from "../../models/utils.js";
-import { Button, ConfirmDialog } from "../shared/ui/index.js";
+import { Button } from "../shared/ui/index.js";
 
 // Funcionário → "Clientes conhecidos": atalho com clientes que esta pessoa faz
 // de vez em quando (e que NÃO são da agenda dela). Aparecem no celular dela em
@@ -17,7 +17,13 @@ function KnownClientsSection({ staffMember, clients, assignments = {}, setStaff,
   const list = all.filter((k) => !k.to || k.to >= today);
   const [adding, setAdding] = useState(false);
   const [pick, setPick] = useState("");
-  const [removeId, setRemoveId] = useState(null);
+  // Retirar um cliente conhecido é uma ação leve: sai logo, com "Desfazer" durante uns segundos.
+  const [lastRemoved, setLastRemoved] = useState(null); // { entry, index, name }
+  useEffect(() => {
+    if (!lastRemoved) return undefined;
+    const id = setTimeout(() => setLastRemoved(null), 6000);
+    return () => clearTimeout(id);
+  }, [lastRemoved]);
 
   // Clientes fixos da agenda dele não entram (já aparecem sozinhos).
   const agendaIds = new Set();
@@ -33,7 +39,19 @@ function KnownClientsSection({ staffMember, clients, assignments = {}, setStaff,
     save([...list, { clientId: Number(pick) }]);
     setAdding(false); setPick("");
   }
-  const removing = removeId != null ? clientById(clients, removeId) : null;
+  function removeKnown(entry) {
+    const index = list.findIndex((k) => String(k.clientId) === String(entry.clientId));
+    const c = clientById(clients, entry.clientId);
+    save(list.filter((k) => String(k.clientId) !== String(entry.clientId)));
+    setLastRemoved({ entry, index, name: c ? c.name : `#${entry.clientId}` });
+  }
+  function undoRemove() {
+    if (!lastRemoved) return;
+    const next = [...list];
+    next.splice(Math.min(lastRemoved.index, next.length), 0, lastRemoved.entry);
+    save(next);
+    setLastRemoved(null);
+  }
 
   return (
     <div data-testid="known-clients">
@@ -48,7 +66,7 @@ function KnownClientsSection({ staffMember, clients, assignments = {}, setStaff,
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{c ? c.name : `#${k.clientId}`}</div>
                 {c && c.city && <div style={{ fontSize: 12, color: COLORS.ink3 }}>{c.city}</div>}
               </div>
-              <Button variant="dangerSoft" icon={Trash2} onClick={() => setRemoveId(k.clientId)}>{t.knownRemove}</Button>
+              <Button variant="dangerSoft" icon={Trash2} onClick={() => removeKnown(k)}>{t.knownRemove}</Button>
             </div>
           );
         })}
@@ -75,16 +93,12 @@ function KnownClientsSection({ staffMember, clients, assignments = {}, setStaff,
         </div>
       )}
 
-      <ConfirmDialog
-        open={removeId != null}
-        title={t.knownRemoveTitle}
-        body={t.knownRemoveBody(removing ? removing.name : "", (staffMember.name || "").split(" ")[0])}
-        cancelLabel={cancelLabel}
-        confirmLabel={t.knownRemove}
-        destructive
-        onCancel={() => setRemoveId(null)}
-        onConfirm={() => { save(list.filter((k) => String(k.clientId) !== String(removeId))); setRemoveId(null); }}
-      />
+      {lastRemoved && (
+        <div role="status" style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, padding: "8px 8px 8px 12px", borderRadius: 10, background: COLORS.ink, color: "#fff", fontSize: 13 }}>
+          <span style={{ flex: 1, minWidth: 0 }}>{t.knownRemovedToast(lastRemoved.name)}</span>
+          <button type="button" onClick={undoRemove} style={{ border: "none", background: "transparent", color: "#9FE0BF", fontWeight: 800, fontSize: 13, fontFamily: "inherit", cursor: "pointer", padding: "6px 8px" }}>{t.knownUndo}</button>
+        </div>
+      )}
     </div>
   );
 }

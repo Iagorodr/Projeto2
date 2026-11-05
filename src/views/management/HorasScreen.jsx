@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Check, Pencil, X, RotateCcw, MoreHorizontal, FileDown } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -85,6 +85,14 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [closedToast, setClosedToast] = useState(false);
   const [recalcToast, setRecalcToast] = useState(null); // mensagem do aviso após recalcular
+  // Ações leves (documento: "sem pop-up, com toast Desfazer"): aprovar extra e decisões das Revisões.
+  const [undoToast, setUndoToast] = useState(null); // { message, undo }
+  const undoTimer = useRef(null);
+  function offerUndo(message, undo) {
+    clearTimeout(undoTimer.current);
+    setUndoToast({ message, undo });
+    undoTimer.current = setTimeout(() => setUndoToast(null), 6000);
+  }
   const [reviewOpen, setReviewOpen] = useState(() => !!(navIntent && navIntent.openReviews)); // vindo do atalho "A repassar" do Dashboard
   const [payAsk, setPayAsk] = useState(null); // { staffId, date "dd/mm/aaaa" } — pop-up "já pagou?"
   const [unpayId, setUnpayId] = useState(null);
@@ -290,6 +298,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   }
   function approveEntry(staffId, i) {
     updateHoras(staffId, (h) => ({ ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, approved: true } : e)) }));
+    offerUndo(t.b1ExtraApproved, () => revertApproval(staffId, i));
   }
   function revertApproval(staffId, i) {
     updateHoras(staffId, (h) => ({ ...h, entries: h.entries.map((e, idx) => (idx === i ? { ...e, approved: false } : e)) }));
@@ -841,9 +850,16 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
         open={reviewOpen} initialTab={navIntent && navIntent.openReviews ? navIntent.tab || null : null}
         onClose={() => setReviewOpen(false)}
         onChange={(next, msg) => {
+          // Desfazer repõe só os funcionários que esta decisão mudou (não mexe no resto).
+          const prev = horasData;
+          const changed = Object.keys({ ...prev, ...next }).filter((k) => prev[k] !== next[k]);
           setHorasData(next);
-          setRecalcToast(msg);
-          setTimeout(() => setRecalcToast(null), 5000);
+          setRecalcToast(null);
+          offerUndo(msg, () => setHorasData((cur) => {
+            const out = { ...cur };
+            changed.forEach((k) => { if (prev[k] === undefined) delete out[k]; else out[k] = prev[k]; });
+            return out;
+          }));
         }}
         horasData={horasData} clients={clients} staff={staff} period={period} ctx={ctx} lang={lang} t={t}
       />
@@ -853,6 +869,11 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       />
       {closedToast && <Toast message={t.closedToast} onDismiss={() => setClosedToast(false)} closeLabel={c0.close} />}
       {recalcToast && <Toast message={recalcToast} onDismiss={() => setRecalcToast(null)} closeLabel={c0.close} />}
+      {undoToast && !recalcToast && (
+        <Toast message={undoToast.message} actionLabel={t.b1Undo}
+          onAction={() => { undoToast.undo(); clearTimeout(undoTimer.current); setUndoToast(null); }}
+          onDismiss={() => { clearTimeout(undoTimer.current); setUndoToast(null); }} closeLabel={c0.close} />
+      )}
     </div>
   );
 }

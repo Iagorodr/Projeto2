@@ -11,7 +11,7 @@ import {
 } from "../../models/utils.js";
 import { T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
-  PageHeader, MobileHeader, Card, Pill, Avatar, FilterChip, SearchField, Button, Drawer, DataTable, InfoTip, ChevronCircle, ConfirmDialog,
+  PageHeader, MobileHeader, Card, Pill, Avatar, FilterChip, SearchField, Button, Drawer, DataTable, InfoTip, ChevronCircle, ConfirmDialog, Toast,
 } from "../shared/ui/index.js";
 
 // Botões das linhas: mais baixos que os do resto do ecrã (a tabela fica mais leve).
@@ -114,14 +114,34 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
 
   // "Lembrar funcionário": deixa um aviso na caixa de Avisos dele (com o selo
   // de não lido no app). Um por funcionário e por dia, para não encher a caixa.
+  // "Lembrar" é uma ação leve: sem pop-up, com "Desfazer" (documento, Confirmar vs. desfazer).
+  const [undoRemind, setUndoRemind] = useState(null); // { id, staffId, name }
+  const undoTimer = useRef(null);
   function remindStaff(staffId, gaps) {
     const today = isoDateStr(TODAY);
+    const id = Date.now();
     setSentItems((prev) => [
-      { id: Date.now(), type: "aviso", staffId, clientId: null, text: t.remindText(gaps), date: today, hasPhoto: false, seenByManagement: true },
+      { id, type: "aviso", staffId, clientId: null, text: t.remindText(gaps), date: today, hasPhoto: false, seenByManagement: true },
       ...prev,
     ]);
     setRemindedIds((ids) => [...ids, staffId]);
+    const who = (staff.find((s) => s.id === staffId) || {}).name || "";
+    clearTimeout(undoTimer.current);
+    setUndoRemind({ id, staffId, name: who.split(" ")[0] });
+    undoTimer.current = setTimeout(() => setUndoRemind(null), 6000);
   }
+  function undoLastRemind() {
+    if (!undoRemind) return;
+    const { id, staffId } = undoRemind;
+    setSentItems((prev) => prev.filter((x) => x.id !== id));
+    setRemindedIds((ids) => ids.filter((x) => x !== staffId));
+    clearTimeout(undoTimer.current);
+    setUndoRemind(null);
+  }
+  const remindToast = undoRemind ? (
+    <Toast message={t.b1Reminded(undoRemind.name)} actionLabel={t.b1Undo} onAction={undoLastRemind}
+      onDismiss={() => { clearTimeout(undoTimer.current); setUndoRemind(null); }} closeLabel={T[lang].common.close} />
+  ) : null;
 
   const monitored = staff
     // Etapa 4j (4.9): troca `s.status === "ativo"` pelo auxiliar único
@@ -419,6 +439,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
         />
 
         {extractDrawer}
+        {remindToast}
       </div>
     );
   }
@@ -536,6 +557,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       )}
 
       {extractDrawer}
+      {remindToast}
     </div>
   );
 }

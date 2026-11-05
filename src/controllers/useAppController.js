@@ -473,7 +473,7 @@ export function useAppController() {
         supabase.from("contractors").select("*"),
         supabase.from("contractor_periods").select("*"),
         // Só a gerência recebe linhas (RLS); para a equipa vem vazio.
-        supabase.from("staff_private").select("staff_id, nif"),
+        supabase.from("staff_private").select("staff_id, nif, iban"),
       ]);
 
       if (clientsRes.error) { console.error("Erro ao carregar clientes:", clientsRes.error); ok = false; }
@@ -518,8 +518,9 @@ export function useAppController() {
         // NIF (staff_private): tabela ainda por criar → não é erro, o NIF só não fica guardado.
         if (staffPrivateRes && !staffPrivateRes.error && Array.isArray(staffPrivateRes.data)) {
           staffPrivateReadyRef.current = true;
-          const nifBy = new Map(staffPrivateRes.data.map((r) => [Number(r.staff_id), r.nif || ""]));
-          staffList = staffList.map((st) => ({ ...st, nif: nifBy.get(Number(st.id)) || "" }));
+          const privBy = new Map(staffPrivateRes.data.map((r) => [Number(r.staff_id), r]));
+          // IBAN: o de staff_private; se ainda não foi copiado, o que estava em `staff` (transição).
+          staffList = staffList.map((st) => { const pr = privBy.get(Number(st.id)) || {}; return { ...st, nif: pr.nif || "", iban: pr.iban || st.iban || "" }; });
         } else {
           staffPrivateReadyRef.current = false;
           if (staffPrivateRes && staffPrivateRes.error) console.warn("Tabela `staff_private` ausente: correr supabase/fichas_planning_nif.sql. NIF só em memória.");

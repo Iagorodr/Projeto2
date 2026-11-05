@@ -9,7 +9,7 @@ import { Field, ViewField } from "../shared/Layout.jsx";
 import { Toggle } from "../shared/ui/Toggle.jsx";
 import {
   PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, SupervisorTag, Drawer, Button, ConfirmDialog, Card, StoredFile,
-  ProfileSection, ProfileHero, DocSlot, docState, Fab, HeroChip,
+  ProfileSection, ProfileHero, DocSlot, docState, Fab, HeroChip, InfoTip,
 } from "../shared/ui/index.js";
 import { findContractor, normalizeContractorColor } from "../../models/contractors.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
@@ -313,7 +313,7 @@ function FuncionariosScreen({ navIntent = null, lang, setLang, staff, setStaff, 
     },
     { key: "accountType", label: t.colAccountType, width: 1.8, render: (s) => <AccountTypePill s={s} t={t} /> },
     {
-      key: "partner", label: t.b1ColPartner, width: 1.4,
+      key: "partner", label: <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>{t.b1ColPartner}<InfoTip text={t.b1PartnerInfo} label={c0.moreInfoLabel} /></span>, width: 1.4,
       render: (s) => {
         const p = s.partnerId != null ? staff.find((x) => x.id === s.partnerId) : null;
         if (!p) return <span style={{ fontSize: 12, color: COLORS.ink3 }}>—</span>;

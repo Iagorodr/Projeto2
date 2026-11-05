@@ -204,7 +204,7 @@ function toDbStaff(s) {
     account_type: s.accountType,
     status: s.status,
     valid_until: s.validUntil,
-    iban: s.iban,
+    // IBAN deixou de ir para `staff` (que toda a equipa lê): vai para staff_private.
     role: s.role,
     can_view_all_clients: !!s.canViewAllClients,
     can_expenses: !!s.canExpenses,
@@ -237,7 +237,7 @@ function fromDbStaff(row) {
 
 // Dados só da gerência (supabase/fichas_planning_nif.sql → staff_private).
 function toDbStaffPrivate(s) {
-  return { staff_id: s.id, nif: (s.nif || "").trim() || null };
+  return { staff_id: s.id, nif: (s.nif || "").trim() || null, iban: (s.iban || "").trim() || null };
 }
 
 function toDbCompanySettings({ company, cutoffDay, contractAlertDays, closeDeadlineDays, highlightsMonths, highlightsRealtime, reclamacaoBaseClients, reclamacaoExcelenteCount, reclamacaoRazoavelCount }) {

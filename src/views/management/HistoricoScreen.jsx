@@ -10,7 +10,7 @@ import { clientById, entryClientName, fmtEuro, fmtHoursNum, fmtHoursScreen, fmtN
 import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { exportGenericTablePdf } from "../../models/pdfExport.js";
 import {
-  PageHeader, DataTable, Drawer, Button, Pill, Card, KpiCard, ReclamacoesCard, Avatar, ConfirmDialog,
+  PageHeader, DataTable, Drawer, Button, Pill, Card, KpiCard, ReclamacoesCard, Avatar, ConfirmDialog, InfoTip,
 } from "../shared/ui/index.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 
@@ -380,7 +380,7 @@ function HistoricoScreen({ lang, setLang, company, clients, closedPeriods, onDel
     const stampsOf = (p, i) => <PeriodStamps p={p} t={t} index={i} />;
     const listColumns = [
       { key: "period", label: t.colPeriod, width: 1.3, render: (p) => <span style={{ fontWeight: 600 }}>{p.periodLabel}</span> },
-      { key: "status", label: t.b1ColStatus, width: 1.3, allowOverflow: true, render: (p) => stampsOf(p, closedPeriods.indexOf(p)) },
+      { key: "status", label: <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>{t.b1ColStatus}<InfoTip text={t.b1StatusInfo} label={c0.moreInfoLabel} /></span>, width: 1.3, allowOverflow: true, render: (p) => stampsOf(p, closedPeriods.indexOf(p)) },
       {
         key: "hours", label: t.colHours, width: 1.5,
         render: (p) => {

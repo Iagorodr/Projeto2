@@ -10,7 +10,7 @@ import { T, missingItemSubjectLabel } from "../../models/i18n.js";
 import { uploadFile, KINDS, uploadErrorKey } from "../../models/fileStorage.js";
 import { Field } from "../shared/Layout.jsx";
 import {
-  PageHeader, Button, Drawer, Pill, SupervisorTag, Avatar, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, StoredFile, Card, Toast, Fab,
+  PageHeader, Button, Drawer, Pill, SupervisorTag, Avatar, FilterChip, SearchSelect, MultiSelect, PhotoDropzone, StoredFile, Card, Toast, Fab, InfoTip,
 } from "../shared/ui/index.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { TYPE_META, TypeIconBlock } from "../shared/avisosTypeMeta.jsx";
@@ -159,6 +159,8 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   const t = T[lang].avisos;
   const c0 = T[lang].common;
   const [tab, setTab] = useState("pedidos");
+  // Recebidos: filtro por tipo de pedido (documento p. 28: secções viram filtros com contagem).
+  const [pedFilter, setPedFilter] = useState("aberto");
   const isMobileAv = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draftType, setDraftType] = useState("reclamacao");
@@ -189,6 +191,17 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   const staleMissingItems = missingItems.filter(hiddenOld);
   const visibleMissingItems = showStale ? missingItems : missingItems.filter((m) => !hiddenOld(m));
   const pendingSolicitations = visibleMissingItems.filter((m) => !m.resolved).length;
+  const pedKind = (m) => (m.kind === "produto" ? "produto" : m.kind === "correcao" ? "correcao" : "outros");
+  const PED_FILTERS = {
+    aberto: (m) => !m.resolved,
+    produto: (m) => !m.resolved && pedKind(m) === "produto",
+    correcao: (m) => !m.resolved && pedKind(m) === "correcao",
+    outros: (m) => !m.resolved && pedKind(m) === "outros",
+    resolvidos: (m) => m.resolved,
+  };
+  const pedList = visibleMissingItems.filter(PED_FILTERS[pedFilter] || PED_FILTERS.aberto);
+  const pedCount = (k) => visibleMissingItems.filter(PED_FILTERS[k]).length;
+  const allSent = groupSentItems(sentItems);
 
   // Abrir o separador "Pedidos" (o que abre por omissão) marca como vistos os
   // pedidos por tratar que estão à vista — é isso que faz o selo do menu e a
@@ -256,6 +269,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   function sendReply(id) { setMissingItems((prev) => prev.map((m) => (m.id === id ? { ...m, response: replyDraft.trim() } : m))); setReplyingId(null); }
 
   const tabContent = {
+    enviados: { items: allSent, type: null },
     reclamacoes: { items: complaints, type: "reclamacao" },
     elogios: { items: praises, type: "elogio" },
     avisos: { items: notices, type: "aviso" },
@@ -271,10 +285,10 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
   function selectTab(key) {
     setTab(key);
     setSelId(null);
-    const typeByTab = { reclamacoes: "reclamacao", elogios: "elogio", avisos: "aviso" };
+    const typeByTab = { reclamacoes: "reclamacao", elogios: "elogio", avisos: "aviso", enviados: "*" };
     const type = typeByTab[key];
     if (!type) return;
-    setSentItems((prev) => prev.map((i) => (i.type === type && !i.seenByManagement ? { ...i, seenByManagement: true } : i)));
+    setSentItems((prev) => prev.map((i) => ((type === "*" || i.type === type) && !i.seenByManagement ? { ...i, seenByManagement: true } : i)));
   }
 
   return (
@@ -282,16 +296,48 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
       <PageHeader title={t.title} actions={isMobileAv ? null : <Button icon={Plus} onClick={openDrawer}>{t.newAviso}</Button>} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
       {isMobileAv && <Fab icon={Plus} label={t.newAviso} onClick={openDrawer} />}
 
-      <div className="chip-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
-        <FilterChip active={tab === "pedidos"} onClick={() => selectTab("pedidos")} count={pendingSolicitations}>{t.sectionSolicitations}</FilterChip>
-        <FilterChip active={tab === "reclamacoes"} onClick={() => selectTab("reclamacoes")} count={unseenOf(complaints)}>{t.tabComplaints}</FilterChip>
-        <FilterChip active={tab === "elogios"} onClick={() => selectTab("elogios")} count={unseenOf(praises)}>{t.sectionPraise}</FilterChip>
-        <FilterChip active={tab === "avisos"} onClick={() => selectTab("avisos")} count={unseenOf(notices)}>{t.sectionNotices}</FilterChip>
-      </div>
+      {/* Recebidos / Enviados (documento p. 28), depois os filtros de cada caixa com contagem. */}
+      {(() => {
+        const box = tab === "pedidos" ? "recebidos" : "enviados";
+        const sentUnseen = unseenOf(allSent);
+        const boxBtn = (key, label, count, onClick) => {
+          const on = box === key;
+          return (
+            <button key={key} type="button" aria-pressed={on} onClick={onClick}
+              style={{ flex: isMobileAv ? 1 : "none", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, height: 42, padding: "0 18px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 800, background: on ? "#fff" : "transparent", color: on ? COLORS.ink : COLORS.ink2, boxShadow: on ? "0 1px 3px rgba(21,24,22,.12)" : "none" }}>
+              {label}
+              {count > 0 && <span style={{ minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: on ? "var(--p1)" : "#D3D8D1", color: on ? "#fff" : COLORS.ink, fontSize: 11.5, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{count}</span>}
+            </button>
+          );
+        };
+        return (
+          <>
+            <div role="tablist" style={{ display: isMobileAv ? "flex" : "inline-flex", gap: 4, padding: 4, borderRadius: 16, background: COLORS.lineSoft, marginBottom: 12 }}>
+              {boxBtn("recebidos", t.b1Received, pendingSolicitations, () => selectTab("pedidos"))}
+              {boxBtn("enviados", t.b1Sent, sentUnseen, () => selectTab(tab === "pedidos" ? "enviados" : tab))}
+            </div>
+            <InfoTip text={t.b1BoxInfo} label={c0.moreInfoLabel} style={{ verticalAlign: "top", marginLeft: 4 }} />
+            <div className="chip-row" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+              {box === "recebidos" ? (
+                [["aberto", t.b1Open], ["produto", t.b1Product], ["correcao", t.b1Corrections], ["outros", t.b1Other], ["resolvidos", t.b1Resolved]].map(([k, label]) => (
+                  <FilterChip key={k} active={pedFilter === k} onClick={() => { setPedFilter(k); setSelId(null); }} count={k === "resolvidos" ? undefined : pedCount(k) || undefined}>{label}</FilterChip>
+                ))
+              ) : (
+                <>
+                  <FilterChip active={tab === "enviados"} onClick={() => selectTab("enviados")}>{t.b1All}</FilterChip>
+                  <FilterChip active={tab === "reclamacoes"} onClick={() => selectTab("reclamacoes")} count={unseenOf(complaints) || undefined}>{t.tabComplaints}</FilterChip>
+                  <FilterChip active={tab === "elogios"} onClick={() => selectTab("elogios")} count={unseenOf(praises) || undefined}>{t.sectionPraise}</FilterChip>
+                  <FilterChip active={tab === "avisos"} onClick={() => selectTab("avisos")} count={unseenOf(notices) || undefined}>{t.sectionNotices}</FilterChip>
+                </>
+              )}
+            </div>
+          </>
+        );
+      })()}
 
       {wide ? (() => {
         // PC (B1): como o correio — lista à esquerda, o aviso aberto à direita.
-        const list = tab === "pedidos" ? visibleMissingItems : tabContent.items;
+        const list = tab === "pedidos" ? pedList : tabContent.items;
         const sel = list.find((x) => x.id === selId) || list[0] || null;
         const dotOf = (x) => (tab === "pedidos" ? ({ new: "var(--p1)", pending: "#C98A12", resolved: "#C3C8C2" })[pedidoStatus(x)] : (x.seenByManagement ? "#C3C8C2" : "var(--p1)"));
         return (
@@ -330,14 +376,14 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
                   replying={replyingId} replyDraft={replyDraft} setReplyDraft={setReplyDraft}
                   onStartReply={startReply} onSendReply={sendReply} onToggleResolved={toggleResolved}
                 />
-              ) : <SentItemCard item={sel} type={tabContent.type} staff={staff} clients={clients} c0={c0} lang={lang} />)}
+              ) : <SentItemCard item={sel} type={tabContent.type || sel.type} staff={staff} clients={clients} c0={c0} lang={lang} />)}
             </div>
           </div>
         );
       })() : (
       tab === "pedidos" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {visibleMissingItems.length === 0 ? <EmptyNote>{t.nothingHere}</EmptyNote> : visibleMissingItems.map((m) => (
+          {pedList.length === 0 ? <EmptyNote>{t.nothingHere}</EmptyNote> : pedList.map((m) => (
             <PedidoCard
               key={m.id} m={m} staff={staff} clients={clients} lang={lang} t={t} c0={c0}
               stale={isSolicitationOld(m, openPeriod)}
@@ -362,7 +408,7 @@ function AvisosScreen({ lang, setLang, staff, clients, missingItems, setMissingI
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {tabContent.items.length === 0 ? <EmptyNote>{t.nothingHere}</EmptyNote> : tabContent.items.map((item) => (
-            <SentItemCard key={item.id} item={item} type={tabContent.type} staff={staff} clients={clients} c0={c0} lang={lang} />
+            <SentItemCard key={item.id} item={item} type={tabContent.type || item.type} staff={staff} clients={clients} c0={c0} lang={lang} />
           ))}
         </div>
       )

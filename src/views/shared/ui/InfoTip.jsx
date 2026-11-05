@@ -57,7 +57,7 @@ function InfoTip({ text, label = "Mais informações", style, balloonStyle }) {
         aria-describedby={open ? balloonId : undefined}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        onClick={() => setOpen((o) => !o)}
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
         style={{
           width: minTap, height: minTap, border: "none", background: "transparent", padding: 0,
           display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",

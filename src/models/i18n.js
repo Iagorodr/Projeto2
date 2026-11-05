@@ -168,7 +168,7 @@ const T = {
       averageHoursLabel: (n) => `média ${n}h`,
     },
     clientes: {
-      b1Planning: "Foto do planning", b1PlanningAdd: "Adicionar foto do planning", b1PlanningChange: "Trocar foto", b1PlanningRemove: "Remover foto", b1PlanningRemoveBody: "A foto do planning sai da ficha e é apagada do cofre.", b1PlanningOpen: "Abrir foto do planning", b1Replacement: "Replacement", b1Preference: "Preferência de horário", b1Todo: "O que fazer", b1DocSent: "Existe", b1DocMissing: "Em falta", b1ColType: "Tipo", b1MapAria: (c) => `Mapa de ${c}`, b1NoAddress: "Sem morada", b1Visits: (n) => `${n} ${n === 1 ? "visita" : "visitas"} por semana`, b1DocsCount: (a, b) => `${a} de ${b}`,
+      b1Planning: "Foto do planning", b1PlanningAdd: "Adicionar foto do planning", b1PlanningChange: "Trocar foto", b1PlanningRemove: "Remover foto", b1PlanningRemoveBody: "A foto do planning sai da ficha e é apagada do cofre.", b1PlanningOpen: "Abrir foto do planning", b1TypeInfo: "Fixo: cliente da agenda de todas as semanas. Replacement: cliente temporário, só entre as datas do contrato (ex.: substituição de férias).", b1HoursInfo: "Horas registadas pela equipa neste período, comparadas com as horas que a agenda prevê para o período inteiro.", b1Replacement: "Replacement", b1Preference: "Preferência de horário", b1Todo: "O que fazer", b1DocSent: "Existe", b1DocMissing: "Em falta", b1ColType: "Tipo", b1MapAria: (c) => `Mapa de ${c}`, b1NoAddress: "Sem morada", b1Visits: (n) => `${n} ${n === 1 ? "visita" : "visitas"} por semana`, b1DocsCount: (a, b) => `${a} de ${b}`,
       title: "Clientes",
       subtitle: (n) => `${n} cliente${n === 1 ? "" : "s"} ativo${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Pesquisar cliente", newClient: "Novo cliente",
@@ -281,6 +281,7 @@ const T = {
       pickWeek: "Escolher semana", backToToday: "Hoje",
     },
     horas: {
+      b1ExtraApproved: "Hora extra aprovada.", b1Undo: "Desfazer",
       title: "Horas",
       searchPlaceholder: "Pesquisar funcionário",
       kpiPending: "Pendentes", kpiPaid: "Pagos", kpiUnpaid: "Por pagar",
@@ -437,6 +438,7 @@ const T = {
       lockedHere: "Esta pessoa está aqui por cobertura de férias. Altere ou remova em “Cobertura de férias”.",
     },
     avisos: {
+      b1BoxInfo: "Recebidos: pedidos da equipa (falta de produto, correções de horas, outros). Enviados: reclamações, elogios e avisos que a gerência mandou à equipa.", b1Received: "Recebidos", b1Sent: "Enviados", b1All: "Todos", b1Open: "Por tratar", b1Product: "Produto", b1Corrections: "Correções", b1Other: "Outros", b1Resolved: "Resolvidos",
       title: "Avisos",
       typeComplaint: "Reclamação", typePraise: "Elogio", typeNotice: "Aviso",
       formStaff: "Funcionário(s)", formStaffPlaceholder: "Escolha",
@@ -463,7 +465,7 @@ const T = {
       withPhoto: "com foto",
     },
     funcionarios: {
-      b1Nif: "NIF", b1NifHint: "Número de identificação fiscal. Só a gerência vê.", b1PayTax: "IBAN e NIF", b1ColPartner: "Dupla",b1ColPartner: "Dupla", b1Duo: (n) => `Em dupla com ${n}`, b1Solo: "Trabalha sozinho/a", b1DocSoon: (n) => n === 0 ? "Expira hoje" : `Expira em ${n} d`, b1DocsCount: (a, b) => `${a} de ${b}`, b1ResidenceAlert: (d) => `Título de residência ${d}`, b1ClientsCount: (n) => `${n} ${n === 1 ? "cliente" : "clientes"}`,
+      b1Nif: "NIF", b1NifHint: "Número de identificação fiscal. Só a gerência vê.", b1PayTax: "IBAN e NIF", b1PartnerInfo: "Quem trabalha em dupla: a agenda preenche-se para os dois (pode tirar-se um de um cliente). As horas não: cada um regista as suas.", b1ColPartner: "Dupla", b1Duo: (n) => `Em dupla com ${n}`, b1Solo: "Trabalha sozinho/a", b1DocSoon: (n) => n === 0 ? "Expira hoje" : `Expira em ${n} d`, b1DocsCount: (a, b) => `${a} de ${b}`, b1ResidenceAlert: (d) => `Título de residência ${d}`, b1ClientsCount: (n) => `${n} ${n === 1 ? "cliente" : "clientes"}`,
       title: "Funcionários",
       subtitle: (n) => `${n} funcionário${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Pesquisar funcionário", newStaff: "Novo Funcionário",
@@ -473,7 +475,7 @@ const T = {
       fName: "Nome", fEmail: "Email (login)", fContact: "Contacto (telefone)", fPassword: "Palavra-passe",
       fIban: "IBAN", fAccountType: "Tipo de conta", fStatus: "Status", fValidUntil: "Válido até",
       fCanViewAllClients: "Vê todos os clientes", fCanExpenses: "Pode lançar despesas a reembolsar", fCanExpensesHint: "O funcionário lança, a gerência aprova. Entra no relatório dele, à parte das horas.", fPartner: "Parceiro (dupla)", partnerNone: "Sem dupla", partnerHint: "Com dupla, a agenda preenche-se pelos dois (dá para tirar um deles de um cliente). As horas não: cada um marca as suas.",
-      assignedClients: "Clientes atribuídos", knownClientsTitle: "Clientes conhecidos", knownClientsHint: "Atalho: clientes que esta pessoa faz de vez em quando. Aparecem logo em «Adicionar outro cliente» no celular dela, sem precisar de procurar ou digitar o nome. Não muda a agenda nem o cliente.", knownEmpty: "Nenhum cliente conhecido.", knownAdd: "Adicionar cliente conhecido", knownPick: "Cliente", knownPickPlaceholder: "Escolha um cliente…",   knownSave: "Adicionar",   knownRemove: "Remover", knownRemoveTitle: "Remover cliente conhecido?", knownRemoveBody: (c, who) => `${c} deixa de aparecer em «Adicionar outro cliente» de ${who}. Não apaga o cliente nem as horas já lançadas.`,    knownNoOptions: "Ainda não há clientes para escolher. Crie um em Clientes.",    assignedNote: "A atribuição de clientes é feita no ecrã de Agendas.",
+      assignedClients: "Clientes atribuídos", knownClientsTitle: "Clientes conhecidos", knownClientsHint: "Atalho: clientes que esta pessoa faz de vez em quando. Aparecem logo em «Adicionar outro cliente» no celular dela, sem precisar de procurar ou digitar o nome. Não muda a agenda nem o cliente.", knownEmpty: "Nenhum cliente conhecido.", knownAdd: "Adicionar cliente conhecido", knownPick: "Cliente", knownPickPlaceholder: "Escolha um cliente…",   knownSave: "Adicionar",   knownRemove: "Remover", knownRemovedToast: (c) => `${c} saiu dos clientes conhecidos.`, knownUndo: "Desfazer", knownRemoveTitle: "Remover cliente conhecido?", knownRemoveBody: (c, who) => `${c} deixa de aparecer em «Adicionar outro cliente» de ${who}. Não apaga o cliente nem as horas já lançadas.`,    knownNoOptions: "Ainda não há clientes para escolher. Crie um em Clientes.",    assignedNote: "A atribuição de clientes é feita no ecrã de Agendas.",
       documentsTitle: "Documentos", docSlots: ["Identidade", "Passaporte", "Residência", "Atividade"],
       attach: "Anexar", attached: (name) => `Anexado: ${name}`, removeDoc: "Remover", docRemoveTitle: "Remover este documento?", docRemoveBody: (n) => `O ficheiro anexado «${n}» será removido do cliente. Pode anexar outro depois.`, docRemoveKeep: "Manter", docRemoveYes: "Sim, remover", noFile: "Nenhum ficheiro",
       docsNote: "Fica guardado num cofre privado, só visível à gerência. Fotos, PDF, Word ou Excel até 10 MB.",
@@ -563,7 +565,7 @@ const T = {
       copied: "Copiado!",
     },
     historico: {
-      b1Last: "Último período", b1Open: "Abrir", b1Paid: "PAGO", b1Reopened: "REABERTO", b1Unpaid: (n) => `${n} por pagar`, b1ColStatus: "Estado", b1Occ: "Ocorrências", b1People: "Pessoas", b1ComplaintsDelta: (d) => (d === 0 ? "igual ao anterior" : `${d > 0 ? "↑" : "↓"} ${Math.abs(d)} vs anterior`), b1OccShort: (r, e, a) => `${r} recl. · ${e} elog. · ${a} ${a === 1 ? "aviso" : "avisos"}`, b1ReopenedHint: "Houve correções depois de finalizar (meses reabertos)",
+      b1StatusInfo: "PAGO: todos os que trabalharam no período foram pagos. «N por pagar»: ainda há pagamentos em falta. REABERTO: houve um mês reaberto para correção antes do fecho (registado a partir de novembro de 2026).", b1Last: "Último período", b1Open: "Abrir", b1Paid: "PAGO", b1Reopened: "REABERTO", b1Unpaid: (n) => `${n} por pagar`, b1ColStatus: "Estado", b1Occ: "Ocorrências", b1People: "Pessoas", b1ComplaintsDelta: (d) => (d === 0 ? "igual ao anterior" : `${d > 0 ? "↑" : "↓"} ${Math.abs(d)} vs anterior`), b1OccShort: (r, e, a) => `${r} recl. · ${e} elog. · ${a} ${a === 1 ? "aviso" : "avisos"}`, b1ReopenedHint: "Houve correções depois de finalizar (meses reabertos)",
       title: "Histórico",
       subtitle: "Períodos fechados",
       noResults: "Nenhum período fechado ainda. Feche um período em Horas quando todos os funcionários estiverem pagos.",
@@ -587,6 +589,7 @@ const T = {
       deleteConfirmBtn: "Sim, apagar",
     },
     monitoramento: {
+      b1Reminded: (n) => `Lembrete enviado a ${n}.`, b1Undo: "Desfazer",
       title: "Monitoramento",
       subtitle: (label) => `Semana atual (${label}). Dias já passados e ainda vazios aparecem em destaque, para você ajudar quem estiver com dificuldade.`,
       searchPlaceholder: "Pesquisar funcionário",
@@ -1047,7 +1050,7 @@ const T = {
       averageHoursLabel: (n) => `average ${n}h`,
     },
     clientes: {
-      b1Planning: "Planning photo", b1PlanningAdd: "Add planning photo", b1PlanningChange: "Change photo", b1PlanningRemove: "Remove photo", b1PlanningRemoveBody: "The planning photo is removed from the record and deleted from the vault.", b1PlanningOpen: "Open planning photo", b1Replacement: "Replacement", b1Preference: "Schedule preference", b1Todo: "What to do", b1DocSent: "On file", b1DocMissing: "Missing", b1ColType: "Type", b1MapAria: (c) => `Map of ${c}`, b1NoAddress: "No address", b1Visits: (n) => `${n} ${n === 1 ? "visit" : "visits"} per week`, b1DocsCount: (a, b) => `${a} of ${b}`,
+      b1Planning: "Planning photo", b1PlanningAdd: "Add planning photo", b1PlanningChange: "Change photo", b1PlanningRemove: "Remove photo", b1PlanningRemoveBody: "The planning photo is removed from the record and deleted from the vault.", b1PlanningOpen: "Open planning photo", b1TypeInfo: "Regular: client on the weekly schedule. Replacement: temporary client, only between the contract dates (e.g. holiday cover).", b1HoursInfo: "Hours logged by the team this period, compared with the hours the schedule plans for the whole period.", b1Replacement: "Replacement", b1Preference: "Schedule preference", b1Todo: "What to do", b1DocSent: "On file", b1DocMissing: "Missing", b1ColType: "Type", b1MapAria: (c) => `Map of ${c}`, b1NoAddress: "No address", b1Visits: (n) => `${n} ${n === 1 ? "visit" : "visits"} per week`, b1DocsCount: (a, b) => `${a} of ${b}`,
       title: "Clients",
       subtitle: (n) => `${n} active client${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Search client", newClient: "New client",
@@ -1150,6 +1153,7 @@ const T = {
       pickWeek: "Choose week", backToToday: "Today",
     },
     horas: {
+      b1ExtraApproved: "Overtime approved.", b1Undo: "Undo",
       title: "Hours",
       searchPlaceholder: "Search Staff",
       kpiPending: "Pending", kpiPaid: "Paid", kpiUnpaid: "Unpaid",
@@ -1301,6 +1305,7 @@ const T = {
       lockedHere: "This person is here because of a holiday cover. Change or remove it in “Holiday cover”.",
     },
     avisos: {
+      b1BoxInfo: "Received: requests from the team (missing product, hour corrections, other). Sent: complaints, praise and notices management sent to the team.", b1Received: "Received", b1Sent: "Sent", b1All: "All", b1Open: "To handle", b1Product: "Product", b1Corrections: "Corrections", b1Other: "Other", b1Resolved: "Resolved",
       title: "Notices",
       typeComplaint: "Complaint", typePraise: "Praise", typeNotice: "Notice",
       formStaff: "Staff", formStaffPlaceholder: "Choose",
@@ -1327,7 +1332,7 @@ const T = {
       withPhoto: "with photo",
     },
     funcionarios: {
-      b1Nif: "Tax ID (NIF)", b1NifHint: "Tax identification number. Only management can see it.", b1PayTax: "IBAN and tax ID", b1ColPartner: "Pair",b1ColPartner: "Pair", b1Duo: (n) => `Paired with ${n}`, b1Solo: "Works alone", b1DocSoon: (n) => n === 0 ? "Expires today" : `Expires in ${n} d`, b1DocsCount: (a, b) => `${a} of ${b}`, b1ResidenceAlert: (d) => `Residence permit ${d}`, b1ClientsCount: (n) => `${n} ${n === 1 ? "client" : "clients"}`,
+      b1Nif: "Tax ID (NIF)", b1NifHint: "Tax identification number. Only management can see it.", b1PayTax: "IBAN and tax ID", b1PartnerInfo: "Who works as a pair: the schedule fills in for both (one can be removed from a client). Hours do not: each person logs their own.", b1ColPartner: "Pair", b1Duo: (n) => `Paired with ${n}`, b1Solo: "Works alone", b1DocSoon: (n) => n === 0 ? "Expires today" : `Expires in ${n} d`, b1DocsCount: (a, b) => `${a} of ${b}`, b1ResidenceAlert: (d) => `Residence permit ${d}`, b1ClientsCount: (n) => `${n} ${n === 1 ? "client" : "clients"}`,
       title: "Staff",
       subtitle: (n) => `${n} staff member${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Search staff", newStaff: "New Staff",
@@ -1337,7 +1342,7 @@ const T = {
       fName: "Name", fEmail: "Email (login)", fContact: "Contact (phone)", fPassword: "Password",
       fIban: "IBAN", fAccountType: "Account type", fStatus: "Status", fValidUntil: "Valid until",
       fCanViewAllClients: "Can view all clients", fCanExpenses: "Can log expenses to reimburse", fCanExpensesHint: "The employee logs, management approves. It goes on their report, separate from the hours.", fPartner: "Partner (pair)", partnerNone: "No pair", partnerHint: "With a pair, the schedule is filled in for both (you can take one off a client). Hours are not: each person marks their own.",
-      assignedClients: "Assigned clients", knownClientsTitle: "Known clients", knownClientsHint: "Shortcut: clients this person does now and then. They show up right away under “Add another client” on their phone, with no searching or typing. It doesn’t change the schedule or the client.", knownEmpty: "No known clients.", knownAdd: "Add known client", knownPick: "Client", knownPickPlaceholder: "Choose a client…",   knownSave: "Add",   knownRemove: "Remove", knownRemoveTitle: "Remove known client?", knownRemoveBody: (c, who) => `${c} will no longer show under “Add another client” for ${who}. The client and hours already logged are not deleted.`,    knownNoOptions: "There are no clients to pick yet. Create one under Clients.",    assignedNote: "Client assignment is done on the Schedules screen.",
+      assignedClients: "Assigned clients", knownClientsTitle: "Known clients", knownClientsHint: "Shortcut: clients this person does now and then. They show up right away under “Add another client” on their phone, with no searching or typing. It doesn’t change the schedule or the client.", knownEmpty: "No known clients.", knownAdd: "Add known client", knownPick: "Client", knownPickPlaceholder: "Choose a client…",   knownSave: "Add",   knownRemove: "Remove", knownRemovedToast: (c) => `${c} removed from known clients.`, knownUndo: "Undo", knownRemoveTitle: "Remove known client?", knownRemoveBody: (c, who) => `${c} will no longer show under “Add another client” for ${who}. The client and hours already logged are not deleted.`,    knownNoOptions: "There are no clients to pick yet. Create one under Clients.",    assignedNote: "Client assignment is done on the Schedules screen.",
       documentsTitle: "Documents", docSlots: ["ID", "Passport", "Residence permit", "Work certificate"],
       attach: "Attach", attached: (name) => `Attached: ${name}`, removeDoc: "Remove", docRemoveTitle: "Remove this document?", docRemoveBody: (n) => `The attached file “${n}” will be removed from the client. You can attach another later.`, docRemoveKeep: "Keep", docRemoveYes: "Yes, remove", noFile: "No file",
       docsNote: "Stored in a private vault, visible to management only. Photos, PDF, Word or Excel up to 10 MB.",
@@ -1422,7 +1427,7 @@ const T = {
       copied: "Copied!",
     },
     historico: {
-      b1Last: "Last period", b1Open: "Open", b1Paid: "PAID", b1Reopened: "REOPENED", b1Unpaid: (n) => `${n} unpaid`, b1ColStatus: "Status", b1Occ: "Occurrences", b1People: "People", b1ComplaintsDelta: (d) => (d === 0 ? "same as before" : `${d > 0 ? "↑" : "↓"} ${Math.abs(d)} vs previous`), b1OccShort: (r, e, a) => `${r} compl. · ${e} praise · ${a} ${a === 1 ? "notice" : "notices"}`, b1ReopenedHint: "Corrections were made after finalising (reopened months)",
+      b1StatusInfo: "PAID: everyone who worked in the period was paid. «N unpaid»: payments still missing. REOPENED: a month was reopened for correction before closing (recorded from November 2026).", b1Last: "Last period", b1Open: "Open", b1Paid: "PAID", b1Reopened: "REOPENED", b1Unpaid: (n) => `${n} unpaid`, b1ColStatus: "Status", b1Occ: "Occurrences", b1People: "People", b1ComplaintsDelta: (d) => (d === 0 ? "same as before" : `${d > 0 ? "↑" : "↓"} ${Math.abs(d)} vs previous`), b1OccShort: (r, e, a) => `${r} compl. · ${e} praise · ${a} ${a === 1 ? "notice" : "notices"}`, b1ReopenedHint: "Corrections were made after finalising (reopened months)",
       title: "History",
       subtitle: "Closed periods",
       noResults: "No period closed yet. Close a period in Hours once every staff member is paid.",
@@ -1446,6 +1451,7 @@ const T = {
       deleteConfirmBtn: "Yes, delete",
     },
     monitoramento: {
+      b1Reminded: (n) => `Reminder sent to ${n}.`, b1Undo: "Undo",
       title: "Monitoring",
       subtitle: (label) => `Current week (${label}). Days that have already passed and are still empty are highlighted, so you can help anyone who's struggling.`,
       searchPlaceholder: "Search staff",
@@ -1873,7 +1879,7 @@ const T = {
       averageHoursLabel: (n) => `moyenne ${n}h`,
     },
     clientes: {
-      b1Planning: "Photo du planning", b1PlanningAdd: "Ajouter la photo du planning", b1PlanningChange: "Changer la photo", b1PlanningRemove: "Retirer la photo", b1PlanningRemoveBody: "La photo du planning est retirée de la fiche et supprimée du coffre.", b1PlanningOpen: "Ouvrir la photo du planning", b1Replacement: "Remplacement", b1Preference: "Préférence d'horaire", b1Todo: "À faire", b1DocSent: "Présent", b1DocMissing: "Manquant", b1ColType: "Type", b1MapAria: (c) => `Carte de ${c}`, b1NoAddress: "Sans adresse", b1Visits: (n) => `${n} ${n === 1 ? "passage" : "passages"} par semaine`, b1DocsCount: (a, b) => `${a} sur ${b}`,
+      b1Planning: "Photo du planning", b1PlanningAdd: "Ajouter la photo du planning", b1PlanningChange: "Changer la photo", b1PlanningRemove: "Retirer la photo", b1PlanningRemoveBody: "La photo du planning est retirée de la fiche et supprimée du coffre.", b1PlanningOpen: "Ouvrir la photo du planning", b1TypeInfo: "Fixe : client du planning de chaque semaine. Remplacement : client temporaire, seulement entre les dates du contrat (ex. : remplacement de congés).", b1HoursInfo: "Heures saisies par l'équipe sur la période, comparées aux heures prévues par le planning pour toute la période.", b1Replacement: "Remplacement", b1Preference: "Préférence d'horaire", b1Todo: "À faire", b1DocSent: "Présent", b1DocMissing: "Manquant", b1ColType: "Type", b1MapAria: (c) => `Carte de ${c}`, b1NoAddress: "Sans adresse", b1Visits: (n) => `${n} ${n === 1 ? "passage" : "passages"} par semaine`, b1DocsCount: (a, b) => `${a} sur ${b}`,
       title: "Clients",
       subtitle: (n) => `${n} client${n === 1 ? "" : "s"} actif${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Rechercher un client", newClient: "Nouveau client",
@@ -1976,6 +1982,7 @@ const T = {
       pickWeek: "Choisir une semaine", backToToday: "Aujourd'hui",
     },
     horas: {
+      b1ExtraApproved: "Heure sup. approuvée.", b1Undo: "Annuler",
       title: "Heures",
       searchPlaceholder: "Rechercher un employé",
       kpiPending: "En attente", kpiPaid: "Payés", kpiUnpaid: "À payer",
@@ -2127,6 +2134,7 @@ const T = {
       lockedHere: "Cette personne est ici par remplacement de congés. Modifiez ou supprimez dans « Remplacement de congés ».",
     },
     avisos: {
+      b1BoxInfo: "Reçus : demandes de l'équipe (produit manquant, corrections d'heures, autres). Envoyés : réclamations, éloges et avis envoyés par la direction.", b1Received: "Reçus", b1Sent: "Envoyés", b1All: "Tous", b1Open: "À traiter", b1Product: "Produit", b1Corrections: "Corrections", b1Other: "Autres", b1Resolved: "Résolus",
       title: "Avis",
       typeComplaint: "Réclamation", typePraise: "Compliment", typeNotice: "Avis",
       formStaff: "Employé(s)", formStaffPlaceholder: "Choisir",
@@ -2153,7 +2161,7 @@ const T = {
       withPhoto: "avec photo",
     },
     funcionarios: {
-      b1Nif: "NIF / n° fiscal", b1NifHint: "Numéro d'identification fiscale. Seule la direction le voit.", b1PayTax: "IBAN et n° fiscal", b1ColPartner: "Duo",b1ColPartner: "Duo", b1Duo: (n) => `En duo avec ${n}`, b1Solo: "Travaille seul(e)", b1DocSoon: (n) => n === 0 ? "Expire aujourd'hui" : `Expire dans ${n} j`, b1DocsCount: (a, b) => `${a} sur ${b}`, b1ResidenceAlert: (d) => `Titre de séjour ${d}`, b1ClientsCount: (n) => `${n} ${n === 1 ? "client" : "clients"}`,
+      b1Nif: "NIF / n° fiscal", b1NifHint: "Numéro d'identification fiscale. Seule la direction le voit.", b1PayTax: "IBAN et n° fiscal", b1PartnerInfo: "Qui travaille en duo : le planning se remplit pour les deux (on peut en retirer un d'un client). Pas les heures : chacun saisit les siennes.", b1ColPartner: "Duo", b1Duo: (n) => `En duo avec ${n}`, b1Solo: "Travaille seul(e)", b1DocSoon: (n) => n === 0 ? "Expire aujourd'hui" : `Expire dans ${n} j`, b1DocsCount: (a, b) => `${a} sur ${b}`, b1ResidenceAlert: (d) => `Titre de séjour ${d}`, b1ClientsCount: (n) => `${n} ${n === 1 ? "client" : "clients"}`,
       title: "Employés",
       subtitle: (n) => `${n} employé${n === 1 ? "" : "s"}`,
       searchPlaceholder: "Rechercher un employé", newStaff: "Nouvel employé",
@@ -2163,7 +2171,7 @@ const T = {
       fName: "Nom", fEmail: "Email (identifiant)", fContact: "Contact (téléphone)", fPassword: "Mot de passe",
       fIban: "IBAN", fAccountType: "Type de compte", fStatus: "Statut", fValidUntil: "Valable jusqu'au",
       fCanViewAllClients: "Voit tous les clients", fCanExpenses: "Peut saisir des frais à rembourser", fCanExpensesHint: "L'employé saisit, la direction approuve. Figure sur son relevé, à part des heures.", fPartner: "Partenaire (duo)", partnerNone: "Sans duo", partnerHint: "En duo, le planning se remplit pour les deux (on peut en retirer un d'un client). Pas les heures : chacun marque les siennes.",
-      assignedClients: "Clients attribués", knownClientsTitle: "Clients connus", knownClientsHint: "Raccourci : clients que cette personne fait de temps en temps. Ils apparaissent directement sous « Ajouter un autre client » sur son téléphone, sans chercher ni taper le nom. Cela ne change ni le planning ni le client.", knownEmpty: "Aucun client connu.", knownAdd: "Ajouter un client connu", knownPick: "Client", knownPickPlaceholder: "Choisissez un client…",   knownSave: "Ajouter",   knownRemove: "Retirer", knownRemoveTitle: "Retirer un client connu ?", knownRemoveBody: (c, who) => `${c} n’apparaîtra plus sous « Ajouter un autre client » pour ${who}. Le client et les heures déjà saisies ne sont pas supprimés.`,    knownNoOptions: "Il n’y a pas encore de clients à choisir. Créez-en un dans Clients.",    assignedNote: "L'attribution des clients se fait dans l'écran Plannings.",
+      assignedClients: "Clients attribués", knownClientsTitle: "Clients connus", knownClientsHint: "Raccourci : clients que cette personne fait de temps en temps. Ils apparaissent directement sous « Ajouter un autre client » sur son téléphone, sans chercher ni taper le nom. Cela ne change ni le planning ni le client.", knownEmpty: "Aucun client connu.", knownAdd: "Ajouter un client connu", knownPick: "Client", knownPickPlaceholder: "Choisissez un client…",   knownSave: "Ajouter",   knownRemove: "Retirer", knownRemovedToast: (c) => `${c} retiré des clients connus.`, knownUndo: "Annuler", knownRemoveTitle: "Retirer un client connu ?", knownRemoveBody: (c, who) => `${c} n’apparaîtra plus sous « Ajouter un autre client » pour ${who}. Le client et les heures déjà saisies ne sont pas supprimés.`,    knownNoOptions: "Il n’y a pas encore de clients à choisir. Créez-en un dans Clients.",    assignedNote: "L'attribution des clients se fait dans l'écran Plannings.",
       documentsTitle: "Documents", docSlots: ["Carte d'identité", "Passeport", "Titre de séjour", "Attestation d'activité"],
       attach: "Joindre", attached: (name) => `Joint : ${name}`, removeDoc: "Supprimer", docRemoveTitle: "Supprimer ce document ?", docRemoveBody: (n) => `Le fichier joint « ${n} » sera retiré du client. Vous pourrez en joindre un autre ensuite.`, docRemoveKeep: "Garder", docRemoveYes: "Oui, supprimer", noFile: "Aucun fichier",
       docsNote: "Conservé dans un coffre privé, visible uniquement par la direction. Photos, PDF, Word ou Excel jusqu'à 10 Mo.",
@@ -2248,7 +2256,7 @@ const T = {
       copied: "Copié !",
     },
     historico: {
-      b1Last: "Dernière période", b1Open: "Ouvrir", b1Paid: "PAYÉ", b1Reopened: "ROUVERT", b1Unpaid: (n) => `${n} à payer`, b1ColStatus: "État", b1Occ: "Événements", b1People: "Personnes", b1ComplaintsDelta: (d) => (d === 0 ? "comme avant" : `${d > 0 ? "↑" : "↓"} ${Math.abs(d)} vs précédente`), b1OccShort: (r, e, a) => `${r} récl. · ${e} élog. · ${a} avis`, b1ReopenedHint: "Des corrections ont été faites après finalisation (mois rouverts)",
+      b1StatusInfo: "PAYÉ : tous ceux qui ont travaillé ont été payés. «N à payer» : il manque encore des paiements. ROUVERT : un mois a été rouvert pour correction avant la clôture (enregistré depuis novembre 2026).", b1Last: "Dernière période", b1Open: "Ouvrir", b1Paid: "PAYÉ", b1Reopened: "ROUVERT", b1Unpaid: (n) => `${n} à payer`, b1ColStatus: "État", b1Occ: "Événements", b1People: "Personnes", b1ComplaintsDelta: (d) => (d === 0 ? "comme avant" : `${d > 0 ? "↑" : "↓"} ${Math.abs(d)} vs précédente`), b1OccShort: (r, e, a) => `${r} récl. · ${e} élog. · ${a} avis`, b1ReopenedHint: "Des corrections ont été faites après finalisation (mois rouverts)",
       title: "Historique",
       subtitle: "Périodes clôturées",
       noResults: "Aucune période clôturée pour l'instant. Clôturez une période dans Heures quand tous les employés sont payés.",
@@ -2272,6 +2280,7 @@ const T = {
       deleteConfirmBtn: "Oui, supprimer",
     },
     monitoramento: {
+      b1Reminded: (n) => `Rappel envoyé à ${n}.`, b1Undo: "Annuler",
       title: "Surveillance",
       subtitle: (label) => `Semaine en cours (${label}). Les jours déjà passés et encore vides sont mis en évidence, pour vous permettre d'aider ceux qui ont des difficultés.`,
       searchPlaceholder: "Rechercher un employé",

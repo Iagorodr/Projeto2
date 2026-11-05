@@ -20,7 +20,7 @@ import { DateField, DurationField } from "../shared/FormInputs.jsx";
 import CityField from "../shared/CityField.jsx";
 import { resolveCity } from "../../models/cities.js";
 import {
-  PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, Drawer, Button, ConfirmDialog, ProgressBar, Card, StoredFile,
+  PageHeader, SearchField, FilterChip, DataTable, Avatar, Pill, Drawer, Button, ConfirmDialog, ProgressBar, Card, StoredFile, InfoTip,
   ProfileSection, MiniPlaceMap, DocSlot, Fab, ContractorBadge, HeroChip,
 } from "../shared/ui/index.js";
 import { useIsMobile } from "../../hooks/useIsMobile.js";
@@ -415,7 +415,7 @@ function ClientesScreen({
     },
     { key: "city", label: t.colCity, render: (c) => c.city || "—" },
     {
-      key: "kind", label: t.b1ColType, width: 1, mobileHidden: true,
+      key: "kind", label: <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>{t.b1ColType}<InfoTip text={t.b1TypeInfo} label={c0.moreInfoLabel} /></span>, width: 1.1, mobileHidden: true,
       render: (c) => (c.clientType === "replacement"
         ? <Pill variant="neutral">{t.b1Replacement}</Pill>
         : <span style={{ fontSize: 12.5, color: COLORS.ink2 }}>{t.clientTypeFixed}</span>),
@@ -434,7 +434,7 @@ function ClientesScreen({
       // `overflow: hidden` da célula (herdado de DataTable.jsx). O
       // `minWidth: 150` que já existia era só no `style` do ProgressBar
       // (um filho), não na coluna em si — não segurava a célula.
-      key: "hours", label: t.colHoursToDate, width: 1.6, minWidth: 190,
+      key: "hours", label: <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>{t.colHoursToDate}<InfoTip text={t.b1HoursInfo} label={c0.moreInfoLabel} /></span>, width: 1.6, minWidth: 190,
       // Feito vs PREVISTO pela agenda até hoje (conta dia a dia: dias da semana, frequência,
       // contrato, equipa nos "individual") — antes comparava com "horas/mês" (4,33 semanas),
       // que não bate com o período (21→20) nem com a equipa, e a meio do período parecia sempre baixo.

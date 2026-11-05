@@ -65,7 +65,7 @@ function Toast({ message, actionLabel, onAction, onDismiss, closeLabel = "Fechar
         display: "flex", alignItems: "center", gap: 14,
         background: COLORS.forest900, color: "#fff",
         padding: "12px 16px", borderRadius: RADIUS.control, boxShadow: SHADOW.sh2,
-        fontSize: 13, zIndex: 80, maxWidth: "calc(100vw - 32px)",
+        fontSize: 13, zIndex: 96 /* acima das gavetas (85) e diálogos (90): o "Desfazer" tem de se ver */, maxWidth: "calc(100vw - 32px)",
       }}
     >
       <span>{message}</span>

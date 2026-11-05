@@ -107,10 +107,13 @@ function DataTable({
                 />
               </label>
             )}
-            {columns.map((col, i) => (
-              <button
+            {columns.map((col, i) => {
+              // Só é botão quando ordena: um título com uma dica (i) lá dentro não pode estar dentro de um <button>.
+              const HeadTag = col.sortable ? "button" : "div";
+              return (
+              <HeadTag
                 key={col.key}
-                type="button"
+                type={col.sortable ? "button" : undefined}
                 onClick={col.sortable ? () => onSortChange?.(col.key) : undefined}
                 style={{
                   flex: col.width || 1, minWidth: col.minWidth, display: "flex", alignItems: "center",
@@ -126,8 +129,9 @@ function DataTable({
                 {col.sortable && sortKey === col.key && (
                   sortDir === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />
                 )}
-              </button>
-            ))}
+              </HeadTag>
+              );
+            })}
           </div>
 
           {/* Corpo */}
