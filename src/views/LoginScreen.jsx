@@ -7,7 +7,7 @@ import { InstallAppButton } from "./shared/Layout.jsx";
 import { Button } from "./shared/ui/index.js";
 import { AuthShell, LoginLogo, authInputStyle as inputStyle } from "./shared/AuthShell.jsx";
 import { T } from "../models/i18n.js";
-import { isSupabaseConfigured } from "../models/supabaseClient.js";
+import { isSupabaseConfigured, isDemoMode, exitDemo } from "../models/supabaseClient.js";
 import { Avatar } from "./shared/ui/Avatar.jsx";
 
 const ERROR_KEY_BY_CODE = {
@@ -146,6 +146,31 @@ function LoginScreen({ lang, setLang, onEnterManagement, onEnterEmployee, onLogi
               {authLoading ? t.entering : t.enter}
             </Button>
           </form>
+        ) : isDemoMode ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 4 }}>
+            <div style={{ background: "var(--p1-8)", border: "1px solid var(--p1-12)", borderRadius: 14, padding: "12px 14px" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--p1)" }}>{t.demoTitle}</div>
+              <div style={{ fontSize: 13.5, color: COLORS.ink2, lineHeight: 1.45, marginTop: 4 }}>{t.demoNote}</div>
+            </div>
+            <Button variant="primary" onClick={onEnterManagement} style={{ height: 52, width: "100%", fontSize: 15 }}>{t.demoEnterManagement}</Button>
+            <div style={{ fontSize: 12.5, color: COLORS.ink3, marginTop: 6 }}>{t.demoChooseEmployee}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {staff.filter((s) => s.status !== "inativo").slice(0, 6).map((s) => (
+                <button
+                  key={s.id} type="button" onClick={() => onEnterEmployee(s.id)}
+                  style={{ display: "flex", alignItems: "center", gap: 8, textAlign: "left", border: `1px solid ${COLORS.line}`, borderRadius: 14, background: "#fff", padding: "10px 12px", fontSize: 13.5, fontWeight: 600, color: COLORS.ink, cursor: "pointer", fontFamily: "inherit", minWidth: 0 }}
+                >
+                  <Avatar name={s.name} size={26} />
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name.split(" ")[0]}</span>
+                  {isSupervisorRole(s.role) && <span style={{ marginLeft: "auto", fontSize: 10.5, fontWeight: 700, color: "var(--p1)" }}>{t.supervisorTag}</span>}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={exitDemo}
+              style={{ marginTop: 8, alignSelf: "center", border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink2, fontSize: 13, fontWeight: 700, textDecoration: "underline", textUnderlineOffset: 4, fontFamily: "inherit" }}>
+              {t.demoExit}
+            </button>
+          </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}>
             <div style={{ display: "flex", gap: 8 }}>

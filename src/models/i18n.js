@@ -89,6 +89,7 @@ const T = {
     },
     login: {
       isManagement: "Sou gerência", isEmployee: "Sou funcionário",
+      demoTitle: "Demonstração", demoNote: "Dados fictícios, sempre atualizados para hoje. Pode mexer à vontade: nada fica gravado.", demoEnterManagement: "Entrar como gerência", demoChooseEmployee: "Ou entre como alguém da equipa:", demoExit: "Sair da demonstração",
       emailPlaceholder: "digite seu email", passwordPlaceholder: "digite sua palavra-passe",
       resetSend: "Enviar link para o meu email", resetSending: "A enviar...", resetEmailRequired: "Escreva primeiro o seu email no campo acima.",
       resetSent: "Pedido registado. O envio por email ainda está a ser ativado: se não receber nada, peça à gerência da sua empresa uma palavra-passe temporária.",
@@ -999,6 +1000,7 @@ const T = {
     },
     login: {
       isManagement: "I'm management", isEmployee: "I'm staff",
+      demoTitle: "Demo", demoNote: "Sample data, always up to date for today. Try anything: nothing is saved.", demoEnterManagement: "Enter as management", demoChooseEmployee: "Or enter as someone on the team:", demoExit: "Leave the demo",
       emailPlaceholder: "enter your email", passwordPlaceholder: "enter your password",
       resetSend: "Send a link to my email", resetSending: "Sending...", resetEmailRequired: "Please type your email in the field above first.",
       resetSent: "Request registered. Email sending is still being turned on: if you receive nothing, ask your company's management for a temporary password.",
@@ -1851,6 +1853,7 @@ const T = {
     },
     login: {
       isManagement: "Je suis la direction", isEmployee: "Je suis employé",
+      demoTitle: "Démonstration", demoNote: "Données fictives, toujours à jour pour aujourd'hui. Essayez tout : rien n'est enregistré.", demoEnterManagement: "Entrer comme direction", demoChooseEmployee: "Ou entrez comme membre de l'équipe :", demoExit: "Quitter la démonstration",
       emailPlaceholder: "entrez votre email", passwordPlaceholder: "entrez votre mot de passe",
       resetSend: "Envoyer un lien à mon e-mail", resetSending: "Envoi...", resetEmailRequired: "Saisissez d'abord votre e-mail dans le champ ci-dessus.",
       resetSent: "Demande enregistrée. L'envoi par e-mail est encore en cours d'activation : si vous ne recevez rien, demandez un mot de passe temporaire à la direction de votre entreprise.",

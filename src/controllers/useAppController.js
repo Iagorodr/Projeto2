@@ -5,13 +5,10 @@
 // Persistência: se o Supabase estiver configurado (ver models/supabaseClient.js),
 // o estado é carregado de lá ao abrir e cada alteração é gravada de volta. Sem
 // configuração, o app funciona exatamente como antes, só em memória, usando os
-// dados de demonstração de models/data.js / models/seedHistory.js.
+// dados de demonstração de models/demoState.js (gerados para o dia de hoje).
 import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  INITIAL_CLIENTS, INITIAL_STAFF, INITIAL_ASSIGNMENTS, INITIAL_HORAS,
-  INITIAL_MISSING, INITIAL_SENT,
-} from "../models/data.js";
 import { TODAY } from "../models/data.js";
+import { buildDemoState } from "../models/demoState.js";
 import { activeClientsCount, isStaffActive, snapshotClientRate, pinTeamChanges, getOpenPeriod, isoDateStr } from "../models/utils.js";
 import { diffKeys, mergeRemote, buildPatch, isMissingRpc } from "../models/horasSync.js";
 import { listDiff, listMerge, mapDiff, mapMerge, isEmptyDiff } from "../models/appDataSync.js";
@@ -35,6 +32,9 @@ import {
 // aparecer, nem ser gravado, noutra). Sem Supabase (modo demonstração) ou com
 // VITE_START_EMPTY=true, o comportamento é o de sempre.
 const START_EMPTY = isSupabaseConfigured || import.meta.env.VITE_START_EMPTY === "true";
+// Demonstração: dados gerados para o dia de hoje (ver models/demoState.js), uma vez por visita.
+let demoCache = null;
+const demo = () => (demoCache || (demoCache = buildDemoState()));
 
 // Feito uma única vez, ao carregar a página: um link com `?e=codigo` guarda o
 // código da empresa; e a mensagem deixada pela saída anterior (inatividade,
@@ -84,9 +84,9 @@ export function useAppController() {
   const [reclamacaoExcelenteCount, setReclamacaoExcelenteCount] = useState(1);
   const [reclamacaoRazoavelCount, setReclamacaoRazoavelCount] = useState(3);
 
-  const [clients, setClients] = useState(START_EMPTY ? [] : INITIAL_CLIENTS);
+  const [clients, setClients] = useState(() => (START_EMPTY ? [] : demo().clients));
   // Contratantes (ver models/contractors.js). Em demonstração nascem das "origens" dos clientes de exemplo.
-  const [contractors, setContractors] = useState(() => (START_EMPTY ? [] : deriveContractors(INITIAL_CLIENTS)));
+  const [contractors, setContractors] = useState(() => (START_EMPTY ? [] : deriveContractors(demo().clients)));
   const contractorsReadyRef = useRef(false); // a tabela `contractors` existe e foi lida: só então se grava
   // Meses fechados por contratante (supabase/contratantes_fecho.sql). Gravados um a um, ao fechar/reabrir/marcar.
   const [contractorClosings, setContractorClosings] = useState([]);
@@ -95,9 +95,9 @@ export function useAppController() {
   const staffPrivateReadyRef = useRef(false);
   const closingsRef = useRef([]);
   closingsRef.current = contractorClosings;
-  const [staff, setStaff] = useState(START_EMPTY ? [] : INITIAL_STAFF);
-  const [assignments, setAssignments] = useState(START_EMPTY ? {} : INITIAL_ASSIGNMENTS);
-  const [horasData, setHorasDataState] = useState(START_EMPTY ? {} : INITIAL_HORAS);
+  const [staff, setStaff] = useState(() => (START_EMPTY ? [] : demo().staff));
+  const [assignments, setAssignments] = useState(() => (START_EMPTY ? {} : demo().assignments));
+  const [horasData, setHorasDataState] = useState(() => (START_EMPTY ? {} : demo().horasData));
   // Horas: ver models/horasSync.js. `horasRef` é sempre o valor mais recente
   // (síncrono); `dirtyRef` são os funcionários com alterações ainda por gravar
   // — só esses são enviados ao servidor, e só os que NÃO estão aí são
@@ -130,21 +130,16 @@ export function useAppController() {
     horasRef.current = next;
     setHorasDataState(next);
   }, []);
-  const [closedPeriods, setClosedPeriods] = useState([]);
-  // Histórico de demonstração (~340 kB) só é carregado no modo demonstração.
-  useEffect(() => {
-    if (START_EMPTY) return;
-    import("../models/seedHistory.js").then((m) => setClosedPeriods((prev) => (prev.length ? prev : m.INITIAL_CLOSED_PERIODS)));
-  }, []);
-  const [missingItems, setMissingItems] = useState(START_EMPTY ? [] : INITIAL_MISSING);
-  const [sentItems, setSentItems] = useState(START_EMPTY ? [] : INITIAL_SENT);
+  const [closedPeriods, setClosedPeriods] = useState(() => (START_EMPTY ? [] : demo().closedPeriods));
+  const [missingItems, setMissingItems] = useState(() => (START_EMPTY ? [] : demo().missingItems));
+  const [sentItems, setSentItems] = useState(() => (START_EMPTY ? [] : demo().sentItems));
   const [personalNotes, setPersonalNotes] = useState([]);
   // Avisos de falta: { id, staffId, date:"YYYY-MM-DD", note, createdAt, handled }
-  const [absences, setAbsences] = useState([]);
+  const [absences, setAbsences] = useState(() => (START_EMPTY ? [] : demo().absences));
   // Coberturas de férias (só a gerência grava): { id, clientId, fromStaffId,
   // toStaffId, from:"YYYY-MM-DD", to:"YYYY-MM-DD", createdAt } — ver utils.js
   // (`agendaClientIdsOn`). A agenda semanal não é alterada: a volta é automática.
-  const [covers, setCovers] = useState([]);
+  const [covers, setCovers] = useState(() => (START_EMPTY ? [] : demo().covers));
   // Agenda protegida (caso ACTE 3): quando a GERÊNCIA muda a agenda (semana-tipo,
   // coberturas, visitas avulsas) e isso muda a equipa prevista de um dia que já
   // tem horas, essas horas ficam fixas como estão (ver `pinTeamChanges`). As

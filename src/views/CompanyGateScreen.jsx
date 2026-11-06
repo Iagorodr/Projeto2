@@ -4,6 +4,7 @@ import { FONT } from "../styles/tokens.js";
 import { T } from "../models/i18n.js";
 import { Button } from "./shared/ui/index.js";
 import { AuthShell, LoginLogo, authInputStyle } from "./shared/AuthShell.jsx";
+import { isDemoCode, enterDemo } from "../models/supabaseClient.js";
 
 // Primeiro ecrã: código da empresa. Placeholder «Ex: acme-lda», taglines
 // no painel esquerdo (desktop) via AuthShell.
@@ -19,6 +20,7 @@ function CompanyGateScreen({ lang, setLang, onSubmit }) {
     e.preventDefault();
     if (busy) return;
     if (!value.trim()) { setError("empty"); return; }
+    if (isDemoCode(value)) { enterDemo(); return; } // empresa de demonstração
     setBusy(true);
     setError(null);
     const result = await onSubmit(value);
