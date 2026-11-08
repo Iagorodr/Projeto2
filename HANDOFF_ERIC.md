@@ -5,7 +5,8 @@
 **Repositório:** github.com/Iagorodr/Projeto2 (ramo `main`)
 **Produção:** Vercel — projetos `servix-empresa-x` (servix-empresa-x.vercel.app) e `projeto-fin`, ambos com deploy automático a partir do `main`
 **Base de dados:** Supabase, projeto "Projeto Servix Oficial" (`zoizwdungwtioppvupcl`, eu-west-1)
-**Empresas em produção:** `1` = L & A (código `lea`, a empresa real) · `2` = EMPRESATESTE (código `teste`, ver secção 13)
+**Empresas em produção:** `1` = L & A (código `lea`, a empresa real) · `2` = EMPRESATESTE (código **`teste-interno`**, empresa de testes com dados no banco — ver secção 13)
+**Última atualização deste documento:** 8/11/2026
 
 Este documento continua o `HANDOFF_SERVIX.md` do Toni. Tudo o que está aqui foi feito por cima do redesign **B1** (commits até `99fc627`, do Toni). Os meus commits vão de `c2b88dc` a `622f7fd` e têm todos o trailer `Claude-Session: …session_016bupjkLjwZrPU5FRBfHrVv`.
 
@@ -49,6 +50,7 @@ Este documento continua o `HANDOFF_SERVIX.md` do Toni. Tudo o que está aqui foi
 | Conta L&A | **Nunca carregar em "Nova senha"** em Acessos na empresa L&A. |
 | Mudar decisões | Avisar sempre o Iago quando uma decisão anterior muda. |
 | Língua | Responder em pt-PT. Textos da app em pt/en/fr. |
+| **Este documento** | **Decisão do Iago (8/11): a cada mudança ou decisão, atualizar este `HANDOFF_ERIC.md` no mesmo commit** (secção certa + "Registo de alterações" no fim + data no topo). |
 | Commits | Trailers: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` e `Claude-Session: https://claude.ai/code/session_016bupjkLjwZrPU5FRBfHrVv` (o próximo agente usa os seus). |
 | PC do Iago | Windows. O `device_bash` **não funciona** lá (hipervisor/BIOS), por isso só há `device_commit_files` e `device_stage_files`. O repositório local dele está em `C:\Users\Utilizador\ProjetoFin\servix`. A pasta `ProjetoFin` é a antiga cópia do projeto e tem os bundles. |
 
@@ -64,6 +66,7 @@ Este documento continua o `HANDOFF_SERVIX.md` do Toni. Tudo o que está aqui foi
 | `supabase/iban_privado_A.sql` | **aplicado** | `staff_private.iban` + cópia dos IBAN |
 | `supabase/iban_privado_B.sql` | **aplicado e verificado** | `staff.iban` anulado, trigger `staff_no_iban` impede que volte a ser gravado, IBAN retirado de `app_data.closed_periods`. Verificação: 0 em `staff`, 0 no histórico, 8 protegidos |
 | `supabase/horas_ferramentas.sql` | **aplicado (RLS ativado)** | histórico de gravações das horas + funções `private.horas_*` (secção 7) |
+| `supabase/empresa_teste_interno.sql` | **por correr** | código da empresa 2 passa de `teste` a `teste-interno` |
 | `supabase/horas_usar.sql` | **corrido uma vez** | Iago 28/10 ACTE 3 → 4h e linhas da ACTE 3 fixadas. Fica como modelo para casos futuros |
 | `private.copia_app_data_20261105` | existe | cópia integral de `app_data` antes da correção ACTE 3. **Pode apagar-se** quando o Iago confirmar (`drop table private.copia_app_data_20261105;`) |
 
@@ -318,19 +321,20 @@ O `fixar_horas_acte3.sql` foi **removido** e substituído pelas ferramentas gen�
   - uma cobertura de férias em curso (Beatriz → Sofia), uma visita avulsa amanhã (Miguel) e uma falta avisada;
   - datas de contrato e validade deslocadas em semanas inteiras desde 15/10/2026.
 - Foi removido `seedHistory.js` e o `INITIAL_HORAS` estático (datas fixas que envelheciam). O dev local sem `.env` usa o mesmo gerador.
-- ⚠️ **O código `teste` deixou de abrir a empresa 2 (EMPRESATESTE) do banco.** Os dados dela continuam lá intactos, com horas de 21/09 a 17/10 e nenhum período fechado. Se o Iago quiser a empresa 2 para testes internos, basta tirar `"teste"` de `DEMO_CODES`. Ainda não respondeu a isto.
+- **Decisão do Iago (8/11):** `demo` e `teste` abrem a **demonstração** (para mostrar a clientes novos). A empresa de testes **com dados no banco** (id 2, EMPRESATESTE) mantém-se para testar o que precisa de banco (ficheiros, sincronização entre aparelhos, notificações, permissões) e passa a ter o código **`teste-interno`** (`supabase/empresa_teste_interno.sql`). Não é uma empresa de clientes reais. Os dados dela estão parados em 17/10 (horas de 21/09 a 17/10, nenhum período fechado), por isso mostra atrasos — é normal.
+- Diferenças demo × empresa de testes do banco: a demo gera dados para hoje, não grava nada, entra sem palavra-passe e cada aparelho tem a sua; a empresa do banco grava, usa contas com email, sincroniza entre aparelhos e tem ficheiros e notificações a sério.
 
 ---
 
 ## 14. Pendentes, ideias e riscos conhecidos
 
-**Por publicar:** este documento, `tests/` e o script `npm test`. Commit local por cima de `622f7fd`; publicar quando o Iago disser.
+**Por publicar:** este documento, `tests/`, o script `npm test` e `supabase/empresa_teste_interno.sql`. Commits locais por cima de `622f7fd`; publicar quando o Iago disser.
 
 **Pendentes ou à espera do Iago:**
-1. Confirmar se o código `teste` fica a abrir a demo ou volta a ser a empresa 2 real.
+1. O Iago correr `supabase/empresa_teste_interno.sql` e o agente verificar (`select id, code from public.companies` → 2 = `teste-interno`).
 2. Apagar `private.copia_app_data_20261105` quando o Iago confirmar que está tudo bem.
 3. Duração própria por visita avulsa (se for pedida).
-4. A EMPRESATESTE (id 2) pode ser arquivada no `/admin` se deixar de ser usada.
+4. Se um dia a empresa de testes do banco deixar de ser usada, pode ser arquivada no `/admin`.
 
 **Riscos e notas técnicas:**
 - `expectedTeamIds` usa a agenda **de hoje** para todas as datas: uma mudança na semana-tipo altera a equipa "prevista" de dias passados. Por isso existe `pinTeamChanges`, que só protege clientes "dividida" no período aberto. As Revisões de dias passados podem mudar depois de uma mudança na agenda; as horas não.
@@ -380,3 +384,12 @@ npx vite --port 5199   # sem .env = modo demonstração local
 - `src/App.jsx`, `src/main.jsx`, `src/versionCheck.js` (novo), `src/index.css`
 - `public/` (ícones e manifest), `vercel.json`, `publicar.cmd`, `scripts/publicar.ps1`, `tests/` (novo)
 - `supabase/redesign_b1_cores_equipa.sql`, `fichas_planning_nif.sql`, `iban_privado_A.sql`, `iban_privado_B.sql`, `horas_ferramentas.sql`, `horas_usar.sql`
+
+---
+
+## 17. Registo de alterações deste documento
+
+| Data | O quê |
+|---|---|
+| 8/11/2026 | Versão inicial (trabalho de 4 a 8/11). |
+| 8/11/2026 | Decisão: código `teste` fica na demonstração; empresa 2 do banco passa a `teste-interno` (SQL por correr). Regra nova: atualizar este documento a cada mudança ou decisão. |
