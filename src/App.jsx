@@ -352,6 +352,8 @@ export default function App() {
             key: it.key, icon: it.icon, label: tSidebar[it.key],
             badge: it.key === "avisos" ? c.myUnreadBadge : undefined,
           })),
+          // Ajuda também no menu do PC/tablet (no telemóvel já está em "Mais").
+          { key: "ajuda", icon: CircleHelp, label: HELP_LABEL[c.lang] || HELP_LABEL.pt },
           ...(isGerSup ? [{ key: "__switch", icon: Repeat, label: T[c.lang].common.viewAsManagement }] : []),
         ];
 

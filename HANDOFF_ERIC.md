@@ -328,6 +328,8 @@ O `fixar_horas_acte3.sql` foi **removido** e substituído pelas ferramentas gen�
 
 ## 13b. Revisão geral do sistema (8/11)
 
+**Matriz completa (8/11):** 3 papéis (gerência, supervisor, funcionário) × 4 ecrãs (computador 1366×768, tablet deitado 1024×700, tablet em pé 768×1024, telemóvel 390×844), todas as páginas de cada papel — 0 problemas (consola, texto partido, conteúdo fora do ecrã). Script de referência: abrir `/demo`, entrar por cada papel e percorrer o menu.
+
 **Verificações automáticas (todas sem problemas):** todas as páginas da gerência (computador 1366×768, tablet 1024, telemóvel 390), do funcionário e do supervisor (telemóvel e computador): sem erros na consola, sem texto "undefined/NaN", sem nada a sair do ecrã. Textos pt/en/fr completos (nenhuma chave em falta). `npm test` 31/31.
 
 **Corrigido:**
@@ -336,6 +338,7 @@ O `fixar_horas_acte3.sql` foi **removido** e substituído pelas ferramentas gen�
 - **Notas × Dashboard:** o Dashboard mostrava feriados no bloco Notas e a página Notas dizia "Sem lembretes". A página Notas passa a ter "Feriados próximos" (só leitura, 45 dias).
 - **Avisos:** os pedidos de correção de horas tinham o ícone de produto em falta. O ícone segue agora o assunto (produto, correção = relógio, local, outro) — `avisosTypeMeta.jsx` (`TypeIconBlock kind`).
 - **Funcionários (tabela):** "Replacement temporário · até 28/12" ficava cortado; passa a pílula + data por baixo. A pílula "Inativo" já não estica a toda a largura. "Novo Funcionário" → "Novo funcionário" (consistente com "Novo cliente").
+- **Ajuda no menu do funcionário e do supervisor (computador e tablet):** só existia no "Mais" do telemóvel e no botão "?"; agora também no menu lateral (`App.jsx`, `sidebarItems`).
 - **Demonstração:** contratantes com valor/hora e clientes diretos com preço de venda (Contratantes deixava de mostrar "sem preço"/"—"); contratos já vencidos renovados (evita "Expirado" e "8h de 0h" previstas). Fica 1 contrato "a acabar".
 
 **Para o Iago decidir (não mexi):**
@@ -411,3 +414,4 @@ npx vite --port 5199   # sem .env = modo demonstração local
 | 8/11/2026 | Decisão: código `teste` fica na demonstração; empresa 2 do banco passa a `teste-interno` (SQL por correr). Regra nova: atualizar este documento a cada mudança ou decisão. |
 | 8/11/2026 | SQL `teste-interno` aplicado e verificado (empresa 2 = `teste-interno`); documento e testes publicados. |
 | 8/11/2026 | Revisão geral (secção 13b): variação dos contratantes proporcional, hoje não conta como em falta, feriados nas Notas, ícones dos pedidos, tabela de Funcionários, demo com preços. |
+| 8/11/2026 | Matriz 3 papéis × 4 ecrãs sem problemas; "Ajuda" no menu lateral do funcionário/supervisor. |
