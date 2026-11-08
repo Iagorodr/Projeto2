@@ -45,7 +45,7 @@ Este documento continua o `HANDOFF_SERVIX.md` do Toni. Tudo o que está aqui foi
 | Publicar | **Só quando o Iago escrever "publica".** Antes disso, os commits ficam locais. |
 | Como publicar | O ambiente do agente **não consegue fazer push** (o proxy bloqueia o repositório) e o token do GitHub que o Iago deu não serve aqui. O agente cria `git bundle create <saida>.bundle origin/main..main` e põe o ficheiro em `C:\Users\Utilizador\ProjetoFin\`, pela ponte do computador (`device_commit_files`) ou como anexo no chat se o PC não estiver ligado. O Iago corre `.\publicar.cmd` dentro de `ProjetoFin\servix`. Depois o agente confirma com `mcp__Vercel__list_deployments` que os **dois** projetos ficaram `READY` com o SHA certo. No fim: `git update-ref refs/remotes/origin/main HEAD`. |
 | `publicar.cmd` | Chama `scripts/publicar.ps1`: faz fetch, fast-forward, aplica o bundle mais recente (só avança se encaixar), faz push e arquiva os bundles em `ProjetoFin\bundles-publicados`. O `$ErrorActionPreference` é **"Continue"** de propósito: o git escreve mensagens normais no stderr e o PowerShell 5.1 com "Stop" tratava-as como erro (corrigido em `3781343`). |
-| SQL de produção | Gerar o `.sql` em `supabase/` → entregar ao Iago → ele corre no SQL Editor → o agente verifica com `mcp__Supabase__execute_sql` **só com leitura**. Nunca DDL/DML direto pelo agente. Scripts sempre **aditivos e seguros de repetir**, com uma query de verificação no fim. |
+| SQL de produção | Exceção: quando o Iago pede explicitamente ("roda o SQL pra mim"), o agente pode correr um UPDATE pequeno e verificado (foi o caso de `empresa_teste_interno.sql`). Fora disso: gerar o `.sql` em `supabase/` → entregar ao Iago → ele corre no SQL Editor → o agente verifica com `mcp__Supabase__execute_sql` **só com leitura**. Nunca DDL/DML direto pelo agente. Scripts sempre **aditivos e seguros de repetir**, com uma query de verificação no fim. |
 | Avisos do SQL Editor | No aviso "Potential issues detected", recomendar **"Run and enable RLS"**. O aviso de operação destrutiva aparece por causa de `drop trigger if exists`, que não apaga dados. |
 | Conta L&A | **Nunca carregar em "Nova senha"** em Acessos na empresa L&A. |
 | Mudar decisões | Avisar sempre o Iago quando uma decisão anterior muda. |
@@ -66,7 +66,7 @@ Este documento continua o `HANDOFF_SERVIX.md` do Toni. Tudo o que está aqui foi
 | `supabase/iban_privado_A.sql` | **aplicado** | `staff_private.iban` + cópia dos IBAN |
 | `supabase/iban_privado_B.sql` | **aplicado e verificado** | `staff.iban` anulado, trigger `staff_no_iban` impede que volte a ser gravado, IBAN retirado de `app_data.closed_periods`. Verificação: 0 em `staff`, 0 no histórico, 8 protegidos |
 | `supabase/horas_ferramentas.sql` | **aplicado (RLS ativado)** | histórico de gravações das horas + funções `private.horas_*` (secção 7) |
-| `supabase/empresa_teste_interno.sql` | **por correr** | código da empresa 2 passa de `teste` a `teste-interno` |
+| `supabase/empresa_teste_interno.sql` | **aplicado (8/11, pelo agente a pedido do Iago) e verificado** | código da empresa 2 passa de `teste` a `teste-interno` |
 | `supabase/horas_usar.sql` | **corrido uma vez** | Iago 28/10 ACTE 3 → 4h e linhas da ACTE 3 fixadas. Fica como modelo para casos futuros |
 | `private.copia_app_data_20261105` | existe | cópia integral de `app_data` antes da correção ACTE 3. **Pode apagar-se** quando o Iago confirmar (`drop table private.copia_app_data_20261105;`) |
 
@@ -328,13 +328,12 @@ O `fixar_horas_acte3.sql` foi **removido** e substituído pelas ferramentas gen�
 
 ## 14. Pendentes, ideias e riscos conhecidos
 
-**Por publicar:** este documento, `tests/`, o script `npm test` e `supabase/empresa_teste_interno.sql`. Commits locais por cima de `622f7fd`; publicar quando o Iago disser.
+**Publicado:** este documento, `tests/`, `npm test` e `supabase/empresa_teste_interno.sql` (8/11).
 
 **Pendentes ou à espera do Iago:**
-1. O Iago correr `supabase/empresa_teste_interno.sql` e o agente verificar (`select id, code from public.companies` → 2 = `teste-interno`).
-2. Apagar `private.copia_app_data_20261105` quando o Iago confirmar que está tudo bem.
-3. Duração própria por visita avulsa (se for pedida).
-4. Se um dia a empresa de testes do banco deixar de ser usada, pode ser arquivada no `/admin`.
+1. Apagar `private.copia_app_data_20261105` quando o Iago confirmar que está tudo bem.
+2. Duração própria por visita avulsa (se for pedida).
+3. Se um dia a empresa de testes do banco deixar de ser usada, pode ser arquivada no `/admin`.
 
 **Riscos e notas técnicas:**
 - `expectedTeamIds` usa a agenda **de hoje** para todas as datas: uma mudança na semana-tipo altera a equipa "prevista" de dias passados. Por isso existe `pinTeamChanges`, que só protege clientes "dividida" no período aberto. As Revisões de dias passados podem mudar depois de uma mudança na agenda; as horas não.
@@ -393,3 +392,4 @@ npx vite --port 5199   # sem .env = modo demonstração local
 |---|---|
 | 8/11/2026 | Versão inicial (trabalho de 4 a 8/11). |
 | 8/11/2026 | Decisão: código `teste` fica na demonstração; empresa 2 do banco passa a `teste-interno` (SQL por correr). Regra nova: atualizar este documento a cada mudança ou decisão. |
+| 8/11/2026 | SQL `teste-interno` aplicado e verificado (empresa 2 = `teste-interno`); documento e testes publicados. |
