@@ -351,8 +351,8 @@ O `fixar_horas_acte3.sql` foi **removido** e substituído pelas ferramentas gen�
 **Publicado:** este documento, `tests/`, `npm test` e `supabase/empresa_teste_interno.sql` (8/11).
 
 **Pendentes ou à espera do Iago:**
-1. Apagar `private.copia_app_data_20261105` quando o Iago confirmar que está tudo bem.
-2. Duração própria por visita avulsa (se for pedida).
+1. ~~Apagar `private.copia_app_data_20261105`~~ — feito em 8/11 (apagada a pedido do Iago, verificado).
+2. ~~Duração própria por visita avulsa~~ — **decidido que não** (8/11): a visita usa a duração da ficha; se o horário for diferente, o funcionário edita à mão no app dele.
 3. Se um dia a empresa de testes do banco deixar de ser usada, pode ser arquivada no `/admin`.
 
 **Riscos e notas técnicas:**
@@ -417,3 +417,4 @@ npx vite --port 5199   # sem .env = modo demonstração local
 | 8/11/2026 | Matriz 3 papéis × 4 ecrãs sem problemas; "Ajuda" no menu lateral do funcionário/supervisor. |
 | 8/11/2026 | Decisão opção B (contrato de cliente fixo terminado = só alerta; previstas seguem a agenda). |
 | 8/11/2026 | Publicado `729f846` (revisão, Ajuda no menu, opção B, documento e testes) — Vercel READY nos dois projetos. |
+| 8/11/2026 | Cópia `copia_app_data_20261105` apagada; decisão: visita avulsa sem duração própria; ícone de Funcionários passa a `UserRound` (era igual ao de Clientes). Esclarecido: `teste`/`demo` = demonstração no browser; `teste-interno` = empresa 2 do banco, só para testes que precisam de banco. |

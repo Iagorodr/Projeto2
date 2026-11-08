@@ -1,5 +1,5 @@
 // Dados iniciais (seed) e constantes estáticas do app. Camada "Model".
-import { LayoutDashboard, Users, CalendarDays, Clock, Bell, UsersRound, Settings, Archive, Store, Building2, Home as HouseIcon, Factory, Eye, KeyRound, StickyNote } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, Clock, Bell, UserRound, Settings, Archive, Store, Building2, Home as HouseIcon, Factory, Eye, KeyRound, StickyNote } from "lucide-react";
 
 const LANG_NAMES = { pt: "Português", en: "English", fr: "Français" };
 
@@ -24,7 +24,7 @@ const MENU_ITEMS = [
   { key: "historico", icon: Archive, label: "Histórico" },
   { key: "avisos", icon: Bell, label: "Avisos" },
   { key: "notas", icon: StickyNote, label: "Notas" },
-  { key: "funcionarios", icon: UsersRound, label: "Funcionarios" },
+  { key: "funcionarios", icon: UserRound, label: "Funcionarios" },
   { key: "acessos", icon: KeyRound, label: "Acessos" },
   { key: "definicoes", icon: Settings, label: "Definições" },
 ];

@@ -1,7 +1,7 @@
 // Pesquisa geral (redesign B1): lupa no cabeçalho de cada página, atalho Ctrl+K
 // (⌘K no Mac). Procura clientes, funcionários e contratantes e salta para a ficha.
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Search, Users, UsersRound, Building2, X } from "lucide-react";
+import { Search, Users, UserRound, Building2, X } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { normalizeName } from "../../models/utils.js";
 
@@ -62,7 +62,7 @@ function SearchDialog({ clients, staff, contractors, labels, onClose, onPick }) 
     clients.filter((c) => hit(c.name, c.city, c.address)).slice(0, 8)
       .forEach((c) => out.push({ kind: "client", id: c.id, title: c.name, sub: [c.city, c.address].filter(Boolean).join(" · "), icon: Users, group: labels.searchClients }));
     staff.filter((s) => hit(s.name, s.email, s.contact)).slice(0, 6)
-      .forEach((s) => out.push({ kind: "staff", id: s.id, title: s.name, sub: s.email || s.contact || "", icon: UsersRound, group: labels.searchStaff }));
+      .forEach((s) => out.push({ kind: "staff", id: s.id, title: s.name, sub: s.email || s.contact || "", icon: UserRound, group: labels.searchStaff }));
     contractors.filter((k) => hit(k.name, k.contactName, k.email)).slice(0, 5)
       .forEach((k) => out.push({ kind: "contractor", id: k.id, title: k.name, sub: k.contactName || k.email || "", icon: Building2, group: labels.searchContractors, color: k.color }));
     return out;
