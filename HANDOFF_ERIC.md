@@ -1,7 +1,7 @@
 # Servix — Passagem de trabalho (Eric → próximo agente dev)
 
 **Período coberto:** 4 a 8 de novembro de 2026
-**Último commit em produção:** `622f7fd` (+ este documento e os testes, por publicar)
+**Último commit em produção:** `729f846` (8/11/2026, `servix-empresa-x` e `projeto-fin` READY)
 **Repositório:** github.com/Iagorodr/Projeto2 (ramo `main`)
 **Produção:** Vercel — projetos `servix-empresa-x` (servix-empresa-x.vercel.app) e `projeto-fin`, ambos com deploy automático a partir do `main`
 **Base de dados:** Supabase, projeto "Projeto Servix Oficial" (`zoizwdungwtioppvupcl`, eu-west-1)
@@ -416,3 +416,4 @@ npx vite --port 5199   # sem .env = modo demonstração local
 | 8/11/2026 | Revisão geral (secção 13b): variação dos contratantes proporcional, hoje não conta como em falta, feriados nas Notas, ícones dos pedidos, tabela de Funcionários, demo com preços. |
 | 8/11/2026 | Matriz 3 papéis × 4 ecrãs sem problemas; "Ajuda" no menu lateral do funcionário/supervisor. |
 | 8/11/2026 | Decisão opção B (contrato de cliente fixo terminado = só alerta; previstas seguem a agenda). |
+| 8/11/2026 | Publicado `729f846` (revisão, Ajuda no menu, opção B, documento e testes) — Vercel READY nos dois projetos. |
