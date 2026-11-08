@@ -97,8 +97,13 @@ function AccountTypeLabel({ s, t }) {
 function AccountTypePill({ s, t }) {
   if (s.accountType !== "replacement") return <Pill variant="neutral">{t.accountFixed}</Pill>;
   if (!s.validUntil) return <Pill variant="neutral">{t.accountReplacement}</Pill>;
-  if (isExpiredByValidity(s)) return <Pill variant="neutral">{t.expiredOn(dmFromIso(s.validUntil))}</Pill>;
-  return <Pill variant="neutral">{t.accountReplacementUntil(dmFromIso(s.validUntil))}</Pill>;
+  // Pílula curta + data por baixo (antes "Replacement temporário · até 28/12" ficava cortado na tabela).
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, minWidth: 0 }}>
+      <Pill variant="neutral">{t.accountReplacement}</Pill>
+      <span style={{ fontSize: 11, color: COLORS.ink3, whiteSpace: "nowrap" }}>{isExpiredByValidity(s) ? t.expiredOn(dmFromIso(s.validUntil)) : t.b1Until(dmFromIso(s.validUntil))}</span>
+    </div>
+  );
 }
 
 // Coluna/selo "Estado" (documento, 4.9, "Efeitos de estar inativa por
@@ -109,7 +114,7 @@ function StatusBlock({ s, t, c0 }) {
   const active = isStaffActive(s, TODAY);
   if (!active) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
         <Pill variant="neutral">{c0.inactive}</Pill>
         {isExpiredByValidity(s) && <span style={{ fontSize: 11, color: COLORS.ink3 }}>{t.expiredOn(dmFromIso(s.validUntil))}</span>}
       </div>

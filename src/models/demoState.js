@@ -15,6 +15,7 @@ import {
   addDays, isoDateStr, getCutoffPeriod, weekBlocksOfPayPeriod, dayScheduledClients, expectedShare,
   buildClosedPeriodSnapshot, isStaffActive, pad2, formatPeriodLabel,
 } from "./utils.js";
+import { deriveContractors } from "./contractors.js";
 
 const CUTOFF = 20;
 const ANCHOR = new Date(2026, 9, 15); // dia em que as datas de exemplo foram escritas
@@ -72,6 +73,16 @@ export function buildDemoState() {
     contractEnd: shiftDMY(c.contractEnd, shift),
     clientValidUntil: shiftDMY(c.clientValidUntil, shift),
   }));
+  // Contratos já vencidos na demo: renova-os (senão aparecem "Expirado" e "8h de 0h" previstas).
+  const parseDMY = (str) => { const [d, m, y] = String(str || "").split("/").map(Number); return y ? new Date(y, m - 1, d) : null; };
+  clients.forEach((c) => {
+    const end = parseDMY(c.contractEnd);
+    if (end && end < TODAY) { const n = addDays(TODAY, 220 + (c.id % 9) * 30); c.contractEnd = `${pad2(n.getDate())}/${pad2(n.getMonth() + 1)}/${n.getFullYear()}`; }
+    // Preço de venda para os clientes diretos (Próprio): A receber e margem com números.
+    if (!c.sellPrice) c.sellPrice = Number(c.valueHour || 14) + 12;
+  });
+  // Contratantes com valor/hora (para "A receber" e "Margem" não ficarem "sem preço").
+  const contractors = deriveContractors(clients).map((k, i) => (k.isDirect ? k : { ...k, rate: [26, 24, 25][i % 3] }));
   const staff = INITIAL_STAFF.map((s) => ({ ...s, validUntil: shiftISO(s.validUntil, shift) }));
   const assignments = INITIAL_ASSIGNMENTS;
     const open = getCutoffPeriod(TODAY, CUTOFF, 0);
@@ -132,5 +143,5 @@ export function buildDemoState() {
     horasData[s.id] = { status: "pendente", paid: false, paidAt: null, entries, lockedWeeks, noClientDays: [], reopened: false };
   });
 
-  return { clients, staff, assignments, horasData, closedPeriods, missingItems, sentItems, covers, absences };
+  return { clients, contractors, staff, assignments, horasData, closedPeriods, missingItems, sentItems, covers, absences };
 }

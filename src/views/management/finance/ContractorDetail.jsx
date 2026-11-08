@@ -91,7 +91,15 @@ function ContractorDetail({ lang, tier, contractor: c, clients, periods, has12, 
   const valuePeriods = mkPeriods((d) => d.value || 0);
 
   const cur = dataOf(current);
-  const prev = periods.length > 1 ? dataOf(periods[periods.length - 2]) : null;
+  const prevFull = periods.length > 1 ? dataOf(periods[periods.length - 2]) : null;
+  // Período atual a meio: compara com o anterior até ao mesmo ponto (proporcional aos dias passados).
+  const frac = (() => {
+    if (!current || !current.isCurrent || !current.start || !current.end) return 1;
+    const day = 86400000; const total = Math.round((current.end - current.start) / day) + 1;
+    const done = Math.round((Math.min(TODAY, current.end) - current.start) / day) + 1;
+    return total > 0 ? Math.max(0.05, Math.min(1, done / total)) : 1;
+  })();
+  const prev = prevFull ? { ...prevFull, hours: prevFull.hours * frac, value: prevFull.value != null ? prevFull.value * frac : prevFull.value } : null;
 
   // Horas por cliente na janela: 7 maiores + "+ N outros".
   const byClient = new Map();

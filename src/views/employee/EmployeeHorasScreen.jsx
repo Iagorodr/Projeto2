@@ -502,7 +502,7 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
 
   // Faixa "em falta" (5.2.3), só com dias do bloco atual.
   const missingDaysInChunk = weekLockedFlag ? [] : days.filter((d) =>
-    d <= TODAY && scheduledIfActive(d).length > 0 && !dayIsCovered(myHoras, isoDateStr(d)));
+    d < TODAY && scheduledIfActive(d).length > 0 && !dayIsCovered(myHoras, isoDateStr(d)));
 
   // Cartões do painel do dia (5.2.4): um por cliente da agenda — a não ser
   // que essa visita já tenha sido "adiantada" para outro dia desta semana

@@ -105,6 +105,8 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
         if (dayIsCovered(h, dKey)) return "filled";
         if (!hasAgendaOnDay(s.id, d)) return "no-agenda";
         if (d > TODAY) return "future";
+        // Hoje ainda não acabou: aparece "hoje" e só conta como em falta a partir de amanhã.
+        if (dKey === isoDateStr(TODAY)) return "today";
         return "missed";
       });
       const gaps = locked || notStarted ? 0 : dayStatuses.filter((st) => st === "missed").length;
@@ -318,6 +320,7 @@ function MonitoramentoScreen({ lang, setLang, staff, clients, horasData, assignm
       if (w && w.locked) return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: COLORS.ink3, fontSize: 12.5 }}><Lock size={12} />{st === "filled" ? fmtH(hoursOn(row.staffMember.id, isoDateStr(d))) : ""}</span>;
       if (st === "filled") { const h = hoursOn(row.staffMember.id, isoDateStr(d)); return <span style={{ fontWeight: 700, color: COLORS.ink }}>{h > 0 ? fmtH(h) : "✓"}</span>; }
       if (st === "missed") return <span style={{ display: "inline-block", fontSize: 11.5, fontWeight: 800, color: "#B8343A", background: "#FCE5E5", borderRadius: 8, padding: "3px 7px", whiteSpace: "nowrap" }}>{t.dayMissingShort}</span>;
+      if (st === "today") return <span title={t.dayTodayTitle} style={{ display: "inline-block", fontSize: 11.5, fontWeight: 700, color: COLORS.amberInk, background: COLORS.amberBg, borderRadius: 8, padding: "3px 7px", whiteSpace: "nowrap" }}>{t.dayTodayShort}</span>;
       if (st === "future") return <span style={{ color: "#C3C8C2" }}>·</span>;
       return <span style={{ color: COLORS.ink3 }}>–</span>;
     },

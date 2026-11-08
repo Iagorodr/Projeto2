@@ -131,7 +131,7 @@ function SentFeedCard({ entry, staff, clients, lang, t, c0 }) {
     return (
       <Card style={{ padding: 14 }}>
         <div style={{ display: "flex", gap: 12 }}>
-          <TypeIconBlock type="pedido" />
+          <TypeIconBlock type="pedido" kind={m.kind} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontWeight: 700, fontSize: 13.5, color: COLORS.ink }}>{subject}</span>

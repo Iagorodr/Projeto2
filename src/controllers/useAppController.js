@@ -86,7 +86,7 @@ export function useAppController() {
 
   const [clients, setClients] = useState(() => (START_EMPTY ? [] : demo().clients));
   // Contratantes (ver models/contractors.js). Em demonstração nascem das "origens" dos clientes de exemplo.
-  const [contractors, setContractors] = useState(() => (START_EMPTY ? [] : deriveContractors(demo().clients)));
+  const [contractors, setContractors] = useState(() => (START_EMPTY ? [] : demo().contractors));
   const contractorsReadyRef = useRef(false); // a tabela `contractors` existe e foi lida: só então se grava
   // Meses fechados por contratante (supabase/contratantes_fecho.sql). Gravados um a um, ao fechar/reabrir/marcar.
   const [contractorClosings, setContractorClosings] = useState([]);

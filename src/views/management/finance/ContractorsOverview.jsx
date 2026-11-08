@@ -86,6 +86,16 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, closin
   ];
   const hasDirectHours = eurMode && contractors.some((c) => real.some((p) => { const e = p.contractors.get(c.id); return e && e.hours > 0 && (e.value == null || e.missingPrice > 0); }));
 
+  // Período atual ainda a meio: a variação compara com o anterior ATÉ AO MESMO PONTO
+  // (proporcional aos dias já passados). Antes comparava o mês a meio com o mês
+  // inteiro anterior e mostrava sempre uma queda (ex.: ↓ 37%) que não existia.
+  const dayMs = 86400000;
+  const elapsedFrac = (() => {
+    if (!current || !current.isCurrent || !current.start || !current.end) return 1;
+    const total = Math.round((current.end - current.start) / dayMs) + 1;
+    const done = Math.round((Math.min(today, current.end) - current.start) / dayMs) + 1;
+    return total > 0 ? Math.max(0.05, Math.min(1, done / total)) : 1;
+  })();
   // Linhas (período atual), do maior valor a receber para o menor; sem valor vão para o fim.
   const rows = contractors.map((c) => {
     const d = current.contractors.get(c.id);
@@ -93,7 +103,7 @@ function ContractorsOverview({ lang, tier, contractors, clients, periods, closin
     return {
       c, hours: d ? d.hours : 0, value: d ? d.value : null,
       margin: d && d.value != null ? d.value - (d.pricedStaffCost || 0) : null, dates: contractorDates(c, (activeCycleWindow(c, closings, today) || current).end, today),
-      change: changePct(d ? d.hours : 0, pd ? pd.hours : 0),
+      change: changePct(d ? d.hours : 0, pd ? pd.hours * elapsedFrac : 0),
       trend: periods.slice(-6).map((p) => (p.contractors.get(c.id) ? p.contractors.get(c.id).hours : 0)),
       clientsN: clientsOfContractor(clients, c).length,
     };

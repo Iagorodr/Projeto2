@@ -59,7 +59,7 @@ function PedidoCard({ m, staff, clients, lang, t, c0, stale, replying, replyDraf
   return (
     <Card style={{ padding: 14 }}>
       <div style={{ display: "flex", gap: 12 }}>
-        <TypeIconBlock type="pedido" />
+        <TypeIconBlock type="pedido" kind={m.kind} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>

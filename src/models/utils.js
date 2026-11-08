@@ -1804,7 +1804,7 @@ function thisWeekSummary(clients, assignments, staffId, horasEntry, today, staff
     let state;
     if (covered) state = "registered";
     else if (!hasAgenda) state = "noClients";
-    else if (d > today) state = "future";
+    else if (d >= today) state = "future"; // hoje ainda não acabou: não conta como em falta
     else state = "missing";
     days.push({ dateKey, state, isToday: dateKey === isoDateStr(today) });
   }
@@ -1825,7 +1825,7 @@ function periodMissingDays(clients, assignments, staffId, horasEntry, payPeriodC
       // uma conta Replacement nunca conta como "em falta" (não há mais
       // agenda real nesse dia, só a atribuição antiga que fica guardada).
       const activeOnDay = !staffMember || (isStaffActive(staffMember, d) && staffStartedOn(staffMember, d));
-      if (d <= today && activeOnDay && !absenceOn(absences, staffId, isoDateStr(d)) && dayScheduledClients(clients, assignments, staffId, d, covers).length > 0 && !dayIsCovered(horasEntry, isoDateStr(d))) {
+      if (d < today && activeOnDay && !absenceOn(absences, staffId, isoDateStr(d)) && dayScheduledClients(clients, assignments, staffId, d, covers).length > 0 && !dayIsCovered(horasEntry, isoDateStr(d))) {
         missing.push(d);
       }
     });
@@ -1871,7 +1871,7 @@ function staffWithGapsCount(staff, horasData, clients, assignments, payPeriod, p
         const notStarted = chunk.start > today;
         if (locked || notStarted) return sum;
         const missed = calPeriodDays(chunk).filter(
-          (d) => d <= today && staffStartedOn(s, d) && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d))
+          (d) => d < today && staffStartedOn(s, d) && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d))
         ).length;
         return sum + missed;
       }, 0);
@@ -1896,7 +1896,7 @@ function staffWithGaps(staff, horasData, clients, assignments, payPeriod, payPer
     const locked = migrateLockedWeeksToBlocks(h.lockedWeeks, payPeriod, cutoffDay);
     const days = payPeriodChunks.reduce((sum, chunk) => {
       if (locked[isoDateStr(chunk.start)] || chunk.start > today) return sum;
-      return sum + calPeriodDays(chunk).filter((d) => d <= today && staffStartedOn(s, d) && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d))).length;
+      return sum + calPeriodDays(chunk).filter((d) => d < today && staffStartedOn(s, d) && hasAgendaOnDay(s.id, d) && !dayIsCovered(h, isoDateStr(d))).length;
     }, 0);
     if (days > 0) out.push({ id: s.id, name: s.name, days });
   });

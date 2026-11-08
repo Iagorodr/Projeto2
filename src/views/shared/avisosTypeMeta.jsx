@@ -5,7 +5,7 @@
 // (EmployeeAvisosScreen.jsx, 5.6) — precisa nos dois já nesta etapa (o
 // mesmo critério do SearchSelect/PhotoDropzone), por isso fica aqui em vez
 // de duplicado em cada ficheiro.
-import { MessageSquare, ThumbsUp, Info, PackageX } from "lucide-react";
+import { MessageSquare, ThumbsUp, Info, PackageX, Clock, MapPin, HelpCircle } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 
@@ -19,9 +19,11 @@ const TYPE_META = {
 // Bloco de ícone pequeno usado em cada cartão de item (não confundir com
 // os "cartões grandes selecionáveis" das gavetas/sheets — esses são
 // específicos de cada ecrã, por terem alturas e layouts diferentes).
-function TypeIconBlock({ type, size = 40 }) {
+// Pedidos: o ícone segue o assunto (produto, correção de horas, local, outro).
+const PEDIDO_ICON = { produto: PackageX, correcao: Clock, local: MapPin, outro: HelpCircle, outros: HelpCircle };
+function TypeIconBlock({ type, size = 40, kind }) {
   const meta = TYPE_META[type];
-  const Icon = meta.icon;
+  const Icon = (type === "pedido" && kind && PEDIDO_ICON[kind]) || meta.icon;
   return (
     <div
       style={{

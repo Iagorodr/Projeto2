@@ -7,6 +7,7 @@ import { RADIUS, FONT } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
 import { isoDateStr, addDays, startOfISOWeek, notesForOwner, monthAbbr } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
+import { upcomingHolidays } from "../../models/holidays.js";
 import { Field } from "./Layout.jsx";
 import { PageHeader, Button, IconButton, Drawer, Pill, Card, Toast, InfoTip, MobileHeader, Fab } from "./ui/index.js";
 import { usePushNotifications } from "../../hooks/usePushNotifications.js";
@@ -186,13 +187,41 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
     { key: "depois", label: t.groupLater },
   ];
 
+  // Feriados próximos (os mesmos que o Dashboard mostra no bloco Notas): só leitura.
+  const holidays = upcomingHolidays(TODAY, 45, lang).slice(0, 4);
+  const holidayBlock = holidays.length > 0 && (
+    <div style={{ marginTop: notes.length === 0 ? 4 : 20 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".06em", textTransform: "uppercase", color: COLORS.ink3, marginBottom: 8 }}>{t.holidaysTitle}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {holidays.map((h) => {
+          const [y, m, d] = h.iso.split("-").map(Number);
+          return (
+            <div key={h.iso} style={{ display: "flex", alignItems: "center", gap: 12, background: COLORS.card, border: `1px dashed ${COLORS.line}`, borderRadius: RADIUS.card, padding: "10px 14px" }}>
+              <div style={{ width: 40, textAlign: "center", lineHeight: 1.05 }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.ink }}>{d}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#C0392B", textTransform: "lowercase" }}>{monthAbbr(lang, m - 1)}</div>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{h.name}</div>
+                <div style={{ fontSize: 12, color: COLORS.ink3 }}>{t.holidayTag} · {y}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
   const list = notes.length === 0 ? (
-    <EmptyNotes text={t.emptyState} />
+    <>
+      <EmptyNotes text={t.emptyState} />
+      {holidayBlock}
+    </>
   ) : (
     <div className="b1-cascade" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {groupDefs.map((g) => (
         <NoteGroup key={g.key} groupKey={g.key} label={g.label} items={groups[g.key]} lang={lang} t={t} todayIso={todayIso} onDelete={deleteNote} deleteSize={desktop ? "gerencia" : "mobile"} />
       ))}
+      {holidayBlock}
     </div>
   );
 
