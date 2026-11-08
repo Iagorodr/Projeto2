@@ -48,4 +48,15 @@ console.log(ok, "ok", bad, "falhas");
   eq("idempotente", r3.count, 0);
   console.log(ok, "ok", bad, "falhas");
 }
+
+{
+  // Opção B (8/11): contrato de cliente FIXO terminado não corta as visitas previstas.
+  const fixo = { id: 501, name: "Fixo", days: [1], duration: 120, hoursMode: "dividida", frequency: "weekly", contractEnd: "01/01/2026" };
+  const st = [{ id: 1, name: "A", status: "ativo", accountType: "fixo" }];
+  const ctx2 = { staff: st, assignments: { "1-1": [501] }, covers: [], absences: [] };
+  const per2 = { start: new Date(2026, 10, 2), end: new Date(2026, 10, 8) };
+  eq("fixo com contrato terminado continua previsto", U.clientExpectedHours(fixo, per2, ctx2, new Date(2026, 10, 9)).whole, 2);
+  const repl = { ...fixo, id: 502, clientType: "replacement", contractStart: "01/10/2026", contractEnd: "31/10/2026" };
+  eq("replacement fora da validade não é previsto", U.clientExpectedHours(repl, per2, { ...ctx2, assignments: { "1-1": [502] } }, new Date(2026, 10, 9)).whole, 0);
+}
 if (bad > 0) process.exitCode = 1;

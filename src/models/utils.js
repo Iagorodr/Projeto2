@@ -1955,17 +1955,19 @@ function clientTotalHours(horasData, clientId, period) {
 }
 
 // Horas PREVISTAS de um cliente no período, contadas dia a dia pela agenda (dias da
-// semana, frequência, duração por dia, fim do contrato quando está bem preenchido). Cliente "individual": cada pessoa da equipa faz a duração inteira,
+// semana, frequência, duração por dia; validade só nos replacement). Cliente "individual": cada pessoa da equipa faz a duração inteira,
 // por isso multiplica pela equipa prevista do dia (mínimo 1). Devolve
 // { whole, toYesterday, toToday }: período inteiro, até ontem e até hoje (inclusive).
 function clientExpectedHours(client, period, ctx, today) {
   const out = { whole: 0, toYesterday: 0, toToday: 0 };
   if (!client || !period) return out;
-  const cEnd = parseClientDate(client.contractEnd); // contrato já terminado: deixa de haver visitas previstas
+  // Decisão do Iago (8/11, opção B): nos clientes FIXOS o fim do contrato é só um
+  // alerta para renovar — as visitas previstas seguem a agenda, como as horas que a
+  // equipa regista (antes cortava aqui e aparecia "8h de 0h"). Nos replacement a
+  // validade continua a valer, via `clientAppliesOnDate`.
   const todayIso = isoDateStr(today);
   for (let d = new Date(period.start); d <= period.end; d = addDays(d, 1)) {
     const iso = isoDateStr(d);
-    if (cEnd && iso > isoDateStr(cEnd) && !visitScheduledOn(ctx && ctx.covers, client.id, iso)) continue;
     const dow = d.getDay() === 0 ? 7 : d.getDay();
     const avulsa = visitScheduledOn(ctx && ctx.covers, client.id, iso);
     if (!avulsa && (!(client.days || []).includes(dow) || !clientAppliesOnDate(client, d))) continue;

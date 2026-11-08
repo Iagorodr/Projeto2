@@ -21,7 +21,7 @@ Este documento continua o `HANDOFF_SERVIX.md` do Toni. Tudo o que está aqui foi
 5. **Visita avulsa** = cobertura com `kind: "visit"`. Põe um cliente na agenda de alguém só num dia, sem mexer na ficha nem na semana-tipo (secção 8).
 6. **A demonstração** (`/demo`, código `demo` ou `teste`) corre só no browser, com dados gerados para o dia de hoje, e nunca toca no Supabase (secção 13).
 7. **A app atualiza-se sozinha** quando há deploy novo (`src/versionCheck.js`).
-8. **Testes da lógica:** `npm test` (31 verificações, devem passar todas).
+8. **Testes da lógica:** `npm test` (33 verificações, devem passar todas).
 9. **Textos sempre em pt/en/fr** (`src/models/i18n.js`, chaves novas com prefixo `b1…` ou dentro do bloco do ecrã). Responder ao Iago sempre em **português de Portugal**.
 10. **Ferramentas SQL das horas** já instaladas em produção: `private.horas_ver/fixar/definir/rasto` e histórico de gravações (secção 7).
 
@@ -330,7 +330,7 @@ O `fixar_horas_acte3.sql` foi **removido** e substituído pelas ferramentas gen�
 
 **Matriz completa (8/11):** 3 papéis (gerência, supervisor, funcionário) × 4 ecrãs (computador 1366×768, tablet deitado 1024×700, tablet em pé 768×1024, telemóvel 390×844), todas as páginas de cada papel — 0 problemas (consola, texto partido, conteúdo fora do ecrã). Script de referência: abrir `/demo`, entrar por cada papel e percorrer o menu.
 
-**Verificações automáticas (todas sem problemas):** todas as páginas da gerência (computador 1366×768, tablet 1024, telemóvel 390), do funcionário e do supervisor (telemóvel e computador): sem erros na consola, sem texto "undefined/NaN", sem nada a sair do ecrã. Textos pt/en/fr completos (nenhuma chave em falta). `npm test` 31/31.
+**Verificações automáticas (todas sem problemas):** todas as páginas da gerência (computador 1366×768, tablet 1024, telemóvel 390), do funcionário e do supervisor (telemóvel e computador): sem erros na consola, sem texto "undefined/NaN", sem nada a sair do ecrã. Textos pt/en/fr completos (nenhuma chave em falta). `npm test` 33/33.
 
 **Corrigido:**
 - **Contratantes — variação errada:** a seta (ex.: "↓ 37%") comparava o período atual, ainda a meio, com o período anterior inteiro → mostrava sempre uma queda. Agora compara com o anterior **até ao mesmo ponto** (proporcional aos dias passados). Em `ContractorsOverview.jsx` (lista e cartões) e `ContractorDetail.jsx` (gráficos do detalhe).
@@ -341,8 +341,9 @@ O `fixar_horas_acte3.sql` foi **removido** e substituído pelas ferramentas gen�
 - **Ajuda no menu do funcionário e do supervisor (computador e tablet):** só existia no "Mais" do telemóvel e no botão "?"; agora também no menu lateral (`App.jsx`, `sidebarItems`).
 - **Demonstração:** contratantes com valor/hora e clientes diretos com preço de venda (Contratantes deixava de mostrar "sem preço"/"—"); contratos já vencidos renovados (evita "Expirado" e "8h de 0h" previstas). Fica 1 contrato "a acabar".
 
-**Para o Iago decidir (não mexi):**
-- **Contrato terminado × agenda:** um cliente com `contractEnd` no passado continua na agenda e a equipa regista horas, mas em Clientes as "horas previstas" passam a 0 (aparece "8h de 0h" e "Expirado"). Ou a agenda deixa de mostrar o cliente depois do fim do contrato, ou as previstas continuam pela agenda e o "Expirado" é só um alerta para renovar. Hoje é contraditório.
+**Decidido pelo Iago (8/11) — contrato terminado × agenda = opção B:** nos clientes **fixos**, o fim do contrato é só um **alerta para renovar** ("Expirado", "Contratos vencidos" nas Pendências). O cliente continua na agenda e as **horas previstas continuam a seguir a agenda** (antes `clientExpectedHours` cortava no fim do contrato e aparecia "8h de 0h"). Nos **replacement** a validade (início/fim) continua a mandar na agenda e nas previstas, via `clientAppliesOnDate`. Testes em `tests/agenda.test.mjs`.
+
+**Ideia em aberto (não pedida):**
 - **Mini-linhas (sparklines)** do período atual descem sempre no último ponto, porque o período ainda vai a meio. Pode passar a tracejado ou a mostrar a projeção.
 
 ## 14. Pendentes, ideias e riscos conhecidos
@@ -350,7 +351,6 @@ O `fixar_horas_acte3.sql` foi **removido** e substituído pelas ferramentas gen�
 **Publicado:** este documento, `tests/`, `npm test` e `supabase/empresa_teste_interno.sql` (8/11).
 
 **Pendentes ou à espera do Iago:**
-0. Decidir "contrato terminado × agenda" (secção 13b).
 1. Apagar `private.copia_app_data_20261105` quando o Iago confirmar que está tudo bem.
 2. Duração própria por visita avulsa (se for pedida).
 3. Se um dia a empresa de testes do banco deixar de ser usada, pode ser arquivada no `/admin`.
@@ -373,7 +373,7 @@ O `fixar_horas_acte3.sql` foi **removido** e substituído pelas ferramentas gen�
 
 ```bash
 npm install
-npm test          # 31 verificações (horas protegidas + agenda/visitas)
+npm test          # 33 verificações (horas protegidas + agenda/visitas + contratos)
 npm run build     # deve compilar sem erros; index-*.js ≈ 0,87 MB (≈257 kB gzip)
 npx vite --port 5199   # sem .env = modo demonstração local
 ```
@@ -415,3 +415,4 @@ npx vite --port 5199   # sem .env = modo demonstração local
 | 8/11/2026 | SQL `teste-interno` aplicado e verificado (empresa 2 = `teste-interno`); documento e testes publicados. |
 | 8/11/2026 | Revisão geral (secção 13b): variação dos contratantes proporcional, hoje não conta como em falta, feriados nas Notas, ícones dos pedidos, tabela de Funcionários, demo com preços. |
 | 8/11/2026 | Matriz 3 papéis × 4 ecrãs sem problemas; "Ajuda" no menu lateral do funcionário/supervisor. |
+| 8/11/2026 | Decisão opção B (contrato de cliente fixo terminado = só alerta; previstas seguem a agenda). |
