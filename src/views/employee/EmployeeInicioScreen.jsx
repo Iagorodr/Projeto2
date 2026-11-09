@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AlertTriangle, Bell, Eye, Clock, CalendarDays, UsersRound, Plus, ChevronRight, Info, StickyNote } from "lucide-react";
+import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { FONT, RADIUS, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
@@ -466,7 +467,7 @@ function EmployeeInicioScreen({
   // na mesma coluna esquerda (7), em vez de lhe dar coluna própria — vale
   // confirmar isto na revisão.
   return (
-    <div style={{ width: "100%", maxWidth: 1100 }}>
+    <div style={{ ...styles.content, width: "100%", maxWidth: 1100 }}>
       <PageHeader title={`${tMenu.hello}, ${me.name}`} subtitle={formatTodayLabel(lang)} lang={lang} setLang={setLang} langNames={LANG_NAMES} />
       <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "7 1 420px", display: "flex", flexDirection: "column", gap: 20, minWidth: 320 }}>

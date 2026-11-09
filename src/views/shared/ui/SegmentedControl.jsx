@@ -10,6 +10,7 @@ import { useControlSize } from "../../../hooks/useBreakpoint.js";
 
 // options: [{ value, label }]
 function SegmentedControl({ options, value, onChange }) {
+  const { height } = useControlSize();
   return (
     <div
       style={{
@@ -26,7 +27,7 @@ function SegmentedControl({ options, value, onChange }) {
             onClick={() => onChange(opt.value)}
             style={{
               border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
-              padding: "7px 14px", borderRadius: RADIUS.control - 2,
+              padding: "0 14px", minHeight: height - 6, display: "inline-flex", alignItems: "center", borderRadius: RADIUS.control - 2,
               background: active ? COLORS.vivo : "transparent",
               color: active ? "#fff" : COLORS.vivoInk,
               boxShadow: active ? "0 2px 6px -2px rgba(31,122,95,.6)" : "none",

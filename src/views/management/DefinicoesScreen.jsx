@@ -9,7 +9,7 @@ import { T } from "../../models/i18n.js";
 import { PageHeader, Card, Button, ConfirmDialog, SegmentedBar, InfoTip } from "../shared/ui/index.js";
 import { Toggle } from "../shared/ui/Toggle.jsx";
 import { supabase } from "../../models/supabaseClient.js";
-import { useBreakpoint } from "../../hooks/useBreakpoint.js";
+import { useBreakpoint, useControlSize } from "../../hooks/useBreakpoint.js";
 
 // Diálogo simples de "feito" (um botão só) — reaproveitado pelo sucesso de
 // "Formatar dados" e pela troca de palavra-passe da empresa, pra não
@@ -61,6 +61,7 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
   // Telemóvel: o índice de secções passa a uma linha de separadores no topo (desliza
   // para o lado e fica preso ao rolar) e a foto fica por cima dos campos do perfil.
   const phone = useBreakpoint() === "mobile";
+  const ctl = useControlSize();
   const secStyle = (id) => (activeSection === id ? { animation: "b1-rise .4s var(--ease) both" } : { display: "none" });
   function goToSection(id) {
     setActiveSection(id);
@@ -166,7 +167,7 @@ function DefinicoesScreen({ lang, setLang, company, setCompany, cutoffDay, setCu
               onClick={() => goToSection(sec.id)}
               style={{
                 textAlign: "left", border: phone ? `1px solid ${activeSection === sec.id ? COLORS.forest200 : COLORS.line}` : "none", cursor: "pointer",
-                padding: "9px 12px", borderRadius: 10, fontSize: 13, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap", fontFamily: "inherit",
+                padding: "0 12px", minHeight: ctl.height, borderRadius: 10, fontSize: 13, fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap", fontFamily: "inherit",
                 ...(phone && activeSection !== sec.id ? { background: COLORS.card } : null),
                 color: sec.id === "risco" ? "#B8343A" : activeSection === sec.id ? COLORS.forest700 : COLORS.ink2,
                 background: activeSection === sec.id ? COLORS.forest50 : phone ? COLORS.card : "transparent",

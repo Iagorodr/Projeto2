@@ -1,5 +1,5 @@
 /* Dashboard da gerência — redesign B1 (ver o protótipo "Servix Dashboard B1"). */
-.dsh { background: var(--page, #ECEEE9); min-height: 100%; padding: 20px 24px 40px; display: grid; gap: 16px; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-flow: row dense; max-width: 1440px; }
+.dsh { background: var(--page, #ECEEE9); min-height: 100%; --gx: clamp(14px, 3.6vw, 28px); padding: clamp(14px, 4vw, 22px) var(--gx) 40px; display: grid; gap: 16px; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-flow: row dense; max-width: 1440px; }
 .dsh .c1 { grid-column: span 1; } .dsh .c2 { grid-column: span 2; } .dsh .c4 { grid-column: 1 / -1; } .dsh .r2 { grid-row: span 2; }
 .dsh-head { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .dsh-head h1 { font-weight: 900; font-size: 30px; letter-spacing: -.03em; line-height: 1; margin: 0; font-stretch: 118%; }
@@ -169,16 +169,16 @@
 .dsh-tabs { display: none; }
 
 @media (max-width: 1180px) {
-  .dsh { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 18px 18px 36px; }
+  .dsh { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: 36px; }
   .dsh .c2 { grid-column: span 2; } .dsh .c4 { grid-column: 1 / -1; }
   .dsh-hero-in { grid-template-columns: 1fr 1fr; gap: 20px 28px; } .dsh-rule { grid-column: 1 / -1; grid-row: 2; }
   .dsh-kpis { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 639px) {
-  .dsh { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px 14px 28px; }
+  .dsh { grid-template-columns: minmax(0, 1fr); gap: 12px; padding-bottom: 28px; }
   .dsh .c1, .dsh .c2, .dsh .c4 { grid-column: 1 / -1; } .dsh .r2 { grid-row: auto; }
   .dsh-head h1 { font-size: 24px; }
-  .dsh-acts { flex-wrap: nowrap; overflow-x: auto; margin: 0 -14px; padding: 2px 14px; width: calc(100% + 28px); scrollbar-width: none; }
+  .dsh-acts { flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(-1 * var(--gx)); padding: 2px var(--gx); width: calc(100% + 2 * var(--gx)); scrollbar-width: none; }
   .dsh-acts .dsh-sep, .dsh-acts .dsh-edit, .dsh-acts .dsh-lang { display: none; }
   .dsh-tabs { display: flex; position: sticky; top: 0; z-index: 11; background: #fff; border-radius: 16px; padding: 4px; gap: 4px; box-shadow: 0 6px 16px -10px rgba(0,0,0,.2); grid-column: 1 / -1; }
   .dsh-tabs button { flex: 1; padding: 10px; border-radius: 12px; font-size: 14px; font-weight: 700; color: #6F776F; border: 0; background: none; font-family: inherit; cursor: pointer; transition: background .25s, color .25s; min-height: 44px; }

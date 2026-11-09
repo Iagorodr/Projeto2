@@ -86,7 +86,7 @@ function PageHeader({ title, subtitle, titleInfo, actions, lang, setLang, langNa
       <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ fontFamily: FONT.heading, fontWeight: 600, fontSize: mobile ? 22 : 26, color: COLORS.ink, lineHeight: 1.15 }}>{title}</div>
-          {titleInfo}
+          {titleInfo && <span style={{ display: "flex", margin: "-12px 0" }}>{titleInfo}</span>}
         </div>
         {subtitle && <div style={{ fontSize: mobile ? 12.5 : 13, color: COLORS.ink2, marginTop: mobile ? 2 : 4 }}>{subtitle}</div>}
       </div>
