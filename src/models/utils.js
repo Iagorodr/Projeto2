@@ -1913,9 +1913,39 @@ function notesForOwner(personalNotes, ownerId) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-// Ausências (avisos de falta): uma linha por funcionário e dia.
+// Ausências (pedidos de folga/falta): uma linha por funcionário e dia.
+// Campos (todos opcionais, para os avisos antigos continuarem a valer):
+//   status: "pending" | "approved" | "declined" (sem status = aprovado);
+//   kind: "vacation" | "absence" | "client"; requestId (agrupa os dias do mesmo pedido);
+//   clientIds: só estes clientes (sem isto = o dia todo); outside: clientes repassados a outra empresa.
+// Só conta para a agenda o que está aprovado: pendente e recusado não tiram nada.
+function absenceApproved(a) { return !a.status || a.status === "approved"; }
+// Falta do DIA TODO (aprovada). Faltas só de alguns clientes não entram aqui: ver `partialAbsenceOn`.
 function absenceOn(absences, staffId, isoDate) {
-  return (absences || []).find((a) => a.staffId === staffId && a.date === isoDate) || null;
+  return (absences || []).find((a) => a.staffId === staffId && a.date === isoDate && absenceApproved(a) && !(a.clientIds && a.clientIds.length)) || null;
+}
+// Falta aprovada só de alguns clientes nesse dia (ex.: "não consigo o cliente X às 15h").
+function partialAbsenceOn(absences, staffId, isoDate) {
+  return (absences || []).find((a) => a.staffId === staffId && a.date === isoDate && absenceApproved(a) && a.clientIds && a.clientIds.length) || null;
+}
+// Este cliente deste funcionário está "de fora" nesse dia (dia todo ou só ele)?
+function clientAbsentOn(absences, staffId, clientId, isoDate) {
+  if (absenceOn(absences, staffId, isoDate)) return true;
+  const p = partialAbsenceOn(absences, staffId, isoDate);
+  return !!(p && p.clientIds.includes(clientId));
+}
+// Pedidos por decidir, agrupados (um por `requestId`), do mais antigo para o mais recente.
+function pendingAbsenceRequests(absences, todayIso) {
+  const map = new Map();
+  (absences || []).forEach((a) => {
+    if (a.status !== "pending") return;
+    if (todayIso && a.date < todayIso) return;
+    const key = a.requestId || a.id;
+    if (!map.has(key)) map.set(key, { id: key, staffId: a.staffId, kind: a.kind || "absence", note: a.note || "", clientIds: a.clientIds || [], createdAt: a.createdAt || "", dates: [], ids: [] });
+    const r = map.get(key);
+    r.dates.push(a.date); r.ids.push(a.id);
+  });
+  return [...map.values()].map((r) => ({ ...r, dates: r.dates.sort() })).sort((x, y) => String(x.createdAt).localeCompare(String(y.createdAt)));
 }
 // Todos os dias de `from` a `to` (inclusive, "YYYY-MM-DD"), no máximo 62.
 function isoDatesBetween(from, to) {
@@ -2087,5 +2117,5 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { pinTeamChanges, isVisitCover, visitScheduledOn, entryRate, snapshotClientRate, pinClientHours, unpinHours, unpinVisit, staffWithGaps, EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
+export { pinTeamChanges, isVisitCover, visitScheduledOn, entryRate, snapshotClientRate, pinClientHours, unpinHours, unpinVisit, staffWithGaps, EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, absenceApproved, partialAbsenceOn, clientAbsentOn, pendingAbsenceRequests, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
 };

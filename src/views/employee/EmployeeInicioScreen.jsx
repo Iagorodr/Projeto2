@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AlertTriangle, Bell, Eye, Clock, CalendarDays, UsersRound, Plus, ChevronRight, Info, StickyNote } from "lucide-react";
 import { COLORS } from "../../styles/colors.js";
 import { FONT, RADIUS, SHADOW } from "../../styles/tokens.js";
@@ -7,9 +8,10 @@ import {
   dayScheduledClients, thisWeekSummary, periodMissingDays, staffWithGapsCount, isStaffActive, expectedShare,
   fmtHoursScreen, pad2, isoDateStr, notesForOwner, fmtNoteDate,
   getOpenPeriod, getCutoffPeriod, weekBlocksOfPayPeriod, staffTotalPay, staffTotalHours, fmtEuro, calPeriodLabel,
-  isSupervisorRole, recentClosedPeriodsChronological, shortMonthFromIso, addDays, staffExpensesPending, calPeriodDays, expectedTeamIds, staffById,
+  isSupervisorRole, clientAbsentOn, getAssignedClientIds, recentClosedPeriodsChronological, shortMonthFromIso, addDays, staffExpensesPending, calPeriodDays, expectedTeamIds, staffById,
 } from "../../models/utils.js";
 import { T, formatTodayLabel, WEEKDAY_FULL_BY_LANG, DAY_ABBR_SUN0_BY_LANG, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
+import AbsenceSheet from "../shared/AbsenceSheet.jsx";
 import { Card, Button, Pill, ProgressBar, PageHeader, ClientCheckCard, ChevronCircle, SaveChip, OfflineBar } from "../shared/ui/index.js";
 import { findContractor, normalizeContractorColor } from "../../models/contractors.js";
 
@@ -41,7 +43,7 @@ function dotStyle(state) {
 // EmployeeMenuScreen/SupervisorDashboardScreen antes deste ecrã existir).
 function EmployeeInicioScreen({
   lang, setLang, me, onNavigate, avisosBadge,
-  clients, staff, assignments, horasData, cutoffDay, closedPeriods, personalNotes, absences, covers,
+  clients, staff, assignments, horasData, cutoffDay, closedPeriods, personalNotes, absences, setAbsences, covers,
   contractors = [], saveState = "saved", onRetrySave,
 }) {
   const t = T[lang].employeeInicio;
@@ -325,11 +327,14 @@ function EmployeeInicioScreen({
   const nextDays = [1, 2, 3].map((k) => {
     const d = addDays(TODAY, k);
     const key = isoDateStr(d);
-    const list = isStaffActive(me, d) ? dayScheduledClients(clients, assignments, me.id, d, covers) : [];
+    const list = isStaffActive(me, d) ? dayScheduledClients(clients, assignments, me.id, d, covers).filter((c) => !clientAbsentOn(absences, me.id, c.id, key)) : [];
     const mins = list.reduce((a, c) => a + expectedShare(shareCtx, c, key, me.id).minutes, 0);
     return { key, d, list, mins, label: k === 1 ? `${t.tomorrow} · ${dayAbbrSun0[d.getDay()].toLowerCase()} ${d.getDate()}/${d.getMonth() + 1}` : `${dayAbbrSun0[d.getDay()].charAt(0)}${dayAbbrSun0[d.getDay()].slice(1).toLowerCase()} ${d.getDate()}/${d.getMonth() + 1}` };
   });
+  const [absenceOpen, setAbsenceOpen] = useState(false);
+  const myClientsForAbsence = clients.filter((c) => getAssignedClientIds(assignments, me.id).includes(c.id));
   const nextDaysCard = (
+    <>
     <Card>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <div style={cardTitleStyle}>{t.nextDaysTitle}</div>
@@ -344,7 +349,12 @@ function EmployeeInicioScreen({
           </div>
         ))}
       </div>
+      {setAbsences && (
+        <Button variant="secondary" style={{ width: "100%", marginTop: 10 }} onClick={() => setAbsenceOpen(true)}>{T[lang].absences.btn}</Button>
+      )}
     </Card>
+    {setAbsences && <AbsenceSheet lang={lang} open={absenceOpen} onClose={() => setAbsenceOpen(false)} staffId={me.id} absences={absences} setAbsences={setAbsences} myClients={myClientsForAbsence} />}
+    </>
   );
 
   // O meu período: semanas finalizadas, extras e despesas por aprovar, dia X de Y.

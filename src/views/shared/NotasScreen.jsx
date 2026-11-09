@@ -9,6 +9,7 @@ import { isoDateStr, addDays, startOfISOWeek, notesForOwner, monthAbbr } from ".
 import { T } from "../../models/i18n.js";
 import { upcomingHolidays } from "../../models/holidays.js";
 import { Field } from "./Layout.jsx";
+import AbsenceRequests from "./AbsenceRequests.jsx";
 import { PageHeader, Button, IconButton, Drawer, Pill, Card, Toast, InfoTip, MobileHeader, Fab } from "./ui/index.js";
 import { usePushNotifications } from "../../hooks/usePushNotifications.js";
 
@@ -136,7 +137,7 @@ function PushStatus({ push, t, c0, desktop }) {
 // `desktop` escolhe o enquadramento (PC/tablet = `PageHeader`+conteúdo,
 // telemóvel = moldura `mobStyles.phone`) — mesmo padrão já usado em
 // EmployeeHistoricoScreen.jsx/EmployeeAvisosScreen.jsx.
-function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersonalNotes, desktop }) {
+function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersonalNotes, desktop, absences, setAbsences, staff, clients }) {
   const t = T[lang].notas;
   const c0 = T[lang].common;
   const todayIso = isoDateStr(TODAY);
@@ -229,6 +230,8 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
     <Toast message={t.noteDeletedToast} actionLabel={t.undo} onAction={undoDelete} onDismiss={() => setUndoInfo(null)} closeLabel={c0.close} />
   );
 
+  const requests = ownerId === "management" && setAbsences ? <AbsenceRequests lang={lang} absences={absences} setAbsences={setAbsences} staff={staff || []} clients={clients || []} /> : null;
+
   if (desktop) {
     return (
       <div style={styles.content}>
@@ -241,6 +244,8 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
         />
 
         <PushStatus push={push} t={t} c0={c0} desktop />
+
+        {requests}
 
         <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div style={{ flex: 7, minWidth: 280 }}>{list}</div>
@@ -275,6 +280,8 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
       </div>
 
       <PushStatus push={push} t={t} c0={c0} desktop={false} />
+
+      {requests}
 
       {/* Nova nota: botão "+" flutuante (documento p. 35), acima da barra de baixo. */}
       {!sheetOpen && <Fab icon={Plus} label={t.newNote} onClick={openSheet} />}

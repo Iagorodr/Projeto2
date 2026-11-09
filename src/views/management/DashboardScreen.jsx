@@ -13,7 +13,7 @@ import {
   clientById, parseDMY, getOpenPeriod, unseenAvisosCount, formatPeriodLabel, staffTotalHours, staffTotalPay,
   notesForOwner, fmtEuro, fmtHoursScreen, monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod,
   fmtHM, countReviews, inReviewWindow, pendingExpenseList, staffExpensesApproved, uniqueSentCount, groupSentItems,
-  addDays, weekBlocksOfPayPeriod, staffWithGaps, clientExpectedHours, dayScheduledClients, absenceOn, parseClientDate,
+  addDays, weekBlocksOfPayPeriod, staffWithGaps, clientExpectedHours, dayScheduledClients, absenceOn, absenceApproved, pendingAbsenceRequests, parseClientDate,
 } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { DASH } from "../../models/i18nDash.js";
@@ -121,7 +121,8 @@ function DashboardScreen({
     data.entries.forEach((e) => { if (e.extra && !e.approved && !e.voided) overtimePending += 1; if (!e.voided && !e.clientId && e.custom) customClientPending += 1; if (!e.voided && e.shareReview) shareReviewPending += 1; });
   });
   const pendingRequests = unseenAvisosCount(missingItems, sentItems, period);
-  const absencesPending = (absences || []).filter((a) => !a.handled && a.date >= isoDateStr(TODAY)).length;
+  const absencesPending = (absences || []).filter((a) => absenceApproved(a) && !a.handled && a.date >= isoDateStr(TODAY)).length;
+  const absenceRequestsPending = pendingAbsenceRequests(absences, isoDateStr(TODAY)).length;
   const contractDiff = (c) => (parseDMY(c.contractEnd) - TODAY) / DAY_MS;
   const contractsNearExpiry = clients.filter((c) => { const x = contractDiff(c); return x >= 0 && x <= contractAlertDays; }).length;
   const contractsExpired = clients.filter((c) => contractDiff(c) < 0).length;
@@ -148,6 +149,7 @@ function DashboardScreen({
     { key: "closings", tone: "warn", label: f.pendingClosings(closingsToDo), count: closingsToDo, go: () => onNavigate("contratantes") },
     { key: "reopened", tone: "re", label: t.pendingReopened, count: reopenedCount, go: () => onNavigate("horas") },
     { key: "unread", tone: "acc", label: t.pendingUnread, count: pendingRequests, go: () => onNavigate("avisos") },
+    { key: "absenceReq", tone: "acc", label: tAbs.pendencyReq, count: absenceRequestsPending, go: () => onNavigate("notas") },
     { key: "absence", tone: "warn", label: tAbs.pendency, count: absencesPending, go: () => onNavigate("agendas") },
     { key: "contracts", tone: "warn", label: t.pendingContracts, count: contractsNearExpiry, go: () => onNavigate("clientes") },
     { key: "expired", tone: "bad", label: t.pendingContractsExpired, count: contractsExpired, go: () => onNavigate("clientes") },

@@ -392,7 +392,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
         {listBody}
         {newAvisoSheet}
         {reportSheet}
-        <AbsenceSheet lang={lang} open={absenceOpen} onClose={() => setAbsenceOpen(false)} staffId={staffId} absences={absences} setAbsences={setAbsences} />
+        <AbsenceSheet lang={lang} open={absenceOpen} onClose={() => setAbsenceOpen(false)} staffId={staffId} absences={absences} setAbsences={setAbsences} myClients={myClients} />
         {toastMsg && <Toast message={toastMsg} onDismiss={() => setToastMsg(null)} closeLabel={c0.close} />}
         {reportToastMsg && <Toast message={reportToastMsg} onDismiss={() => setReportToastMsg(null)} closeLabel={c0.close} />}
       </div>
@@ -414,7 +414,7 @@ function EmployeeAvisosScreen({ lang, setLang, onHome, staffId, clients, staff, 
 
       {newAvisoSheet}
       {reportSheet}
-      <AbsenceSheet lang={lang} open={absenceOpen} onClose={() => setAbsenceOpen(false)} staffId={staffId} absences={absences} setAbsences={setAbsences} />
+      <AbsenceSheet lang={lang} open={absenceOpen} onClose={() => setAbsenceOpen(false)} staffId={staffId} absences={absences} setAbsences={setAbsences} myClients={myClients} />
       {toastMsg && <Toast message={toastMsg} onDismiss={() => setToastMsg(null)} closeLabel={c0.close} />}
       {reportToastMsg && <Toast message={reportToastMsg} onDismiss={() => setReportToastMsg(null)} closeLabel={c0.close} />}
     </div>

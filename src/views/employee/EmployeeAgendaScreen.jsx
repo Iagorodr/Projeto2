@@ -8,7 +8,7 @@ import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   staffById, pad2, fmtMinutes, startOfISOWeek, addDays, isoDateStr, clientAppliesOnDate,
   weekLabelPT, isStaffActive, monthAbbr, clientDurationOnDow, clientPartMinutes,
-  agendaClientIdsOn, coveringOn, coveredAwayOn,
+  agendaClientIdsOn, coveringOn, coveredAwayOn, clientAbsentOn,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import { PageHeader, Pill, MobileHeader } from "../shared/ui/index.js";
@@ -30,7 +30,7 @@ function RecurringPill({ label }) {
   );
 }
 
-function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, assignments, covers = [], contractors = [], onOpenClient, desktop }) {
+function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, assignments, covers = [], absences = [], contractors = [], onOpenClient, desktop }) {
   const t = T[lang].employeeAgenda;
   const tCov = T[lang].coberturas;
   const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
@@ -72,7 +72,8 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
     const clientIds = agendaClientIdsOn(assignments, covers, staffId, date);
     return clientIds
       .map((id) => clients.find((c) => c.id === id))
-      .filter((c) => c && clientAppliesOnDate(c, date, covers));
+      .filter((c) => c && clientAppliesOnDate(c, date, covers))
+      .filter((c) => !clientAbsentOn(absences, staffId, c.id, isoDateStr(date)));
   }
 
   function getDayTotalMinutes(day, occ) {

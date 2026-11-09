@@ -95,7 +95,12 @@ export function buildDemoState() {
     from: isoDateStr(addDays(TODAY, -2)), to: isoDateStr(addDays(TODAY, 6)), createdAt: isoDateStr(addDays(TODAY, -5)),
   }));
   covers.push({ id: "demo-visit-1", kind: "visit", groupId: "demo-vg", clientId: 2, fromStaffId: null, toStaffId: 14, from: isoDateStr(addDays(TODAY, 1)), to: isoDateStr(addDays(TODAY, 1)), createdAt: isoDateStr(TODAY) });
-  const absences = [{ id: "demo-abs-1", staffId: 9, date: isoDateStr(addDays(TODAY, 4)), note: "Consulta médica", createdAt: isoDateStr(addDays(TODAY, -1)), handled: false }];
+  const absences = [
+    // Já aprovada: aparece em Agendas como "sem cobertura" até a gerência encaixar os clientes.
+    { id: "demo-abs-1", staffId: 9, date: isoDateStr(addDays(TODAY, 4)), note: "Consulta médica", createdAt: isoDateStr(addDays(TODAY, -1)), handled: false, status: "approved", kind: "absence", requestId: "demo-rq-1" },
+    // Por decidir: aparece nas Notas e no Dashboard, com Aprovar / Recusar.
+    ...[6, 7].map((k) => ({ id: `demo-abs-2-${k}`, staffId: 3, date: isoDateStr(addDays(TODAY, k)), note: "Férias curtas", createdAt: new Date().toISOString(), handled: false, status: "pending", kind: "vacation", requestId: "demo-rq-2" })),
+  ];
 
   // Pedidos e avisos: os de exemplo, com datas recentes.
   const missingAgo = [6, 3, 22, 29];

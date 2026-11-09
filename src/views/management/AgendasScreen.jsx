@@ -8,7 +8,7 @@ import { useControlSize } from "../../hooks/useBreakpoint.js";
 import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, clientDurationOnDow, clientPartMinutes, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
-  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, clientValidOnDate, clientValidityRange, absenceOn,
+  isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, clientValidOnDate, clientValidityRange, absenceOn, partialAbsenceOn, clientAbsentOn,
   isSupervisorRole, agendaClientIdsOn, coveredAwayOn, coveringOn,
 } from "../../models/utils.js";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
@@ -414,10 +414,11 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
   function staffOnClient(day, clientId) { return staff.filter((s) => getCellClientIds(s.id, day).includes(clientId)); }
   // Ausências desta semana (avisos de falta), por funcionário e dia.
   function absenceFor(staffId, day) { return absenceOn(absences, staffId, isoDateStr(weekDates[day - 1])); }
-  // Cliente de quem falta sem nenhum colega presente nesse dia: "sem cobertura".
+  // Cliente de quem falta (dia todo ou só esse cliente) sem nenhum colega que o faça nesse dia: "sem cobertura".
   function isUncovered(staffId, day, clientId) {
-    if (!absenceFor(staffId, day)) return false;
-    return !staff.some((o) => o.id !== staffId && !absenceFor(o.id, day) && getCellClientIds(o.id, day).includes(clientId));
+    const iso = isoDateStr(weekDates[day - 1]);
+    if (!clientAbsentOn(absences, staffId, clientId, iso)) return false;
+    return !staff.some((o) => o.id !== staffId && !clientAbsentOn(absences, o.id, clientId, iso) && !absenceFor(o.id, day) && getCellClientIds(o.id, day).includes(clientId));
   }
   function teamKey(staffId, day, clientId) { return `${staffId}-${day}-${clientId}`; }
   function dayTeamKey(day, clientId) { return `day-${day}-${clientId}`; }
@@ -637,16 +638,39 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
   const shownDays = AGENDA_DAYS;
   const narrowDays = new Set(AGENDA_DAYS.filter((day) => day >= 6 && !staff.some((s) => getCellClientIds(s.id, day).length > 0 || absenceFor(s.id, day))));
   const gridCols = `140px ${AGENDA_DAYS.map((day) => (narrowDays.has(day) ? "minmax(64px, 0.45fr)" : "minmax(120px, 1fr)")).join(" ")}`;
-  const weekAbsenceRows = [];
+  // Clientes sem cobertura nesta semana: por funcionário, dia e cliente (faltas aprovadas).
+  const uncoveredItems = [];
+  const outsideItems = [];
   staff.forEach((s) => {
     AGENDA_DAYS.forEach((day) => {
-      const a = absenceFor(s.id, day);
-      if (!a) return;
-      const uncovered = getCellClientIds(s.id, day).filter((cid) => isUncovered(s.id, day, cid)).map((cid) => clientById(clients, cid)?.name).filter(Boolean);
-      weekAbsenceRows.push({ a, staffMember: s, day, uncovered });
+      const iso = isoDateStr(weekDates[day - 1]);
+      const rec = absenceFor(s.id, day) || partialAbsenceOn(absences, s.id, iso);
+      if (!rec) return;
+      getCellClientIds(s.id, day).filter((cid) => isUncovered(s.id, day, cid)).forEach((cid) => {
+        const item = { a: rec, staffMember: s, day, iso, clientId: cid };
+        if ((rec.outside || []).includes(cid)) outsideItems.push(item); else uncoveredItems.push(item);
+      });
     });
   });
-  function toggleHandled(id) { setAbsences((prev) => (prev || []).map((a) => (a.id === id ? { ...a, handled: !a.handled } : a))); }
+  const [uncoveredOpen, setUncoveredOpen] = useState(false);
+  // Quem pode receber este cliente neste dia (ativo, presente, ainda sem ele).
+  function fitOptions(item) {
+    return staff.filter((o) => o.id !== item.staffMember.id && isStaffActive(o, TODAY)
+      && !absenceFor(o.id, item.day) && !clientAbsentOn(absences, o.id, item.clientId, item.iso)
+      && !getCellClientIds(o.id, item.day).includes(item.clientId));
+  }
+  function fitClient(item, toStaffId) {
+    const created = newVisitCovers({ clientId: item.clientId, staffIds: [toStaffId], dates: [item.iso], covers, assignments });
+    if (created.length === 0) return;
+    const own = new Set(created.map((cv) => cv.id));
+    setCovers((prev) => [...(prev || []), ...created]);
+    showToast(tAbs.fitDone(clientById(clients, item.clientId)?.name || "", firstName(toStaffId)), { actionLabel: tAbs.undo, onAction: () => setCovers((prev) => (prev || []).filter((cv) => !own.has(cv.id))) });
+  }
+  function setOutside(item, on) {
+    setAbsences((prev) => (prev || []).map((a) => (a.id === item.a.id
+      ? { ...a, outside: on ? [...(a.outside || []), item.clientId] : (a.outside || []).filter((x) => x !== item.clientId) }
+      : a)));
+  }
 
   const matchingStaff = staff.filter(staffMatchesSearch);
   const visibleStaff = matchingStaff.filter((s) => isStaffActive(s, TODAY));
@@ -1144,21 +1168,52 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
       )}
       {setCovers && <VisitsPanel t={tCov} covers={covers} staff={staff} clients={clients} onRemove={removeVisits} />}
 
-      {weekAbsenceRows.length > 0 && (
-        <div style={{ border: `1px solid ${COLORS.alert}`, background: "#FFF7F3", borderRadius: RADIUS.card, padding: "10px 14px", marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>{tAbs.noCover}</div>
-          {weekAbsenceRows.map(({ a, staffMember, day, uncovered }) => (
-            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "5px 0", fontSize: 12.5, color: COLORS.ink, opacity: a.handled ? 0.55 : 1 }}>
-              <span style={{ fontWeight: 600 }}>{staffMember.name.split(" ")[0]} · {dayLabels[day]} {pad2(weekDates[day - 1].getDate())}</span>
-              <span style={{ color: COLORS.ink2, flex: "1 1 200px" }}>
-                {a.note ? `${a.note} — ` : ""}{uncovered.length > 0 ? uncovered.join(", ") : tAbs.allCovered}
-              </span>
-              <button type="button" onClick={() => toggleHandled(a.id)}
-                style={{ border: `2px solid ${COLORS.vivo}`, background: COLORS.card, borderRadius: RADIUS.chip, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700, padding: "4px 12px", color: COLORS.vivo }}>
-                {a.handled ? tAbs.reopenAbsence : tAbs.markHandled}
-              </button>
+      {(uncoveredItems.length > 0 || outsideItems.length > 0) && (
+        <div style={{ border: `1px solid ${uncoveredItems.length > 0 ? COLORS.alert : COLORS.line}`, background: uncoveredItems.length > 0 ? "#FFF7F3" : COLORS.card, borderRadius: RADIUS.card, padding: "10px 14px", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <AlertTriangle size={16} color={uncoveredItems.length > 0 ? COLORS.alert : COLORS.ink3} />
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.ink, flex: 1 }}>
+              {uncoveredItems.length > 0 ? tAbs.uncoveredSummary(uncoveredItems.length) : tAbs.outsideTag}
+              {uncoveredItems.length > 0 && outsideItems.length > 0 ? ` · ${outsideItems.length} ${tAbs.outsideTag.toLowerCase()}` : ""}
+            </span>
+            <button type="button" onClick={() => setUncoveredOpen((o) => !o)} aria-expanded={uncoveredOpen}
+              style={{ border: `2px solid ${COLORS.vivo}`, background: COLORS.card, borderRadius: RADIUS.chip, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700, padding: "4px 12px", color: COLORS.vivo }}>
+              {uncoveredOpen ? tAbs.uncoveredClose : tAbs.uncoveredOpen}
+            </button>
+          </div>
+          {uncoveredOpen && (
+            <div style={{ marginTop: 8 }}>
+              {uncoveredItems.map((it) => {
+                const opts = fitOptions(it);
+                const cl = clientById(clients, it.clientId);
+                return (
+                  <div key={`${it.a.id}-${it.clientId}`} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "7px 0", borderTop: `1px solid ${COLORS.line}`, fontSize: 12.5, color: COLORS.ink }}>
+                    <span style={{ fontWeight: 700, flex: "1 1 190px" }}>
+                      {cl?.name || "—"}
+                      <span style={{ fontWeight: 500, color: COLORS.ink2 }}> · {it.staffMember.name.split(" ")[0]} · {dayLabels[it.day]} {pad2(weekDates[it.day - 1].getDate())}</span>
+                      {it.a.note ? <span style={{ fontWeight: 500, color: COLORS.ink3 }}> — {it.a.note}</span> : null}
+                    </span>
+                    <select aria-label={tAbs.fitIn} value="" disabled={opts.length === 0} title={opts.length === 0 ? tAbs.fitNobody : undefined}
+                      onChange={(e) => { const target = staff.find((o) => String(o.id) === e.target.value); if (target) fitClient(it, target.id); }}
+                      style={{ ...styles.input, width: "auto", minWidth: 150, fontSize: 12.5 }}>
+                      <option value="">{opts.length === 0 ? tAbs.fitNobody : tAbs.fitIn}</option>
+                      {opts.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
+                    </select>
+                    <button type="button" onClick={() => setOutside(it, true)}
+                      style={{ border: `1.5px solid ${COLORS.line}`, background: COLORS.card, borderRadius: RADIUS.chip, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600, padding: "4px 12px", color: COLORS.ink2 }}>
+                      {tAbs.outsideBtn}
+                    </button>
+                  </div>
+                );
+              })}
+              {outsideItems.map((it) => (
+                <div key={`o-${it.a.id}-${it.clientId}`} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "7px 0", borderTop: `1px solid ${COLORS.line}`, fontSize: 12.5, color: COLORS.ink3 }}>
+                  <span style={{ flex: "1 1 190px" }}>{clientById(clients, it.clientId)?.name || "—"} · {it.staffMember.name.split(" ")[0]} · {dayLabels[it.day]} {pad2(weekDates[it.day - 1].getDate())} — {tAbs.outsideTag}</span>
+                  <button type="button" onClick={() => setOutside(it, false)} style={{ border: "none", background: "transparent", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: COLORS.vivo }}>{tAbs.outsideUndo}</button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 

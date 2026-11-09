@@ -261,7 +261,7 @@ export default function App() {
               <AvisosScreen lang={c.lang} setLang={c.setLang} staff={c.staff} clients={c.clients} missingItems={c.missingItems} setMissingItems={c.setMissingItems} sentItems={c.sentItems} setSentItems={c.setSentItems} setHorasData={c.setHorasData} closedPeriods={c.closedPeriods} cutoffDay={c.cutoffDay} />
             )}
             {c.screen === "notas" && (
-              <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop />
+              <NotasScreen lang={c.lang} setLang={c.setLang} ownerId="management" personalNotes={c.personalNotes} setPersonalNotes={c.setPersonalNotes} desktop absences={c.absences} setAbsences={c.setAbsences} staff={c.staff} clients={c.clients} />
             )}
             {c.screen === "funcionarios" && <FuncionariosScreen navIntent={c.navIntent} lang={c.lang} setLang={c.setLang} staff={c.staff} setStaff={c.setStaff} clients={c.clients} assignments={c.assignments} contractors={c.contractors} horasData={c.horasData} onDeleteStaff={c.deleteStaff} onNavigate={c.setScreen} openPeriodStart={isoDateStr(openPeriodNow.start)} companyEmail={c.company.email} />}
             {c.screen === "contratantes" && <ContratantesScreen lang={c.lang} setLang={c.setLang} contractors={c.contractors} setContractors={c.setContractors} onDeleteContractor={c.deleteContractor} clients={c.clients} setClients={c.setClients} staff={c.staff} horasData={c.horasData} closedPeriods={c.closedPeriods} cutoffDay={c.cutoffDay} assignments={c.assignments} covers={c.covers} absences={c.absences} closings={c.contractorClosings} onSaveClosing={c.saveClosing} companyName={c.company.name} companyInfo={c.company} who={c.company.email} onNavigate={c.goTo} navIntent={c.navIntent} />}
@@ -372,7 +372,7 @@ export default function App() {
               <EmployeeInicioScreen
                 lang={c.lang} setLang={c.setLang} me={c.me} onNavigate={c.setEmpScreen}
                 avisosBadge={c.myUnreadBadge} clients={c.clients} staff={c.staff} assignments={c.assignments}
-                horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} covers={c.covers}
+                horasData={c.horasData} cutoffDay={c.cutoffDay} closedPeriods={c.closedPeriods} personalNotes={c.personalNotes} absences={c.absences} setAbsences={c.setAbsences} covers={c.covers}
                 contractors={c.contractors} saveState={c.saveState} onRetrySave={c.retrySave}
               />
             )}

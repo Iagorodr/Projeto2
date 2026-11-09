@@ -2,22 +2,27 @@ import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
+import { RADIUS } from "../../styles/tokens.js";
 import { TODAY } from "../../models/data.js";
 import { isoDateStr, isoDatesBetween, fmtNoteDate } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { Field } from "./Layout.jsx";
-import { Drawer, Button, Toast, ConfirmDialog } from "./ui/index.js";
+import { Drawer, Button, Toast, ConfirmDialog, SegmentedControl } from "./ui/index.js";
 
-// Aviso de falta do funcionário: escolhe um dia (ou um intervalo) e, se
-// quiser, um motivo. Grava uma linha por dia em `absences`; a gerência vê no
-// Dashboard e na Agenda e decide quem cobre. Só dias de hoje em diante.
-function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences }) {
+// Pedido de folga do funcionário: tipo (férias / não posso ir / só um cliente),
+// um dia ou intervalo e, se quiser, um motivo. Grava uma linha por dia em
+// `absences` com `status: "pending"`: nada muda na agenda até a gerência
+// aprovar (Notas e Dashboard). Aprovado, os clientes ficam "sem cobertura" em
+// Agendas e a gerência encaixa-os. Só dias de hoje em diante.
+function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences, myClients = [] }) {
   const t = T[lang].absences;
   const c0 = T[lang].common;
   const todayIso = isoDateStr(TODAY);
   const [from, setFrom] = useState(todayIso);
   const [to, setTo] = useState(todayIso);
   const [note, setNote] = useState("");
+  const [kind, setKind] = useState("absence");
+  const [pickedClients, setPickedClients] = useState([]);
   const [toastMsg, setToastMsg] = useState(null);
   const [cancelId, setCancelId] = useState(null);
 
@@ -29,16 +34,19 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences }) {
     const end = to < from ? from : to;
     const days = isoDatesBetween(from, end).filter((d) => d >= todayIso);
     if (days.length === 0) return;
+    if (kind === "client" && pickedClients.length === 0) return;
     const now = new Date().toISOString();
+    const requestId = `rq-${staffId}-${Date.now().toString(36)}`;
     setAbsences((prev) => {
       const keep = (prev || []).filter((a) => !(a.staffId === staffId && days.includes(a.date)));
       const added = days.map((d) => ({
         id: `${staffId}-${d}-${Date.now()}`, staffId, date: d, note: note.trim(), createdAt: now, handled: false,
+        status: "pending", kind, requestId, ...(kind === "client" ? { clientIds: pickedClients } : null),
       }));
       return [...keep, ...added];
     });
-    setNote("");
-    setToastMsg(t.sentToast(days.length));
+    setNote(""); setPickedClients([]);
+    setToastMsg(t.sentToastReq);
   }
   function handleRemove(id) { setAbsences((prev) => (prev || []).filter((a) => a.id !== id)); }
 
@@ -46,10 +54,15 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences }) {
     <>
       <Drawer
         open={open} onClose={onClose} title={t.sheetTitle} closeLabel={c0.close}
-        footer={<Button size="mobile" style={{ width: "100%" }} onClick={handleSend} disabled={!from} disabledReason={!from ? t.fromRequired : undefined} disabledReasonBelow>{t.send}</Button>}
+        footer={<Button size="mobile" style={{ width: "100%" }} onClick={handleSend} disabled={!from || (kind === "client" && pickedClients.length === 0)} disabledReason={!from ? t.fromRequired : (kind === "client" && pickedClients.length === 0) ? t.clientsRequired : undefined} disabledReasonBelow>{t.send}</Button>}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ fontSize: 13, color: COLORS.ink2 }}>{t.intro}</div>
+          <Field label={t.kindLabel}>
+            <SegmentedControl value={kind} onChange={setKind} options={[
+              { value: "vacation", label: t.kindVacation }, { value: "absence", label: t.kindAbsence }, ...(myClients.length > 0 ? [{ value: "client", label: t.kindClient }] : []),
+            ]} />
+          </Field>
           <Field label={t.from}>
             <input type="date" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={from} min={todayIso}
               onChange={(e) => { setFrom(e.target.value); if (to < e.target.value) setTo(e.target.value); }} />
@@ -58,6 +71,23 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences }) {
             <input type="date" style={{ ...styles.input, width: "100%", boxSizing: "border-box" }} value={to} min={from || todayIso}
               onChange={(e) => setTo(e.target.value)} />
           </Field>
+          {kind === "client" && (
+            <Field label={t.clientsLabel}>
+              <div style={{ fontSize: 12, color: COLORS.ink3, marginBottom: 6 }}>{t.clientsHint}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {myClients.map((c) => {
+                  const on = pickedClients.includes(c.id);
+                  return (
+                    <button key={c.id} type="button" aria-pressed={on}
+                      onClick={() => setPickedClients((p) => (on ? p.filter((x) => x !== c.id) : [...p, c.id]))}
+                      style={{ border: `1.5px solid ${on ? COLORS.vivo : COLORS.line}`, background: on ? COLORS.mint : COLORS.card, color: on ? COLORS.vivoInk : COLORS.ink, borderRadius: RADIUS.chip, padding: "6px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
           <Field label={t.note}>
             <textarea style={styles.textarea} rows={3} placeholder={t.notePlaceholder} value={note} onChange={(e) => setNote(e.target.value)} />
           </Field>
@@ -68,7 +98,7 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences }) {
             ) : mine.map((a) => (
               <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "6px 0", borderBottom: `1px solid ${COLORS.line}` }}>
                 <span style={{ fontSize: 13, color: COLORS.ink }}>
-                  {fmtNoteDate(a.date)}{a.note ? ` · ${a.note}` : ""}{a.handled ? ` · ${t.coveredTag}` : ""}
+                  {fmtNoteDate(a.date)} · <b style={{ color: a.status === "declined" ? COLORS.alert : a.status === "pending" ? COLORS.ink2 : COLORS.vivoInk }}>{a.status === "pending" ? t.statusPending : a.status === "declined" ? t.statusDeclined : t.statusApproved}</b>{a.note ? ` · ${a.note}` : ""}{a.handled ? ` · ${t.coveredTag}` : ""}
                 </span>
                 <button type="button" onClick={() => setCancelId(a.id)} aria-label={t.cancel}
                   style={{ border: "none", background: "transparent", cursor: "pointer", color: COLORS.ink3, display: "flex", padding: 6 }}>
