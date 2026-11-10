@@ -1,5 +1,5 @@
 import { useState, useEffect, useId } from "react";
-import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, CalendarDays, AlertTriangle, ArrowLeftRight, CalendarPlus } from "lucide-react";
+import { Plus, X, UsersRound, RefreshCw, ChevronDown, ChevronRight, CalendarDays, AlertTriangle, ArrowLeftRight, CalendarPlus, CalendarOff } from "lucide-react";
 import { styles } from "../../styles/styles.js";
 import { FREQ_STYLE, isRecurringFreq } from "../../styles/freqColors.js";
 import { COLORS } from "../../styles/colors.js";
@@ -9,8 +9,11 @@ import { AGENDA_DAYS, TODAY, LANG_NAMES } from "../../models/data.js";
 import {
   clientById, staffById, clientDurationOnDow, clientPartMinutes, startOfISOWeek, addDays, isoDateStr, pad2, fmtMinutes, fmtHoursScreen,
   isStaffActive, formatPeriodLabel, partnerOf, clientAppliesThisWeek, clientAppliesOnDate, clientValidOnDate, clientValidityRange, absenceOn, partialAbsenceOn, clientAbsentOn,
-  isSupervisorRole, agendaClientIdsOn, coveredAwayOn, coveringOn,
+  isSupervisorRole, agendaClientIdsOn, coveredAwayOn, coveringOn, holidayClientsOn, holidayDecisions,
 } from "../../models/utils.js";
+import { holidayOn } from "../../models/holidays.js";
+import { HOLIDAY_T } from "../../models/i18nHoliday.js";
+import HolidayPlanner from "./HolidayPlanner.jsx";
 import { T, DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import CopyClientsDialog from "../shared/CopyClientsDialog.jsx";
 import { findContractor } from "../../models/contractors.js";
@@ -308,7 +311,7 @@ function ClientTeamPopover({ client, team, perPerson, t, c0, staff, onRemove, on
 // 2026-10-06 -> "06/10" (datas curtas nos avisos de validade).
 function fmtDM(d) { return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`; }
 
-function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences, covers = [], setCovers, clients, setClients, staff, assignments, setAssignments, onOpenClient }) {
+function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences, covers = [], setCovers, clients, setClients, staff, assignments, setAssignments, onOpenClient, navIntent = null }) {
   const t = T[lang].agendas;
   const c0 = T[lang].common;
   const tc = T[lang].clientes;
@@ -361,6 +364,18 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const weekDates = AGENDA_DAYS.map((_, i) => addDays(weekStart, i));
   const todayIso = isoDateStr(TODAY);
+  // Feriados da semana em exibição e dos próximos 7 dias (inclui os de fim de semana).
+  const tHol = HOLIDAY_T[lang] || HOLIDAY_T.pt;
+  const [holidayOpen, setHolidayOpen] = useState(() => navIntent?.openHoliday || null);
+  const holidayBanners = (() => {
+    const dates = new Set(weekDates.map((d) => isoDateStr(d)));
+    for (let i = 0; i <= 7; i++) dates.add(isoDateStr(addDays(TODAY, i)));
+    return [...dates].sort().filter((iso) => holidayOn(iso, lang)).map((iso) => {
+      const rows = holidayClientsOn(clients, staff, assignments, iso);
+      const done = holidayDecisions(covers, iso);
+      return { iso, name: holidayOn(iso, lang), total: rows.length, undecided: rows.filter((r) => !done.has(r.client.id)).length };
+    });
+  })();
   // Token 1 (segunda) a 7 (domingo) do dia de hoje de verdade — não depende
   // de `weekDates`/`weekStart` (que agora navegam) porque a vista "Por
   // dia" seleciona por DIA DA SEMANA (mesma semana-tipo em qualquer
@@ -1167,6 +1182,27 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
         />
       )}
       {setCovers && <VisitsPanel t={tCov} covers={covers} staff={staff} clients={clients} onRemove={removeVisits} />}
+
+      {setCovers && holidayBanners.map((h) => (
+        <div key={h.iso} style={{ border: `1px solid ${h.undecided > 0 ? COLORS.alert : COLORS.line}`, background: h.undecided > 0 ? "#FFF7F3" : COLORS.card, borderRadius: RADIUS.card, padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <CalendarOff size={16} color={h.undecided > 0 ? COLORS.alert : COLORS.ink3} />
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.ink, flex: 1 }}>
+            {h.total === 0
+              ? `${h.name} (${h.iso.slice(8, 10)}/${h.iso.slice(5, 7)}) · ${new Date(h.iso).getDay() === 0 || new Date(h.iso).getDay() === 6 ? tHol.weekendTag : tHol.tag}`
+              : h.undecided > 0 ? tHol.banner(h.name, `${h.iso.slice(8, 10)}/${h.iso.slice(5, 7)}`, h.undecided) : tHol.bannerDone(h.name, `${h.iso.slice(8, 10)}/${h.iso.slice(5, 7)}`)}
+          </span>
+          {h.total > 0 && h.iso >= todayIso && (
+            <button type="button" onClick={() => setHolidayOpen(h.iso)}
+              style={{ border: `2px solid ${COLORS.vivo}`, background: COLORS.card, borderRadius: RADIUS.chip, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700, padding: "4px 12px", color: COLORS.vivo }}>
+              {h.undecided > 0 ? tHol.decide : tHol.edit}
+            </button>
+          )}
+        </div>
+      ))}
+      {setCovers && holidayOpen && (
+        <HolidayPlanner open onClose={() => setHolidayOpen(null)} lang={lang} iso={holidayOpen} clients={clients} staff={staff}
+          assignments={assignments} covers={covers} setCovers={setCovers} onDone={(msg) => showToast(msg)} />
+      )}
 
       {(uncoveredItems.length > 0 || outsideItems.length > 0) && (
         <div style={{ border: `1px solid ${uncoveredItems.length > 0 ? COLORS.alert : COLORS.line}`, background: uncoveredItems.length > 0 ? "#FFF7F3" : COLORS.card, borderRadius: RADIUS.card, padding: "10px 14px", marginBottom: 16 }}>

@@ -8,7 +8,7 @@ import { TODAY } from "../../models/data.js";
 import { DAY_LABELS_1_7_BY_LANG } from "../../models/i18n.js";
 import {
   addDays, isoDateStr, clientById, isStaffActive, fmtNoteDate, coverOverlaps,
-  isVisitCover, agendaClientIdsOn, clientDurationOn, fmtMinutes,
+  isVisitCover, isHolidayCover, agendaClientIdsOn, clientDurationOn, fmtMinutes,
 } from "../../models/utils.js";
 import { Button, SegmentedControl } from "../shared/ui/index.js";
 
@@ -28,7 +28,7 @@ function newId(clientId) { return `cv-${Date.now().toString(36)}-${clientId}-${M
 function groupCovers(covers) {
   const map = new Map();
   (covers || []).forEach((cv) => {
-    if (isVisitCover(cv)) return; // visitas avulsas têm o seu próprio painel
+    if (isVisitCover(cv) || isHolidayCover(cv)) return; // visitas avulsas e decisões de feriado têm o seu próprio sítio
     const key = [cv.fromStaffId, cv.toStaffId, cv.from, cv.to].join("|");
     if (!map.has(key)) map.set(key, { key, fromStaffId: cv.fromStaffId, toStaffId: cv.toStaffId, from: cv.from, to: cv.to, items: [] });
     map.get(key).items.push(cv);

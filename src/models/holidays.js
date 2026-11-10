@@ -1,5 +1,6 @@
-// Feriados oficiais da Bélgica (para os lembretes do Dashboard). Só informativo: não muda a agenda
-// nem as visitas previstas, porque a empresa trabalha em alguns feriados.
+// Feriados oficiais da Bélgica (nacionais, sem os regionais). Por si só não mudam a agenda:
+// a empresa trabalha em alguns feriados. A gerência decide cliente a cliente (ver
+// `holidayClientsOn` em utils.js e o ecrã HolidayPlanner).
 const NAMES = {
   newYear: { pt: "Ano Novo", en: "New Year's Day", fr: "Nouvel An" },
   easterMonday: { pt: "Segunda-feira de Páscoa", en: "Easter Monday", fr: "Lundi de Pâques" },
@@ -49,4 +50,11 @@ export function upcomingHolidays(today, days, lang) {
     .filter((h) => h.iso >= from && h.iso <= to)
     .sort((a, b) => (a.iso < b.iso ? -1 : 1))
     .map((h) => ({ iso: h.iso, name: NAMES[h.key][lang] || NAMES[h.key].pt }));
+}
+
+// Nome do feriado numa data ("YYYY-MM-DD"), ou null se não for feriado.
+export function holidayOn(isoDate, lang) {
+  const y = Number(String(isoDate).slice(0, 4));
+  const h = belgianHolidays(y).find((x) => x.iso === isoDate);
+  return h ? (NAMES[h.key][lang] || NAMES[h.key].pt) : null;
 }

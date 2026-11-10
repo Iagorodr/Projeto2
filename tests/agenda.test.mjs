@@ -59,4 +59,28 @@ console.log(ok, "ok", bad, "falhas");
   const repl = { ...fixo, id: 502, clientType: "replacement", contractStart: "01/10/2026", contractEnd: "31/10/2026" };
   eq("replacement fora da validade não é previsto", U.clientExpectedHours(repl, per2, { ...ctx2, assignments: { "1-1": [502] } }, new Date(2026, 10, 9)).whole, 0);
 }
+{
+  // Feriado (10/11): a gerência decide cliente a cliente; "mudar de dia" = decisão + visita avulsa.
+  const a = { id: 601, name: "Uma vez", days: [3], duration: 60, hoursMode: "dividida", frequency: "weekly" };
+  const b = { id: 602, name: "Duas vezes", days: [3, 5], duration: 60, hoursMode: "dividida", frequency: "weekly" };
+  const st = [{ id: 1, name: "A", status: "ativo", accountType: "fixo" }];
+  const as = { "1-3": [601, 602], "1-5": [602] };
+  const rows = U.holidayClientsOn([a, b], st, as, "2026-11-11");
+  eq("feriado: clientes e visitas por semana", rows.map((r) => [r.client.id, r.perWeek]), [[602, 2], [601, 1]]);
+  eq("feriado: tudo por decidir", U.pendingHolidayDecisions(["2026-11-11"], [a, b], st, as, [])[0].undecided, 2);
+  const cv = [
+    { id: "h1", kind: "holiday", holiday: "2026-11-11", clientId: 602, decision: "skip", moveTo: null, fromStaffId: 1, toStaffId: null, from: "2026-11-11", to: "2026-11-11" },
+    { id: "h2", kind: "holiday", holiday: "2026-11-11", clientId: 601, decision: "skip", moveTo: "2026-11-12", visitGroup: "g", fromStaffId: 1, toStaffId: null, from: "2026-11-11", to: "2026-11-11" },
+    { id: "v1", kind: "visit", groupId: "g", clientId: 601, fromStaffId: null, toStaffId: 1, from: "2026-11-12", to: "2026-11-12" },
+  ];
+  eq("feriado: agenda do dia fica vazia", U.agendaClientIdsOn(as, cv, 1, "2026-11-11"), []);
+  eq("feriado: cliente mudado aparece no outro dia", U.agendaClientIdsOn(as, cv, 1, "2026-11-12"), [601]);
+  eq("feriado: sexta não muda", U.agendaClientIdsOn(as, cv, 1, "2026-11-13"), [602]);
+  eq("feriado: sem decisões por decidir", U.pendingHolidayDecisions(["2026-11-11"], [a, b], st, as, cv), []);
+  const keep = [{ ...cv[0], decision: "keep" }];
+  eq("feriado: 'faz-se' não altera a agenda", U.agendaClientIdsOn(as, keep, 1, "2026-11-11").sort(), [601, 602]);
+  eq("feriado: nunca aparece como 'coberto por'", U.coveredAwayOn(as, cv, 1, "2026-11-11"), []);
+  eq("feriado: não conta como sobreposição de cobertura", U.coverOverlaps(cv, 602, "2026-11-01", "2026-11-30"), []);
+}
+console.log(ok, "ok", bad, "falhas");
 if (bad > 0) process.exitCode = 1;

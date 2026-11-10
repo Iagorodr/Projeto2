@@ -1696,7 +1696,14 @@ function pinTeamChanges(horasData, clients, before, after, fromIso, toIso) {
 // de forma fixa (ex.: replacement de outra empresa). Nesse dia o cliente conta
 // como previsto mesmo fora dos dias/frequência/validade da ficha.
 function isVisitCover(cv) { return !!cv && cv.kind === "visit"; }
+// DECISÃO DE FERIADO (`kind: "holiday"`): a gerência decidiu, para um cliente de uma pessoa,
+// se o feriado `holiday` se faz ou não. `decision: "keep"` não muda nada (só regista que foi
+// decidido); `"skip"` tira o cliente da agenda dessa pessoa nesse dia (`moveTo` = dia para onde
+// foi mudado, com uma visita avulsa própria identificada por `visitGroup`). Sem dono novo
+// (`toStaffId` null), por isso nunca aparece como "coberto por".
+function isHolidayCover(cv) { return !!cv && cv.kind === "holiday"; }
 function coverActiveOn(cv, iso) {
+  if (isHolidayCover(cv)) return cv.decision === "skip" && cv.from === iso;
   if (isVisitCover(cv)) return !!cv.from && cv.from <= iso && iso <= (cv.to || cv.from);
   return !!cv && !!cv.from && !!cv.to && cv.from <= iso && iso <= cv.to && String(cv.fromStaffId) !== String(cv.toStaffId);
 }
@@ -1732,7 +1739,7 @@ function coveredAwayOn(assignments, covers, staffId, date) {
   const iso = isoOfDate(date);
   const base = (assignments && assignments[`${staffId}-${dowOfIso(iso)}`]) || [];
   return (covers || [])
-    .filter((cv) => coverActiveOn(cv, iso) && String(cv.fromStaffId) === String(staffId) && base.includes(cv.clientId))
+    .filter((cv) => !isHolidayCover(cv) && coverActiveOn(cv, iso) && String(cv.fromStaffId) === String(staffId) && base.includes(cv.clientId))
     .map((cv) => ({ clientId: cv.clientId, cover: cv }));
 }
 // Clientes que `staffId` faz nesta data SÓ por cobertura (não estão na
@@ -1755,7 +1762,7 @@ function coveringOn(assignments, covers, staffId, date) {
 }
 // Coberturas que se sobrepõem no mesmo cliente e período (para avisar antes de gravar).
 function coverOverlaps(covers, clientId, from, to, ignoreId) {
-  return (covers || []).filter((cv) => !isVisitCover(cv) && cv.id !== ignoreId && cv.clientId === clientId && cv.from <= to && from <= cv.to);
+  return (covers || []).filter((cv) => !isVisitCover(cv) && !isHolidayCover(cv) && cv.id !== ignoreId && cv.clientId === clientId && cv.from <= to && from <= cv.to);
 }
 
 function dayScheduledClients(clients, assignments, staffId, date, covers) {
@@ -1947,6 +1954,52 @@ function pendingAbsenceRequests(absences, todayIso) {
   });
   return [...map.values()].map((r) => ({ ...r, dates: r.dates.sort() })).sort((x, y) => String(x.createdAt).localeCompare(String(y.createdAt)));
 }
+
+// --- Feriados: decisão da gerência cliente a cliente ---
+
+// Dias da semana (1=seg … 7=dom) em que o cliente está em alguma agenda semanal.
+function clientWeekDays(assignments, clientId) {
+  const days = new Set();
+  Object.entries(assignments || {}).forEach(([k, ids]) => {
+    if ((ids || []).includes(clientId)) days.add(Number(k.slice(k.lastIndexOf("-") + 1)));
+  });
+  return days;
+}
+// Clientes previstos na semana-tipo num dia ("YYYY-MM-DD"), sem olhar a coberturas/decisões:
+// [{ client, staffIds, perWeek }]. `perWeek` = em quantos dias da semana o cliente é feito.
+function holidayClientsOn(clients, staff, assignments, isoDate) {
+  const date = parseIso(isoDate);
+  const dow = dowOfIso(isoDate);
+  const byClient = new Map();
+  (staff || []).filter((s) => isStaffActive(s, date)).forEach((s) => {
+    ((assignments && assignments[`${s.id}-${dow}`]) || []).forEach((cid) => {
+      const c = clientById(clients, cid);
+      if (!c || !clientAppliesOnDate(c, date)) return;
+      if (!byClient.has(cid)) byClient.set(cid, { client: c, staffIds: [], perWeek: clientWeekDays(assignments, cid).size });
+      byClient.get(cid).staffIds.push(s.id);
+    });
+  });
+  return [...byClient.values()].sort((a, b) => a.client.name.localeCompare(b.client.name));
+}
+function parseIso(isoDate) { const [y, m, d] = String(isoDate).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); }
+// Decisões já tomadas para um feriado: Map(clientId -> { decision, moveTo, records }).
+function holidayDecisions(covers, isoDate) {
+  const map = new Map();
+  (covers || []).filter((cv) => isHolidayCover(cv) && cv.holiday === isoDate).forEach((cv) => {
+    if (!map.has(cv.clientId)) map.set(cv.clientId, { decision: cv.decision, moveTo: cv.moveTo || null, records: [] });
+    map.get(cv.clientId).records.push(cv);
+  });
+  return map;
+}
+// Feriados nos próximos `daysAhead` dias com clientes por decidir: [{ iso, total, undecided }].
+// `holidayDates` = datas de feriado (ISO) já filtradas por quem chama.
+function pendingHolidayDecisions(holidayDates, clients, staff, assignments, covers) {
+  return holidayDates.map((iso) => {
+    const rows = holidayClientsOn(clients, staff, assignments, iso);
+    const done = holidayDecisions(covers, iso);
+    return { iso, total: rows.length, undecided: rows.filter((r) => !done.has(r.client.id)).length };
+  }).filter((h) => h.undecided > 0);
+}
 // Todos os dias de `from` a `to` (inclusive, "YYYY-MM-DD"), no máximo 62.
 function isoDatesBetween(from, to) {
   const [y1, m1, d1] = from.split("-").map(Number);
@@ -2117,5 +2170,5 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { pinTeamChanges, isVisitCover, visitScheduledOn, entryRate, snapshotClientRate, pinClientHours, unpinHours, unpinVisit, staffWithGaps, EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, absenceApproved, partialAbsenceOn, clientAbsentOn, pendingAbsenceRequests, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
+export { dowOfIso, pinTeamChanges, isVisitCover, isHolidayCover, clientWeekDays, holidayClientsOn, holidayDecisions, pendingHolidayDecisions, visitScheduledOn, entryRate, snapshotClientRate, pinClientHours, unpinHours, unpinVisit, staffWithGaps, EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, absenceApproved, partialAbsenceOn, clientAbsentOn, pendingAbsenceRequests, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
 };

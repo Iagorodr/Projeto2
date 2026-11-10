@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { ChevronRight, RefreshCw, UsersRound, MapPin } from "lucide-react";
+import { holidayOn } from "../../models/holidays.js";
+import { HOLIDAY_T } from "../../models/i18nHoliday.js";
 import { mobStyles } from "../../styles/mobStyles.js";
 import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
@@ -296,6 +298,7 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
                 <div style={{ width: 110, flexShrink: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.ink }}>{dayLabels[day]}</div>
                   <div style={{ fontSize: 12, color: COLORS.ink2 }}>{pad2(date.getDate())} {monthAbbr(lang, date.getMonth())}</div>
+                  {holidayOn(isoDateStr(date), lang) && <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.clayInk, marginTop: 2 }}>{HOLIDAY_T[lang].tag}</div>}
                 </div>
                 <div style={{ flex: 1, display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {occ.length === 0
@@ -370,6 +373,11 @@ function EmployeeAgendaScreen({ lang, setLang, onHome, staffId, staff, clients, 
 
       {/* Cartões do dia selecionado */}
       <div style={{ marginTop: 18, minHeight: 120 }}>
+        {holidayOn(isoDateStr(weekDates[selectedDay - 1]), lang) && (
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.clayInk, background: COLORS.clayTint, borderRadius: 10, padding: "6px 10px", marginBottom: 10 }}>
+            {HOLIDAY_T[lang].tag} · {holidayOn(isoDateStr(weekDates[selectedDay - 1]), lang)}
+          </div>
+        )}
         {selOcc.length === 0 ? (
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "center",
