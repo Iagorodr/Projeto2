@@ -84,3 +84,14 @@ console.log(ok, "ok", bad, "falhas");
 }
 console.log(ok, "ok", bad, "falhas");
 if (bad > 0) process.exitCode = 1;
+{
+  // Feriado + cliente quinzenal: passar o ciclo = mudar a semana de referência (frequencyAnchor).
+  const q = { id: 700, name: "Quinzenal", days: [3], duration: 60, hoursMode: "dividida", frequency: "biweekly", frequencyAnchor: "2026-11-09" };
+  eq("quinzenal faz-se a 11/11", U.clientAppliesOnDate(q, new Date(2026, 10, 11), []), true);
+  eq("quinzenal não a 18/11", U.clientAppliesOnDate(q, new Date(2026, 10, 18), []), false);
+  const q2 = { ...q, frequencyAnchor: "2026-11-18" };
+  eq("ciclo passado: faz-se a 18/11", U.clientAppliesOnDate(q2, new Date(2026, 10, 18), []), true);
+  eq("ciclo passado: 25/11 não", U.clientAppliesOnDate(q2, new Date(2026, 10, 25), []), false);
+  eq("ciclo passado: 2/12 sim", U.clientAppliesOnDate(q2, new Date(2026, 11, 2), []), true);
+}
+console.log(ok, "ok", bad, "falhas");

@@ -16,7 +16,7 @@ const parse = (iso) => { const [y, m, d] = iso.split("-").map(Number); return ne
 
 // Decisão cliente a cliente de um feriado (ver `isHolidayCover` em utils.js). Ao guardar,
 // cria/atualiza as decisões e, nos "mudar de dia", uma visita avulsa no dia escolhido.
-function HolidayPlanner({ open, onClose, lang, iso, clients, staff, assignments, covers, setCovers, onDone }) {
+function HolidayPlanner({ open, onClose, lang, iso, clients, staff, assignments, covers, setCovers, setClients, onDone }) {
   const t = HOLIDAY_T[lang] || HOLIDAY_T.pt;
   const dayLabels = DAY_LABELS_1_7_BY_LANG[lang];
   const name = holidayOn(iso, lang) || t.tag;
@@ -29,11 +29,12 @@ function HolidayPlanner({ open, onClose, lang, iso, clients, staff, assignments,
   }, [existing]);
   const [choice, setChoice] = useState(initial);
 
-  // Dias possíveis para mudar: de hoje até 6 dias depois do feriado, sem domingos nem o próprio feriado.
+  // Dias possíveis para mudar: de hoje até 14 dias depois do feriado, sem domingos nem feriados.
+  // Em clientes quinzenais/mensais, o mesmo dia da semana seguinte «passa o ciclo» para essa semana.
   const dayOptions = useMemo(() => {
     const out = [];
     const start = parse(iso);
-    for (let i = -6; i <= 6; i++) {
+    for (let i = -6; i <= 14; i++) {
       const d = addDays(start, i);
       const k = isoDateStr(d);
       if (k === iso || k < isoDateStr(TODAY) || d.getDay() === 0 || holidayOn(k, lang)) continue;
@@ -42,6 +43,9 @@ function HolidayPlanner({ open, onClose, lang, iso, clients, staff, assignments,
     return out;
   }, [iso, lang]);
 
+  const cycleNext = isoDateStr(addDays(parse(iso), 7));
+  const isCycle = (c) => c.frequency === "biweekly" || c.frequency === "monthly";
+  const shifts = (r, ch) => isCycle(r.client) && ch?.decision === "move" && ch.moveTo === cycleNext;
   const firstName = (id) => ((staff || []).find((s) => String(s.id) === String(id))?.name || "").split(" ")[0];
   const same = (a, b) => (a?.decision || null) === (b?.decision || null) && (a?.moveTo || null) === (b?.moveTo || null);
   const changed = rows.filter((r) => choice[r.client.id] && !same(choice[r.client.id], initial[r.client.id]));
@@ -65,13 +69,18 @@ function HolidayPlanner({ open, onClose, lang, iso, clients, staff, assignments,
     const ids = new Set(changed.map((r) => r.client.id));
     const oldVisitGroups = new Set();
     (covers || []).forEach((cv) => { if (isHolidayCover(cv) && cv.holiday === iso && ids.has(cv.clientId) && cv.visitGroup) oldVisitGroups.add(cv.visitGroup); });
+    // Ciclos já passados por decisões anteriores voltam atrás antes de aplicar as novas.
+    const anchorOps = new Map();
+    changed.forEach((r) => { const old = existing.get(r.client.id)?.records?.find((x) => x.cycleShift); if (old) anchorOps.set(r.client.id, old.prevAnchor || ""); });
     let next = (covers || []).filter((cv) => !(isHolidayCover(cv) && cv.holiday === iso && ids.has(cv.clientId)) && !(isVisitCover(cv) && oldVisitGroups.has(cv.groupId)));
     const now = new Date().toISOString();
     const created = [];
     changed.forEach((r) => {
       const ch = choice[r.client.id];
       let visitGroup = null;
-      if (ch.decision === "move" && ch.moveTo) {
+      const shiftNow = shifts(r, ch);
+      if (shiftNow) anchorOps.set(r.client.id, cycleNext); // passa o ciclo: o cliente cai nessa semana sozinho
+      if (ch.decision === "move" && ch.moveTo && !shiftNow) {
         const visits = newVisitCovers({ clientId: r.client.id, staffIds: r.staffIds, dates: [ch.moveTo], covers: [...next, ...created], assignments });
         visitGroup = visits[0]?.groupId || null;
         created.push(...visits);
@@ -79,11 +88,20 @@ function HolidayPlanner({ open, onClose, lang, iso, clients, staff, assignments,
       r.staffIds.forEach((sid) => created.push({
         id: `hd-${iso}-${r.client.id}-${sid}`, kind: "holiday", holiday: iso, clientId: r.client.id,
         decision: ch.decision === "keep" ? "keep" : "skip", moveTo: ch.decision === "move" ? ch.moveTo : null, visitGroup,
+        ...(shiftNow ? { cycleShift: true, prevAnchor: existing.get(r.client.id)?.records?.find((x) => x.cycleShift)?.prevAnchor ?? (r.client.frequencyAnchor || "") } : {}),
         fromStaffId: sid, toStaffId: null, from: iso, to: iso, createdAt: now,
       }));
     });
     next = [...next, ...created];
     setCovers(() => next);
+    if (anchorOps.size && setClients) {
+      // Restaura/aplica a semana de referência do ciclo (a antiga fica guardada na decisão para poder desfazer).
+      setClients((prev) => prev.map((c) => {
+        if (!anchorOps.has(c.id)) return c;
+        const target = anchorOps.get(c.id);
+        return { ...c, frequencyAnchor: target };
+      }));
+    }
     onDone?.(t.saved(changed.length));
     onClose?.();
   }
@@ -129,9 +147,10 @@ function HolidayPlanner({ open, onClose, lang, iso, clients, staff, assignments,
                     <select aria-label={t.pickDay} value={ch.moveTo || ""} onChange={(e) => set(r.client.id, { decision: "move", moveTo: e.target.value || null })}
                       style={{ ...styles.input, width: "auto", minWidth: 180, marginTop: 8, borderRadius: RADIUS.control }}>
                       <option value="">{t.pickDay}</option>
-                      {dayOptions.map((o) => <option key={o.iso} value={o.iso}>{o.label}</option>)}
+                      {dayOptions.map((o) => <option key={o.iso} value={o.iso}>{o.label}{isCycle(r.client) && o.iso === cycleNext ? ` · ${t.cycleOpt(r.client.frequency)}` : ""}</option>)}
                     </select>
                   )}
+                  {shifts(r, ch) && <div style={{ fontSize: 12, color: COLORS.ink2, marginTop: 6 }}>{t.cycleNote(dm(cycleNext), r.client.frequency)}</div>}
                 </div>
               );
             })}

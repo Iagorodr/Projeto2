@@ -1201,7 +1201,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
       ))}
       {setCovers && holidayOpen && (
         <HolidayPlanner open onClose={() => setHolidayOpen(null)} lang={lang} iso={holidayOpen} clients={clients} staff={staff}
-          assignments={assignments} covers={covers} setCovers={setCovers} onDone={(msg) => showToast(msg)} />
+          assignments={assignments} covers={covers} setCovers={setCovers} setClients={setClients} onDone={(msg) => showToast(msg)} />
       )}
 
       {(uncoveredItems.length > 0 || outsideItems.length > 0) && (
