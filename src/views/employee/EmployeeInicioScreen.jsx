@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { AlertTriangle, Bell, Eye, Clock, CalendarDays, UsersRound, Plus, ChevronRight, Info, StickyNote } from "lucide-react";
 import { styles } from "../../styles/styles.js";
+import { holidayOn } from "../../models/holidays.js";
+import { HOLIDAY_T } from "../../models/i18nHoliday.js";
 import { COLORS } from "../../styles/colors.js";
 import { FONT, RADIUS, SHADOW } from "../../styles/tokens.js";
 import { LANG_NAMES, TODAY } from "../../models/data.js";
@@ -345,7 +347,10 @@ function EmployeeInicioScreen({
         {nextDays.map((n, k) => (
           <div key={n.key} style={{ display: "grid", gridTemplateColumns: "112px 1fr auto", gap: 10, alignItems: "center", padding: "12px 0", borderTop: k ? `1px dashed ${COLORS.line}` : "none" }}>
             <b style={{ fontSize: 14.5, color: COLORS.ink }}>{n.label}</b>
-            <span style={{ fontSize: 14, color: COLORS.ink2, lineHeight: 1.35 }}>{n.list.length ? n.list.map((c) => c.name).join(" · ") : t.noClientsDay}</span>
+            <span style={{ fontSize: 14, color: COLORS.ink2, lineHeight: 1.35 }}>
+              {holidayOn(n.key, lang) && <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: COLORS.clayInk, marginBottom: 2 }}>{HOLIDAY_T[lang].tag} · {holidayOn(n.key, lang)}</span>}
+              {n.list.length ? n.list.map((c) => c.name).join(" · ") : t.noClientsDay}
+            </span>
             <b style={{ fontSize: 14.5, color: COLORS.ink }}>{n.list.length ? fmtHoursScreen(n.mins / 60) : ""}</b>
           </div>
         ))}
