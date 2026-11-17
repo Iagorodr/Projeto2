@@ -103,8 +103,9 @@ console.log(ok, "ok", bad, "falhas");
   const qz = { id: 802, name: "Quinzenal", days: [3], duration: 60, hoursMode: "dividida", frequency: "biweekly", frequencyAnchor: "2026-11-09" };
   const st = [{ id: 1, name: "Ana", status: "ativo", accountType: "fixo" }];
   const as = { "1-3": [800, 802], "1-2": [801], "1-4": [801] };
-  eq("adiar: elegível 1x/semana", U.postponeEligible(as, cl), true);
-  eq("adiar: 2x/semana não é elegível", U.postponeEligible(as, cl2), false);
+  eq("adiar: semanal não é elegível", U.postponeEligible(as, cl), false);
+  eq("adiar: quinzenal é elegível", U.postponeEligible(as, qz), true);
+  eq("adiar: mensal é elegível", U.postponeEligible(as, { ...qz, frequency: "monthly" }), true);
   const abs = [
     { id: "pp1", staffId: 1, date: "2026-11-11", kind: "postpone", clientIds: [800], owners: [1], status: "auto" },
     { id: "pp2", staffId: 1, date: "2026-11-11", kind: "postpone", clientIds: [802], owners: [1], status: "auto", cycleShift: true, newAnchor: "2026-11-18" },

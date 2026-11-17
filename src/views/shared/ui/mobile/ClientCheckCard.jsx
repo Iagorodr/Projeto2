@@ -11,7 +11,7 @@
 // Horas; este componente só dá os `onToggle`/`onExtraTime` como callbacks.
 // `extraPill`: texto opcional tipo "+30 min · por aprovar" (pílula âmbar,
 // mostrada quando já há horas extra pedidas nesse cliente).
-import { Check, Clock, User, Undo2 } from "lucide-react";
+import { Check, Clock, User, Undo2, CalendarClock } from "lucide-react";
 import { COLORS } from "../../../../styles/colors.js";
 import { SHADOW } from "../../../../styles/tokens.js";
 import { Pill } from "../Pill.jsx";
@@ -39,7 +39,7 @@ function ActionButton({ icon: Icon, label, onClick, active }) {
 function ClientCheckCard({
   name, subtitle, checked, onToggle, onExtraTime, extraTimeLabel = "Fiz mais tempo",
   extraPill, extraPillVariant = "pending", readOnly, dimmed, dimmedNote, onAdjustSplit, adjustSplitLabel,
-  onSolo, soloLabel, soloActive, soloTag, soloUndoLabel, conflictTag, managerTag,
+  onSolo, soloLabel, soloActive, soloTag, soloUndoLabel, conflictTag, managerTag, onPostpone, postponeLabel,
 }) {
   const text = dimmed && dimmedNote ? dimmedNote : (subtitle || "");
   const m = !dimmed ? HOURS_RE.exec(text) : null;
@@ -88,6 +88,12 @@ function ClientCheckCard({
 
         {hours && (
           <div style={{ fontFamily: HEADING, fontSize: 22, color: COLORS.ink, flexShrink: 0, whiteSpace: "nowrap" }}>{hours}</div>
+        )}
+        {onPostpone && !checked && !readOnly && !dimmed && (
+          <button type="button" onClick={onPostpone} aria-label={postponeLabel} title={postponeLabel}
+            style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0, border: `1.5px solid ${COLORS.line}`, background: COLORS.card, color: COLORS.ink2, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <CalendarClock size={18} strokeWidth={2.1} />
+          </button>
         )}
       </div>
 

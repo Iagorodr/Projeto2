@@ -1967,11 +1967,9 @@ function pendingAbsenceRequests(absences, todayIso) {
 
 // --- Adiamento de cliente para a semana seguinte (pedido do funcionário) ---
 
-// Só clientes feitos no máximo 1 vez por semana (semanais, quinzenais, mensais).
+// Só clientes quinzenais ou mensais.
 function postponeEligible(assignments, client) {
-  if (!client || client.frequency === "alternate") return false;
-  const n = clientWeekDays(assignments, client.id).size;
-  return n >= 1 && n <= 1;
+  return !!client && (client.frequency === "biweekly" || client.frequency === "monthly");
 }
 // Funcionários que fazem este cliente nesse dia (semana-tipo).
 function postponeStaffIds(assignments, staff, clientId, iso) {

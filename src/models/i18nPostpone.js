@@ -1,9 +1,9 @@
 // Textos do adiamento de cliente para a semana seguinte (funcionário) e do aviso/aprovação (gerência).
 export const POSTPONE_T = {
   pt: {
-    button: "Adiar cliente para a próxima semana",
+    iconLabel: "Adiar para a próxima semana",
     title: "Adiar para a próxima semana",
-    intro: "Só clientes feitos no máximo 1 vez por semana. Fica aceite logo, mas a gerência é avisada.",
+    intro: "Só para clientes quinzenais e mensais. Fica aceite logo, mas a gerência é avisada.",
     none: "Hoje não há clientes que possam ser adiados.",
     warnTitle: "Atenção",
     warn: "Avise a gerência antes de adiar. Ao confirmar, o cliente deixa de contar nesta semana e a gerência recebe um aviso.",
@@ -25,9 +25,9 @@ export const POSTPONE_T = {
     pendency: "Adiamentos de clientes por ver ou aprovar",
   },
   en: {
-    button: "Postpone client to next week",
+    iconLabel: "Postpone to next week",
     title: "Postpone to next week",
-    intro: "Only clients done at most once a week. It is accepted straight away, but management is notified.",
+    intro: "Only for biweekly and monthly clients. It is accepted straight away, but management is notified.",
     none: "No clients can be postponed today.",
     warnTitle: "Heads up",
     warn: "Tell management before postponing. Once you confirm, the client no longer counts this week and management gets a notice.",
@@ -48,9 +48,9 @@ export const POSTPONE_T = {
     pendency: "Client postponements to review or approve",
   },
   fr: {
-    button: "Reporter le client à la semaine prochaine",
+    iconLabel: "Reporter à la semaine prochaine",
     title: "Reporter à la semaine prochaine",
-    intro: "Seulement les clients faits au plus une fois par semaine. C'est accepté tout de suite, mais la direction est prévenue.",
+    intro: "Seulement pour les clients bimensuels et mensuels. C'est accepté tout de suite, mais la direction est prévenue.",
     none: "Aucun client ne peut être reporté aujourd'hui.",
     warnTitle: "Attention",
     warn: "Prévenez la direction avant de reporter. Une fois confirmé, le client ne compte plus cette semaine et la direction reçoit un avis.",

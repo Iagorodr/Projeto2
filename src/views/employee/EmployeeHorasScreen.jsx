@@ -519,6 +519,8 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
     const sh = expectedShare(sharedCtx, client, selectedKey, staffId);
     return fmtMinutes(sh.minutes) + (sh.team > 1 ? ` · ${t.sharedWith(sh.team - 1)}` : "");
   }
+  // Adiar para a semana seguinte: ícone no cartão do cliente quinzenal/mensal ainda por marcar (hoje ou dias passados).
+  const canPostpone = (client) => !!setAbsences && !weekLockedFlag && postponeEligible(assignments, client) && !entriesForDay.some((e) => e.clientId === client.id) && !postponeFor(covers, staffId, client.id, selectedKey);
   const scheduledCards = scheduledToday.map((client) => {
     const pendingPp = postponeFor(covers, staffId, client.id, selectedKey);
     if (pendingPp && pendingPp.status === "pending") {
@@ -548,6 +550,7 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
       checked: !!entry, entry,
       extraPill: entry ? extraPillOf(entry) : undefined, extraPillVariant: entry && entry.extraMinutes < 0 ? "neutral" : "pending", soloHint: entry ? soloHintOf(entry) : undefined,
       soloAllowed: soloAllowedFor(entry), soloActive: !!(entry && entry.solo), conflict: !!(entry && entry.conflict),
+      canPostpone: canPostpone(client),
     };
   });
   const adHocCards = entriesForDay.filter((e) => !scheduledIds.has(e.clientId)).map((entry, ai) => {
@@ -566,10 +569,6 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
   const dayCards = [...scheduledCards, ...adHocCards];
   const shownCards = [...dayCards, ...postponedCards]; // os adiados aparecem esbatidos mas não contam
 
-  // Adiar para a semana seguinte: só clientes por marcar, feitos no máx. 1x/semana, hoje ou mais tarde.
-  const postponeOptions = (setAbsences && selectedDate >= new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()))
-    ? scheduledToday.filter((c) => postponeEligible(assignments, c) && !entriesForDay.some((e) => e.clientId === c.id) && !postponeFor(covers, staffId, c.id, selectedKey))
-    : [];
   const ppPeriod = getCutoffPeriodPP(selectedDate, cutoffDay, 0);
   const ppClient = postponeClientId != null ? clients.find((c) => c.id === postponeClientId) : null;
   const ppSecond = ppClient ? postponesInPeriod(covers, ppClient.id, ppPeriod) >= 1 : false;
@@ -957,6 +956,8 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
                   conflictTag={card.conflict ? t.conflictTag : undefined}
                   managerTag={card.entry && card.entry.byManagement ? t.byManagerShort : undefined}
                   extraTimeLabel={t.extraTimeButton}
+                  onPostpone={card.canPostpone ? () => { setPostponeClientId(card.clientId); setPostponeOpen(true); } : undefined}
+                  postponeLabel={pp.iconLabel}
                 />
               ))}
             </DayPanel>
@@ -985,15 +986,6 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
                     style={{ flex: 1, minWidth: 0, height: "auto", minHeight: 48, whiteSpace: "normal", textAlign: "center", lineHeight: 1.2, padding: "10px 10px" }}
                   >
                     {t.noClientDayButton}
-                  </Button>
-                )}
-                {postponeOptions.length > 0 && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => { setPostponeClientId(postponeOptions.length === 1 ? postponeOptions[0].id : null); setPostponeOpen(true); }}
-                    style={{ flex: 1, minWidth: 0, height: "auto", minHeight: 48, whiteSpace: "normal", textAlign: "center", lineHeight: 1.2, padding: "10px 10px" }}
-                  >
-                    {pp.button}
                   </Button>
                 )}
                 <Button
@@ -1197,20 +1189,8 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
       <Drawer open={postponeOpen} onClose={() => { setPostponeOpen(false); setPostponeClientId(null); }} title={pp.title} width={420}
         footer={<Button size="mobile" style={{ width: "100%" }} onClick={confirmPostpone} disabled={!ppClient}>{ppSecond ? pp.confirmSecond : pp.confirm}</Button>}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink }}>{ppClient ? ppClient.name : ""}</div>
           <div style={{ fontSize: 13, color: COLORS.ink2 }}>{pp.intro}</div>
-          {postponeOptions.length === 0 ? <div style={{ fontSize: 13, color: COLORS.ink3 }}>{pp.none}</div> : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {postponeOptions.map((c) => {
-                const on = postponeClientId === c.id;
-                return (
-                  <button key={c.id} type="button" aria-pressed={on} onClick={() => setPostponeClientId(c.id)}
-                    style={{ border: `1.5px solid ${on ? COLORS.vivo : COLORS.line}`, background: on ? COLORS.mint : COLORS.card, color: on ? COLORS.vivoInk : COLORS.ink, borderRadius: 999, padding: "8px 14px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                    {c.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
           {ppClient && (
             <div role="note" style={{ border: `1.5px solid ${COLORS.clay || COLORS.line}`, background: COLORS.clayTint || COLORS.card, color: COLORS.clayInk || COLORS.ink, borderRadius: 12, padding: "10px 12px", fontSize: 13 }}>
               <b>{pp.warnTitle}.</b> {ppSecond ? pp.warnSecond : pp.warn}
