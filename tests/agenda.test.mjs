@@ -31,7 +31,6 @@ const rec = U.reconcileVisits(h, [c], per, ctx, "2026-11-20");
 eq("revisões sem problemas", rec.issues.filter(i=>i.clientId===900).map(i=>i.kind), []);
 const exp = U.clientExpectedHours(c, per, ctx, new Date(2026,10,20));
 eq("horas previstas", exp.whole, 4);
-console.log(ok, "ok", bad, "falhas");
 {
   const cl = { id: 77, name: "Div", days: [3], duration: 240, hoursMode: "dividida", frequency: "weekly" };
   const st = [{ id: 1, name: "A", status: "ativo", accountType: "fixo" }, { id: 2, name: "B", status: "ativo", accountType: "fixo" }];
@@ -111,12 +110,13 @@ console.log(ok, "ok", bad, "falhas");
     { id: "pp2", staffId: 1, date: "2026-11-11", kind: "postpone", clientIds: [802], owners: [1], status: "auto", cycleShift: true, newAnchor: "2026-11-18" },
   ];
   const d = U.derivePostpones(abs, [cl, cl2, qz]);
+  d.clients = [cl, cl2, { ...qz, frequencyAnchor: "2026-11-09" }];
   eq("adiar: agenda do dia sem os adiados", U.agendaClientIdsOn(as, d.covers, 1, "2026-11-11"), []);
   eq("adiar: semana seguinte normal (semanal)", U.agendaClientIdsOn(as, d.covers, 1, "2026-11-18").includes(800), true);
   eq("adiar: não conta como falta", U.absenceOn(abs, 1, "2026-11-11"), null);
   eq("adiar: não é falta parcial", U.clientAbsentOn(abs, 1, 800, "2026-11-11"), false);
-  eq("adiar: ciclo quinzenal passa a 18/11", U.clientAppliesOnDate(d.clients.find((x) => x.id === 802), new Date(2026, 10, 18), d.covers), true);
-  eq("adiar: ciclo quinzenal não a 25/11", U.clientAppliesOnDate(d.clients.find((x) => x.id === 802), new Date(2026, 10, 25), d.covers), false);
+  eq("adiar: ciclo quinzenal passa a 18/11", U.clientAppliesOnDate(qz, new Date(2026, 10, 18), d.covers), true);
+  eq("adiar: ciclo quinzenal não a 25/11", U.clientAppliesOnDate(qz, new Date(2026, 10, 25), d.covers), false);
   eq("adiar: nunca aparece como 'coberto por'", U.coveredAwayOn(as, d.covers, 1, "2026-11-11"), []);
   const pend = [{ id: "pp3", staffId: 1, date: "2026-11-11", kind: "postpone", clientIds: [800], owners: [1], status: "pending" }];
   const dp = U.derivePostpones(pend, [cl]);
@@ -126,4 +126,20 @@ console.log(ok, "ok", bad, "falhas");
   eq("adiar: pedidos de folga não incluem adiamentos", U.pendingAbsenceRequests(pend, "2026-11-01").length, 0);
   eq("adiar: contagem no período", U.postponesInPeriod(d.covers, 800, { start: new Date(2026, 10, 1), end: new Date(2026, 11, 1) }), 1);
 }
+
+{
+  // O ciclo que passa para a semana seguinte (feriado) NÃO recalcula o passado.
+  // Cliente quinzenal com visitas em 28/10 e 11/11; feriado 11/11 -> ciclo passa a 18/11 (referência 18/11).
+  const qz = { id: 810, name: "Madame", days: [3], duration: 60, hoursMode: "dividida", frequency: "biweekly", frequencyAnchor: "2026-11-18" };
+  const hol = [{ id: "hd-2026-11-11-810-1", kind: "holiday", holiday: "2026-11-11", clientId: 810, decision: "skip", cycleShift: true, prevAnchor: "2026-10-28", fromStaffId: 1, toStaffId: null, from: "2026-11-11", to: "2026-11-11" }];
+  const on = (y, m, d, cv) => U.clientAppliesOnDate(qz, new Date(y, m - 1, d), cv);
+  eq("ciclo: 21/10 não era visita (antes da mudança)", on(2026, 10, 21, hol), false);
+  eq("ciclo: 28/10 era visita", on(2026, 10, 28, hol), true);
+  eq("ciclo: 04/11 não era visita", on(2026, 11, 4, hol), false);
+  eq("ciclo: 11/11 (feriado) já não conta", on(2026, 11, 11, hol), false);
+  eq("ciclo: 18/11 passa a ser visita", on(2026, 11, 18, hol), true);
+  eq("ciclo: 02/12 segue o novo ciclo", on(2026, 12, 2, hol), true);
+  eq("ciclo: sem coberturas usa a referência atual", on(2026, 10, 21, []), true);
+}
+
 console.log(ok, "ok", bad, "falhas");

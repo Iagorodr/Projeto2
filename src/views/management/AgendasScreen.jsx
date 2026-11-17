@@ -419,7 +419,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
   function coverAwayItems(staffId, day) {
     return coveredAwayOn(assignments, covers, staffId, weekDates[day - 1]).filter(({ clientId }) => {
       const c = clientById(clients, clientId);
-      return !c || clientAppliesOnDate(c, weekDates[day - 1]);
+      return !c || clientAppliesOnDate(c, weekDates[day - 1], covers);
     });
   }
   function firstName(staffId) { const m = staffById(staff, staffId); return m ? m.name.split(" ")[0] : "—"; }
@@ -989,7 +989,7 @@ function AgendasScreen({ contractors = [], lang, setLang, absences, setAbsences,
   function dayRows(day) {
     const byClient = new Map();
     clients.forEach((c) => {
-      if ((c.days || []).includes(day) && clientAppliesOnDate(c, weekDates[day - 1])) byClient.set(c.id, { client: c, staffIds: new Set() });
+      if ((c.days || []).includes(day) && clientAppliesOnDate(c, weekDates[day - 1], covers)) byClient.set(c.id, { client: c, staffIds: new Set() });
     });
     staff.forEach((s) => {
       getCellClientIds(s.id, day).forEach((cid) => {

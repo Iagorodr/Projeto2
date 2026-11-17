@@ -1426,8 +1426,31 @@ function knownClientsOn(staffMember, clients, date) {
 // dia de referência do cliente (frequencyAnchor) — ou, sem ele, da
 // referência global. Como o molde semanal tem os mesmos dias em toda a
 // semana, a paridade alterna de uma semana para a outra, como esperado.
-function clientAppliesOnDate(client, date, covers) {
-  if (covers && client && visitScheduledOn(covers, client.id, date)) return true; // visita avulsa marcada pela gerência
+// Semana de referência do ciclo (quinzenal/mensal) que valia numa data. Passar o ciclo para a semana
+// seguinte (feriado ou adiamento) só vale a partir da semana da mudança: o passado não se recalcula
+// (senão as visitas já feitas pareciam fora do ciclo e surgiam visitas "previstas" que nunca existiram).
+function clientAnchorOn(client, covers, date) {
+  const raw = (client && client.frequencyAnchor) || "";
+  if (!client || !covers || covers.length === 0) return raw;
+  const weekOf = (iso) => isoDateStr(startOfISOWeek(parseIso(iso)));
+  const ws = isoDateStr(startOfISOWeek(date));
+  let anchor = raw;
+  // Feriados: o cliente já guarda a referência nova; antes da semana da mudança vale a anterior.
+  const saved = covers.filter((cv) => cv && cv.cycleShift && !cv.synthetic && cv.clientId === client.id && cv.prevAnchor !== undefined)
+    .sort((a, b) => String(a.from).localeCompare(String(b.from)));
+  const later = saved.find((cv) => weekOf(cv.from) > ws);
+  if (later) anchor = later.prevAnchor || "";
+  // Adiamentos pedidos pela equipa (só leitura, ver derivePostpones): valem a partir da semana do adiamento.
+  covers.filter((cv) => cv && cv.cycleShift && cv.synthetic && cv.clientId === client.id && cv.newAnchor && postponeEffective(cv))
+    .sort((a, b) => String(a.from).localeCompare(String(b.from)))
+    .forEach((cv) => { if (weekOf(cv.from) <= ws) anchor = cv.newAnchor; });
+  return anchor;
+}
+
+function clientAppliesOnDate(clientIn, date, covers) {
+  if (covers && clientIn && visitScheduledOn(covers, clientIn.id, date)) return true; // visita avulsa marcada pela gerência
+  const anchorNow = clientAnchorOn(clientIn, covers, date);
+  const client = anchorNow === (clientIn.frequencyAnchor || "") ? clientIn : { ...clientIn, frequencyAnchor: anchorNow };
   if (!clientValidOnDate(client, date)) return false;
   if (!clientAppliesThisWeek(client, startOfISOWeek(date))) return false;
   if (client.frequency !== "alternate") return true;
@@ -2000,17 +2023,16 @@ function derivePostpones(absences, clients) {
   const rows = (absences || []).filter(isPostponeAbsence).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   if (rows.length === 0) return { covers: [], clients };
   const covers = [];
-  const anchors = new Map();
   rows.forEach((a) => {
     const clientId = (a.clientIds || [])[0];
     if (clientId == null) return;
     (a.owners && a.owners.length ? a.owners : [a.staffId]).forEach((sid) => covers.push({
       id: `pp:${a.id}:${sid}`, kind: "postpone", synthetic: true, status: a.status, clientId, fromStaffId: sid, toStaffId: null, from: a.date, to: a.date, byStaffId: a.staffId,
+      ...(a.cycleShift && a.newAnchor ? { cycleShift: true, newAnchor: a.newAnchor } : {}),
     }));
-    if (a.cycleShift && a.newAnchor && (a.status === "auto" || a.status === "approved")) anchors.set(clientId, a.newAnchor);
   });
-  const derived = anchors.size ? clients.map((c) => (anchors.has(c.id) ? { ...c, frequencyAnchor: anchors.get(c.id) } : c)) : clients;
-  return { covers, clients: derived };
+  // O ciclo empurrado vai nas próprias coberturas (ver clientAnchorOn); os clientes ficam como estão.
+  return { covers, clients };
 }
 
 // --- Feriados: decisão da gerência cliente a cliente ---
@@ -2111,7 +2133,7 @@ function clientExpectedHours(client, period, ctx, today) {
     const iso = isoDateStr(d);
     const dow = d.getDay() === 0 ? 7 : d.getDay();
     const avulsa = visitScheduledOn(ctx && ctx.covers, client.id, iso);
-    if (!avulsa && (!(client.days || []).includes(dow) || !clientAppliesOnDate(client, d))) continue;
+    if (!avulsa && (!(client.days || []).includes(dow) || !clientAppliesOnDate(client, d, ctx && ctx.covers))) continue;
     let h = clientDurationOnDow(client, dow) / 60;
     if (client.hoursMode === "individual") h *= Math.max(1, expectedTeamIds(ctx, client, iso).length);
     out.whole += h;
