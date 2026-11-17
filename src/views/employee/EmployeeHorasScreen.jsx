@@ -517,7 +517,7 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
   // Cartão ainda por marcar: a MINHA parte prevista (duração ÷ equipa da agenda).
   function expectedSubtitle(client) {
     const sh = expectedShare(sharedCtx, client, selectedKey, staffId);
-    return fmtMinutes(sh.minutes) + (sh.team > 1 ? ` · ${t.sharedWith(sh.team - 1)}` : "");
+    return fmtMinutes(sh.minutes) + (sh.team > 1 ? ` (${fmtMinutes(clientDurationOn(client, selectedKey))} ÷ ${sh.team})` : "");
   }
   // Adiar para a semana seguinte: ícone no cartão do cliente quinzenal/mensal ainda por marcar (hoje ou dias passados).
   const canPostpone = (client) => !!setAbsences && !weekLockedFlag && postponeEligible(assignments, client) && !entriesForDay.some((e) => e.clientId === client.id) && !postponeFor(covers, staffId, client.id, selectedKey);
@@ -607,7 +607,10 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
   function subtitleFor(entry) {
     const baseHours = entry.hours - (entry.extraMinutes || 0) / 60;
     let s = fmtHoursScreen(baseHours);
-    if (entry.sharedCount > 1) s += ` · ${t.sharedWith(entry.sharedCount - 1)}`;
+    if (entry.sharedCount > 1) {
+      const cl = clientById(clients, entry.clientId);
+      s += cl ? ` (${fmtMinutes(clientDurationOn(cl, visitDateOf(entry)))} ÷ ${entry.sharedCount})` : ` · ${t.sharedWith(entry.sharedCount - 1)}`;
+    }
     if (entry.splitAdjusted) s += ` · ${t.adjustedTag}`;
     return s;
   }
