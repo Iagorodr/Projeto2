@@ -8,7 +8,7 @@ import {
   clientById, entryClientName, pad2, fmtHoursScreen, fmtMinutes, dateStrInPeriod, dayIsCovered,
   startOfISOWeek, addDays, isoDateStr, recomputeSharedHours, entryRate, visitDateOf, isHorasFrozenOn, getOpenPeriod, getNextPeriod, getCutoffPeriod,
   weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks,
-  calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive,
+  calPeriodDays, calPeriodLabel, dayScheduledClients, isStaffActive, postponeEligible, postponeStaffIds, postponesInPeriod, postponeFor, getCutoffPeriod as getCutoffPeriodPP, isPostponeCover, addDays as addDaysPP,
   parseHoursInput, staffTotalPay, fmtEuro, expensesOf,
   staffStartedOn, knownClientsOn, absenceOn, clientDurationOn, findByName, expectedShare, suggestSameVisit, linkSameVisit,
 } from "../../models/utils.js";
@@ -19,6 +19,7 @@ import { PeriodNav } from "../shared/ui/PeriodNav.jsx";
 import ExpensesCard from "./ExpensesCard.jsx";
 import { removeFile } from "../../models/fileStorage.js";
 import { tagManagerChanges } from "../../models/managerTag.js";
+import { POSTPONE_T } from "../../models/i18nPostpone.js";
 import {
   MobileHeader, WeekStrip, DayPanel, ClientCheckCard, BottomActionBar, PeriodCalendar,
   Card, ConfirmDialog, Drawer, Button, Pill, SearchField, Toast, ProgressBar, SaveChip, OfflineBar,
@@ -69,7 +70,7 @@ function MissingBanner({ title, subtitle, action, onAction }) {
   );
 }
 
-function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [], covers = [], asManager = false, startDate = null, saveState = "saved", onRetrySave }) {
+function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId, company, clients, staff, assignments, horasData, setHorasData, cutoffDay, closedPeriods, setMissingItems, absences = [], covers = [], setAbsences = null, asManager = false, startDate = null, saveState = "saved", onRetrySave }) {
   const t = T[lang].employeeHoras;
   const pdfT = T[lang].pdf;
   const dayAbbr = DAY_ABBR_SUN0_BY_LANG[lang];
@@ -143,6 +144,9 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
   const [addClientOpen, setAddClientOpen] = useState(false);
   const [addClientSearch, setAddClientSearch] = useState("");
   const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [postponeOpen, setPostponeOpen] = useState(false);
+  const [postponeClientId, setPostponeClientId] = useState(null);
+  const pp = POSTPONE_T[lang] || POSTPONE_T.pt;
   const [extraTarget, setExtraTarget] = useState(null);
   const [extraDraft, setExtraDraft] = useState(0);
   const [noClientConfirmOpen, setNoClientConfirmOpen] = useState(false);
@@ -516,6 +520,10 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
     return fmtMinutes(sh.minutes) + (sh.team > 1 ? ` · ${t.sharedWith(sh.team - 1)}` : "");
   }
   const scheduledCards = scheduledToday.map((client) => {
+    const pendingPp = postponeFor(covers, staffId, client.id, selectedKey);
+    if (pendingPp && pendingPp.status === "pending") {
+      return { id: `sched-${client.id}`, clientId: client.id, name: client.name, subtitle: fmtMinutes(client.duration), checked: false, dimmed: true, dimmedNote: pp.cardPending, readOnly: true };
+    }
     const advancedAway = myHoras.entries.find((e) => !e.voided && e.clientId === client.id && e.replacesDate === selectedKey);
     if (advancedAway) {
       // `new Date("YYYY-MM-DD")` interpreta a data como UTC e pode
@@ -551,7 +559,35 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
       soloAllowed: soloAllowedFor(entry), soloActive: !!entry.solo, conflict: !!entry.conflict,
     };
   });
+  const postponedCards = (covers || []).filter((cv) => isPostponeCover(cv) && (cv.status === "auto" || cv.status === "approved") && cv.from === selectedKey && String(cv.fromStaffId) === String(staffId)).map((cv) => {
+    const cl = clients.find((c) => c.id === cv.clientId);
+    return { id: `postponed-${cv.id}`, clientId: cv.clientId, name: cl ? cl.name : "—", subtitle: "", checked: false, dimmed: true, dimmedNote: pp.cardNote, readOnly: true };
+  });
   const dayCards = [...scheduledCards, ...adHocCards];
+  const shownCards = [...dayCards, ...postponedCards]; // os adiados aparecem esbatidos mas não contam
+
+  // Adiar para a semana seguinte: só clientes por marcar, feitos no máx. 1x/semana, hoje ou mais tarde.
+  const postponeOptions = (setAbsences && selectedDate >= new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()))
+    ? scheduledToday.filter((c) => postponeEligible(assignments, c) && !entriesForDay.some((e) => e.clientId === c.id) && !postponeFor(covers, staffId, c.id, selectedKey))
+    : [];
+  const ppPeriod = getCutoffPeriodPP(selectedDate, cutoffDay, 0);
+  const ppClient = postponeClientId != null ? clients.find((c) => c.id === postponeClientId) : null;
+  const ppSecond = ppClient ? postponesInPeriod(covers, ppClient.id, ppPeriod) >= 1 : false;
+  function confirmPostpone() {
+    if (!ppClient || !setAbsences) return;
+    const ids = postponeStaffIds(assignments, staff, ppClient.id, selectedKey);
+    const owners = ids.includes(staffId) ? ids : [...ids, staffId];
+    const cycle = ppClient.frequency === "biweekly" || ppClient.frequency === "monthly";
+    const status = ppSecond ? "pending" : "auto";
+    const row = {
+      id: `pp-${selectedKey}-${ppClient.id}-${staffId}`, staffId, date: selectedKey, kind: "postpone", clientIds: [ppClient.id], owners,
+      status, seen: false, note: "", createdAt: new Date().toISOString(), handled: false, requestId: `pp-${staffId}-${Date.now().toString(36)}`,
+      ...(cycle ? { cycleShift: true, newAnchor: isoDateStr(addDaysPP(selectedDate, 7)) } : {}),
+    };
+    setAbsences((prev) => [...(prev || []).filter((a) => a.id !== row.id), row]);
+    showToast(status === "auto" ? pp.toastAuto(ppClient.name) : pp.toastPending(ppClient.name));
+    setPostponeOpen(false); setPostponeClientId(null);
+  }
 
   // Ajuste de tempo: + = hora extra (por aprovar), − = tempo a menos (só marcado, sem aprovação).
   function extraPillOf(entry) {
@@ -889,7 +925,7 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
                     <div style={{ marginBottom: weekLockedFlag ? 0 : 8 }}>{t.noAttendanceTitle}</div>
                     {!weekLockedFlag && <Button variant="ghost" onClick={undoNoClientDay}>{t.noAttendanceUndo}</Button>}
                   </div>
-                ) : !hasAgendaToday && dayCards.length === 0 ? (
+                ) : !hasAgendaToday && shownCards.length === 0 ? (
                   // Só mostra "não tem clientes hoje" se NÃO houver nada
                   // registado nesse dia. Antes aparecia sempre que a agenda
                   // do dia estava vazia e escondia os lançamentos já feitos
@@ -904,7 +940,7 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
               onAddClient={!weekLockedFlag && !markedNoClient && (hasAgendaToday || dayCards.length > 0) ? () => setAddClientOpen(true) : undefined}
               addClientLabel={t.addClientButton}
             >
-              {dayCards.map((card) => (
+              {shownCards.map((card) => (
                 <ClientCheckCard
                   key={card.id}
                   name={card.name}
@@ -949,6 +985,15 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
                     style={{ flex: 1, minWidth: 0, height: "auto", minHeight: 48, whiteSpace: "normal", textAlign: "center", lineHeight: 1.2, padding: "10px 10px" }}
                   >
                     {t.noClientDayButton}
+                  </Button>
+                )}
+                {postponeOptions.length > 0 && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => { setPostponeClientId(postponeOptions.length === 1 ? postponeOptions[0].id : null); setPostponeOpen(true); }}
+                    style={{ flex: 1, minWidth: 0, height: "auto", minHeight: 48, whiteSpace: "normal", textAlign: "center", lineHeight: 1.2, padding: "10px 10px" }}
+                  >
+                    {pp.button}
                   </Button>
                 )}
                 <Button
@@ -1149,6 +1194,30 @@ function EmployeeHorasScreen({ topNotice = null, lang, setLang, onHome, staffId,
       </Drawer>
 
       {/* Folha: "Fiz o cliente de outro dia" (adiantar) */}
+      <Drawer open={postponeOpen} onClose={() => { setPostponeOpen(false); setPostponeClientId(null); }} title={pp.title} width={420}
+        footer={<Button size="mobile" style={{ width: "100%" }} onClick={confirmPostpone} disabled={!ppClient}>{ppSecond ? pp.confirmSecond : pp.confirm}</Button>}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ fontSize: 13, color: COLORS.ink2 }}>{pp.intro}</div>
+          {postponeOptions.length === 0 ? <div style={{ fontSize: 13, color: COLORS.ink3 }}>{pp.none}</div> : (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {postponeOptions.map((c) => {
+                const on = postponeClientId === c.id;
+                return (
+                  <button key={c.id} type="button" aria-pressed={on} onClick={() => setPostponeClientId(c.id)}
+                    style={{ border: `1.5px solid ${on ? COLORS.vivo : COLORS.line}`, background: on ? COLORS.mint : COLORS.card, color: on ? COLORS.vivoInk : COLORS.ink, borderRadius: 999, padding: "8px 14px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {ppClient && (
+            <div role="note" style={{ border: `1.5px solid ${COLORS.clay || COLORS.line}`, background: COLORS.clayTint || COLORS.card, color: COLORS.clayInk || COLORS.ink, borderRadius: 12, padding: "10px 12px", fontSize: 13 }}>
+              <b>{pp.warnTitle}.</b> {ppSecond ? pp.warnSecond : pp.warn}
+            </div>
+          )}
+        </div>
+      </Drawer>
       <Drawer open={advanceOpen} onClose={() => setAdvanceOpen(false)} title={t.advanceSheetTitle} width={420}>
         {(() => {
           const earlier = missedClientsEarlier();

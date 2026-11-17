@@ -4,7 +4,7 @@ import { styles } from "../../styles/styles.js";
 import { COLORS } from "../../styles/colors.js";
 import { RADIUS } from "../../styles/tokens.js";
 import { TODAY } from "../../models/data.js";
-import { isoDateStr, isoDatesBetween, fmtNoteDate } from "../../models/utils.js";
+import { isoDateStr, isoDatesBetween, fmtNoteDate, isPostponeAbsence } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { Field } from "./Layout.jsx";
 import { Drawer, Button, Toast, ConfirmDialog, SegmentedControl } from "./ui/index.js";
@@ -27,7 +27,7 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences, myC
   const [cancelId, setCancelId] = useState(null);
 
   const mine = (absences || [])
-    .filter((a) => a.staffId === staffId && a.date >= todayIso)
+    .filter((a) => a.staffId === staffId && a.date >= todayIso && !isPostponeAbsence(a))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   function handleSend() {
@@ -38,7 +38,7 @@ function AbsenceSheet({ lang, open, onClose, staffId, absences, setAbsences, myC
     const now = new Date().toISOString();
     const requestId = `rq-${staffId}-${Date.now().toString(36)}`;
     setAbsences((prev) => {
-      const keep = (prev || []).filter((a) => !(a.staffId === staffId && days.includes(a.date)));
+      const keep = (prev || []).filter((a) => isPostponeAbsence(a) || !(a.staffId === staffId && days.includes(a.date)));
       const added = days.map((d) => ({
         id: `${staffId}-${d}-${Date.now()}`, staffId, date: d, note: note.trim(), createdAt: now, handled: false,
         status: "pending", kind, requestId, ...(kind === "client" ? { clientIds: pickedClients } : null),

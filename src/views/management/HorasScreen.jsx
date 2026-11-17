@@ -13,7 +13,7 @@ import {
   expensesOf, staffExpensesApproved, staffExpensesPending, pendingExpenseList, expectedShare, dayScheduledClients, addDays, absenceOn, isStaffActive, migrateLockedWeeksToBlocks,
 } from "../../models/utils.js";
 import { formatTodayLabel, T, DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
-import { exportStaffHorasPdf, exportPeriodSummaryPdf } from "../../models/pdfExport.js";
+import { exportStaffHorasPdf, exportPeriodSummaryPdf, exportJointHorasPdf } from "../../models/pdfExport.js";
 import {
   PageHeader, Card, SegmentedBar, FilterChip, SearchField, Button, Pill,
   Avatar, DataTable, Drawer, ConfirmDialog, Toast, SharedWithBadge, InfoTip,
@@ -173,6 +173,8 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
   const isPhoneTier = useBreakpoint() === "mobile";
   const [paidStamp, setPaidStamp] = useState(null); // carimbo "✓ Pago" logo depois de marcar
   const [moreOpen, setMoreOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinPick, setJoinPick] = useState([]);
   // Horas previstas pela agenda para cada pessoa no período (a sua parte de cada visita).
   const expectedByStaff = useMemo(() => {
     const out = {};
@@ -250,6 +252,17 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
       pdfT,
       statusLabels: { paid: c0.paid, finished: t.statusFinished, pending: c0.pending },
     });
+  }
+  function exportJointPdf() {
+    const picked = staff.filter((s) => joinPick.includes(s.id));
+    if (picked.length < 2) return;
+    const entries = picked.flatMap((s) => ((horasData[s.id] || {}).entries || []).filter((e) => dateStrInPeriod(e.date, period)));
+    exportJointHorasPdf({
+      companyName: company?.name, companyInfo: company,
+      staffNames: picked.map((s) => s.name),
+      periodLabel, entries, clients, pdfT,
+    });
+    setJoinOpen(false);
   }
   function exportStaffPdf() {
     exportStaffHorasPdf({
@@ -510,6 +523,10 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                     <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); exportPeriodPdf(); }}
                       style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", border: "none", background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: COLORS.ink, textAlign: "left" }}>
                       <FileDown size={17} /> {t.exportPdfGeneral}
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); setJoinPick([]); setJoinOpen(true); }}
+                      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", border: "none", background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, color: COLORS.ink, textAlign: "left" }}>
+                      <FileDown size={17} /> {t.joinPdf}
                     </button>
                   </div>
                 </>
@@ -798,6 +815,27 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
             </>
           );
         })()}
+      </Drawer>
+
+      <Drawer
+        open={joinOpen} onClose={() => setJoinOpen(false)} title={t.joinTitle} closeLabel={c0.close}
+        footer={<Button size="mobile" style={{ width: "100%" }} onClick={exportJointPdf} disabled={joinPick.length < 2} disabledReason={t.joinNeed} disabledReasonBelow>{t.joinGenerate}</Button>}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ fontSize: 13, color: COLORS.ink2 }}>{t.joinHint}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {staff.map((s) => {
+              const on = joinPick.includes(s.id);
+              return (
+                <button key={s.id} type="button" aria-pressed={on}
+                  onClick={() => setJoinPick((p) => (on ? p.filter((x) => x !== s.id) : [...p, s.id]))}
+                  style={{ border: `1.5px solid ${on ? COLORS.vivo : COLORS.line}`, background: on ? COLORS.mint : COLORS.card, color: on ? COLORS.vivoInk : COLORS.ink, borderRadius: RADIUS.chip, padding: "8px 14px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  {s.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </Drawer>
 
       <ConfirmDialog

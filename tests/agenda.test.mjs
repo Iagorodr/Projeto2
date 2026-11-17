@@ -95,3 +95,34 @@ if (bad > 0) process.exitCode = 1;
   eq("ciclo passado: 2/12 sim", U.clientAppliesOnDate(q2, new Date(2026, 11, 2), []), true);
 }
 console.log(ok, "ok", bad, "falhas");
+
+{
+  // Adiamento para a semana seguinte (linhas de `absences` com kind "postpone").
+  const cl = { id: 800, name: "Semanal", days: [3], duration: 60, hoursMode: "dividida", frequency: "weekly" };
+  const cl2 = { id: 801, name: "Duas vezes", days: [2, 4], duration: 60, hoursMode: "dividida", frequency: "weekly" };
+  const qz = { id: 802, name: "Quinzenal", days: [3], duration: 60, hoursMode: "dividida", frequency: "biweekly", frequencyAnchor: "2026-11-09" };
+  const st = [{ id: 1, name: "Ana", status: "ativo", accountType: "fixo" }];
+  const as = { "1-3": [800, 802], "1-2": [801], "1-4": [801] };
+  eq("adiar: elegível 1x/semana", U.postponeEligible(as, cl), true);
+  eq("adiar: 2x/semana não é elegível", U.postponeEligible(as, cl2), false);
+  const abs = [
+    { id: "pp1", staffId: 1, date: "2026-11-11", kind: "postpone", clientIds: [800], owners: [1], status: "auto" },
+    { id: "pp2", staffId: 1, date: "2026-11-11", kind: "postpone", clientIds: [802], owners: [1], status: "auto", cycleShift: true, newAnchor: "2026-11-18" },
+  ];
+  const d = U.derivePostpones(abs, [cl, cl2, qz]);
+  eq("adiar: agenda do dia sem os adiados", U.agendaClientIdsOn(as, d.covers, 1, "2026-11-11"), []);
+  eq("adiar: semana seguinte normal (semanal)", U.agendaClientIdsOn(as, d.covers, 1, "2026-11-18").includes(800), true);
+  eq("adiar: não conta como falta", U.absenceOn(abs, 1, "2026-11-11"), null);
+  eq("adiar: não é falta parcial", U.clientAbsentOn(abs, 1, 800, "2026-11-11"), false);
+  eq("adiar: ciclo quinzenal passa a 18/11", U.clientAppliesOnDate(d.clients.find((x) => x.id === 802), new Date(2026, 10, 18), d.covers), true);
+  eq("adiar: ciclo quinzenal não a 25/11", U.clientAppliesOnDate(d.clients.find((x) => x.id === 802), new Date(2026, 10, 25), d.covers), false);
+  eq("adiar: nunca aparece como 'coberto por'", U.coveredAwayOn(as, d.covers, 1, "2026-11-11"), []);
+  const pend = [{ id: "pp3", staffId: 1, date: "2026-11-11", kind: "postpone", clientIds: [800], owners: [1], status: "pending" }];
+  const dp = U.derivePostpones(pend, [cl]);
+  eq("adiar 2.ª vez: pendente não altera a agenda", U.agendaClientIdsOn(as, dp.covers, 1, "2026-11-11"), [800, 802]);
+  eq("adiar 2.ª vez: pedidos por aprovar na caixa", U.postponeInbox(pend).length, 1);
+  eq("adiar: aviso novo na caixa; visto sai", [U.postponeInbox(abs).length, U.postponeInbox(abs.map((a) => ({ ...a, seen: true }))).length], [2, 0]);
+  eq("adiar: pedidos de folga não incluem adiamentos", U.pendingAbsenceRequests(pend, "2026-11-01").length, 0);
+  eq("adiar: contagem no período", U.postponesInPeriod(d.covers, 800, { start: new Date(2026, 10, 1), end: new Date(2026, 11, 1) }), 1);
+}
+console.log(ok, "ok", bad, "falhas");

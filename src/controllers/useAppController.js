@@ -6,10 +6,10 @@
 // o estado é carregado de lá ao abrir e cada alteração é gravada de volta. Sem
 // configuração, o app funciona exatamente como antes, só em memória, usando os
 // dados de demonstração de models/demoState.js (gerados para o dia de hoje).
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { TODAY } from "../models/data.js";
 import { buildDemoState } from "../models/demoState.js";
-import { activeClientsCount, isStaffActive, snapshotClientRate, pinTeamChanges, getOpenPeriod, isoDateStr } from "../models/utils.js";
+import { activeClientsCount, isStaffActive, snapshotClientRate, pinTeamChanges, getOpenPeriod, isoDateStr, derivePostpones } from "../models/utils.js";
 import { diffKeys, mergeRemote, buildPatch, isMissingRpc } from "../models/horasSync.js";
 import { listDiff, listMerge, mapDiff, mapMerge, isEmptyDiff } from "../models/appDataSync.js";
 import { supabase, isSupabaseConfigured } from "../models/supabaseClient.js";
@@ -167,7 +167,9 @@ export function useAppController() {
   }, [guardAgenda]);
   const setCoversGuarded = useCallback((u) => {
     setCovers((prev) => {
-      const next = typeof u === "function" ? u(prev) : u;
+      let next = typeof u === "function" ? u(prev) : u;
+      // Coberturas "sintéticas" (adiamentos vindos de `absences`) só existem para leitura: nunca se gravam.
+      if (Array.isArray(next) && next.some((cv) => cv && cv.synthetic)) next = next.filter((cv) => !cv.synthetic);
       if (next !== prev) {
         const as = latestRef.current.assignments || {};
         queueMicrotask(() => guardAgenda({ assignments: as, covers: prev || [] }, { assignments: as, covers: next || [] }));
@@ -1175,6 +1177,9 @@ export function useAppController() {
   const companyNoticeValue = isSupabaseConfigured && perspective !== "login" ? companyNotice(companyStatus, isManagerSession) : null;
 
   latestRef.current = { staff, clients, absences, covers, assignments, closedPeriods, cutoffDay };
+  // Adiamentos de clientes (funcionário grava em `absences`): vistos como cobertura "de fora" e ciclo empurrado.
+  const postponeView = useMemo(() => derivePostpones(absences, clients), [absences, clients]);
+  const viewCovers = useMemo(() => (postponeView.covers.length ? [...(covers || []), ...postponeView.covers] : covers), [covers, postponeView]);
   return {
     saveState: isSupabaseConfigured ? saveState : "saved", retrySave,
     perspective, setPerspective, screen, setScreen, goTo, navIntent, empScreen, setEmpScreen, empClientFocus, setEmpClientFocus, openEmpClient,
@@ -1184,10 +1189,10 @@ export function useAppController() {
     reclamacaoBaseClients: Math.max(1, activeClientsCount(clients, TODAY)), setReclamacaoBaseClients,
     reclamacaoExcelenteCount, setReclamacaoExcelenteCount,
     reclamacaoRazoavelCount, setReclamacaoRazoavelCount,
-    clients, setClients, contractors, setContractors, deleteContractor, contractorClosings, saveClosing, staff, setStaff, assignments, setAssignments: setAssignmentsGuarded,
+    clients: postponeView.clients, setClients, contractors, setContractors, deleteContractor, contractorClosings, saveClosing, staff, setStaff, assignments, setAssignments: setAssignmentsGuarded,
     horasData, setHorasData, closedPeriods, setClosedPeriods,
     missingItems, setMissingItems, sentItems, setSentItems,
-    personalNotes, setPersonalNotes, absences, setAbsences, covers, setCovers: setCoversGuarded,
+    personalNotes, setPersonalNotes, absences, setAbsences, covers: viewCovers, setCovers: setCoversGuarded,
     enterManagement, enterEmployee, deleteClient, deleteStaff,
     formatAllData, verifyPassword,
     authLoading, authError, loginWithPassword, logout, passwordGate, requestPasswordReset, setNewPassword, tutorialPending, finishTutorial,

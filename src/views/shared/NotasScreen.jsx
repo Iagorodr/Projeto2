@@ -10,6 +10,7 @@ import { T } from "../../models/i18n.js";
 import { upcomingHolidays } from "../../models/holidays.js";
 import { Field } from "./Layout.jsx";
 import AbsenceRequests from "./AbsenceRequests.jsx";
+import PostponeInbox from "./PostponeInbox.jsx";
 import { PageHeader, Button, IconButton, Drawer, Pill, Card, Toast, InfoTip, MobileHeader, Fab } from "./ui/index.js";
 import { usePushNotifications } from "../../hooks/usePushNotifications.js";
 
@@ -230,7 +231,12 @@ function NotasScreen({ lang, setLang, onHome, ownerId, personalNotes, setPersona
     <Toast message={t.noteDeletedToast} actionLabel={t.undo} onAction={undoDelete} onDismiss={() => setUndoInfo(null)} closeLabel={c0.close} />
   );
 
-  const requests = ownerId === "management" && setAbsences ? <AbsenceRequests lang={lang} absences={absences} setAbsences={setAbsences} staff={staff || []} clients={clients || []} /> : null;
+  const requests = ownerId === "management" && setAbsences ? (
+    <>
+      <PostponeInbox lang={lang} absences={absences} setAbsences={setAbsences} staff={staff || []} clients={clients || []} />
+      <AbsenceRequests lang={lang} absences={absences} setAbsences={setAbsences} staff={staff || []} clients={clients || []} />
+    </>
+  ) : null;
 
   if (desktop) {
     return (

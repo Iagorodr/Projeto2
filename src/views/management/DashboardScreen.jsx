@@ -13,11 +13,12 @@ import {
   clientById, parseDMY, getOpenPeriod, unseenAvisosCount, formatPeriodLabel, staffTotalHours, staffTotalPay,
   notesForOwner, fmtEuro, fmtHoursScreen, monthAbbr, isStaffActive, boardStaff, activeClientsCount, isoDateStr, dateStrInPeriod,
   fmtHM, countReviews, inReviewWindow, pendingExpenseList, staffExpensesApproved, uniqueSentCount, groupSentItems,
-  addDays, weekBlocksOfPayPeriod, staffWithGaps, clientExpectedHours, dayScheduledClients, absenceOn, absenceApproved, pendingAbsenceRequests, pendingHolidayDecisions, parseClientDate,
+  addDays, weekBlocksOfPayPeriod, staffWithGaps, clientExpectedHours, dayScheduledClients, absenceOn, absenceApproved, pendingAbsenceRequests, pendingHolidayDecisions, postponeInbox, parseClientDate,
 } from "../../models/utils.js";
 import { T } from "../../models/i18n.js";
 import { DASH } from "../../models/i18nDash.js";
 import { upcomingHolidays } from "../../models/holidays.js";
+import { POSTPONE_T } from "../../models/i18nPostpone.js";
 import { HOLIDAY_T } from "../../models/i18nHoliday.js";
 import ClientsByCityCard from "./ClientsByCityCard.jsx";
 import { contractorPeriods, periodFinance } from "../../models/contractorStats.js";
@@ -124,6 +125,7 @@ function DashboardScreen({
   const pendingRequests = unseenAvisosCount(missingItems, sentItems, period);
   const absencesPending = (absences || []).filter((a) => absenceApproved(a) && !a.handled && a.date >= isoDateStr(TODAY)).length;
   const absenceRequestsPending = pendingAbsenceRequests(absences, isoDateStr(TODAY)).length;
+  const postponePending = postponeInbox(absences).length;
   // Feriados nos próximos 7 dias com clientes por decidir (a gerência decide em Agendas).
   const tHol = HOLIDAY_T[lang] || HOLIDAY_T.pt;
   const holidayPending = pendingHolidayDecisions(upcomingHolidays(TODAY, 7, lang).map((h) => h.iso), clients, staff, assignments, covers);
@@ -155,6 +157,7 @@ function DashboardScreen({
     { key: "closings", tone: "warn", label: f.pendingClosings(closingsToDo), count: closingsToDo, go: () => onNavigate("contratantes") },
     { key: "reopened", tone: "re", label: t.pendingReopened, count: reopenedCount, go: () => onNavigate("horas") },
     { key: "unread", tone: "acc", label: t.pendingUnread, count: pendingRequests, go: () => onNavigate("avisos") },
+    { key: "postpone", tone: "warn", label: POSTPONE_T[lang].pendency, count: postponePending, go: () => onNavigate("notas") },
     { key: "absenceReq", tone: "acc", label: tAbs.pendencyReq, count: absenceRequestsPending, go: () => onNavigate("notas") },
     { key: "holiday", tone: "warn", label: holidayFirst ? tHol.pendency(holidayName, `${holidayFirst.iso.slice(8, 10)}/${holidayFirst.iso.slice(5, 7)}`) : "", count: holidayPending.reduce((n, h) => n + h.undecided, 0), go: () => onNavigate("agendas", { openHoliday: holidayFirst?.iso }) },
     { key: "absence", tone: "warn", label: tAbs.pendency, count: absencesPending, go: () => onNavigate("agendas") },

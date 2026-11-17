@@ -340,6 +340,58 @@ async function exportStaffHorasPdf({ companyName, companyInfo, staffName, period
   doc.save(`horas-${staffName.replace(/\s+/g, "_")}-${periodLabel.replace(/\s+/g, "_")}${fileSuffix}.pdf`);
 }
 
+
+// PDF "unido" (só gerência): soma as horas de vários funcionários por cliente,
+// sem repetir o cliente (Cliente X 2h + 2h -> Cliente X 4h). Útil para duplas
+// que querem ver tudo junto.
+async function exportJointHorasPdf({ companyName, companyInfo, staffNames, periodLabel, entries, clients, pdfT }) {
+  const { jsPDF, autoTable } = await loadPdf();
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const names = staffNames.join(" + ");
+  const startY = await buildHeader(doc, {
+    companyInfo,
+    companyName,
+    reportTitle: pdfT.reportTitleJoint,
+    subtitle: `${names} — ${periodLabel}`,
+    pdfT,
+  });
+  const byClient = new Map();
+  let totalHours = 0;
+  let totalValue = 0;
+  entries.filter((e) => !e.voided).forEach((e) => {
+    const key = e.clientId != null ? `id:${e.clientId}` : `n:${entryClientName(clients, e)}`;
+    const cur = byClient.get(key) || { name: entryClientName(clients, e), hours: 0, value: 0, pendingExtra: false };
+    const value = e.hours * entryRate(e, clients);
+    cur.hours += e.hours;
+    cur.value += value;
+    if (e.extra && !e.approved) cur.pendingExtra = true;
+    byClient.set(key, cur);
+    totalHours += e.hours;
+    totalValue += value;
+  });
+  const list = Array.from(byClient.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const hasPendingExtra = list.some((r) => r.pendingExtra);
+  autoTable(doc, {
+    startY,
+    head: [[pdfT.colClient, pdfT.colHours, pdfT.colTotal]],
+    body: list.map((r) => [r.name, `${fmtHoursNum(r.hours)}${r.pendingExtra ? "*" : ""}`, fmtEuro(r.value)]),
+    ...tableStyle({ 1: { halign: "right" }, 2: { halign: "right" } }),
+  });
+  let afterTableY = doc.lastAutoTable.finalY;
+  if (hasPendingExtra) {
+    doc.setFontSize(8.5);
+    doc.setTextColor(...INK2);
+    doc.text(pdfT.extraPendingLegend, 40, afterTableY + 14);
+    afterTableY += 14;
+  }
+  buildTotalsBox(doc, afterTableY, [
+    { label: pdfT.totalHoursLabel, value: `${fmtHoursNum(totalHours)}h` },
+    { label: pdfT.totalValueLabel, value: fmtEuro(totalValue) },
+  ]);
+  drawFooters(doc, `${companyName || ""} · ${pdfT.reportTitleJoint} · ${names}`, pdfT);
+  doc.save(`horas-unidas-${staffNames.join("_").replace(/\s+/g, "_")}-${periodLabel.replace(/\s+/g, "_")}.pdf`);
+}
+
 // Resumo do período inteiro (todos os funcionários): Funcionário, Status,
 // Total de horas, Total a pagar — para o botão "Exportar PDF (geral)".
 async function exportPeriodSummaryPdf({ companyName, companyInfo, periodLabel, rows, totalHours, totalValue, totalExpenses, pdfT, statusLabels }) {
@@ -403,4 +455,4 @@ async function exportGenericTablePdf({ companyName, companyInfo, reportTitle, su
   doc.save(fileName);
 }
 
-export { exportStaffHorasPdf, exportPeriodSummaryPdf, exportGenericTablePdf };
+export { exportJointHorasPdf, exportStaffHorasPdf, exportPeriodSummaryPdf, exportGenericTablePdf };
