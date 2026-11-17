@@ -355,27 +355,29 @@ async function exportJointHorasPdf({ companyName, companyInfo, staffNames, perio
     subtitle: `${names} — ${periodLabel}`,
     pdfT,
   });
-  const byClient = new Map();
+  // Uma linha por dia e cliente: se dois funcionários fizeram o mesmo cliente no mesmo dia, as horas somam (2h + 2h = 4h).
+  const byDayClient = new Map();
   let totalHours = 0;
   let totalValue = 0;
   entries.filter((e) => !e.voided).forEach((e) => {
-    const key = e.clientId != null ? `id:${e.clientId}` : `n:${entryClientName(clients, e)}`;
-    const cur = byClient.get(key) || { name: entryClientName(clients, e), hours: 0, value: 0, pendingExtra: false };
+    const name = entryClientName(clients, e);
+    const key = `${e.date}|${e.clientId != null ? `id:${e.clientId}` : `n:${name}`}`;
+    const cur = byDayClient.get(key) || { date: e.date, name, hours: 0, value: 0, pendingExtra: false };
     const value = e.hours * entryRate(e, clients);
     cur.hours += e.hours;
     cur.value += value;
     if (e.extra && !e.approved) cur.pendingExtra = true;
-    byClient.set(key, cur);
+    byDayClient.set(key, cur);
     totalHours += e.hours;
     totalValue += value;
   });
-  const list = Array.from(byClient.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const list = Array.from(byDayClient.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.name.localeCompare(b.name, undefined, { numeric: true }));
   const hasPendingExtra = list.some((r) => r.pendingExtra);
   autoTable(doc, {
     startY,
-    head: [[pdfT.colClient, pdfT.colHours, pdfT.colTotal]],
-    body: list.map((r) => [r.name, `${fmtHoursNum(r.hours)}${r.pendingExtra ? "*" : ""}`, fmtEuro(r.value)]),
-    ...tableStyle({ 1: { halign: "right" }, 2: { halign: "right" } }),
+    head: [[pdfT.colDate, pdfT.colClient, pdfT.colHours, pdfT.colTotal]],
+    body: list.map((r) => [shortDate(r.date), r.name, `${fmtHoursNum(r.hours)}${r.pendingExtra ? "*" : ""}`, fmtEuro(r.value)]),
+    ...tableStyle({ 2: { halign: "right" }, 3: { halign: "right" } }),
   });
   let afterTableY = doc.lastAutoTable.finalY;
   if (hasPendingExtra) {
