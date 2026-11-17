@@ -375,7 +375,7 @@ async function exportJointHorasPdf({ companyName, companyInfo, staffNames, perio
   const hasPendingExtra = list.some((r) => r.pendingExtra);
   autoTable(doc, {
     startY,
-    head: [[pdfT.colDate, pdfT.colClient, pdfT.colHours, pdfT.colTotal]],
+    head: [[pdfT.colDate, pdfT.colClient, pdfT.colHours, pdfT.colValueJoint]],
     body: list.map((r) => [shortDate(r.date), r.name, `${fmtHoursNum(r.hours)}${r.pendingExtra ? "*" : ""}`, fmtEuro(r.value)]),
     ...tableStyle({ 2: { halign: "right" }, 3: { halign: "right" } }),
   });
