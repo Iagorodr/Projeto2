@@ -143,3 +143,25 @@ console.log(ok, "ok", bad, "falhas");
 }
 
 console.log(ok, "ok", bad, "falhas");
+// Divisão por acertar: cliente de 4h, um registou 1h (fixas) e o outro 2h → propõe 3h/1h
+{
+  const cl = { id: 88, name: "Sebamafe", days: [5], duration: 240, hoursMode: "dividida", frequency: "weekly" };
+  const st = [{ id: 1, name: "Iago", status: "ativo", accountType: "fixo" }, { id: 2, name: "Jadson", status: "ativo", accountType: "fixo" }];
+  const cx = { staff: st, assignments: { "1-5": [88], "2-5": [88] }, covers: [], absences: [] };
+  const per2 = { start: new Date(2026, 10, 16), end: new Date(2026, 10, 22) };
+  const hh = { 1: { entries: [{ date: "2026-11-20", clientId: 88, hours: 1, extraMinutes: 0, manualBase: 1 }] }, 2: { entries: [{ date: "2026-11-20", clientId: 88, hours: 2, extraMinutes: 0 }] } };
+  const r = U.reconcileVisits(hh, [cl], per2, cx, "2026-11-21");
+  const sp = r.issues.filter((i) => i.kind === "split");
+  eq("divisão: aviso", sp.length, 1);
+  eq("divisão: proposta", sp[0] && sp[0].proposal.map((x) => [x.staffId, x.hours]), [["2", 3]]);
+  const ap = U.applySplit(hh, sp[0]);
+  eq("divisão: aplicada", [ap[1].entries[0].hours, ap[2].entries[0].hours], [1, 3]);
+  eq("divisão: depois já bate", U.reconcileVisits(ap, [cl], per2, cx, "2026-11-21").issues.filter((i) => i.kind === "split").length, 0);
+  const ak = U.ackSplit(hh, sp[0]);
+  eq("divisão: está certo", [U.reconcileVisits(ak, [cl], per2, cx, "2026-11-21").issues.filter((i) => i.kind === "split").length, ak[2].entries[0].hours], [0, 2]);
+  eq("divisão: soma certa sem aviso", U.reconcileVisits({ 1: { entries: [{ date: "2026-11-20", clientId: 88, hours: 2, extraMinutes: 0 }] }, 2: hh[2] }, [cl], per2, cx, "2026-11-21").issues.filter((i) => i.kind === "split").length, 0);
+  eq("melhor cliente exato", U.bestClientMatch("  sebamáfe ", [cl]), { id: 88, exact: true });
+  eq("melhor cliente aproximado", U.bestClientMatch("Sebamafe Lda", [cl, { id: 5, name: "Outro" }]), { id: 88, exact: false });
+}
+console.log(ok, "ok", bad, "falhas");
+if (bad > 0) process.exitCode = 1;

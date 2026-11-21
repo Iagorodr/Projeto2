@@ -6,7 +6,7 @@ import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { TODAY } from "../../models/data.js";
 import { DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
-  acceptExtra, ackMissing, markRepassed, outsideLeftover, applyHoursChanges, applySuggestion, assignPendingEntry, clientById, confirmHoursOk, fmtEuro, fmtHoursScreen, hoursImpact, isoDateStr,
+  acceptExtra, ackMissing, ackSplit, applySplit, bestClientMatch, markRepassed, outsideLeftover, applyHoursChanges, applySuggestion, assignPendingEntry, clientById, confirmHoursOk, fmtEuro, fmtHoursScreen, hoursImpact, isoDateStr,
   keepSeparate, reconcileVisits, resolveConflict, voidExtra, weekLabelPT,
 } from "../../models/utils.js";
 import { Button, Pill } from "../shared/ui/index.js";
@@ -19,7 +19,7 @@ import { Button, Pill } from "../shared/ui/index.js";
 // `onChange(nextHorasData, toastMsg)` recebe o novo horasData.
 const SUGGESTED = new Set(["join", "extra", "missing", "leftover"]); // têm caixa de seleção
 const PRESELECT = new Set(["join"]); // vêm marcados à partida (provas claras); o resto marca-se à mão
-const TAB_ORDER = ["hours", "join", "extra", "missing", "leftover", "conflict", "pending", "repass"]; // separadores (+ "clients")
+const TAB_ORDER = ["hours", "split", "join", "extra", "missing", "leftover", "conflict", "pending", "repass"]; // separadores (+ "clients")
 
 function isoToDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
 
@@ -133,7 +133,7 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
   const pct = rec.totals.expected > 0 ? Math.round((rec.totals.checked / rec.totals.expected) * 100) : 0;
 
   const kindPill = (i) => {
-    const map = { join: ["pending", t.reviewKindJoin], extra: ["neutral", t.reviewKindExtra], missing: ["missing", t.reviewKindMissing], leftover: ["pending", t.reviewKindLeftover], conflict: ["missing", t.reviewKindConflict], pending: ["reopened", t.reviewKindPending], repass: ["reopened", t.reviewKindRepass], hours: ["pending", t.reviewKindHours] };
+    const map = { join: ["pending", t.reviewKindJoin], extra: ["neutral", t.reviewKindExtra], missing: ["missing", t.reviewKindMissing], leftover: ["pending", t.reviewKindLeftover], conflict: ["missing", t.reviewKindConflict], pending: ["reopened", t.reviewKindPending], repass: ["reopened", t.reviewKindRepass], hours: ["pending", t.reviewKindHours], split: ["pending", t.reviewKindSplit] };
     const [variant, label] = map[i.kind];
     return <Pill variant={variant}>{label}</Pill>;
   };
@@ -188,6 +188,31 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
             </div>
           )}
           {i.paid && <div style={{ ...line, marginTop: 4 }}>{t.reviewPaidNote}</div>}
+        </div>
+      );
+    }
+    if (i.kind === "split") {
+      const less = i.diff < 0;
+      const prop = i.proposal ? [...i.proposal.map((r) => ({ staffId: r.staffId, hours: r.hours })), ...i.marks.filter((m) => !i.proposal.some((r) => String(r.staffId) === String(m.staffId))).map((m) => ({ staffId: m.staffId, hours: m.hours }))] : null;
+      return (
+        <div key={i.key} style={card} data-testid="review-issue" data-kind="split">
+          {head}
+          <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{dayLabel(i.date)}</div>
+          <div style={line}>{t.reviewMarksLabel}: {i.marks.map((m) => `${firstOf(m.staffId)} ${fmtHoursScreen(m.hours)}`).join(" · ")}</div>
+          <div style={{ ...line, marginTop: 6, color: COLORS.amberInk, background: COLORS.amberBg, borderRadius: RADIUS.control, padding: "6px 10px" }}>
+            {t.reviewSplitWhy(fmtHoursScreen(i.total), fmtHoursScreen(i.sum), fmtHoursScreen(Math.abs(i.diff)), less)}
+          </div>
+          {i.paid ? <div style={{ ...line, marginTop: 6 }}>{t.reviewPaidNote}</div> : (
+            <>
+              {prop ? (
+                <div style={{ ...line, marginTop: 6, fontWeight: 600, color: COLORS.ink, fontVariantNumeric: "tabular-nums" }}>{t.reviewSplitProposal(prop.map((r) => `${firstOf(r.staffId)} ${fmtHoursScreen(r.hours)}`).join(" · "))}</div>
+              ) : <div style={{ ...line, marginTop: 6 }}>{t.reviewSplitNoProposal}</div>}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                {prop && <Button variant="primary" onClick={() => act(() => applySplit(horasData, i), t.reviewDoneSplit)} data-testid="review-split-apply">{t.reviewSplitApply}</Button>}
+                <Button variant="ghost" onClick={() => act(() => ackSplit(horasData, i), t.reviewDoneSplitOk)}>{t.reviewSplitOk}</Button>
+              </div>
+            </>
+          )}
         </div>
       );
     }
@@ -313,7 +338,8 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
       );
     }
     // pending: cliente escrito à mão
-    const choice = pick[i.key] !== undefined ? pick[i.key] : "";
+    const best = bestClientMatch(i.name, clients);
+    const choice = pick[i.key] !== undefined ? pick[i.key] : (best ? String(best.id) : "");
     const cand = i.candidates.map((id) => clientById(clients, id)).filter(Boolean);
     const assign = (cid) => act(() => assignPendingEntry(horasData, clients, i, cid, ctx), t.reviewDonePending);
     return (
@@ -399,7 +425,7 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
           <div role="tablist" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, WebkitOverflowScrolling: "touch" }} data-testid="review-tabs">
             {tabs.map((k) => {
               const on = k === curTab;
-              const label = k === "clients" ? t.reviewTabClients : ({ hours: t.reviewKindHours, join: t.reviewKindJoin, extra: t.reviewKindExtra, missing: t.reviewKindMissing, leftover: t.reviewKindLeftover, conflict: t.reviewKindConflict, pending: t.reviewKindPending, repass: t.reviewKindRepass })[k];
+              const label = k === "clients" ? t.reviewTabClients : ({ hours: t.reviewKindHours, split: t.reviewKindSplit, join: t.reviewKindJoin, extra: t.reviewKindExtra, missing: t.reviewKindMissing, leftover: t.reviewKindLeftover, conflict: t.reviewKindConflict, pending: t.reviewKindPending, repass: t.reviewKindRepass })[k];
               const n = k === "clients" ? rec.clients.length : counts[k];
               return (
                 <button

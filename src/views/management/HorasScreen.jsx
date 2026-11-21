@@ -6,7 +6,7 @@ import { RADIUS, FONT } from "../../styles/tokens.js";
 import { useControlSize, useBreakpoint } from "../../hooks/useBreakpoint.js";
 import { TODAY } from "../../models/data.js";
 import {
-  clientById, clientDurationOn, entryClientName, isPendingClientEntry, recomputeSharedHours, unpinVisit, entryRate, visitDateOf, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
+  clientById, bestClientMatch, nameCandidates, clientDurationOn, entryClientName, isPendingClientEntry, recomputeSharedHours, unpinVisit, entryRate, visitDateOf, pad2, fmtEuro, fmtHoursScreen, dateStrInPeriod,
   buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, formatPeriodLabel,
   startOfISOWeek, isoDateStr, weekLabelPT, staffTotalHours, staffTotalPay,
   weekBlocksOfPayPeriod, calPeriodLabel, boardStaff, countReviews,
@@ -340,18 +340,25 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     // Redividir é uma decisão explícita da gerência: solta também as horas fixadas desta visita.
     setHorasData((prev) => recomputeSharedHours(unpinVisit(prev, visitDateOf(entry), entry.clientId), clients, visitDateOf(entry), entry.clientId, { ctx }));
   }
-  function startEditRow(i, entry) { setEditingIndex(i); setRowDraft({ clientId: entry.clientId || "", hours: entry.hours }); }
+  // Linha com cliente escrito à mão: já vem escolhido o cliente da lista com o mesmo
+  // nome (ou o mais parecido), para a gerência só confirmar.
+  function startEditRow(i, entry) {
+    const best = !entry.clientId && entry.custom && entry.custom.name ? bestClientMatch(entry.custom.name, clients) : null;
+    setEditingIndex(i);
+    setRowDraft({ clientId: entry.clientId || (best ? best.id : ""), hours: entry.hours });
+  }
   function cancelEditRow() { setEditingIndex(null); }
   // Ao confirmar o cliente de uma linha "fora da lista" (ou trocar o cliente),
   // cruza com quem fez o mesmo cliente nesse dia e divide as horas — só se
   // houver mais alguém; sozinho, ficam as horas escritas. Só corrigir as horas
   // de uma linha que já tinha cliente NÃO redivide (o valor da gerência fica).
-  function saveEditRow(staffId, i) {
+  function saveEditRow(staffId, i, draftOverride) {
+    const draft = draftOverride || rowDraft;
     setHorasData((prev) => {
       const h = prev[staffId];
       const old = h && h.entries[i];
       if (!old) return prev;
-      const newClientId = rowDraft.clientId || old.clientId;
+      const newClientId = draft.clientId || old.clientId;
       const clientChanged = !!newClientId && newClientId !== old.clientId;
       let next = {
         ...prev,
@@ -361,12 +368,12 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
             if (idx !== i) return e;
             const { splitAdjusted, splitHours, shareReview, sharedCount, teamConfirmed, outside, outsideHours, conflict, solo, soloCheck, ...base } = e;
             const kept = clientChanged ? base : e;
-            const newHours = Number(rowDraft.hours) || 0;
+            const newHours = Number(draft.hours) || 0;
             // Horas corrigidas à mão pela gerência ficam FIXAS: nenhum cálculo automático
             // (colegas a marcar, mudança no cliente, revisões) as volta a mudar.
             const hoursEdited = Math.abs(newHours - (e.hours || 0)) > 1e-9;
             const pin = hoursEdited ? { manualBase: Math.max(0, newHours - (e.extraMinutes || 0) / 60) } : {};
-            return { ...kept, ...pin, clientId: newClientId, custom: rowDraft.clientId ? undefined : e.custom, hours: newHours, approved: e.extra ? false : e.approved };
+            return { ...kept, ...pin, clientId: newClientId, custom: draft.clientId ? undefined : e.custom, hours: newHours, approved: e.extra ? false : e.approved };
           }),
         },
       };
@@ -727,6 +734,21 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                           >
                             {isEditing ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                {pendingClient && (() => {
+                                  const best = bestClientMatch(e.custom.name, clients);
+                                  const near = nameCandidates(e.custom.name, clients).map((id) => clientById(clients, id)).filter(Boolean);
+                                  return (
+                                    <div style={{ flexBasis: "100%", fontSize: 12.5, color: COLORS.ink2, lineHeight: 1.5 }}>
+                                      <div style={{ color: COLORS.ink, fontWeight: 600 }}>{t.pendingWrote(e.custom.city ? `${e.custom.name}, ${e.custom.city}` : e.custom.name)}</div>
+                                      <div>{best ? (best.exact ? t.pendingSame : t.pendingSuggested) : t.pendingNoMatch}</div>
+                                      {near.length > 1 && (
+                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                                          {near.map((c) => <Button key={c.id} variant={String(rowDraft.clientId) === String(c.id) ? "primary" : "secondary"} onClick={() => setRowDraft((dft) => ({ ...dft, clientId: c.id }))}>{c.name}</Button>)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                                 <select value={rowDraft.clientId || ""} onChange={(ev) => setRowDraft((dft) => ({ ...dft, clientId: Number(ev.target.value) }))} style={{ flex: 1, minWidth: 140, height: 36, borderRadius: RADIUS.control, border: `1px solid ${COLORS.lineInput}`, padding: "0 8px", fontFamily: "inherit" }}>
                                   <option value="" disabled>{t.clientPickPlaceholder}</option>
                                   {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -762,6 +784,11 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
                                         );
                                       })()}
                                       {pendingClient && <Pill variant="pending">{t.clientPendingTag}</Pill>}
+                                      {pendingClient && !locked && (() => {
+                                        const best = bestClientMatch(e.custom.name, clients);
+                                        const bc = best && clientById(clients, best.id);
+                                        return bc ? <Button variant="secondary" onClick={() => saveEditRow(openStaff.id, i, { clientId: bc.id, hours: e.hours })}>{t.pendingConfirmAs(bc.name)}</Button> : null;
+                                      })()}
                                       {e.conflict && <Pill variant="pending">{t.conflictTag}</Pill>}
                                       {!e.voided && ((e.extra && !e.approved) || pendingClient || e.shareReview || e.conflict) && (
                                         <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>

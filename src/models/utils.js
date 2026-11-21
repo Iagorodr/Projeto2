@@ -555,6 +555,90 @@ function nameCandidates(name, clients, limit = 3) {
   }).filter((x) => x.score >= 0.5).sort((a, b) => b.score - a.score).slice(0, limit).map((x) => x.id);
 }
 
+// Melhor cliente da lista para um nome escrito à mão: igualdade exata (sem acentos
+// nem maiúsculas) ou, se não houver, o mais parecido. { id, exact } ou null.
+function bestClientMatch(name, clients) {
+  const n = normName(name);
+  if (!n) return null;
+  const exact = (clients || []).find((c) => normName(c.name) === n);
+  if (exact) return { id: exact.id, exact: true };
+  const near = nameCandidates(name, clients, 1);
+  return near.length ? { id: near[0], exact: false } : null;
+}
+
+// DIVISÃO POR ACERTAR: visita partilhada (2+ pessoas) em que a soma do que cada um
+// registou não bate com o total do cliente nesse dia (ex.: cliente de 4h, um registou
+// 1h e o outro 2h). Fica de fora: cliente "individual", conflitos "trabalhei sozinho",
+// visitas extra, e a falta de alguém da agenda que ainda não marcou (isso é "horas
+// soltas"). Proposta: quem tem as horas FIXAS mantém-nas e os outros repartem o resto.
+// "Está certo" (`splitOk` = soma em minutos) esconde o ponto enquanto a soma for a mesma.
+function splitMismatches(horasData, clients, period, ctx) {
+  const out = [];
+  entryPairs(horasData, period).forEach(({ date, clientId }) => {
+    const client = clientById(clients, clientId);
+    if (!client || client.hoursMode === "individual") return;
+    const marks = markersOf(horasData, date, clientId);
+    if (marks.length < 2) return;
+    if (marks.some((m) => m.entry.solo || m.entry.conflict || m.entry.extra || m.entry.outside)) return;
+    const baseOf = (e) => (e.hours || 0) - (e.extraMinutes || 0) / 60;
+    const total = clientDurationOn(client, date) / 60;
+    const sum = marks.reduce((a, m) => a + baseOf(m.entry), 0);
+    const sumMin = Math.round(sum * 60);
+    const diffMin = sumMin - Math.round(total * 60);
+    if (diffMin === 0) return;
+    if (marks.every((m) => m.entry.splitOk === sumMin)) return;
+    if (diffMin < 0 && ctx) {
+      const have = new Set(marks.map((m) => String(m.staffId)));
+      const missing = expectedTeamIds(ctx, client, date).filter((id) => !have.has(String(id)));
+      if (missing.length > 0 && !marks.every((m) => m.entry.teamConfirmed)) return; // "horas soltas" trata disto
+    }
+    const pinned = marks.filter((m) => typeof m.entry.manualBase === "number");
+    const free = marks.filter((m) => typeof m.entry.manualBase !== "number");
+    let proposal = null;
+    if (free.length > 0) {
+      const rest = total - pinned.reduce((a, m) => a + baseOf(m.entry), 0);
+      if (rest >= 0) {
+        const each = Math.round((rest / free.length) * 60) / 60;
+        const rows = free.map((m) => ({ staffId: m.staffId, hours: each, from: baseOf(m.entry) }));
+        if (rows.some((r) => Math.abs(r.hours - r.from) > 1e-6)) proposal = rows;
+      }
+    }
+    out.push({
+      date, clientId, total, sum, diff: diffMin / 60, proposal,
+      marks: marks.map((m) => ({ staffId: m.staffId, workDate: m.entry.date, hours: baseOf(m.entry), pinned: typeof m.entry.manualBase === "number" })),
+    });
+  });
+  return out;
+}
+// Aplica a proposta: as horas de quem a recebe ficam FIXAS (decisão da gerência).
+function applySplit(horasData, issue) {
+  if (!issue || !issue.proposal || issue.paid) return horasData;
+  let out = horasData;
+  issue.proposal.forEach((r) => {
+    const h = out[r.staffId];
+    if (!h || h.paid) return;
+    out = { ...out, [r.staffId]: { ...h, entries: h.entries.map((e) => {
+      if (e.voided || e.clientId !== issue.clientId || visitDateOf(e) !== issue.date) return e;
+      // eslint-disable-next-line no-unused-vars
+      const { splitOk, shareReview, ...rest } = e;
+      return { ...rest, manualBase: r.hours, hours: r.hours + (e.extraMinutes || 0) / 60 };
+    }) } };
+  });
+  return out;
+}
+// "Está certo": deixa como está (e não volta a avisar enquanto a soma for a mesma).
+function ackSplit(horasData, issue) {
+  if (!issue) return horasData;
+  const sumMin = Math.round(issue.sum * 60);
+  let out = horasData;
+  issue.marks.forEach((m) => {
+    const h = out[m.staffId];
+    if (!h) return;
+    out = { ...out, [m.staffId]: { ...h, entries: h.entries.map((e) => (!e.voided && e.clientId === issue.clientId && visitDateOf(e) === issue.date ? { ...e, splitOk: sumMin } : e)) } };
+  });
+  return out;
+}
+
 // Conferência completa do período. Devolve
 //   { issues, clients, totals, byKind }
 //   issues  — problemas abertos (ordenados por cliente e data)
@@ -628,6 +712,9 @@ function reconcileVisits(horasData, clients, period, ctx, today) {
         marks: [{ staffId: sid, workDate: e.date, hours: e.hours || 0 }],
       });
     });
+  });
+  splitMismatches(horasData, clients, period, ctx).forEach((x) => {
+    issues.push({ kind: "split", key: `split|${x.date}|${x.clientId}`, clientId: x.clientId, date: x.date, weekStart: isoDateStr(startOfISOWeek(dateFromIso(x.date))), marks: x.marks, total: x.total, sum: x.sum, diff: x.diff, proposal: x.proposal });
   });
   // Horas diferentes da duração ATUAL do cliente (o antigo "Recalcular horas"), por
   // lançamento. Fora ficam os lançamentos que esperam por um "juntar" (as horas
@@ -714,7 +801,7 @@ function countReviews(horasData, clients, period, ctx, today) {
   const total = r.issues.length;
   return {
     conflicts: k.conflict || 0, hours: k.hours || 0, leftovers: k.leftover || 0, joins: k.join || 0, extras: k.extra || 0, missing: k.missing || 0, pending: k.pending || 0,
-    repass: k.repass || 0,
+    repass: k.repass || 0, splits: k.split || 0,
     total, attention: total - (k.pending || 0) - (k.repass || 0),
   };
 }
@@ -2250,5 +2337,5 @@ function emailInUse(staffList, companyEmail, email, excludeId) {
 // Papéis com ecrã de supervisor: "supervisor" e "gerencia_supervisor" (este também pode alternar para a vista de gerência).
 const isSupervisorRole = (role) => role === "supervisor" || role === "gerencia_supervisor";
 
-export { dowOfIso, pinTeamChanges, isVisitCover, isHolidayCover, isPostponeCover, isPlanCover, postponeEligible, postponeStaffIds, postponesInPeriod, postponeFor, postponeInbox, derivePostpones, isPostponeAbsence, clientWeekDays, holidayClientsOn, holidayDecisions, pendingHolidayDecisions, visitScheduledOn, entryRate, snapshotClientRate, pinClientHours, unpinHours, unpinVisit, staffWithGaps, EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, absenceApproved, partialAbsenceOn, clientAbsentOn, pendingAbsenceRequests, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
+export { dowOfIso, pinTeamChanges, isVisitCover, isHolidayCover, isPostponeCover, isPlanCover, postponeEligible, postponeStaffIds, postponesInPeriod, postponeFor, postponeInbox, derivePostpones, isPostponeAbsence, clientWeekDays, holidayClientsOn, holidayDecisions, pendingHolidayDecisions, visitScheduledOn, entryRate, snapshotClientRate, pinClientHours, unpinHours, unpinVisit, staffWithGaps, EXPENSE_TYPES, parseMoneyInput, expensesOf, expenseApprovedValue, staffExpensesApproved, staffExpensesPending, pendingExpenseList, staffKnowsClient, outsideLeftover, pendingRepasses, markRepassed, normalizeName, findByName, normalizeEmail, emailInUse, isSupervisorRole, partnerOf, linkPartners, entryClientName, isPendingClientEntry, clientById, dayIsCovered, recomputeSharedHours, planHoursRecalc, isHorasFrozenOn, visitDateOf, joinVisit, expectedTeamIds, expectedShare, planLeftovers, applyLeftovers, listConflicts, resolveConflict, countReviews, reconcileVisits, weeksOfPeriod, inReviewWindow, hoursImpact, applyJoinIssue, acceptExtra, keepSeparate, voidExtra, ackMissing, assignPendingEntry, applySuggestion, applyHoursChanges, confirmHoursOk, suggestSameVisit, linkSameVisit, nameCandidates, bestClientMatch, splitMismatches, applySplit, ackSplit, staffById, isStaffActive, clientDurationOnDow, clientDurationOn, clientPartMinutes, staffStartedOn, closeDeadlineInfo, boardStaff, activeClientsCount, pad2, fmtEuro, compactEuro, fmtHoursNum, fmtHoursScreen, fmtMinutes, parseDMY, dateStrInPeriod, buildClosedPeriodSnapshot, getCutoffPeriod, getOpenPeriod, getNextPeriod, isSolicitationOld, isSolicitationStale, unseenAvisosCount, sentGroupKey, groupSentItems, uniqueSentCount, recipientsText, formatPeriodLabel, startOfISOWeek, addDays, isoDateStr, weekDiff, REFERENCE_WEEK_START, clientAppliesThisWeek, clientAppliesOnDate, knownClientActiveOn, knownClientsOn, parseClientDate, clientValidityRange, clientValidOnDate, clientValidInWeek, weekLabelPT, getWeekChunk, getPayPeriodFor, getWeekChunkFor, nextWeekChunk, prevWeekChunk, buildWeekChunkSequence, weekChunksOfPayPeriod, weekBlocksOfPayPeriod, migrateLockedWeeksToBlocks, calPeriodDays, calPeriodLabel, staffTotalHours, staffTotalPay, getAssignedClientIds, dayScheduledClients, coverActiveOn, agendaClientIdsOn, coveredAwayOn, coveringOn, coverOverlaps, recentClosedPeriodsChronological, shortMonthFromIso, notesForOwner, absenceOn, absenceApproved, partialAbsenceOn, clientAbsentOn, pendingAbsenceRequests, isoDatesBetween, fmtNoteDate, thisWeekSummary, periodMissingDays, staffWithGapsCount, monthAbbr, clientTotalHours, clientTeamStaffIds, agendaHoursSuggestion, parseHoursInput, fmtHM, pctChange, clientExpectedHours
 };
