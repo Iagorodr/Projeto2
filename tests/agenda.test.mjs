@@ -163,5 +163,19 @@ console.log(ok, "ok", bad, "falhas");
   eq("melhor cliente exato", U.bestClientMatch("  sebamáfe ", [cl]), { id: 88, exact: true });
   eq("melhor cliente aproximado", U.bestClientMatch("Sebamafe Lda", [cl, { id: 5, name: "Outro" }]), { id: 88, exact: false });
 }
+// Ajuda fora da agenda (4/11 Sebamafe): Iago ajudou o Jadson, soma certa → só "confirmar", sem correções
+{
+  const cl = { id: 89, name: "Sebamafe", days: [3], duration: 240, hoursMode: "dividida", frequency: "weekly" };
+  const st = [{ id: 1, name: "Iago", status: "ativo", accountType: "fixo" }, { id: 2, name: "Jadson", status: "ativo", accountType: "fixo" }, { id: 3, name: "Talia", status: "ativo", accountType: "fixo" }];
+  const cx = { staff: st, assignments: { "2-3": [89], "3-3": [89] }, covers: [], absences: [] };
+  const pr = { start: new Date(2026, 10, 2), end: new Date(2026, 10, 8) };
+  const hh = { 1: { entries: [{ date: "2026-11-04", clientId: 89, hours: 2, extraMinutes: 0 }] }, 2: { entries: [{ date: "2026-11-04", clientId: 89, hours: 2, extraMinutes: 0 }] }, 3: { entries: [{ date: "2026-11-04", clientId: 89, hours: 0, extraMinutes: 0, voided: true }] } };
+  const kinds = U.reconcileVisits(hh, [cl], pr, cx, "2026-11-21").issues.map((i) => i.kind).sort();
+  eq("ajuda: só 'help'", kinds, ["help"]);
+  const iss = U.reconcileVisits(hh, [cl], pr, cx, "2026-11-21").issues.find((i) => i.kind === "help");
+  eq("ajuda: Iago é o de fora", iss.marks.filter((m) => m.helper).map((m) => m.staffId), ["1"]);
+  const ak = U.ackHelp(hh, iss);
+  eq("ajuda: confirmada some, horas iguais", [U.reconcileVisits(ak, [cl], pr, cx, "2026-11-21").issues.length, ak[1].entries[0].hours, ak[2].entries[0].hours], [0, 2, 2]);
+}
 console.log(ok, "ok", bad, "falhas");
 if (bad > 0) process.exitCode = 1;

@@ -6,7 +6,7 @@ import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { TODAY } from "../../models/data.js";
 import { DAY_ABBR_SUN0_BY_LANG } from "../../models/i18n.js";
 import {
-  acceptExtra, ackMissing, ackSplit, applySplit, bestClientMatch, markRepassed, outsideLeftover, applyHoursChanges, applySuggestion, assignPendingEntry, clientById, confirmHoursOk, fmtEuro, fmtHoursScreen, hoursImpact, isoDateStr,
+  acceptExtra, ackMissing, ackHelp, ackSplit, applySplit, bestClientMatch, markRepassed, outsideLeftover, applyHoursChanges, applySuggestion, assignPendingEntry, clientById, confirmHoursOk, fmtEuro, fmtHoursScreen, hoursImpact, isoDateStr,
   keepSeparate, reconcileVisits, resolveConflict, voidExtra, weekLabelPT,
 } from "../../models/utils.js";
 import { Button, Pill } from "../shared/ui/index.js";
@@ -19,7 +19,7 @@ import { Button, Pill } from "../shared/ui/index.js";
 // `onChange(nextHorasData, toastMsg)` recebe o novo horasData.
 const SUGGESTED = new Set(["join", "extra", "missing", "leftover"]); // têm caixa de seleção
 const PRESELECT = new Set(["join"]); // vêm marcados à partida (provas claras); o resto marca-se à mão
-const TAB_ORDER = ["hours", "split", "join", "extra", "missing", "leftover", "conflict", "pending", "repass"]; // separadores (+ "clients")
+const TAB_ORDER = ["hours", "split", "join", "extra", "missing", "leftover", "conflict", "pending", "repass", "help"]; // separadores (+ "clients")
 
 function isoToDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
 
@@ -133,7 +133,7 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
   const pct = rec.totals.expected > 0 ? Math.round((rec.totals.checked / rec.totals.expected) * 100) : 0;
 
   const kindPill = (i) => {
-    const map = { join: ["pending", t.reviewKindJoin], extra: ["neutral", t.reviewKindExtra], missing: ["missing", t.reviewKindMissing], leftover: ["pending", t.reviewKindLeftover], conflict: ["missing", t.reviewKindConflict], pending: ["reopened", t.reviewKindPending], repass: ["reopened", t.reviewKindRepass], hours: ["pending", t.reviewKindHours], split: ["pending", t.reviewKindSplit] };
+    const map = { join: ["pending", t.reviewKindJoin], extra: ["neutral", t.reviewKindExtra], missing: ["missing", t.reviewKindMissing], leftover: ["pending", t.reviewKindLeftover], conflict: ["missing", t.reviewKindConflict], pending: ["reopened", t.reviewKindPending], repass: ["reopened", t.reviewKindRepass], hours: ["pending", t.reviewKindHours], split: ["pending", t.reviewKindSplit], help: ["neutral", t.reviewKindHelp] };
     const [variant, label] = map[i.kind];
     return <Pill variant={variant}>{label}</Pill>;
   };
@@ -188,6 +188,20 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
             </div>
           )}
           {i.paid && <div style={{ ...line, marginTop: 4 }}>{t.reviewPaidNote}</div>}
+        </div>
+      );
+    }
+    if (i.kind === "help") {
+      const helpers = i.marks.filter((m) => m.helper).map((m) => firstOf(m.staffId));
+      return (
+        <div key={i.key} style={card} data-testid="review-issue" data-kind="help">
+          {head}
+          <div style={{ fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{dayLabel(i.date)}</div>
+          <div style={{ ...line, fontVariantNumeric: "tabular-nums" }}>{i.marks.map((m) => `${firstOf(m.staffId)}${m.helper ? ` (${t.reviewHelpOutside})` : ""} ${fmtHoursScreen(m.hours)}`).join(" + ")} = {fmtHoursScreen(i.total)}</div>
+          <div style={{ ...line, marginTop: 4 }}>{t.reviewHelpWhy(helpers.join(", "), fmtHoursScreen(i.total))}</div>
+          <div style={{ marginTop: 8 }}>
+            <Button variant="secondary" onClick={() => act(() => ackHelp(horasData, i), t.reviewDoneHelp)} data-testid="review-help-ok">{t.reviewHelpOk}</Button>
+          </div>
         </div>
       );
     }
@@ -425,7 +439,7 @@ export default function HoursReviewDialog({ open, onClose, onChange, horasData, 
           <div role="tablist" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 10, WebkitOverflowScrolling: "touch" }} data-testid="review-tabs">
             {tabs.map((k) => {
               const on = k === curTab;
-              const label = k === "clients" ? t.reviewTabClients : ({ hours: t.reviewKindHours, split: t.reviewKindSplit, join: t.reviewKindJoin, extra: t.reviewKindExtra, missing: t.reviewKindMissing, leftover: t.reviewKindLeftover, conflict: t.reviewKindConflict, pending: t.reviewKindPending, repass: t.reviewKindRepass })[k];
+              const label = k === "clients" ? t.reviewTabClients : ({ hours: t.reviewKindHours, split: t.reviewKindSplit, help: t.reviewKindHelp, join: t.reviewKindJoin, extra: t.reviewKindExtra, missing: t.reviewKindMissing, leftover: t.reviewKindLeftover, conflict: t.reviewKindConflict, pending: t.reviewKindPending, repass: t.reviewKindRepass })[k];
               const n = k === "clients" ? rec.clients.length : counts[k];
               return (
                 <button
