@@ -62,7 +62,7 @@ function ExpensesCard({ lang, staffId, expenses, period, locked, onSave, onDelet
     if (receiptFile) {
       setSaving(true); setSaveError("");
       try {
-        receipt = await uploadFile(receiptFile, { kind: KINDS.receipts, ownerId: staffId, imagesOnly: true });
+        receipt = await uploadFile(receiptFile, { kind: KINDS.receipts, ownerId: staffId, imagesOnly: true, allowPdf: true });
       } catch (err) {
         setSaving(false); setSaveError(tf[uploadErrorKey(err)]);
         return;
@@ -188,6 +188,7 @@ function ExpensesCard({ lang, staffId, expenses, period, locked, onSave, onDelet
             <div style={{ marginTop: 14 }}>
               <div style={label}>{t.fReceipt}</div>
               <PhotoDropzone
+                allowPdf
                 file={receiptFile} onChange={setReceiptFile} label={t.receiptAdd} removeLabel={tf.remove} labels={tf}
                 existing={form.receipt} onClearExisting={() => setForm({ ...form, receipt: null })} disabled={saving}
               />

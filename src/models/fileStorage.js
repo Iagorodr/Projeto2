@@ -64,11 +64,12 @@ export function isImageMime(mime) { return String(mime || "").toLowerCase().star
 export function isImageFile(file) { return isImageMime(fileMime(file)); }
 
 // Valida à entrada. Devolve null se ok, ou um código: "type" | "size".
-// `imagesOnly`: só fotos (avisos, recibos); senão aceita também PDF/Word/Excel.
-export function validateFile(file, { imagesOnly = false } = {}) {
+// `imagesOnly`: só fotos (avisos, recibos); `allowPdf` junta o PDF às fotos (recibos); senão aceita também PDF/Word/Excel.
+export function validateFile(file, { imagesOnly = false, allowPdf = false } = {}) {
   if (!file) return "type";
   const mime = fileMime(file);
   if (isImageMime(mime)) return file.size > MAX_IMAGE_INPUT_BYTES ? "size" : null;
+  if (imagesOnly && allowPdf && mime === "application/pdf") return file.size > MAX_BYTES ? "size" : null;
   if (imagesOnly || !DOC_MIMES.has(mime)) return "type";
   return file.size > MAX_BYTES ? "size" : null;
 }
@@ -137,8 +138,8 @@ export function buildPath(kind, ownerId, file, companyId = currentCompanyId) {
 
 // Envia um ficheiro e devolve a referência para guardar nos dados.
 // Lança Error com `.code` = "size" | "type" | "upload".
-export async function uploadFile(file, { kind, ownerId = null, imagesOnly = false } = {}) {
-  const bad = validateFile(file, { imagesOnly });
+export async function uploadFile(file, { kind, ownerId = null, imagesOnly = false, allowPdf = false } = {}) {
+  const bad = validateFile(file, { imagesOnly, allowPdf });
   if (bad) { const e = new Error(bad); e.code = bad; throw e; }
   const ready = await prepareFile(file);
   if (ready.size > MAX_BYTES) { const e = new Error("size"); e.code = "size"; throw e; }

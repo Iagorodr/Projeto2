@@ -9,17 +9,17 @@
 // pessoa grava. `existing` é uma foto já guardada antes (mostra "Ver" e
 // permite remover com `onClearExisting`).
 import { useEffect, useRef, useState } from "react";
-import { Camera, Image as ImageIcon, X } from "lucide-react";
+import { Camera, FileText, Image as ImageIcon, X } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";
 import { RADIUS } from "../../../styles/tokens.js";
-import { validateFile } from "../../../models/fileStorage.js";
+import { isImageFile, validateFile } from "../../../models/fileStorage.js";
 import { StoredFile } from "./StoredFile.jsx";
 
 function hasCamera() {
   try { return typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(pointer: coarse)").matches; } catch { return false; }
 }
 
-function PhotoDropzone({ file, onChange, label, removeLabel, labels, existing, onClearExisting, disabled }) {
+function PhotoDropzone({ file, onChange, label, removeLabel, labels, existing, onClearExisting, disabled, allowPdf = false }) {
   const [dragOver, setDragOver] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [error, setError] = useState("");
@@ -36,16 +36,19 @@ function PhotoDropzone({ file, onChange, label, removeLabel, labels, existing, o
 
   function pickFile(f) {
     if (!f || disabled) return;
-    const bad = validateFile(f, { imagesOnly: true });
+    const bad = validateFile(f, { imagesOnly: true, allowPdf });
     if (bad) { setError(bad === "size" ? labels?.tooBig || "" : labels?.badType || ""); return; }
     setError("");
     onChange(f);
   }
 
+  const filePdf = !!file && !isImageFile(file);
   if (file && previewUrl) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 10, border: `1px solid ${COLORS.line}`, borderRadius: RADIUS.control, padding: 8 }}>
-        <img src={previewUrl} alt="" style={{ width: 44, height: 44, borderRadius: RADIUS.chip, objectFit: "cover", flexShrink: 0 }} />
+        {filePdf
+          ? <div style={{ width: 44, height: 44, borderRadius: RADIUS.chip, flexShrink: 0, background: COLORS.bg, border: `1px solid ${COLORS.line}`, display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.ink3 }}><FileText size={18} strokeWidth={1.6} /></div>
+          : <img src={previewUrl} alt="" style={{ width: 44, height: 44, borderRadius: RADIUS.chip, objectFit: "cover", flexShrink: 0 }} />}
         <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: COLORS.ink2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</div>
         {!disabled && (
           <button type="button" onClick={() => onChange(null)} aria-label={removeLabel}
@@ -95,7 +98,7 @@ function PhotoDropzone({ file, onChange, label, removeLabel, labels, existing, o
           <ImageIcon size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} />
           <span>{label}</span>
           <input
-            ref={inputRef} type="file" accept="image/*" data-testid="photo-input" style={{ display: "none" }}
+            ref={inputRef} type="file" accept={allowPdf ? "image/*,application/pdf" : "image/*"} data-testid="photo-input" style={{ display: "none" }}
             onChange={(e) => { pickFile(e.target.files?.[0]); e.target.value = ""; }}
           />
         </div>
