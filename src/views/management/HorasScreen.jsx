@@ -257,10 +257,12 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     const picked = staff.filter((s) => joinPick.includes(s.id));
     if (picked.length < 2) return;
     const entries = picked.flatMap((s) => ((horasData[s.id] || {}).entries || []).filter((e) => dateStrInPeriod(e.date, period)));
+    // Despesas (reembolsos) de quem foi escolhido: as aprovadas somam ao total, as por aprovar aparecem marcadas.
+    const expenses = picked.flatMap((s) => expensesOf(horasData[s.id] || {}, period).filter((x) => x.status !== "rejected").map((x) => ({ ...x, staffName: s.name })));
     exportJointHorasPdf({
       companyName: company?.name, companyInfo: company,
       staffNames: picked.map((s) => s.name),
-      periodLabel, entries, clients, pdfT,
+      periodLabel, entries, clients, expenses, pdfT,
     });
     setJoinOpen(false);
   }
@@ -413,6 +415,7 @@ function HorasScreen({ lang, setLang, company, clients, staff, horasData, setHor
     const ok = Math.abs(diff) < 0.01;
     return {
       line: t.sharedTotalLine(fmtHoursScreen(total), fmtHoursScreen(sum)),
+      rows: [{ label: t.sharedTotalLabel, value: fmtHoursScreen(total) }, { label: t.sharedSumLabel, value: fmtHoursScreen(sum) }],
       verdict: ok ? t.sharedTotalOk : diff < 0 ? t.sharedTotalLess(fmtHoursScreen(-diff)) : t.sharedTotalMore(fmtHoursScreen(diff)),
       ok,
     };

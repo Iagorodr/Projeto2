@@ -13,7 +13,8 @@
 // alcança o botão, foco abre o balão, Esc fecha); `aria-label` (passado
 // por quem usa, já traduzido) e o balão ligado ao botão por
 // `aria-describedby`, como pede o documento.
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Info } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";
 import { RADIUS } from "../../../styles/tokens.js";
@@ -24,6 +25,22 @@ function InfoTip({ text, label = "Mais informações", style, balloonStyle }) {
   const { minTap } = useControlSize();
   const balloonId = useId();
   const rootRef = useRef(null);
+  const btnRef = useRef(null);
+  const balloonRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  // O balão é desenhado por cima de tudo (fixo, no body) e fica sempre dentro do ecrã:
+  // numa gaveta ou perto da borda direita não é cortado.
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    const w = balloonRef.current ? balloonRef.current.offsetWidth : 260;
+    const h = balloonRef.current ? balloonRef.current.offsetHeight : 80;
+    const below = window.innerHeight - r.bottom;
+    const top = below >= h + 12 ? r.bottom + 2 : Math.max(8, r.top - h - 2);
+    const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8));
+    setPos({ top, left });
+  }, [open, text]);
 
   useEffect(() => {
     if (!open) return;
@@ -31,11 +48,14 @@ function InfoTip({ text, label = "Mais informações", style, balloonStyle }) {
       if (e.key === "Escape") setOpen(false);
     }
     function onPointerDown(e) {
-      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(e.target) && !(balloonRef.current && balloonRef.current.contains(e.target))) setOpen(false);
     }
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("pointerdown", onPointerDown);
+    const onScroll = () => setOpen(false);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
+      window.removeEventListener("scroll", onScroll, true);
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("pointerdown", onPointerDown);
     };
@@ -52,6 +72,7 @@ function InfoTip({ text, label = "Mais informações", style, balloonStyle }) {
       style={{ position: "relative", display: "inline-flex", verticalAlign: "middle", ...style }}
     >
       <button
+        ref={btnRef}
         type="button"
         aria-label={label}
         aria-describedby={open ? balloonId : undefined}
@@ -66,21 +87,23 @@ function InfoTip({ text, label = "Mais informações", style, balloonStyle }) {
       >
         <Info size={20} strokeWidth={1.8} />
       </button>
-      {open && (
+      {open && createPortal(
         <div
+          ref={balloonRef}
           id={balloonId}
           role="tooltip"
           style={{
-            position: "absolute", top: "calc(100% + 2px)", left: 0, zIndex: 30,
+            position: "fixed", top: pos.top, left: pos.left, zIndex: 1000,
             background: COLORS.card, color: COLORS.ink, border: `1px solid ${COLORS.line}`,
             borderRadius: RADIUS.control, boxShadow: "0 4px 14px rgba(20,63,53,.15)",
             padding: "10px 12px", fontSize: 12.5, fontWeight: 400, lineHeight: 1.45,
-            maxWidth: 260, width: "max-content",
+            maxWidth: "min(300px, calc(100vw - 16px))", width: "max-content",
             ...balloonStyle,
           }}
         >
           {text}
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   );

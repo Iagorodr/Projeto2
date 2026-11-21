@@ -344,7 +344,7 @@ async function exportStaffHorasPdf({ companyName, companyInfo, staffName, period
 // PDF "unido" (só gerência): soma as horas de vários funcionários por cliente,
 // sem repetir o cliente (Cliente X 2h + 2h -> Cliente X 4h). Útil para duplas
 // que querem ver tudo junto.
-async function exportJointHorasPdf({ companyName, companyInfo, staffNames, periodLabel, entries, clients, pdfT }) {
+async function exportJointHorasPdf({ companyName, companyInfo, staffNames, periodLabel, entries, clients, expenses, pdfT }) {
   const { jsPDF, autoTable } = await loadPdf();
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const names = staffNames.join(" + ");
@@ -386,10 +386,43 @@ async function exportJointHorasPdf({ companyName, companyInfo, staffNames, perio
     doc.text(pdfT.extraPendingLegend, 40, afterTableY + 14);
     afterTableY += 14;
   }
-  buildTotalsBox(doc, afterTableY, [
+  const totals = [
     { label: pdfT.totalHoursLabel, value: `${fmtHoursNum(totalHours)}h` },
     { label: pdfT.totalValueLabel, value: fmtEuro(totalValue) },
-  ]);
+  ];
+  // Despesas: só as aprovadas somam ao total; as ainda por aprovar aparecem com "†".
+  const expenseList = (expenses || []).filter((x) => x.status !== "rejected");
+  if (expenseList.length > 0) {
+    const typeName = (ty) => (ty === "fuel" ? pdfT.expTypeFuel : ty === "product" ? pdfT.expTypeProduct : pdfT.expTypeOther);
+    const hasPendingExp = expenseList.some((x) => x.status !== "approved");
+    const expTotal = expenseList.reduce((s, x) => s + expenseApprovedValue(x), 0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...INK);
+    doc.text(pdfT.expensesTitle, 40, afterTableY + 28);
+    doc.setFont("helvetica", "normal");
+    autoTable(doc, {
+      startY: afterTableY + 36,
+      head: [[pdfT.colDate, pdfT.colExpenseDesc, pdfT.colExpenseStatus, pdfT.colTotal]],
+      body: expenseList.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).map((x) => [
+        shortDate(x.date),
+        [x.staffName ? String(x.staffName).split(" ")[0] : "", typeName(x.type), x.description].filter(Boolean).join(" — "),
+        x.status === "approved" ? pdfT.expApproved : `${pdfT.expPending} †`,
+        x.status === "approved" ? fmtEuro(expenseApprovedValue(x)) : `${fmtEuro(x.amount)} †`,
+      ]),
+      ...tableStyle({ 3: { halign: "right" } }),
+    });
+    afterTableY = doc.lastAutoTable.finalY;
+    if (hasPendingExp) {
+      doc.setFontSize(8.5);
+      doc.setTextColor(...INK2);
+      doc.text(pdfT.expensePendingLegend, 40, afterTableY + 14);
+      afterTableY += 14;
+    }
+    totals.push({ label: pdfT.expenseTotalLabel, value: fmtEuro(expTotal) });
+    totals.push({ label: pdfT.grandTotalLabel, value: fmtEuro(totalValue + expTotal) });
+  }
+  buildTotalsBox(doc, afterTableY, totals);
   drawFooters(doc, `${companyName || ""} · ${pdfT.reportTitleJoint} · ${names}`, pdfT);
   doc.save(`horas-unidas-${staffNames.join("_").replace(/\s+/g, "_")}-${periodLabel.replace(/\s+/g, "_")}.pdf`);
 }

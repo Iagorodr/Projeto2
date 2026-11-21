@@ -3,11 +3,12 @@
 // pequena lista com quem são (e a parte de cada um). Fica em posição fixa
 // calculada a partir do botão, para não ser cortada pelo scroll da gaveta.
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { Users } from "lucide-react";
 import { COLORS } from "../../../styles/colors.js";
 import { RADIUS } from "../../../styles/tokens.js";
 
-const POPOVER_WIDTH = 270;
+const POPOVER_WIDTH = 300;
 
 // people: [{ id, name, hoursLabel }]
 function SharedWithBadge({ people, title, heading, note, summary }) {
@@ -72,31 +73,36 @@ function SharedWithBadge({ people, title, heading, note, summary }) {
         <Users size={13} strokeWidth={2.4} />
         {people.length}
       </button>
-      {open && (
+      {open && createPortal(
         <div
           ref={popRef}
           role="tooltip"
           style={{
             position: "fixed", top: pos.top, left: pos.left, width: POPOVER_WIDTH, zIndex: 1000,
             background: COLORS.card, border: `1.5px solid ${COLORS.iconBorder}`, borderRadius: RADIUS.control,
-            boxShadow: "0 8px 24px rgba(20,63,53,.18)", padding: "10px 12px", boxSizing: "border-box",
+            boxShadow: "0 8px 24px rgba(20,63,53,.18)", padding: "12px 14px", boxSizing: "border-box", maxWidth: "calc(100vw - 16px)",
           }}
         >
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.ink2, marginBottom: 6 }}>{heading}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>{heading}</div>
           {people.map((p) => (
-            <div key={p.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13, color: COLORS.ink, padding: "2px 0" }}>
+            <div key={p.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 14, color: COLORS.ink, padding: "3px 0" }}>
               <span style={{ fontWeight: p.self ? 700 : 500 }}>{p.name}</span>
               <span style={{ color: COLORS.ink2 }}>{p.hoursLabel}</span>
             </div>
           ))}
           {summary && (
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${COLORS.line}`, fontSize: 11.5, lineHeight: 1.4 }}>
-              <div style={{ color: COLORS.ink2 }}>{summary.line}</div>
-              <div style={{ marginTop: 2, fontWeight: 700, color: summary.ok ? COLORS.okInk : COLORS.amberInk }}>{summary.ok ? "✓ " : "⚠ "}{summary.verdict}</div>
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${COLORS.line}`, fontSize: 13.5, lineHeight: 1.45 }}>
+              {summary.rows ? summary.rows.map((r) => (
+                <div key={r.label} style={{ display: "flex", justifyContent: "space-between", gap: 10, color: COLORS.ink2, padding: "2px 0" }}>
+                  <span>{r.label}</span><span style={{ color: COLORS.ink, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{r.value}</span>
+                </div>
+              )) : <div style={{ color: COLORS.ink2 }}>{summary.line}</div>}
+              <div style={{ marginTop: 8, padding: "7px 10px", borderRadius: RADIUS.chip, fontWeight: 700, fontSize: 13, background: summary.ok ? COLORS.okTint : COLORS.amberBg, color: summary.ok ? COLORS.okInk : COLORS.amberInk }}>{summary.ok ? "✓ " : "⚠ "}{summary.verdict}</div>
             </div>
           )}
-          {note && <div style={{ fontSize: 11.5, color: COLORS.ink3, marginTop: 6 }}>{note}</div>}
-        </div>
+          {note && <div style={{ fontSize: 12.5, color: COLORS.ink2, marginTop: 8, lineHeight: 1.45 }}>{note}</div>}
+        </div>,
+        document.body
       )}
     </>
   );
