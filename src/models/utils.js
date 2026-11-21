@@ -580,8 +580,9 @@ function splitMismatches(horasData, clients, period, ctx) {
     const marks = markersOf(horasData, date, clientId);
     if (marks.length < 2) return;
     if (marks.some((m) => m.entry.solo || m.entry.conflict || m.entry.extra || m.entry.outside)) return;
-    const baseOf = (e) => (e.hours || 0) - (e.extraMinutes || 0) / 60;
+    const baseOf = (e) => (e.hours || 0) - Math.max(0, e.extraMinutes || 0) / 60;
     const total = clientDurationOn(client, date) / 60;
+    if (visitTotalMatches(horasData, clients, date, clientId)) return;
     const sum = marks.reduce((a, m) => a + baseOf(m.entry), 0);
     const sumMin = Math.round(sum * 60);
     const diffMin = sumMin - Math.round(total * 60);
@@ -642,14 +643,24 @@ function ackSplit(horasData, issue) {
   return out;
 }
 
-// Visita partilhada (2+ pessoas, cliente "dividida") em que a soma das horas já é o total do cliente.
+// Soma das horas de uma visita: `actual` = o que está registado; `base` = sem o tempo EXTRA a mais
+// (só extra positivo: uma redução da gerência, ex. −120min, conta como horas reais).
+function visitSums(marks) {
+  const actual = marks.reduce((a, m) => a + (m.entry.hours || 0), 0);
+  const base = marks.reduce((a, m) => a + (m.entry.hours || 0) - Math.max(0, m.entry.extraMinutes || 0) / 60, 0);
+  return { actual, base };
+}
+const sameMin = (a, b) => Math.round(a * 60) === Math.round(b * 60);
+
+// Visita (cliente "dividida") em que a soma das horas já é o total do cliente.
 function visitTotalMatches(horasData, clients, date, clientId) {
   const client = clientById(clients, clientId);
   if (!client || client.hoursMode === "individual") return false;
   const marks = markersOf(horasData, date, clientId);
-  if (marks.length < 2) return false;
-  const sum = marks.reduce((a, m) => a + (m.entry.hours || 0) - (m.entry.extraMinutes || 0) / 60, 0);
-  return Math.round(sum * 60) === Math.round((clientDurationOn(client, date) / 60) * 60);
+  if (marks.length < 1) return false;
+  const total = clientDurationOn(client, date) / 60;
+  const { actual, base } = visitSums(marks);
+  return sameMin(actual, total) || sameMin(base, total);
 }
 
 // AJUDA FORA DA AGENDA: alguém que não tem este cliente na agenda foi ajudar numa visita
@@ -669,10 +680,9 @@ function helpVisits(horasData, clients, period, ctx) {
     if (expected.length === 0) return;
     const helpers = marks.filter((m) => !expected.includes(String(m.staffId)) && !staffKnowsClient(ctx.staff, m.staffId, clientId, date));
     if (helpers.length === 0) return;
-    const baseOf = (e) => (e.hours || 0) - (e.extraMinutes || 0) / 60;
+    const baseOf = (e) => (e.hours || 0) - Math.max(0, e.extraMinutes || 0) / 60;
     const total = clientDurationOn(client, date) / 60;
-    const sum = marks.reduce((a, m) => a + baseOf(m.entry), 0);
-    if (Math.round(sum * 60) !== Math.round(total * 60)) return;
+    if (!visitTotalMatches(horasData, clients, date, clientId)) return;
     out.push({ date, clientId, total, marks: marks.map((m) => ({ staffId: m.staffId, workDate: m.entry.date, hours: baseOf(m.entry), helper: helpers.includes(m) })) });
   });
   return out;

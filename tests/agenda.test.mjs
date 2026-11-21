@@ -189,5 +189,17 @@ console.log(ok, "ok", bad, "falhas");
   const ok3 = { 1: hh[1], 2: { entries: [{ date: "2026-11-20", clientId: 90, hours: 3, extraMinutes: 0 }] } };
   eq("desigual certo (1+3) sem aviso", U.reconcileVisits(ok3, [cl], pr, cx, "2026-11-21").issues.filter((i) => i.kind === "split").length, 0);
 }
+// Casos reais Sebamafe: 4/11 (Jadson 4h base − 120min = 2h, Iago 2h) e 30/10 (Jadson 2h + 120min extra = 4h sozinho): sem avisos
+{
+  const cl = { id: 91, name: "Seba", days: [3, 5], duration: 240, hoursMode: "dividida", frequency: "weekly" };
+  const st = [{ id: 1, name: "Iago", status: "ativo", accountType: "fixo" }, { id: 2, name: "Jadson", status: "ativo", accountType: "fixo" }];
+  const cx = { staff: st, assignments: { "2-3": [91], "2-5": [91] }, covers: [], absences: [] };
+  const pr = { start: new Date(2026, 9, 26), end: new Date(2026, 10, 8) };
+  const hh = { 1: { entries: [{ date: "2026-11-04", clientId: 91, hours: 2, extraMinutes: 0, manualBase: 2 }] }, 2: { entries: [
+    { date: "2026-11-04", clientId: 91, hours: 2, extraMinutes: -120, manualBase: 4 },
+    { date: "2026-10-30", clientId: 91, hours: 4, extraMinutes: 120, extra: true, approved: true } ] } };
+  const kinds = U.reconcileVisits(hh, [cl], pr, cx, "2026-11-21").issues.map((i) => i.kind).filter((k) => ["hours", "split", "leftover", "help", "extra"].includes(k));
+  eq("Sebamafe 4/11 só pede confirmar a ajuda; 30/10 sem aviso", kinds, ["help"]);
+}
 console.log(ok, "ok", bad, "falhas");
 if (bad > 0) process.exitCode = 1;
