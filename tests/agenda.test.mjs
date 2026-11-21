@@ -177,5 +177,17 @@ console.log(ok, "ok", bad, "falhas");
   const ak = U.ackHelp(hh, iss);
   eq("ajuda: confirmada some, horas iguais", [U.reconcileVisits(ak, [cl], pr, cx, "2026-11-21").issues.length, ak[1].entries[0].hours, ak[2].entries[0].hours], [0, 2, 2]);
 }
+// Divisão desigual escolhida pelo funcionário (1h) e o outro marcou "de qualquer jeito" (2h) → propõe 1h + 3h
+{
+  const cl = { id: 90, name: "Desigual", days: [5], duration: 240, hoursMode: "dividida", frequency: "weekly" };
+  const st = [{ id: 1, name: "A", status: "ativo", accountType: "fixo" }, { id: 2, name: "B", status: "ativo", accountType: "fixo" }];
+  const cx = { staff: st, assignments: { "1-5": [90], "2-5": [90] }, covers: [], absences: [] };
+  const pr = { start: new Date(2026, 10, 16), end: new Date(2026, 10, 22) };
+  const hh = { 1: { entries: [{ date: "2026-11-20", clientId: 90, hours: 1, extraMinutes: 0, splitAdjusted: true, splitHours: 1 }] }, 2: { entries: [{ date: "2026-11-20", clientId: 90, hours: 2, extraMinutes: 0 }] } };
+  const sp = U.reconcileVisits(hh, [cl], pr, cx, "2026-11-21").issues.find((i) => i.kind === "split");
+  eq("desigual: propõe 1+3", sp && sp.proposal.map((x) => [x.staffId, x.hours]), [["2", 3]]);
+  const ok3 = { 1: hh[1], 2: { entries: [{ date: "2026-11-20", clientId: 90, hours: 3, extraMinutes: 0 }] } };
+  eq("desigual certo (1+3) sem aviso", U.reconcileVisits(ok3, [cl], pr, cx, "2026-11-21").issues.filter((i) => i.kind === "split").length, 0);
+}
 console.log(ok, "ok", bad, "falhas");
 if (bad > 0) process.exitCode = 1;

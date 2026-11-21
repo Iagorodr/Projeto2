@@ -592,11 +592,14 @@ function splitMismatches(horasData, clients, period, ctx) {
       const missing = expectedTeamIds(ctx, client, date).filter((id) => !have.has(String(id)));
       if (missing.length > 0 && !marks.every((m) => m.entry.teamConfirmed)) return; // "horas soltas" trata disto
     }
-    const pinned = marks.filter((m) => typeof m.entry.manualBase === "number");
-    const free = marks.filter((m) => typeof m.entry.manualBase !== "number");
+    // "Fixa" = a parte que alguém escolheu de propósito: horas fixadas pela gerência ou parte ajustada pelo próprio funcionário.
+    const isFixed = (e) => typeof e.manualBase === "number" || (e.splitAdjusted && typeof e.splitHours === "number");
+    const fixedBase = (e) => (typeof e.manualBase === "number" ? e.manualBase : e.splitHours);
+    const pinned = marks.filter((m) => isFixed(m.entry));
+    const free = marks.filter((m) => !isFixed(m.entry));
     let proposal = null;
     if (free.length > 0) {
-      const rest = total - pinned.reduce((a, m) => a + baseOf(m.entry), 0);
+      const rest = total - pinned.reduce((a, m) => a + fixedBase(m.entry), 0);
       if (rest >= 0) {
         const each = Math.round((rest / free.length) * 60) / 60;
         const rows = free.map((m) => ({ staffId: m.staffId, hours: each, from: baseOf(m.entry) }));
@@ -605,7 +608,7 @@ function splitMismatches(horasData, clients, period, ctx) {
     }
     out.push({
       date, clientId, total, sum, diff: diffMin / 60, proposal,
-      marks: marks.map((m) => ({ staffId: m.staffId, workDate: m.entry.date, hours: baseOf(m.entry), pinned: typeof m.entry.manualBase === "number" })),
+      marks: marks.map((m) => ({ staffId: m.staffId, workDate: m.entry.date, hours: baseOf(m.entry), pinned: isFixed(m.entry) })),
     });
   });
   return out;
